@@ -17,3 +17,8 @@ EXECUTE-READY: no — fix UUID byte order, Cargo.lock/artifact gaps, and PRIDE A
 
 ## Round 2 (revised plans)
 CRIT-1, MAJOR-1..6, MINOR-1..4 all RESOLVED · NEW: none · **EXECUTE-READY: yes**
+
+## End-of-Phase Review
+- Round 1 (read-only sandbox): FAIL — MAJOR-1 was a sandbox artifact (Codex couldn't write target/ to run cargo); MAJOR-2 real: Cargo.toml rust-version stale at 1.85. All substantive items (minimal vendored patch, single mzdata/arrow, pins, imzml active, integrity, .ibd untracked) independently CONFIRMED correct.
+- Fix: Cargo.toml rust-version → 1.87 (true MSRV; toolchain pins 1.96 via rust-toolchain.toml). Build re-confirmed green locally.
+- Round 2 (writable sandbox): **PHASE0-VERDICT: PASS** — cargo build green, verify_ibd exits 0 (UUID RFC-4122 + SHA-1), single mzdata(0.63.3 vendored)+arrow(57.0.0), imzml active, rust-version 1.87, vendored diff minimal, .ibd untracked. No remaining CRITICAL/MAJOR.
