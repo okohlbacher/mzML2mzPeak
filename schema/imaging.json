@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "mzPeak imaging discovery metadata",
+  "description": "Governs mzpeak_index.json.metadata.imaging. The per-pixel coordinate columns (IMS:1000050/51/52) and ms_run.parameters remain the authoritative source for spatial/geometry data; this block is discovery-only and MAY be incomplete at write time (D-03 relaxes spec v0.3 §8 'required pixel_count' — real-world imzML frequently omits grid counts). Only is_imaging and coordinate_base are guaranteed.",
+  "type": "object",
+  "required": ["is_imaging", "coordinate_base"],
+  "properties": {
+    "is_imaging": { "type": "boolean" },
+    "pixel_count": {
+      "type": "object",
+      "description": "OPTIONAL — relaxes spec v0.3 §8 'required'. Absent when the imzML omits grid counts (IMS:1000042/43); the Phase 5 verifier MAY derive it from max observed coordinates. The coordinate columns remain authoritative regardless.",
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "integer" },
+        "y": { "type": "integer" }
+      }
+    },
+    "pixel_size_um": {
+      "type": "object",
+      "description": "OPTIONAL physical pixel size in µm (IMS:1000046/47).",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "max_dimension_um": {
+      "type": "object",
+      "description": "OPTIONAL max image dimension in µm (IMS:1000044/45).",
+      "properties": {
+        "x": { "type": "integer" },
+        "y": { "type": "integer" }
+      }
+    },
+    "scan_pattern": { "type": "string", "description": "IMS CURIE, e.g. IMS:1000413 flyback" },
+    "scan_type": { "type": "string", "description": "IMS CURIE, e.g. IMS:1000480 horizontal line scan" },
+    "line_scan_direction": { "type": "string", "description": "IMS CURIE, e.g. IMS:1000491 linescan left-right" },
+    "linescan_sequence": { "type": "string", "description": "IMS CURIE, e.g. IMS:1000401 top-down" },
+    "coordinate_base": {
+      "type": "integer",
+      "const": 1,
+      "description": "Fixed at 1 in v1 — top-left origin, 1-based, no axis flip (spec v0.3 §5.1)."
+    }
+  },
+  "additionalProperties": false
+}
