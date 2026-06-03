@@ -115,13 +115,26 @@ pub struct VerificationReport {
     pub ion_image: IonImageResult,
     /// The first [`MAX_REPORTED_MISMATCHES`] mismatches (bounded; T-05-01 / Security V5).
     pub mismatches: Vec<Mismatch>,
-    /// The TOTAL number of mismatches observed, even when more than the Vec retains.
+    /// The TOTAL number of mismatching `(pixel, axis)` PAIRS observed, even when that exceeds
+    /// what the bounded `mismatches` Vec retains.
+    ///
+    /// This is a `(pixel, axis)`-granularity count, NOT an element-granularity one (WR-01): the
+    /// per-axis comparator (`first_mismatch_*`) reports only the FIRST differing element per
+    /// pixel-axis, so a pixel with 500 corrupted m/z values contributes exactly `1` here (matching
+    /// the per-pixel-per-axis semantics of [`AxisResult::mismatch_count`]). It is therefore a
+    /// faithful count of mismatching pixel-axes, not of mismatching array elements — use the
+    /// `mismatches` records (coord + element + values) for the per-element blast radius.
     pub total_mismatches: usize,
 }
 
 impl VerificationReport {
-    /// Record a mismatch: always increment the running total, but only push onto the
+    /// Record one mismatching `(pixel, axis)` pair: always increment the running
+    /// [`total_mismatches`](VerificationReport::total_mismatches) count, but only push onto the
     /// bounded `mismatches` Vec while it is below [`MAX_REPORTED_MISMATCHES`] (T-05-01).
+    ///
+    /// Granularity (WR-01): the caller invokes this once per mismatching pixel-axis (the
+    /// comparator surfaces only the first differing element), so `total_mismatches` counts
+    /// mismatching pixel-axes — NOT individual mismatching array elements.
     pub fn record_mismatch(&mut self, mismatch: Mismatch) {
         self.total_mismatches += 1;
         if self.mismatches.len() < MAX_REPORTED_MISMATCHES {
