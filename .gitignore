@@ -1,0 +1,6 @@
+# Rust build artifacts
+/target
+
+# Large binary sidecar fetched in plan 00-02 — must never be committed.
+# (The small .imzML header in data/ IS tracked and is intentionally not ignored.)
+data/*.ibd
