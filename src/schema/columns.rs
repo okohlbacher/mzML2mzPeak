@@ -22,3 +22,51 @@ pub struct ImagingColumnSpec {
 pub fn imaging_scan_fields() -> Vec<ImagingColumnSpec> {
     Vec::new()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mzdata::curie;
+    use mzpeak_prototyping::writer::{
+        CustomBuilderFromParameter, inflect_cv_term_to_column_name,
+    };
+
+    #[test]
+    fn declares_int64_xyz() {
+        let fields = imaging_scan_fields();
+        assert_eq!(fields.len(), 3, "x, y, z coordinate specs");
+        assert!(fields[0].required, "position x is required");
+        assert!(fields[1].required, "position y is required");
+        assert!(!fields[2].required, "position z is optional (§4.1)");
+        for spec in &fields {
+            assert_eq!(
+                spec.dtype,
+                DataType::Int64,
+                "coordinate dtype MUST be Int64 (from_spec panics otherwise)"
+            );
+        }
+    }
+
+    #[test]
+    fn names_match_reference() {
+        let fields = imaging_scan_fields();
+        let expected = [
+            "IMS_1000050_position_x",
+            "IMS_1000051_position_y",
+            "IMS_1000052_position_z",
+        ];
+        for (spec, want) in fields.iter().zip(expected) {
+            let got = inflect_cv_term_to_column_name(spec.curie, spec.name, None);
+            assert_eq!(got, want, "inflected name must byte-match the reference reader");
+        }
+    }
+
+    #[test]
+    fn binds_int64() {
+        // D-05 compile-binding proof: the descriptor shape feeds from_spec and the
+        // accession round-trips. Full writer wiring stays in Phase 4.
+        let builder =
+            CustomBuilderFromParameter::from_spec(curie!(IMS: 1000050), "position x", DataType::Int64);
+        assert_eq!(builder.accession(), curie!(IMS: 1000050));
+    }
+}
