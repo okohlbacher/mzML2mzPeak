@@ -156,3 +156,71 @@ pub struct RunProvenance {
     /// Which checksum algorithm `ibd_checksum` is (e.g. "SHA-1", "MD5").
     pub ibd_checksum_type: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample(mz: NumArray, intensity: NumArray, ms_level: u8) -> ImagingSpectrum {
+        ImagingSpectrum {
+            x: 1,
+            y: 1,
+            z: None,
+            mz,
+            intensity,
+            representation: Representation::Unknown,
+            ms_level,
+            native_id: "spectrum=1".to_string(),
+        }
+    }
+
+    #[test]
+    fn representation_from_signal_continuity() {
+        assert_eq!(Representation::from(SignalContinuity::Profile), Representation::Profile);
+        assert_eq!(Representation::from(SignalContinuity::Centroid), Representation::Centroid);
+        assert_eq!(Representation::from(SignalContinuity::Unknown), Representation::Unknown);
+    }
+
+    #[test]
+    fn storage_mode_from_ibd_data_mode() {
+        assert_eq!(StorageMode::from(IbdDataMode::Continuous), StorageMode::Continuous);
+        assert_eq!(StorageMode::from(IbdDataMode::Processed), StorageMode::Processed);
+        assert_eq!(StorageMode::from(IbdDataMode::Unknown), StorageMode::Unknown);
+    }
+
+    #[test]
+    fn numarray_preserves_source_dtype() {
+        let f32_arr = NumArray::F32(vec![1.0, 2.0]);
+        let f64_arr = NumArray::F64(vec![1.0, 2.0]);
+        assert_eq!(f32_arr.source_dtype(), BinaryDataArrayType::Float32);
+        assert_eq!(f64_arr.source_dtype(), BinaryDataArrayType::Float64);
+        // Length is variant-independent.
+        assert_eq!(f32_arr.len(), 2);
+        assert_eq!(f64_arr.len(), 2);
+        assert!(!f32_arr.is_empty());
+    }
+
+    #[test]
+    fn numarray_as_f64_is_convenience() {
+        // F32 widens to f64 for convenience...
+        let widened = NumArray::F32(vec![1.5_f32, 2.5_f32]).as_f64();
+        assert_eq!(widened, vec![1.5_f64, 2.5_f64]);
+        // ...and F64 is returned unchanged.
+        let unchanged = NumArray::F64(vec![3.25_f64, 4.75_f64]).as_f64();
+        assert_eq!(unchanged, vec![3.25_f64, 4.75_f64]);
+    }
+
+    #[test]
+    fn ms_level_zero_is_carried() {
+        // The continuous fixture declares MS:1000511 value="0"; 0 must survive verbatim.
+        let s = sample(NumArray::F32(vec![100.0]), NumArray::F32(vec![5.0]), 0);
+        assert_eq!(s.ms_level, 0);
+    }
+
+    #[test]
+    fn imaging_spectrum_carries_axis_dtypes() {
+        let s = sample(NumArray::F64(vec![100.0, 200.0]), NumArray::F32(vec![5.0, 6.0]), 1);
+        assert_eq!(s.mz.source_dtype(), BinaryDataArrayType::Float64);
+        assert_eq!(s.intensity.source_dtype(), BinaryDataArrayType::Float32);
+    }
+}
