@@ -10,7 +10,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Environment & Foundations
 
 - [x] **ENV-01**: Rust toolchain (edition 2024 / ≥1.85) project builds with deps pinned to upstream (`arrow`/`parquet` 57.0.0, `zip` 4.1.0, `mzdata` 0.63.3 with the non-default `imzml` feature enabled, `mzpeak_prototyping` git-pinned to a specific commit)
-- [ ] **ENV-02**: The PXD001283 `.ibd` binary is fetched into `data/` and its UUID/SHA-1 verified against the existing `.imzML`
+- [x] **ENV-02**: The PXD001283 `.ibd` binary is fetched into `data/` and its UUID/SHA-1 verified against the existing `.imzML`
 - [ ] **ENV-03**: A coordinate-exposure spike confirms (against the pinned `mzdata`) that imzML x/y(/z) are reachable as scan-level CV params for the real local file; fallback path documented if not
 
 ### Input — imzML Reading
@@ -98,7 +98,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | ENV-01 | Phase 0 | Complete |
-| ENV-02 | Phase 0 | Pending |
+| ENV-02 | Phase 0 | Complete |
 | ENV-03 | Phase 1 | Pending |
 | IN-01 | Phase 2 | Pending |
 | IN-02 | Phase 2 | Pending |

@@ -13,7 +13,7 @@ imzML2mzPeak is an all-Rust CLI that losslessly converts mass-spectrometry imagi
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 0: Environment & Foundations** - Pinned Rust 2024 toolchain, exact dependency pins, git-pinned writer, and a UUID/SHA-1-verified `.ibd` in `data/`
+- [x] **Phase 0: Environment & Foundations** - Pinned Rust 2024 toolchain, exact dependency pins, git-pinned writer, and a UUID/SHA-1-verified `.ibd` in `data/` (completed 2026-06-03)
 - [ ] **Phase 1: Coordinate-Exposure Spike (blocking gate)** - Confirm pinned `mzdata` + `imzml` feature compiles and surfaces per-pixel x/y for both storage modes before any layer is built
 - [ ] **Phase 2: imzML Read Layer + Integrity Preflight** - Streaming reader yielding per-spectrum coordinates, arrays, and metadata, with a converter-owned hard-fail integrity gate
 - [ ] **Phase 3: Imaging-Schema Layer** - Lock the imaging mzPeak extension (scan-facet coordinate columns, run-level params, provenance, tolerance contract) per spec v0.3
@@ -38,7 +38,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 2 plans
 
   - [x] 00-01-PLAN.md — Pinned edition-2024 build skeleton: exact upstream pins, mzdata `imzml` feature, git-pinned writer, single-copy mzdata/arrow proof (ENV-01)
-  - [ ] 00-02-PLAN.md — Fetch PXD001283 `.ibd` into `data/`; verify embedded UUID + SHA-1 against the `.imzML` via a committed verifier (ENV-02)
+  - [x] 00-02-PLAN.md — Fetch PXD001283 `.ibd` into `data/`; verify embedded UUID + SHA-1 against the `.imzML` via a committed verifier (ENV-02)
 
 ### Phase 1: Coordinate-Exposure Spike (blocking gate)
 
@@ -137,7 +137,7 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 0. Environment & Foundations | 1/2 | In Progress|  |
+| 0. Environment & Foundations | 2/2 | Complete   | 2026-06-03 |
 | 1. Coordinate-Exposure Spike | 0/TBD | Not started | - |
 | 2. imzML Read Layer + Integrity Preflight | 0/TBD | Not started | - |
 | 3. Imaging-Schema Layer | 0/TBD | Not started | - |
