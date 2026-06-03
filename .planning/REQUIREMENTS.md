@@ -18,16 +18,16 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **IN-01**: Read imzML in **processed** mode (per-spectrum m/z arrays) via `mzdata`
 - [ ] **IN-02**: Read imzML in **continuous** mode (shared m/z axis) via `mzdata`
 - [ ] **IN-03**: Auto-detect storage mode from the imzML CV params (do not infer from spectrum type)
-- [ ] **IN-04**: Correctly decode binary arrays from the `.ibd` preserving **source dtype** (32- and 64-bit float, little-endian) for both m/z and intensity — NO dtype widening/narrowing (supports L1 bit-for-bit). NOTE: zlib-compressed `.ibd` arrays are NOT supported by the `mzdata` imzML reader (`NoCompression` only) → uncompressed `.ibd` is in scope; compressed `.ibd` is out of scope for v1.
-- [ ] **IN-05**: Preserve the profile-vs-centroid spectrum-type flag as-is (orthogonal to storage mode)
-- [ ] **IN-06**: Carry MS level and essential per-spectrum metadata through the pipeline
+- [x] **IN-04**: Correctly decode binary arrays from the `.ibd` preserving **source dtype** (32- and 64-bit float, little-endian) for both m/z and intensity — NO dtype widening/narrowing (supports L1 bit-for-bit). NOTE: zlib-compressed `.ibd` arrays are NOT supported by the `mzdata` imzML reader (`NoCompression` only) → uncompressed `.ibd` is in scope; compressed `.ibd` is out of scope for v1.
+- [x] **IN-05**: Preserve the profile-vs-centroid spectrum-type flag as-is (orthogonal to storage mode)
+- [x] **IN-06**: Carry MS level and essential per-spectrum metadata through the pipeline
 - [ ] **IN-07**: Converter-owned integrity preflight — hard-fail on UUID mismatch and `.ibd` SHA-1 mismatch (do not rely on `mzdata`, which only warns)
 - [ ] **IN-08**: Stream spectra rather than loading the whole dataset into memory (must handle ~35k spectra / large `.ibd`)
 
 ### Spatial — Coordinate & Imaging Metadata
 
 - [ ] **SPA-01**: Extract per-spectrum spatial coordinates (x, y, and z if present) for every pixel
-- [ ] **SPA-02**: Preserve correct coordinate semantics for image reconstruction (origin/indexing base, ordering, no axis flip)
+- [x] **SPA-02**: Preserve correct coordinate semantics for image reconstruction (origin/indexing base, ordering, no axis flip)
 - [ ] **SPA-03**: Capture run-level imaging metadata where available (pixel size, scan pattern, image dimensions) — reading from the imzML XML header directly if `mzdata` does not surface it
 - [ ] **SPA-04**: Preserve the imzML UUID as linkage/provenance in the output
 
@@ -103,13 +103,13 @@ Which phases cover which requirements. Populated during roadmap creation.
 | IN-01 | Phase 2 | Pending |
 | IN-02 | Phase 2 | Pending |
 | IN-03 | Phase 2 | Pending |
-| IN-04 | Phase 2 | Pending |
-| IN-05 | Phase 2 | Pending |
-| IN-06 | Phase 2 | Pending |
+| IN-04 | Phase 2 | Complete |
+| IN-05 | Phase 2 | Complete |
+| IN-06 | Phase 2 | Complete |
 | IN-07 | Phase 2 | Pending |
 | IN-08 | Phase 2 | Pending |
 | SPA-01 | Phase 2 | Pending |
-| SPA-02 | Phase 2 | Pending |
+| SPA-02 | Phase 2 | Complete |
 | SPA-03 | Phase 3 | Pending |
 | SPA-04 | Phase 3 | Pending |
 | SCH-01 | Phase 3 | Pending |

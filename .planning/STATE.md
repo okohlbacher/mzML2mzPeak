@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: milestone
-status: verifying
-stopped_at: "Completed 01-01-PLAN.md — coordinate-exposure spike Verdict: GO (ENV-03)"
-last_updated: "2026-06-03T15:17:43.763Z"
+status: executing
+stopped_at: "Completed 02-01-PLAN.md — library skeleton + dtype-preserving record contracts (IN-04/05/06, SPA-02)"
+last_updated: "2026-06-03T16:40:27.045Z"
 last_activity: 2026-06-03
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 3
-  completed_plans: 3
-  percent: 29
+  total_plans: 6
+  completed_plans: 4
+  percent: 67
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-03)
 
 **Core value:** Convert an arbitrary imzML imaging dataset into a valid imaging mzPeak file without losing spatial or spectral information — every pixel's coordinates and its m/z + intensity data survive the roundtrip.
-**Current focus:** Phase 0 — Environment & Foundations
+**Current focus:** Phase 2 — imzML Read Layer + Integrity Preflight
 
 ## Current Position
 
-Phase: 0 (Environment & Foundations) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
+Phase: 2 (imzML Read Layer + Integrity Preflight) — EXECUTING
+Plan: 1 of 3 complete (next: 02-02 integrity preflight)
+Status: Plan 02-01 complete — library skeleton + record contracts landed
 Last activity: 2026-06-03
 
-Progress: [█████░░░░░] 50%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
@@ -55,6 +55,7 @@ Progress: [█████░░░░░] 50%
 | Phase 0 P01 | 12 | 3 tasks | 8 files |
 | Phase 0 P00-02 | 6 | 2 tasks | 1 files |
 | Phase 01 P01 | 18 | 3 tasks | 4 files |
+| Phase 02 P01 | 2 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,8 @@ Recent decisions affecting current work:
 - Process: Adversarial CODEX/CLI review runs at the START and END of every phase (hard requirement).
 - [Phase 01]: Phase 1 spike Verdict GO: mzdata 0.63.3 surfaces complete per-pixel IMS coords + run metadata for both processed (34840px) and continuous (9px) modes — Phase 2 read layer proceeds as architected.
 - [Phase 01]: Continuous imzML needs no special read-side handling: each returned spectrum materializes its full shared m/z axis (repeated external offset=16, per-spectrum load_ibd_arrays read, n_mz=8399=IMS:1000103).
+- [Phase 02]: Read-layer numeric axes are a dtype-preserving NumArray { F32 | F64 } enum carrying the imzML-declared source dtype verbatim — no coercion at the record boundary (IN-04, L1 bit-for-bit); as_f64() is the only (NON-CANONICAL) coercing accessor, no as_f32().
+- [Phase 02]: ImagingSpectrum coords 1-based (x,y,z), NO axis flip (SPA-02); ms_level carried unchanged incl. 0 (IN-06); RunProvenance uuid is a normalized lowercase String, not uuid::Uuid (no new dep).
 
 ### Pending Todos
 
@@ -92,6 +95,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-03T15:17:43.760Z
-Stopped at: Completed 01-01-PLAN.md — coordinate-exposure spike Verdict: GO (ENV-03)
+Last session: 2026-06-03T16:40:27.045Z
+Stopped at: Completed 02-01-PLAN.md — library skeleton + dtype-preserving record contracts (IN-04/05/06, SPA-02)
 Resume file: None
