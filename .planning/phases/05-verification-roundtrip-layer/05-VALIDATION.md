@@ -1,8 +1,8 @@
 ---
 phase: 5
 slug: verification-roundtrip-layer
-status: draft
-nyquist_compliant: false
+status: planned
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-06-03
 ---
@@ -41,10 +41,12 @@ created: 2026-06-03
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 5-xx | TBD | TBD | VER-01 | — | output spectrum count == source count (exact) | unit | `cargo test --lib verify::count` | ❌ W0 | ⬜ pending |
-| 5-xx | TBD | TBD | VER-02 | — | per-pixel x/y(/z) integer-exact match | unit | `cargo test --lib verify::coords` | ❌ W0 | ⬜ pending |
-| 5-xx | TBD | TBD | VER-03 | T-5-dos | m/z + intensity within ToleranceContract; L1 Δ=0 on raw facet, per-axis | integration | `cargo test --test verify_roundtrip` | ❌ W0 | ⬜ pending |
-| 5-xx | TBD | TBD | VER-04 | — | ion image M[row=y][col=x] reconstructs; sparse pixels handled | unit | `cargo test --lib verify::ion_image` | ❌ W0 | ⬜ pending |
+| 05-01-T2 | 05-01 | 1 | VER-03 | T-05-02,T-05-03 | per-axis L1 Δ=0 at source width (no f32→f64 widen); L2 rel-err; tolerance imported not re-encoded | unit | `cargo test --lib verify::compare` | ❌ W0 | ⬜ pending |
+| 05-01-T1 | 05-01 | 1 | VER-03 | T-05-01 | VerificationReport/Mismatch/VerifyError contracts; bounded mismatch list | unit | `cargo test --lib verify::report` | ❌ W0 | ⬜ pending |
+| 05-02-T1 | 05-02 | 2 | VER-04 | T-05-04,T-05-05 | ion image M[row=y][col=x] top-left; sparse no OOB panic; absent=0 + presence mask | unit | `cargo test --lib verify::ion_image` | ❌ W0 | ⬜ pending |
+| 05-02-T2 | 05-02 | 2 | VER-01,VER-02,VER-03,VER-04 | T-05-06,T-05-07,T-05-08 | count gate first; coord-key pairing (dup error); branch on source repr; no unwrap on reads | unit | `cargo test --lib verify::verify` | ❌ W0 | ⬜ pending |
+| 05-03-T1 | 05-03 | 3 | VER-01,VER-02 | — | output count == source count; every pixel pairs by coordinate | integration | `cargo test --test verify_roundtrip count_equality coordinates_match` | ❌ W0 | ⬜ pending |
+| 05-03-T2 | 05-03 | 3 | VER-03,VER-04 | T-05-09,T-05-10 | profile L1 raw-facet bit-for-bit; centroid source-reference; ≥1 L2; ion-image sanity; sparse no panic | integration | `cargo test --test verify_roundtrip values_l1 raw_facet_bit_for_bit centroid_source_reference values_l2 ion_image_sanity sparse_grid_no_panic` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -79,4 +81,4 @@ created: 2026-06-03
 - [ ] Feedback latency < 120s
 - [ ] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** planned 2026-06-03 (3 plans, 3 waves; every VER-01..04 row maps to an automated command; Wave-0 fixtures created by 05-03)
