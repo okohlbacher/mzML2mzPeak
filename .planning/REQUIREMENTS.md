@@ -97,13 +97,44 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (to be filled by roadmapper) | — | Pending |
+| ENV-01 | Phase 0 | Pending |
+| ENV-02 | Phase 0 | Pending |
+| ENV-03 | Phase 1 | Pending |
+| IN-01 | Phase 2 | Pending |
+| IN-02 | Phase 2 | Pending |
+| IN-03 | Phase 2 | Pending |
+| IN-04 | Phase 2 | Pending |
+| IN-05 | Phase 2 | Pending |
+| IN-06 | Phase 2 | Pending |
+| IN-07 | Phase 2 | Pending |
+| IN-08 | Phase 2 | Pending |
+| SPA-01 | Phase 2 | Pending |
+| SPA-02 | Phase 2 | Pending |
+| SPA-03 | Phase 3 | Pending |
+| SPA-04 | Phase 3 | Pending |
+| SCH-01 | Phase 3 | Pending |
+| SCH-02 | Phase 3 | Pending |
+| SCH-03 | Phase 3 | Pending |
+| SCH-04 | Phase 3 | Pending |
+| OUT-01 | Phase 4 | Pending |
+| OUT-02 | Phase 4 | Pending |
+| OUT-03 | Phase 4 | Pending |
+| OUT-04 | Phase 4 | Pending |
+| VER-01 | Phase 5 | Pending |
+| VER-02 | Phase 5 | Pending |
+| VER-03 | Phase 5 | Pending |
+| VER-04 | Phase 5 | Pending |
+| CLI-01 | Phase 6 | Pending |
+| CLI-02 | Phase 6 | Pending |
+| CLI-03 | Phase 6 | Pending |
+| CLI-04 | Phase 6 | Pending |
+| DAT-01 | Phase 6 | Pending |
 
 **Coverage:**
 - v1 requirements: 30 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 30 ⚠️
+- Mapped to phases: 30 ✓
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-06-03*
-*Last updated: 2026-06-03 after initial definition*
+*Last updated: 2026-06-03 after roadmap creation (traceability populated, 30/30 mapped)*
