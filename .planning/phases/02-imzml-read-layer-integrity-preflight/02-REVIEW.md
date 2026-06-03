@@ -37,3 +37,6 @@ _Verified during triage: zlib .ibd unsupported by vendored reader (NoCompression
 
 ## Round 2 (revised plans) — verified after codex exit
 All 13 findings RESOLVED · NEW: none · **EXECUTE-READY: yes**.
+
+## End-of-Phase Review — verified after codex exit
+Codex (writable) ran cargo test: **29 passed, 0 failed, 1 ignored** (34,840 local gate not run). CRITICAL/MAJOR/MINOR: none. Verified with file:line: dtype path avoids mzs()/intensities() coercion; decode errors via fallible read_into (EOF-only termination); preflight-first; storage mode from data_mode only; ms_level 0 carried; bounded-memory Iterator; single mzdata 0.63.3 + arrow 57.0.0; digest deps =-pinned. **PHASE2-VERDICT: PASS**.
