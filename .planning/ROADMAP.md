@@ -69,7 +69,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. The full local file streams one spectrum at a time with bounded memory (no collect-all), and extracted coordinates preserve imzML semantics (1-based, no axis flip).
   5. An adversarial CODEX/CLI review runs at phase start and end with findings logged.
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+  - [ ] 02-01-PLAN.md — Library skeleton + record contracts: ImagingSpectrum/RunProvenance/Representation/StorageMode types, coordinate semantics doc (IN-05, IN-06, SPA-02)
+  - [ ] 02-02-PLAN.md — Converter-owned integrity preflight: Latin-1 header parse + RFC-4122 UUID + whole-file checksum hard-fail on mismatch/missing .ibd (IN-07)
+  - [ ] 02-03-PLAN.md — Streaming ImagingReader: preflight-gated open, data_mode auto-detect, per-pixel coords + decoded arrays, bounded-memory Iterator over both modes (IN-01..04, IN-06, IN-08, SPA-01)
 
 ### Phase 3: Imaging-Schema Layer
 
@@ -141,7 +145,7 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 0. Environment & Foundations | 2/2 | Complete   | 2026-06-03 |
 | 1. Coordinate-Exposure Spike | 1/1 | Complete   | 2026-06-03 |
-| 2. imzML Read Layer + Integrity Preflight | 0/TBD | Not started | - |
+| 2. imzML Read Layer + Integrity Preflight | 0/3 | Planned | - |
 | 3. Imaging-Schema Layer | 0/TBD | Not started | - |
 | 4. mzPeak Write Layer | 0/TBD | Not started | - |
 | 5. Verification / Roundtrip Layer | 0/TBD | Not started | - |
