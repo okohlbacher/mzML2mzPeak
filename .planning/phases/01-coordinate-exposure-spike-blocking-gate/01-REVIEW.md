@@ -32,3 +32,6 @@ EXECUTE-READY: no — scoped continuous proof, real m/z accessor handling, coord
 ## Round 2 (revised plan) — verified after codex exit
 All 12 findings RESOLVED · NEW: none · **EXECUTE-READY: yes**
 (Monitor briefly false-fired on the round-1 verdict echoed from this file's cat; real verdict confirmed in the post-exit final block.)
+
+## End-of-Phase Review (round 1) — verified after codex exit
+**Verdict: FAIL** — GO gate doesn't ENFORCE run-metadata (data_mode/uuid/ibd_checksum/ibd_checksum_type printed but unchecked) or the continuous mz_offset; binary has no feasible continuous-only run path. Conclusion (coords reachable both modes; continuous m/z materialized) independently CONFIRMED by Codex live-run of the continuous fixture. Fix = strengthen the gate + add continuous-only path, then re-run.
