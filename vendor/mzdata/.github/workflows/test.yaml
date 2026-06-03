@@ -1,0 +1,98 @@
+on: [push, pull_request]
+
+env:
+  RUST_BACKTRACE: full
+  RUST_LOG: debug
+  CARGO_PROFILE_TEST_BUILD_OVERRIDE_DEBUG: true
+
+name: Test
+jobs:
+
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    name: Test Suite
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --features nalgebra,parallelism,async,mzsignal,thermo,numpress,bruker_tdf -- --nocapture --show-output
+
+  test-remote:
+    name: PROXI Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Run cargo test
+        continue-on-error: true
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --features async,proxi,proxi-async -- --nocapture --show-output
+
+  test-spectra-subset:
+    name: mzdata-spectra
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run cargo test
+        continue-on-error: true
+        run: |
+          cd crates/mzdata-spectra && cargo build --features mzsignal,nalgebra,serde
+
+  test-async-subset:
+      name: async_partial
+      runs-on: ubuntu-latest
+      steps:
+        - name: Checkout sources
+          uses: actions/checkout@v4
+
+        - name: Install stable toolchain
+          uses: actions-rs/toolchain@v1
+          with:
+            profile: minimal
+            toolchain: stable
+            override: true
+        - name: Rust Cache
+          uses: Swatinem/rust-cache@v2
+        - name: Run cargo test
+          continue-on-error: true
+          uses: actions-rs/cargo@v1
+          with:
+            command: test
+            args: --features async_partial -- --nocapture --show-output

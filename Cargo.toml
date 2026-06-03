@@ -26,3 +26,12 @@ thiserror = "=2.0.18"
 clap = { version = "=4.5.38", features = ["derive"] }
 log = "=0.4.27"
 env_logger = "=0.11.8"
+
+# --- VENDORED PATCH (plan 00-01): the published mzdata 0.63.3 imzML reader fails to
+# compile with the `imzml` feature (E0046 — missing required `ChromatogramSource::
+# count_chromatograms`). This redirects mzdata 0.63.3 to a minimal vendored fork that
+# adds the missing method, keeping the version at 0.63.3 so the single resolved copy is
+# shared with mzpeak_prototyping's `^0.63.3` requirement. Drop once an upstream
+# 0.63.x backport ships (see deferred-items.md upstream issue draft). ---
+[patch.crates-io]
+mzdata = { path = "vendor/mzdata" }
