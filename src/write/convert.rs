@@ -9,6 +9,7 @@
 use std::path::Path;
 
 use crate::read::ImagingReader;
+#[allow(unused_imports)]
 use crate::write::WriteError;
 
 /// Convert an imaging spectrum stream into an imaging mzPeak archive at `out_path`.
@@ -16,5 +17,9 @@ use crate::write::WriteError;
 /// Implemented in Plan 04-03. Declared here (with the locked signature) so the module-root
 /// re-export surface is stable from Plan 04-01 onward.
 pub fn convert(_reader: ImagingReader, _out_path: &Path) -> Result<(), WriteError> {
-    Err(WriteError::Unimplemented)
+    // Body implemented in Plan 04-03 (streaming read→write loop + finish sequence). The
+    // `WriteError::Unimplemented` placeholder arm was removed in Plan 04-02 when the real
+    // variant set (Io/Parquet/Read/Json) landed; this stub stays unreachable until Plan 03
+    // replaces it wholesale.
+    unimplemented!("convert orchestrator is implemented in Plan 04-03")
 }
