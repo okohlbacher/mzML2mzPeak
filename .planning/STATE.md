@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: milestone
-status: executing
+status: verifying
 stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-06-03T23:18:46.952Z"
+last_updated: "2026-06-03T23:24:17.211Z"
 last_activity: 2026-06-03
 progress:
   total_phases: 7
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 15
-  completed_plans: 14
-  percent: 71
+  completed_plans: 15
+  percent: 86
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-03)
 
 Phase: 05 (verification-roundtrip-layer) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-03
 
 Progress: [███████░░░] 67%
@@ -66,6 +66,7 @@ Progress: [███████░░░] 67%
 | Phase 04 P03 | 38m | 2 tasks | 4 files |
 | Phase 05 P01 | 9 | 2 tasks | 4 files |
 | Phase 05 P02 | 11 | 2 tasks | 4 files |
+| Phase 05 P03 | 3 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 05]: verify orchestrator SPLIT — path-based verify_roundtrip materializes source then delegates to slice-based verify_against_source (test-reachable without .ibd, Pitfall 5); path wrapper is the only collect-all site so the Phase-6 34k iterator switch is one function.
 - [Phase ?]: [Phase 05]: verify STEP3 branches on SOURCE Representation (Profile->get_spectrum_arrays data facet at source width; Centroid->get_spectrum_peaks_for peaks facet, source is L1 ref); F32-source centroid m/z widening is NOT an L1 failure (skipped L1, rel-err L2, Pitfall 2).
 - [Phase ?]: [Phase 05]: count gate returns report (count.passed=false) not CountMismatch error — the report is the deliverable; ion-image grid row-allocated + bounds-checked every write (no sparse-grid OOB panic, T-05-04/05).
+- [Phase ?]: [Phase 05]: VER-01..VER-04 proven end-to-end by tests/verify_roundtrip.rs — extended fixture (F64-m/z profile + F32-m/z profile + centroid over sparse {(1,1),(3,1),(2,3)}) writes a real archive via the write_fixture seam (no .ibd) and verify_against_source asserts count/coords/profile L1 Δ=0 raw-facet bit-for-bit/centroid source-as-L1-ref/≥1 L2/ion-image M[row=y][col=x]/sparse no-panic.
+- [Phase ?]: [Phase 05]: peaks-facet centroid m/z widening (Float32->Float64) documented in-test as out-of-L1-scope; centroid pixel contributes zero L1 mismatch (Pitfall 2); raw_facet_bit_for_bit pins spectra_data as the authoritative L1 reference at source stored width.
 
 ### Pending Todos
 
@@ -122,6 +125,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-03T23:17:42.565Z
+Last session: 2026-06-03T23:24:09.024Z
 Stopped at: Completed 03-01-PLAN.md
 Resume file: None
