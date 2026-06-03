@@ -71,7 +71,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Plans**: 3 plans
 
-  - [ ] 02-01-PLAN.md — Library skeleton + record contracts: ImagingSpectrum/RunProvenance/Representation/StorageMode types, coordinate semantics doc (IN-05, IN-06, SPA-02)
+  - [ ] 02-01-PLAN.md — Library skeleton + record contracts: NumArray (dtype-preserving axes), ImagingSpectrum/RunProvenance/Representation/StorageMode types, coordinate semantics doc (IN-04, IN-05, IN-06, SPA-02)
   - [ ] 02-02-PLAN.md — Converter-owned integrity preflight: Latin-1 header parse + RFC-4122 UUID + whole-file checksum hard-fail on mismatch/missing .ibd (IN-07)
   - [ ] 02-03-PLAN.md — Streaming ImagingReader: preflight-gated open, data_mode auto-detect, per-pixel coords + decoded arrays, bounded-memory Iterator over both modes (IN-01..04, IN-06, IN-08, SPA-01)
 
