@@ -29,9 +29,11 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Success Criteria** (what must be TRUE):
   1. `cargo build` succeeds on a Rust 1.85+/edition-2024 toolchain pinned via `rust-toolchain.toml`, with `arrow`/`parquet` 57.0.0, `zip` 4.1.0, `mzdata` 0.63.3 (`features = ["imzml"]`), `mzpeaks` 1.0.9, and `mzpeak_prototyping` pinned to a specific git commit rev.
   2. `cargo tree` shows exactly one copy of `mzdata` and one copy of `arrow` resolved across the workspace (no duplicate-major fracture).
-  3. The PXD001283 `.ibd` is present in `data/` and its embedded UUID matches `C7822330-F1A8-4D11-AD30-504B30B33722` from the existing `.imzML`.
+  3. The PXD001283 `.ibd` is present in `data/`; its embedded first-16-byte RFC-4122 UUID matches `C7822330-F1A8-4D11-AD30-504B30B33722` AND its whole-file SHA-1 matches `IMS:1000091 = F8C24417B294BFA168D75A470BBB361009BC2671` from the existing `.imzML`.
   4. An adversarial CODEX/CLI review runs at phase start and end; the pin set and `.ibd` provenance pass review with findings logged.
-**Plans**: TBD
+**Plans**: 2 plans
+  - [ ] 00-01-PLAN.md — Pinned edition-2024 build skeleton: exact upstream pins, mzdata `imzml` feature, git-pinned writer, single-copy mzdata/arrow proof (ENV-01)
+  - [ ] 00-02-PLAN.md — Fetch PXD001283 `.ibd` into `data/`; verify embedded UUID + SHA-1 against the `.imzML` via a committed verifier (ENV-02)
 
 ### Phase 1: Coordinate-Exposure Spike (blocking gate)
 **Goal**: It is proven on the pinned stack and on real data that per-pixel spatial coordinates are reachable, so the read-layer design is committed on fact rather than assumption.
