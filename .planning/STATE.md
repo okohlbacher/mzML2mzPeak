@@ -4,13 +4,13 @@ milestone: v0.3
 milestone_name: milestone
 status: executing
 stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-06-03T23:05:44.557Z"
-last_activity: 2026-06-03 -- Phase 05 execution started
+last_updated: "2026-06-03T23:10:53.666Z"
+last_activity: 2026-06-03
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 15
-  completed_plans: 12
+  completed_plans: 13
   percent: 71
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-03)
 ## Current Position
 
 Phase: 05 (verification-roundtrip-layer) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 05
-Last activity: 2026-06-03 -- Phase 05 execution started
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-06-03
 
 Progress: [███████░░░] 67%
 
@@ -64,6 +64,7 @@ Progress: [███████░░░] 67%
 | Phase 04 P01 | 4m | 2 tasks | 5 files |
 | Phase 04 P02 | 4m | 2 tasks | 2 files |
 | Phase 04 P03 | 38m | 2 tasks | 4 files |
+| Phase 05 P01 | 9 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -93,6 +94,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 04]: ImagingWriter registers IMS:1000050/51/52 coordinate columns SOLELY via add_spectrum_scan_field(CustomBuilderFromParameter::from_spec(..)) with zero core-struct edits (OUT-02); maps RunProvenance->file_description by IMS accession (UUID->1000080, SHA-1->1000091/MD5->1000090, Processed->1000031/Continuous->1000030) and assembles+exposes the metadata.imaging block via imaging_metadata() — insertion deferred to Plan 03's finish_parquet->add_index_metadata->finish (RESEARCH Q4).
 - [Phase 04]: write::convert(reader,out_path) streams one spectrum at a time (no collect-all, IN-08), leaves profile/centroid routing to the writer (no representation branch), and OWNS the terminal finish_parquet -> add_index_metadata("imaging", &block) -> finish seam (clone the block BEFORE finish_parquet consumes the writer). Round-trip via reference MzPeakReader resolves IMS:1000050/51 by accession with VALUE-equality (OUT-04 decisive).
 - [Phase 04]: streaming writer must register data/peak columns explicitly via add_spectrum_peak_type::<CentroidPeak>() (no sample source like examples/convert.rs); centroid spectra attach an explicit CentroidPeak list (RESEARCH Pitfall 6) so the SEPARATE peaks facet gets real values; an EMPTY chromatogram facet (no TIC) is required for MzPeakReader to open the archive (it eagerly loads chromatogram metadata). Peaks facet stores m/z f64 / intensity f32 by the upstream schema — L1 note for the Phase-5 verifier (compare against raw arrays at source dtype).
+- [Phase ?]: [Phase 05]: verify comparator compares at SOURCE stored float width (f32-vs-f32, f64-vs-f64) for L1 Δ=0 — never widens via NON-CANONICAL NumArray::as_f64() (grep gate = 0); a source/output dtype-width divergence is itself a mismatch, not a silent widen (T-05-03).
+- [Phase ?]: [Phase 05]: compare.rs imports ToleranceContract::{L1,L2}/ConformanceLevel and re-exposes L1_CONTRACT/L2_CONTRACT as those constants — numbers never re-encoded (T-05-02); VerificationReport caps the mismatch Vec at MAX_REPORTED_MISMATCHES=20 with a total_mismatches counter (T-05-01).
 
 ### Pending Todos
 
@@ -115,6 +118,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-03T21:38:51.188Z
+Last session: 2026-06-03T23:10:28.626Z
 Stopped at: Completed 03-01-PLAN.md
 Resume file: None
