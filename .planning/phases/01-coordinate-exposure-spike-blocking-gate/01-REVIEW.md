@@ -35,3 +35,6 @@ All 12 findings RESOLVED · NEW: none · **EXECUTE-READY: yes**
 
 ## End-of-Phase Review (round 1) — verified after codex exit
 **Verdict: FAIL** — GO gate doesn't ENFORCE run-metadata (data_mode/uuid/ibd_checksum/ibd_checksum_type printed but unchecked) or the continuous mz_offset; binary has no feasible continuous-only run path. Conclusion (coords reachable both modes; continuous m/z materialized) independently CONFIRMED by Codex live-run of the continuous fixture. Fix = strengthen the gate + add continuous-only path, then re-run.
+
+## End-of-Phase Review (round 2) — verified after codex exit
+C1, C2, MAJOR-3 all RESOLVED · NEW: none · **PHASE1-VERDICT: PASS** (gate enforces metadata + continuous mz_offset; --continuous-only live-run exits 0 with GATE PASS).
