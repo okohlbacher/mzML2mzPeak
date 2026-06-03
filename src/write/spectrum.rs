@@ -1,14 +1,118 @@
 //! `ImagingSpectrum` → mzdata `MultiLayerSpectrum` reconstruction.
 //!
-//! Implemented in Plan 04-01 Task 2. Stub declared so the module-root re-export resolves.
+//! This is the genuinely-new mechanism of Phase 4: the impedance match between the read
+//! layer's [`ImagingSpectrum`] record and the `SpectrumLike` value the reference
+//! `mzpeak_prototyping` writer consumes. It is the EXACT INVERSE of the read layer's decode
+//! (`src/read/stream.rs` `to_imaging`/`decode_axis`), so the read↔write round-trip stays
+//! symmetric and bit-for-bit (spec v0.3 §8 L1).
+//!
+//! Three responsibilities, all carried VERBATIM (never inferred):
+//!
+//!   1. **Coordinate params** — re-attach `IMS:1000050/51` (and `IMS:1000052` when `z`
+//!      is present) as CV params on a [`ScanEvent`]. The writer reads coordinate values from
+//!      these scan-event params at WRITE time via `get_param_by_curie(&accession)`
+//!      (RESEARCH.md Pitfall 1); without them the coordinate columns serialize as all-NULL.
+//!   2. **dtype-preserving arrays** — re-encode each [`NumArray`] variant into a
+//!      dtype-matched [`DataArray`]: `F32 → Float32`, `F64 → Float64`. `update_buffer`
+//!      asserts `dtype.size_of() == size_of::<T>()`, so the source bits survive unchanged
+//!      (IN-04 / L1). NEVER widen via `as_f64()`.
+//!   3. **signal_continuity** — set from [`Representation`] verbatim
+//!      (`Profile→Profile`, `Centroid→Centroid`, `Unknown→Unknown`). This alone drives the
+//!      writer's profile→`spectra_data` / centroid→`spectra_peaks` routing; never infer it
+//!      from data shape.
+//!
+//! `ms_level` (including the legal value 0) and `native_id` are carried unchanged.
 
-use mzdata::spectrum::MultiLayerSpectrum;
+use mzdata::curie;
+use mzdata::params::Param;
+use mzdata::prelude::ParamDescribed;
+use mzdata::spectrum::bindata::{ArrayType, BinaryArrayMap, BinaryDataArrayType, DataArray};
+use mzdata::spectrum::{MultiLayerSpectrum, ScanEvent, SignalContinuity, SpectrumDescription};
 
-use crate::read::ImagingSpectrum;
+use crate::read::{ImagingSpectrum, NumArray, Representation};
 
-/// Reconstruct an mzdata `MultiLayerSpectrum` from an [`ImagingSpectrum`]. (Task 2.)
-pub fn to_mzdata(_s: &ImagingSpectrum) -> MultiLayerSpectrum {
-    unimplemented!("implemented in Task 2")
+/// Reconstruct an mzdata [`MultiLayerSpectrum`] from an [`ImagingSpectrum`].
+///
+/// The reconstructed spectrum carries the pixel coordinates as `IMS:1000050/51(/52)` params
+/// on its first scan event, its m/z + intensity arrays at their SOURCE dtype, and its
+/// `signal_continuity` set verbatim from [`Representation`]. Because the array map is
+/// populated (and neither a peak nor deconvoluted-peak list is), `peaks()` reports
+/// `RawData`, which the writer routes by `signal_continuity` automatically.
+///
+/// Does not panic on empty m/z/intensity arrays or `ms_level == 0` (both carried verbatim).
+pub fn to_mzdata(s: &ImagingSpectrum) -> MultiLayerSpectrum {
+    // (1) dtype-preserving arrays: wrap each axis at its SOURCE dtype, raw LE bytes.
+    let mut arrays = BinaryArrayMap::new();
+    arrays.add(num_to_dataarray(ArrayType::MZArray, &s.mz));
+    arrays.add(num_to_dataarray(ArrayType::IntensityArray, &s.intensity));
+
+    // (2) description: id + ms_level carried verbatim; signal_continuity from Representation
+    //     (drives the writer's profile/centroid routing — never inferred from data shape).
+    let mut descr = SpectrumDescription::default();
+    descr.id = s.native_id.clone();
+    descr.ms_level = s.ms_level;
+    descr.signal_continuity = match s.representation {
+        Representation::Profile => SignalContinuity::Profile,
+        Representation::Centroid => SignalContinuity::Centroid,
+        Representation::Unknown => SignalContinuity::Unknown,
+    };
+
+    // (3) coordinate params on a scan event — the writer reads these by accession at write
+    //     time (RESEARCH.md Pitfall 1). z is omitted entirely when absent (not null-valued).
+    let mut scan = ScanEvent::default();
+    scan.add_param(
+        Param::builder()
+            .name("position x")
+            .curie(curie!(IMS:1000050))
+            .value(s.x)
+            .build(),
+    );
+    scan.add_param(
+        Param::builder()
+            .name("position y")
+            .curie(curie!(IMS:1000051))
+            .value(s.y)
+            .build(),
+    );
+    if let Some(z) = s.z {
+        scan.add_param(
+            Param::builder()
+                .name("position z")
+                .curie(curie!(IMS:1000052))
+                .value(z)
+                .build(),
+        );
+    }
+    descr.acquisition.scans.push(scan);
+
+    // Arrays present (and no peak/deconvoluted-peak list) ⇒ `peaks()` reports
+    // `RefPeakDataLevel::RawData`; routing is automatic in the writer.
+    // NOTE: `MultiLayerSpectrum::new` is the 4-arg constructor
+    // `(description, Option<arrays>, Option<peaks>, Option<deconvoluted_peaks>)`
+    // (spectrum_types.rs:1063) — RESEARCH.md Pattern 2 mis-cited the 2-arg `RawSpectrum::new`
+    // at :360. We supply the raw arrays and no peak lists.
+    MultiLayerSpectrum::new(descr, Some(arrays), None, None)
+}
+
+/// Re-encode one [`NumArray`] into a dtype-matched [`DataArray`], preserving the source
+/// dtype bit-for-bit. `F32 → Float32`, `F64 → Float64`. `update_buffer` asserts the dtype
+/// size matches the element size, so no widening/narrowing can occur (IN-04 / L1). NEVER
+/// calls `as_f64()` (lossy for F32).
+fn num_to_dataarray(name: ArrayType, arr: &NumArray) -> DataArray {
+    match arr {
+        NumArray::F32(v) => {
+            let mut da = DataArray::wrap(&name, BinaryDataArrayType::Float32, Vec::new());
+            da.update_buffer(v.as_slice())
+                .expect("f32 slice into Float32 DataArray: dtype size matches");
+            da
+        }
+        NumArray::F64(v) => {
+            let mut da = DataArray::wrap(&name, BinaryDataArrayType::Float64, Vec::new());
+            da.update_buffer(v.as_slice())
+                .expect("f64 slice into Float64 DataArray: dtype size matches");
+            da
+        }
+    }
 }
 
 #[cfg(test)]
