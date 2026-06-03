@@ -20,8 +20,20 @@ The vendored source MUST stay committed; it is the fix. Drop it once an upstream
 
 ---
 
-## BLOCKER (00-01, Task 2 — NEW, discovered while finishing the vendored patch): `mzpeak_prototyping@d1aaaf84` requires Rust 1.87, plan pins 1.85.0
+## RESOLVED (00-01, Task 3): `mzpeak_prototyping@d1aaaf84` requires Rust 1.87 — toolchain bumped to 1.96.0
 
+**Status:** RESOLVED via user-approved toolchain bump. Commit `1a94535`.
+**Resolved:** 2026-06-03.
+
+The git-pinned writer's undeclared ~1.87 MSRV (io_error_more + const String::as_bytes) was cleared by
+bumping `rust-toolchain.toml` `channel` from `1.85.0` to `1.96.0` (1.96.0 already resolves locally as
+`stable`; no install needed). `cargo build` now exits 0. `STACK.md` and `CLAUDE.md` were updated to note
+that 1.85 is edition-2024's floor, not the build floor, and that this writer rev needs ~1.87 so the project
+pins 1.96.0. The `deflate64 0.1.10` lock-pin (same 1.87-stdlib class of issue) is now harmless and was left
+as-is to avoid lock churn; Cargo.lock is unchanged by the bump. Single-copy mzdata/arrow + imzml feature-edge
+proofs recorded in `00-01-SUMMARY.md`. Diagnosis below retained for the historical record.
+
+### (Historical) Original diagnosis
 **Status:** BLOCKING — `cargo build` still cannot pass. Requires a planning-level decision
 (NOT covered by the approved vendored-mzdata-patch scope). Distinct from the mzdata defect.
 **Discovered:** 2026-06-03, immediately after the mzdata patch unblocked the mzdata compile.
