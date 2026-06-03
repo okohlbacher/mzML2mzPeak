@@ -158,6 +158,17 @@ impl ImagingReader {
         &self.provenance
     }
 
+    /// The underlying mzdata reader as a source of file-level PSI-MS + IMS metadata.
+    ///
+    /// `ImzMLReader` implements [`mzdata::prelude::MSDataFileMetadata`] (vendored
+    /// `reader.rs:1454`); the write layer's `copy_metadata_from(source)` consumes this to
+    /// carry the source `file_description` / instrument / sample metadata into the mzPeak
+    /// archive. Exposed read-only (a `&` borrow) so the writer can copy it before the
+    /// streaming loop consumes the reader by value.
+    pub fn source_metadata(&self) -> &impl mzdata::prelude::MSDataFileMetadata {
+        &self.inner
+    }
+
     /// Map a fully-read mzdata spectrum into an [`ImagingSpectrum`], decoding each axis at
     /// its declared dtype. `index` is the stream position (for error context).
     fn to_imaging(
