@@ -17,3 +17,4 @@ pub mod read;
 pub mod integrity;
 pub mod schema;
 pub mod write;
+pub mod verify;
