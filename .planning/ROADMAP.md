@@ -14,7 +14,7 @@ imzML2mzPeak is an all-Rust CLI that losslessly converts mass-spectrometry imagi
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 0: Environment & Foundations** - Pinned Rust 2024 toolchain, exact dependency pins, git-pinned writer, and a UUID/SHA-1-verified `.ibd` in `data/` (completed 2026-06-03)
-- [ ] **Phase 1: Coordinate-Exposure Spike (blocking gate)** - Confirm pinned `mzdata` + `imzml` feature compiles and surfaces per-pixel x/y for both storage modes before any layer is built
+- [x] **Phase 1: Coordinate-Exposure Spike (blocking gate)** - Confirm pinned `mzdata` + `imzml` feature compiles and surfaces per-pixel x/y for both storage modes before any layer is built (completed 2026-06-03)
 - [ ] **Phase 2: imzML Read Layer + Integrity Preflight** - Streaming reader yielding per-spectrum coordinates, arrays, and metadata, with a converter-owned hard-fail integrity gate
 - [ ] **Phase 3: Imaging-Schema Layer** - Lock the imaging mzPeak extension (scan-facet coordinate columns, run-level params, provenance, tolerance contract) per spec v0.3
 - [ ] **Phase 4: mzPeak Write Layer** - Streaming writer that emits a valid imaging mzPeak archive via the public extension seam
@@ -54,7 +54,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Plans**: 1 plan
 
-  - [ ] 01-01-PLAN.md — Spike: prove per-pixel coords + run metadata reachable for processed & continuous via mzdata get_param_by_curie; commit fixtures + 01-FINDINGS.md verdict (ENV-03)
+  - [x] 01-01-PLAN.md — Spike: prove per-pixel coords + run metadata reachable for processed & continuous via mzdata get_param_by_curie; commit fixtures + 01-FINDINGS.md verdict (ENV-03)
 
 ### Phase 2: imzML Read Layer + Integrity Preflight
 
@@ -140,7 +140,7 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 0. Environment & Foundations | 2/2 | Complete   | 2026-06-03 |
-| 1. Coordinate-Exposure Spike | 0/1 | Not started | - |
+| 1. Coordinate-Exposure Spike | 1/1 | Complete   | 2026-06-03 |
 | 2. imzML Read Layer + Integrity Preflight | 0/TBD | Not started | - |
 | 3. Imaging-Schema Layer | 0/TBD | Not started | - |
 | 4. mzPeak Write Layer | 0/TBD | Not started | - |
