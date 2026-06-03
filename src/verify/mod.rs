@@ -20,5 +20,7 @@
 
 pub mod report;
 pub mod compare;
+pub mod ion_image;
 
+pub use ion_image::IonImage;
 pub use report::{Mismatch, MismatchAxis, VerificationReport, VerifyError};
