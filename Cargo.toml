@@ -44,6 +44,22 @@ sha1 = "=0.10.6"
 md-5 = "=0.10.6"
 sha2 = "=0.10.9"
 
+# --- Structurally-aware imzML <scanSettings> geometry parse (Phase 3, D-02). Pinned
+# EXACTLY to mzdata's transitive 0.30.0 so the dep graph keeps ONE copy (a drifted
+# version fractures the shared encoding/CURIE type graph — RESEARCH Pitfall 3).
+#
+# NOTE (deviation, Plan 03-01 Task 1): the planned `features = ["encoding"]` CANNOT be
+# enabled. In quick-xml 0.30 the `encoding` feature is NOT purely additive on the shared
+# single copy — it gates `Attribute::unescape_value`/`unescape_value_with` behind
+# `#[cfg(not(feature = "encoding"))]`. The vendored mzdata 0.63.3 reader (imzml + mzml)
+# calls `attr.unescape_value()` in ~24 places, so unioning `encoding` onto the one shared
+# copy STRIPS that method and breaks mzdata's own compilation (48 E0599 errors). We
+# therefore depend on quick-xml WITHOUT `encoding`. The ISO-8859-1 imzML prolog is then
+# honored by the geometry parser (Plan 03-02) via explicit `encoding_rs` Latin-1 decode of
+# bounded bytes — the fallback already sanctioned in RESEARCH "Alternatives Considered"
+# (encoding_rs 0.8.35 is already in the tree transitively via mzdata).
+quick-xml = "=0.30.0"
+
 # --- Application-boundary helpers: pinned with `=` at upstream-aligned versions. ---
 anyhow = "=1.0.102"
 thiserror = "=2.0.18"
