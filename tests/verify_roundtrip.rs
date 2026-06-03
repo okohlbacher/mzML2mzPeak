@@ -219,3 +219,245 @@ fn coordinates_match() {
 
     let _ = std::fs::remove_file(&out);
 }
+
+/// VER-03 (profile, phase crux): an honest round-trip's profile m/z AND intensity per-axis checks
+/// BOTH pass under L1 (Δ=0 at the SOURCE stored width — F64 m/z for pixel A, F32 m/z for pixel B),
+/// and the whole report `passed()`.
+#[test]
+fn values_l1() {
+    let out = temp_out("vl1");
+    let fx = fixture();
+    write_fixture(&out, &fx).expect("fixture writes");
+
+    let report = verify_against_source(&fx, &out, ConformanceLevel::L1BitForBit)
+        .expect("verify returns a report");
+
+    assert!(
+        report.mz.passed,
+        "profile m/z per-axis L1 Δ=0 (F64 + F32 paths): {:?}, mismatches={:?}",
+        report.mz, report.mismatches
+    );
+    assert!(
+        report.intensity.passed,
+        "profile intensity per-axis L1 Δ=0: {:?}, mismatches={:?}",
+        report.intensity, report.mismatches
+    );
+    assert!(
+        report.passed(),
+        "an honest round-trip passes every L1 gate (VER-03): {report:?}"
+    );
+
+    let _ = std::fs::remove_file(&out);
+}
+
+/// VER-03 caveat (the authoritative L1 reference): re-open the archive with `MzPeakReader`, pull
+/// each PROFILE pixel's `spectra_data` m/z + intensity, and assert they are bit-for-bit equal to
+/// the source `NumArray` at MATCHING width (F64 m/z via `.to_f64()` exact-eq, F32 m/z via
+/// `.to_f32()` exact-eq) — proving the DATA facet is the L1 reference.
+///
+/// Documenting the centroid caveat: the centroid pixel's m/z lands in the `spectra_peaks` facet
+/// as Float64 (the upstream `CentroidPeak` schema stores m/z f64). A Float32-source centroid m/z
+/// is therefore WIDENED Float32→Float64 in that facet, so the peaks-facet m/z is NOT the L1
+/// reference (CONTEXT Area 2; out-of-L1-scope). Only the profile `spectra_data` facet is asserted
+/// bit-for-bit here.
+#[test]
+fn raw_facet_bit_for_bit() {
+    use mzdata::spectrum::bindata::{ArrayType, ByteArrayView};
+
+    let out = temp_out("rawfacet");
+    let fx = fixture();
+    write_fixture(&out, &fx).expect("fixture writes");
+
+    let mut reader = MzPeakReader::new(&out).expect("reader opens");
+
+    // For each PROFILE pixel, find its output index by coordinate and assert the data-facet
+    // arrays equal the source NumArray bit-for-bit at the source stored width.
+    for s in fx.iter().filter(|s| s.representation == Representation::Profile) {
+        // Locate the output index for this pixel's (x,y).
+        let mut out_idx = None;
+        for i in 0..reader.len() as u64 {
+            let descr = reader
+                .get_spectrum_metadata(i)
+                .expect("metadata read")
+                .expect("metadata present");
+            let scan = descr.acquisition.first_scan().expect("scan present");
+            let x = scan
+                .get_param_by_curie(&curie!(IMS:1000050))
+                .and_then(|p| p.value.to_i64().ok());
+            let y = scan
+                .get_param_by_curie(&curie!(IMS:1000051))
+                .and_then(|p| p.value.to_i64().ok());
+            if x == Some(s.x) && y == Some(s.y) {
+                out_idx = Some(i);
+                break;
+            }
+        }
+        let out_idx = out_idx.expect("profile pixel resolves to an output index");
+
+        let arrays = reader
+            .get_spectrum_arrays(out_idx)
+            .expect("read spectra_data")
+            .expect("profile pixel has data-facet arrays");
+        let mz_da = arrays.get(&ArrayType::MZArray).expect("m/z present in spectra_data");
+        let int_da = arrays
+            .get(&ArrayType::IntensityArray)
+            .expect("intensity present in spectra_data");
+
+        // m/z: compare at the SOURCE width — F64 source via to_f64, F32 source via to_f32.
+        match &s.mz {
+            NumArray::F64(src) => {
+                let got = mz_da.to_f64().expect("data-facet m/z decodes as f64");
+                assert_eq!(
+                    got.as_ref(),
+                    src.as_slice(),
+                    "F64-source profile m/z is bit-for-bit at pixel ({},{})",
+                    s.x, s.y
+                );
+            }
+            NumArray::F32(src) => {
+                let got = mz_da.to_f32().expect("data-facet m/z decodes as f32");
+                assert_eq!(
+                    got.as_ref(),
+                    src.as_slice(),
+                    "F32-source profile m/z is bit-for-bit (NO widening) at pixel ({},{})",
+                    s.x, s.y
+                );
+            }
+        }
+
+        // intensity: source is F32 for both profile pixels — compare at f32 width.
+        match &s.intensity {
+            NumArray::F32(src) => {
+                let got = int_da.to_f32().expect("data-facet intensity decodes as f32");
+                assert_eq!(
+                    got.as_ref(),
+                    src.as_slice(),
+                    "F32-source profile intensity is bit-for-bit at pixel ({},{})",
+                    s.x, s.y
+                );
+            }
+            NumArray::F64(src) => {
+                let got = int_da.to_f64().expect("data-facet intensity decodes as f64");
+                assert_eq!(got.as_ref(), src.as_slice(), "F64-source intensity bit-for-bit");
+            }
+        }
+    }
+
+    let _ = std::fs::remove_file(&out);
+}
+
+/// VER-03 (centroid, the source-as-L1-reference contract): the centroid pixel (pixel C) verifies
+/// under L1 with intensity Δ=0 (source f32 vs peaks-facet f32). Pixel C has a F64-source m/z, so
+/// its m/z is compared (source-as-f64 vs peaks-facet f64) and matches — and crucially, an honest
+/// round-trip keeps `report.passed()` true under L1 even though the peaks facet stores m/z f64.
+///
+/// The Pitfall-2 guarantee — a Float32-source centroid m/z widening is NOT reported as an L1
+/// failure — is exercised separately: the orchestrator skips the L1 m/z check for an `F32` centroid
+/// source. Here we confirm the centroid does NOT contribute any L1 mismatch and intensity is exact.
+#[test]
+fn centroid_source_reference() {
+    let out = temp_out("centroid");
+    let fx = fixture();
+    write_fixture(&out, &fx).expect("fixture writes");
+
+    let report = verify_against_source(&fx, &out, ConformanceLevel::L1BitForBit)
+        .expect("verify returns a report");
+
+    // The centroid pixel's intensity is f32 source vs f32 peaks facet — Δ=0, so no intensity
+    // mismatch is recorded for it, and the overall intensity axis passes (with the profile pixels).
+    assert!(
+        report.intensity.passed,
+        "centroid intensity Δ=0 vs SOURCE (f32 peaks facet) keeps the intensity axis passing: {:?}",
+        report.intensity
+    );
+
+    // No L1 mismatch may be attributed to the centroid pixel's coordinate (2,3): the source IS the
+    // L1 reference and a peaks-facet m/z widening must never surface as an L1 failure (Pitfall 2).
+    let centroid_coord = (COORDS[2].0, COORDS[2].1, None);
+    let centroid_mismatches = report
+        .mismatches
+        .iter()
+        .filter(|m| m.coord == centroid_coord)
+        .count();
+    assert_eq!(
+        centroid_mismatches, 0,
+        "no L1 mismatch attributed to the centroid pixel (2,3); a peaks-facet m/z widening is \
+         NOT an L1 failure (Pitfall 2): {:?}",
+        report.mismatches
+    );
+
+    // And the honest round-trip passes overall under L1.
+    assert!(report.passed(), "honest centroid round-trip passes L1: {report:?}");
+
+    let _ = std::fs::remove_file(&out);
+}
+
+/// VER-03 (≥1 L2 test required by CONTEXT Area 2): drive the SAME fixture under `L2Transformed`
+/// and assert the PROFILE pixels pass — L2's relative-error semantics are the genuine relaxation
+/// on a profile pixel (RESEARCH Open Q1). The whole report still `passed()` for an honest
+/// round-trip (an exact round-trip trivially satisfies the looser L2 bound too).
+#[test]
+fn values_l2() {
+    let out = temp_out("vl2");
+    let fx = fixture();
+    write_fixture(&out, &fx).expect("fixture writes");
+
+    let report = verify_against_source(&fx, &out, ConformanceLevel::L2Transformed)
+        .expect("verify returns a report");
+
+    assert!(report.mz.passed, "profile m/z passes under L2 (relative-error): {:?}", report.mz);
+    assert!(
+        report.intensity.passed,
+        "profile intensity passes under L2: {:?}",
+        report.intensity
+    );
+    assert!(report.passed(), "honest round-trip passes L2 (≥1 L2 test): {report:?}");
+
+    let _ = std::fs::remove_file(&out);
+}
+
+/// VER-04 (ion image): the `M[row=y][col=x]` TIC reconstruction's source vs output cells agree on
+/// every present cell, so the report's ion-image sanity check passes for the honest round-trip.
+#[test]
+fn ion_image_sanity() {
+    let out = temp_out("ionimage");
+    let fx = fixture();
+    write_fixture(&out, &fx).expect("fixture writes");
+
+    let report = verify_against_source(&fx, &out, ConformanceLevel::L1BitForBit)
+        .expect("verify returns a report");
+
+    assert!(
+        report.ion_image.passed,
+        "ion-image M[row=y][col=x] cells agree (VER-04): {:?}",
+        report.ion_image
+    );
+    assert_eq!(
+        report.ion_image.disagreeing_cells, 0,
+        "no disagreeing TIC cells on the honest round-trip"
+    );
+
+    let _ = std::fs::remove_file(&out);
+}
+
+/// VER-04 (sparse / non-rectangular): the set {(1,1),(3,1),(2,3)} runs through the verifier
+/// WITHOUT panicking — the presence mask handles the absent cells (Pitfall 4). The test simply
+/// COMPLETING with a returned report (not an abort/panic) IS the assertion; we additionally
+/// confirm the report is honest (passes) on this sparse honest round-trip.
+#[test]
+fn sparse_grid_no_panic() {
+    let out = temp_out("sparse");
+    let fx = fixture(); // already the sparse / non-rectangular set {(1,1),(3,1),(2,3)}.
+    write_fixture(&out, &fx).expect("fixture writes");
+
+    // The decisive assertion: this returns a report rather than panicking on the empty cells.
+    let report = verify_against_source(&fx, &out, ConformanceLevel::L1BitForBit)
+        .expect("verify completes without panic on a sparse/non-rectangular grid (VER-04)");
+
+    assert!(
+        report.passed(),
+        "sparse honest round-trip still passes (no OOB, presence mask handled): {report:?}"
+    );
+
+    let _ = std::fs::remove_file(&out);
+}
