@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: milestone
-status: executing
+status: verifying
 stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-06-03T19:50:50.315Z"
+last_updated: "2026-06-03T19:57:19.454Z"
 last_activity: 2026-06-03
 progress:
   total_phases: 7
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 9
-  completed_plans: 8
-  percent: 43
+  completed_plans: 9
+  percent: 57
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-03)
 
 Phase: 03 (imaging-schema-layer) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-03
 
 Progress: [███████░░░] 67%
@@ -60,6 +60,7 @@ Progress: [███████░░░] 67%
 | Phase 02 P03 | 8m | 2 tasks | 6 files |
 | Phase 03 P01 | 5 | 3 tasks | 7 files |
 | Phase 03 P02 | 9 | 3 tasks | 7 files |
+| Phase 03 P03 | 2m | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -84,6 +85,7 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 03]: imaging_scan_fields() declares IMS:1000050/51/52 as Int64 scan-facet specs (x,y required, z optional); from_spec compile-binding proof adopted (accession round-trips), full writer wiring deferred to Phase 4.
 - [Phase ?]: [Phase 03]: ToleranceContract single source of truth in src/schema/tolerance.rs (re-exported from schema::mod) — L1 Δ=0 bit-for-bit, L2 m/z 1e-7 / intensity 1e-3 (spec v0.3 §8), consumed by the Phase 5 verifier.
 - [Phase ?]: [Phase 03]: scanSettings geometry parser honors the ISO-8859-1 prolog via explicit encoding_rs::WINDOWS_1252 decode of raw cvParam bytes (quick-xml encoding feature stays OFF); read_event_into does not UTF-8-validate while tokenizing so Latin-1 high bytes before scanSettings never abort; bounded stop at </scanSettings>; dispatch on accession only; lenient numeric str::parse->None (D-03). Proven on real HR2MSI grid 260x134 + child terms IMS:1000401/413/480/491 (SPA-03 primary path).
+- [Phase 03]: ImagingMetadata serde struct serializes to metadata.imaging with all 7 geometry fields skip_serializing_if=Option::is_none (pixel_count omitted when None — D-03/D-06); only is_imaging + coordinate_base(const 1, §5.1) non-optional; SPA-04 provenance->file_description vs geometry->ms_run.parameters+metadata.imaging split documented (D-04); serde/serde_json declared as direct deps at resolved single-copy versions; schema validated by focused structural assertion (no validator crate, D-06).
 
 ### Pending Todos
 
@@ -106,6 +108,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-03T19:50:14.803Z
+Last session: 2026-06-03T19:55:16.075Z
 Stopped at: Completed 03-01-PLAN.md
 Resume file: None

@@ -29,12 +29,12 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **SPA-01**: Extract per-spectrum spatial coordinates (x, y, and z if present) for every pixel
 - [x] **SPA-02**: Preserve correct coordinate semantics for image reconstruction (origin/indexing base, ordering, no axis flip)
 - [x] **SPA-03**: Capture run-level imaging metadata where available (pixel size, scan pattern, image dimensions) — reading from the imzML XML header directly if `mzdata` does not surface it
-- [ ] **SPA-04**: Preserve the imzML UUID as linkage/provenance in the output
+- [x] **SPA-04**: Preserve the imzML UUID as linkage/provenance in the output
 
 ### Schema — Imaging mzPeak Extension
 
 - [x] **SCH-01**: Define the imaging extension to the mzPeak schema (coordinate column names, types, and where they live — scan columns in `spectra_metadata.parquet` per the identified extension point)
-- [ ] **SCH-02**: Define a convention for run-level imaging metadata in `mzpeak_index.json` (and/or a `schema/imaging.json`)
+- [x] **SCH-02**: Define a convention for run-level imaging metadata in `mzpeak_index.json` (and/or a `schema/imaging.json`)
 - [x] **SCH-03**: Keep the extension faithful to mzPeak design (PSI-MS/IMS CV accessions, Parquet idioms) so output stays readable by `mzpeak_prototyping`'s reader — mergeable-by-design
 - [x] **SCH-04**: Define the numerical-fidelity tolerance contract (per-axis tolerances for m/z vs intensity)
 
@@ -111,9 +111,9 @@ Which phases cover which requirements. Populated during roadmap creation.
 | SPA-01 | Phase 2 | Complete |
 | SPA-02 | Phase 2 | Complete |
 | SPA-03 | Phase 3 | Complete |
-| SPA-04 | Phase 3 | Pending |
+| SPA-04 | Phase 3 | Complete |
 | SCH-01 | Phase 3 | Complete |
-| SCH-02 | Phase 3 | Pending |
+| SCH-02 | Phase 3 | Complete |
 | SCH-03 | Phase 3 | Complete |
 | SCH-04 | Phase 3 | Complete |
 | OUT-01 | Phase 4 | Pending |
