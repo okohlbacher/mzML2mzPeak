@@ -70,3 +70,40 @@ pub fn parse_scan_settings(_path: &Path) -> Result<ImagingRunMetadata, GeometryP
     // TODO(03-02): replace with the real quick-xml <scanSettings> parse.
     Ok(ImagingRunMetadata::default())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    /// Write `bytes` to a unique temp file ending in `.imzML` and return its path. The
+    /// caller is responsible for cleanup (tests use std::env::temp_dir for determinism).
+    fn write_temp_imzml(name: &str, bytes: &[u8]) -> std::path::PathBuf {
+        let mut dir = std::env::temp_dir();
+        dir.push(format!(
+            "geometry_unit_{}_{}",
+            std::process::id(),
+            name
+        ));
+        let mut f = std::fs::File::create(&dir).expect("create temp imzML");
+        f.write_all(bytes).expect("write temp imzML");
+        dir
+    }
+
+    /// A malformed numeric grid value (`value="abc"`) must map to `None`, NEVER panic
+    /// (Security Domain: malformed/oversized values must not abort the parse). D-03 lenient.
+    #[test]
+    fn malformed_numeric_value_maps_to_none() {
+        let xml = br#"<?xml version="1.0" encoding="ISO-8859-1"?>
+<mzML><scanSettingsList count="1"><scanSettings id="s1">
+<cvParam cvRef="IMS" accession="IMS:1000042" name="max count of pixel x" value="abc"/>
+<cvParam cvRef="IMS" accession="IMS:1000043" name="max count of pixel y" value="7"/>
+</scanSettings></scanSettingsList><run><spectrumList count="0"></spectrumList></run></mzML>
+"#;
+        let path = write_temp_imzml("malformed.imzML", xml);
+        let meta = parse_scan_settings(&path).expect("malformed value must not be an error");
+        std::fs::remove_file(&path).ok();
+        assert_eq!(meta.grid_x, None, "value=\"abc\" must parse to None, never panic");
+        assert_eq!(meta.grid_y, Some(7), "a well-formed sibling value still parses");
+    }
+}

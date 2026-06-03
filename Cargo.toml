@@ -60,6 +60,15 @@ sha2 = "=0.10.9"
 # (encoding_rs 0.8.35 is already in the tree transitively via mzdata).
 quick-xml = "=0.30.0"
 
+# --- ISO-8859-1 (Latin-1) decode of bounded <scanSettings> attribute bytes (Plan 03-02).
+# Because the quick-xml `encoding` feature is intentionally OFF (Plan 03-01 deviation — it
+# strips Attribute::unescape_value from the shared mzdata copy), the geometry parser decodes
+# raw cvParam attribute bytes explicitly via encoding_rs (WINDOWS_1252, a byte-lossless
+# ISO-8859-1 superset that never errors on high bytes). Pinned EXACTLY to mzdata's transitive
+# 0.8.35 so the single shared copy is preserved (verified via `cargo tree -i encoding_rs`).
+# This is the RESEARCH "Alternatives Considered" sanctioned fallback, already in the tree. ---
+encoding_rs = "=0.8.35"
+
 # --- Application-boundary helpers: pinned with `=` at upstream-aligned versions. ---
 anyhow = "=1.0.102"
 thiserror = "=2.0.18"

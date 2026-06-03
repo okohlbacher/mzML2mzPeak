@@ -1102,6 +1102,7 @@ dependencies = [
  "anyhow",
  "arrow",
  "clap",
+ "encoding_rs",
  "env_logger",
  "log",
  "md-5",
