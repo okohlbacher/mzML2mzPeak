@@ -12,9 +12,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use imzml2mzpeak::integrity::header::{self, ChecksumType};
+use imzml2mzpeak::integrity::header::{self, ChecksumType, IntegrityError};
+use imzml2mzpeak::integrity::preflight::preflight;
 
 const CONTINUOUS_IMZML: &str = "tests/fixtures/imaging/Example_Continuous.imzML";
+const BAD_CHECKSUM_IMZML: &str = "tests/fixtures/imaging/Corrupt_BadChecksum.imzML";
+const BAD_UUID_IMZML: &str = "tests/fixtures/imaging/Corrupt_BadUuid.imzML";
 
 /// The clean continuous fixture's declared values (from 01-FINDINGS.md / the imzML header).
 const EXPECTED_UUID: &str = "554a27fa-79d2-4766-9a2c-862e6d78b1f3";
@@ -131,8 +134,129 @@ fn header_parse_missing_checksum_is_typed_error() {
 }
 
 // ---------------------------------------------------------------------------
+// Task 2 — library-level preflight gate
+// ---------------------------------------------------------------------------
+
+#[test]
+fn preflight_ok_on_clean_fixture() {
+    let report = preflight(Path::new(CONTINUOUS_IMZML)).expect("clean pair must pass preflight");
+    assert_eq!(report.uuid, EXPECTED_UUID);
+    assert_eq!(report.checksum_type, ChecksumType::Sha1);
+    assert_eq!(report.checksum_hex.to_lowercase(), EXPECTED_SHA1);
+}
+
+#[test]
+fn preflight_fails_on_bad_checksum() {
+    // Isolate the checksum path: the bad-checksum fixture's .ibd first 16 bytes STILL equal
+    // the declared UUID (so the UUID check passes), but the .ibd body makes the declared
+    // SHA-1 mismatch.
+    let h = header::parse_imzml_header(Path::new(BAD_CHECKSUM_IMZML)).unwrap();
+    assert_eq!(h.uuid, EXPECTED_UUID, "bad-checksum fixture keeps the clean UUID");
+    let ibd_first16 = fs::read("tests/fixtures/imaging/Corrupt_BadChecksum.ibd").unwrap();
+    // The first 16 bytes are the clean UUID bytes -> UUID check would pass.
+    let expected_bytes = uuid::parse_dashed(EXPECTED_UUID);
+    assert_eq!(&ibd_first16[..16], &expected_bytes[..], "UUID check passes on this fixture");
+
+    let err = preflight(Path::new(BAD_CHECKSUM_IMZML)).expect_err("bad checksum must fail");
+    assert!(
+        matches!(err, IntegrityError::ChecksumMismatch { kind: ChecksumType::Sha1, .. }),
+        "expected ChecksumMismatch(Sha1), got {err:?}"
+    );
+}
+
+#[test]
+fn preflight_fails_on_uuid_mismatch() {
+    let err = preflight(Path::new(BAD_UUID_IMZML)).expect_err("bad UUID must fail");
+    assert!(
+        matches!(err, IntegrityError::UuidMismatch { .. }),
+        "expected UuidMismatch, got {err:?}"
+    );
+}
+
+#[test]
+fn preflight_fails_on_missing_ibd() {
+    // A temp dir containing ONLY an .imzML (no sibling .ibd) -> MissingIbd.
+    let dir = tempdir();
+    let imzml = dir.join("Lonely.imzML");
+    fs::copy(CONTINUOUS_IMZML, &imzml).unwrap();
+    let err = preflight(&imzml).expect_err("missing .ibd must fail");
+    match err {
+        IntegrityError::MissingIbd { path } => {
+            assert!(
+                path.to_string_lossy().ends_with("Lonely.ibd"),
+                "MissingIbd should name the resolved sibling path, got {path:?}"
+            );
+        }
+        other => panic!("expected MissingIbd, got {other:?}"),
+    }
+    fs::remove_dir_all(&dir).ok();
+}
+
+// ---------------------------------------------------------------------------
+// Task 2 — SPAWNED-BINARY non-zero-exit proof (ROADMAP criterion 3)
+// ---------------------------------------------------------------------------
+
+fn run_preflight_bin(imzml: &Path) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_preflight"))
+        .arg(imzml)
+        .output()
+        .expect("spawn preflight binary")
+}
+
+#[test]
+fn preflight_bin_zero_exit_on_clean() {
+    let out = run_preflight_bin(Path::new(CONTINUOUS_IMZML));
+    assert!(
+        out.status.success(),
+        "clean pair must exit 0; stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[test]
+fn preflight_bin_nonzero_on_bad_checksum() {
+    let out = run_preflight_bin(Path::new(BAD_CHECKSUM_IMZML));
+    assert!(!out.status.success(), "bad checksum must exit NON-ZERO");
+    let stderr = String::from_utf8_lossy(&out.stderr).to_lowercase();
+    assert!(stderr.contains("checksum"), "stderr should mention checksum: {stderr}");
+}
+
+#[test]
+fn preflight_bin_nonzero_on_bad_uuid() {
+    let out = run_preflight_bin(Path::new(BAD_UUID_IMZML));
+    assert!(!out.status.success(), "bad UUID must exit NON-ZERO");
+    let stderr = String::from_utf8_lossy(&out.stderr).to_lowercase();
+    assert!(stderr.contains("uuid"), "stderr should mention UUID: {stderr}");
+}
+
+#[test]
+fn preflight_bin_nonzero_on_missing_ibd() {
+    let dir = tempdir();
+    let imzml = dir.join("Lonely2.imzML");
+    fs::copy(CONTINUOUS_IMZML, &imzml).unwrap();
+    let out = run_preflight_bin(&imzml);
+    assert!(!out.status.success(), "missing .ibd must exit NON-ZERO");
+    let stderr = String::from_utf8_lossy(&out.stderr).to_lowercase();
+    assert!(stderr.contains("ibd"), "stderr should mention ibd: {stderr}");
+    fs::remove_dir_all(&dir).ok();
+}
+
+// ---------------------------------------------------------------------------
 // shared test helpers
 // ---------------------------------------------------------------------------
+
+/// Parse a dashed lowercase UUID into its 16 RFC-4122 bytes (test-only helper).
+mod uuid {
+    pub fn parse_dashed(s: &str) -> [u8; 16] {
+        let hex: String = s.chars().filter(|c| c.is_ascii_hexdigit()).collect();
+        assert_eq!(hex.len(), 32);
+        let mut out = [0u8; 16];
+        for i in 0..16 {
+            out[i] = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).unwrap();
+        }
+        out
+    }
+}
 
 /// Minimal unique temp dir under the OS temp root (no tempfile dep).
 fn tempdir() -> PathBuf {

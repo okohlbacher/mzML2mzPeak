@@ -13,6 +13,13 @@ rust-version = "1.87"
 name = "imzml2mzpeak"
 path = "src/lib.rs"
 
+# The other bins (spike_coords, verify_ibd) are auto-discovered under src/bin/; declare
+# the preflight bin explicitly so CARGO_BIN_EXE_preflight is unambiguous for the spawned
+# integration tests.
+[[bin]]
+name = "preflight"
+path = "src/bin/preflight.rs"
+
 [dependencies]
 # --- CORE compatibility crates: pinned EXACTLY (these fracture the arrow/mzdata
 # type graph if they drift). Versions mirror mzpeak_prototyping's own Cargo.toml. ---
@@ -28,6 +35,14 @@ mzpeaks = "=1.0.9"
 # default-features = false drops the async/object_store/opendal/tokio stack
 # (STACK.md local-file-only v1 variant). ---
 mzpeak_prototyping = { git = "https://github.com/HUPO-PSI/mzPeak", rev = "d1aaaf84595202e2e7f622c576c1d6ba9154e379", default-features = false }
+
+# --- Integrity digest crates (Plan 02-02, IN-07): canonical RustCrypto LEAF crates,
+# pure-Rust with NO shared transitive types with arrow/mzdata, so they cannot fracture
+# the dep graph. Pinned with `=`. The streaming Update/finalize API hashes the .ibd in
+# fixed chunks (never loading the 815MB sidecar). `md-5` is imported as `md5`. ---
+sha1 = "=0.10.6"
+md-5 = "=0.10.6"
+sha2 = "=0.10.9"
 
 # --- Application-boundary helpers: pinned with `=` at upstream-aligned versions. ---
 anyhow = "=1.0.102"
