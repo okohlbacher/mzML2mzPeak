@@ -28,7 +28,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **SPA-01**: Extract per-spectrum spatial coordinates (x, y, and z if present) for every pixel
 - [x] **SPA-02**: Preserve correct coordinate semantics for image reconstruction (origin/indexing base, ordering, no axis flip)
-- [ ] **SPA-03**: Capture run-level imaging metadata where available (pixel size, scan pattern, image dimensions) — reading from the imzML XML header directly if `mzdata` does not surface it
+- [x] **SPA-03**: Capture run-level imaging metadata where available (pixel size, scan pattern, image dimensions) — reading from the imzML XML header directly if `mzdata` does not surface it
 - [ ] **SPA-04**: Preserve the imzML UUID as linkage/provenance in the output
 
 ### Schema — Imaging mzPeak Extension
@@ -110,7 +110,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | IN-08 | Phase 2 | Complete |
 | SPA-01 | Phase 2 | Complete |
 | SPA-02 | Phase 2 | Complete |
-| SPA-03 | Phase 3 | Pending |
+| SPA-03 | Phase 3 | Complete |
 | SPA-04 | Phase 3 | Pending |
 | SCH-01 | Phase 3 | Complete |
 | SCH-02 | Phase 3 | Pending |
