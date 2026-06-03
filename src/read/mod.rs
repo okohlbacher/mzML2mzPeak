@@ -6,7 +6,7 @@
 //! compiles before `stream.rs` exists.
 
 pub mod record;
+pub mod stream;
 
 pub use record::{ImagingSpectrum, NumArray, Representation, RunProvenance, StorageMode};
-
-// Plan 02-03: pub mod stream;
+pub use stream::{ImagingReader, ReadError};
