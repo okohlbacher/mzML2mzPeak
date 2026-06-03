@@ -196,6 +196,21 @@ pub enum VerifyError {
     /// The output spectrum at `index` (a centroid pixel) has no `spectra_peaks` facet.
     #[error("output spectrum {index}: missing peaks facet (spectra_peaks)")]
     MissingPeaksFacet { index: u64 },
+
+    /// The output spectrum at `index` is missing an expected m/z or intensity array in its
+    /// `spectra_data` facet, so the per-axis comparison cannot run.
+    #[error("output spectrum {index}: missing {axis} array in spectra_data")]
+    MissingArray { index: u64, axis: &'static str },
+
+    /// Decoding a `spectra_data` array (`DataArray::to_f32`/`to_f64`) failed while reading the
+    /// output back for comparison. Wraps the underlying retrieval error as an `io::Error`.
+    #[error("output spectrum {index}: failed to decode {axis} array: {source}")]
+    ArrayDecode {
+        index: u64,
+        axis: &'static str,
+        #[source]
+        source: std::io::Error,
+    },
 }
 
 #[cfg(test)]
