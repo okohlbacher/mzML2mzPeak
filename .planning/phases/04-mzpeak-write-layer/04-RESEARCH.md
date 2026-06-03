@@ -77,7 +77,7 @@ Phase 4 is an integration phase, not a research-heavy one: every dependency is a
 | Scan-event coordinate param attachment | `src/write` (NEW) | mzdata `ScanEvent` | Writer reads coords from scan params at write-time, not from struct fields. |
 | Profile/centroid → data/peaks routing | `mzpeak_prototyping` writer (automatic) | `src/write` sets `signal_continuity` | The writer branches internally on `signal_continuity()`; we only set the flag + supply raw arrays. |
 | Run/instrument metadata mapping | `src/write` (NEW) | mzdata `MSDataFileMetadata` | `copy_metadata_from` + setter methods on the writer. |
-| `metadata.imaging` block insert | `src/write` (NEW) | `mzpeak_prototyping::archive::file_index` | Insert into `FileIndex.metadata` map (Phase-3 SCH-02 design). |
+| `metadata.imaging` block insert | `src/write` (NEW) | `mzpeak_prototyping::archive::sync` | Insert into `FileIndex.metadata` map via `ZipArchiveWriter::add_index_metadata` (Phase-3 SCH-02 design; seam confirmed — see Open Questions Q4). |
 | ZIP archive assembly + index | `mzpeak_prototyping` writer (automatic) | — | `build()`/`finish()` produce the ZIP of Parquet + `mzpeak_index.json`. |
 | Round-trip smoke verification | `src/write` (test) | `mzpeak_prototyping::MzPeakReader` | Inline column-resolution test (criterion 4). |
 
@@ -149,8 +149,9 @@ All dependencies are ALREADY PINNED in `Cargo.toml` and present in `Cargo.lock`.
  │         writer.write_spectrum(&mz_spectrum)?       ◄─ auto-routes    │
  │                                              profile→spectra_data    │
  │                                              centroid→spectra_peaks  │
- │    3. insert metadata.imaging into FileIndex.metadata (OUT-03)       │
- │    4. writer.finish()?                            ◄─ flush + ZIP     │
+ │    3. zip = writer.finish_parquet()?  ◄─ flush Parquet, KEEP zip open│
+ │       zip.add_index_metadata("imaging", &imaging_block)?  (OUT-03)   │
+ │       zip.finish()?  ◄─ writes mzpeak_index.json WITH imaging key    │
  │                                                                      │
  └──────────────────────────────────────────────────────────────────┘
        │
@@ -200,7 +201,7 @@ Note: `spec.curie` is `mzpeak_prototyping::param::CURIE` (the schema layer alrea
 ```rust
 // Sources: mzdata spectrum_types.rs:360 (MultiLayerSpectrum::new), scan_properties.rs:717
 // (SpectrumDescription public fields), bindata/array.rs:146/166 (DataArray::wrap/update_buffer),
-// params.rs:1747 (ParamBuilder::curie), :2221 (add_param)
+// params.rs:1730 (ParamBuilder::value), :1747 (ParamBuilder::curie), :2261 (add_param)
 use mzdata::spectrum::{MultiLayerSpectrum, SpectrumDescription, SignalContinuity, ScanEvent};
 use mzdata::spectrum::bindata::{ArrayType, BinaryArrayMap, DataArray, BinaryDataArrayType};
 use mzdata::params::Param;
@@ -251,7 +252,7 @@ fn num_to_dataarray(name: ArrayType, arr: &NumArray) -> DataArray {
     }
 }
 ```
-**Why `update_buffer`:** it asserts `dtype.size_of() == size_of::<T>()` (array.rs:170), so a `Vec<f32>` into a Float32 array and `Vec<f64>` into Float64 preserves the source dtype bit-for-bit (IN-04 / L1). Verify exact `ScanEvent`/`ParamBuilder` field/value-conversion signatures during execution (Open Question 1).
+**Why `update_buffer`:** it asserts `dtype.size_of() == size_of::<T>()` (array.rs:170), so a `Vec<f32>` into a Float32 array and `Vec<f64>` into Float64 preserves the source dtype bit-for-bit (IN-04 / L1). The `ParamBuilder` `.name().curie().value().build()` chain and `scan.add_param` / `scans.push` paths are now confirmed at source (Open Questions Q1, RESOLVED).
 
 ### Pattern 3: Map run/instrument metadata via `MSDataFileMetadata`
 **What:** The writer implements mzdata's `MSDataFileMetadata` trait (`writer.rs:596-599`, `delegate_impl_metadata_trait!`). Copy source metadata and add processing provenance.
@@ -264,15 +265,16 @@ writer.copy_metadata_from(&source_metadata_holder);
 writer.softwares_mut().push(/* imzml2mzpeak Software entry */);
 writer.data_processings_mut().push(/* conversion DataProcessing */);
 ```
-For OUT-03/SPA-04, the `RunProvenance` → `file_description` mapping (UUID→`IMS:1000080`, checksum→`IMS:1000091/90`, mode→`IMS:1000031/30`) is documented in `src/schema/metadata.rs`; attach those params via `writer.file_description_mut()` (an `MSDataFileMetadata` accessor — verify exact name at execution, Open Question 2).
+For OUT-03/SPA-04, the `RunProvenance` → `file_description` mapping (UUID→`IMS:1000080`, checksum→`IMS:1000091/90`, mode→`IMS:1000031/30`) is documented in `src/schema/metadata.rs`; attach those params via `writer.file_description_mut().add_param(...)` — `file_description_mut()` is confirmed on `MSDataFileMetadata` (mzdata `meta/traits.rs:46`) and `FileDescription` is `ParamDescribed` (`meta/file_description.rs:113`), so `.add_param()` is valid (Open Questions Q2, RESOLVED).
 
 ### Anti-Patterns to Avoid
 - **Passing `ImagingSpectrum` directly to `write_spectrum`.** It is not `SpectrumLike`. You MUST reconstruct an mzdata spectrum.
 - **Putting coordinate values into `from_spec`.** `from_spec(curie, name, dtype)` takes NO value — it builds a column. Values come from the per-spectrum scan-event params.
 - **Setting coords as data-facet columns (`add_spectrum_field`).** Coords are scan metadata; use `add_spectrum_scan_field`.
-- **Hand-managing the ZIP / `mzpeak_index.json`.** `build()`/`finish()` own the archive. Insert `metadata.imaging` through the sanctioned `FileIndex.metadata` map only.
+- **Hand-managing the ZIP / `mzpeak_index.json`.** `build()`/`finish()` own the archive. Insert `metadata.imaging` through the sanctioned `ZipArchiveWriter::add_index_metadata` hook only (Q4).
 - **Adding `signal_continuity` inference from data shape.** Honor `Representation` verbatim (matches the read layer's contract).
 - **Coercing dtype to f64.** Use `NumArray` variants → matching `BinaryDataArrayType` (IN-04, L1).
+- **Calling plain `writer.finish()` when an imaging block must be written.** That writes `mzpeak_index.json` immediately and gives no insertion point. Use `finish_parquet()` → `add_index_metadata` → `finish()` (Q4).
 
 ## Don't Hand-Roll
 
@@ -281,8 +283,10 @@ For OUT-03/SPA-04, the `RunProvenance` → `file_description` mapping (UUID→`I
 | Parquet column for a CV param | Custom Arrow `ArrayBuilder` | `CustomBuilderFromParameter::from_spec` | Already handles Int64/Float64/Bool/String/Null + null-append + accession recovery; `unimplemented!` on other dtypes (visitor.rs:238) — Int64 is supported. [VERIFIED] |
 | ZIP archive of Parquet + index | Manual `zip` crate writing | `builder.build(File, true)` + `writer.finish()` | `ZipArchiveWriter` (writer.rs:664) + `finish_parquet` (writer.rs:1111) assemble members + `mzpeak_index.json`. [VERIFIED] |
 | profile/centroid file routing | `if`/`else` on representation in `src/write` | Set `signal_continuity`, supply raw arrays; let `write_spectrum_data` route | Writer branches internally (base.rs:733-744). [VERIFIED] |
+| Centroid peak list construction from raw arrays | Manually build `MZPeakSetType` / centroid peaks | Supply raw arrays + `SignalContinuity::Centroid`; the peak writer ingests the `RawData` array map directly | `MiniPeakWriter::write_peaks` has an explicit `RefPeakDataLevel::RawData(arrays)` arm (mini_peak.rs:78-89). [VERIFIED] (Q3) |
 | Column-name ↔ accession inflection | String formatting | `inflect_cv_term_to_column_name` (writer) / `parse_column_to_curie` (reader) | Already byte-matched and round-trip-proven in Phase-3 tests. [VERIFIED] |
 | Run/instrument metadata serialization | Manual Arrow struct | mzdata `MSDataFileMetadata` delegation | Writer delegates the whole trait (writer.rs:598). [VERIFIED] |
+| `metadata.imaging` JSON insertion | Re-open ZIP and rewrite `mzpeak_index.json` | `ZipArchiveWriter::add_index_metadata("imaging", &block)` between `finish_parquet()` and `finish()` | Sanctioned hook into `FileIndex.metadata` (sync.rs:217). [VERIFIED] (Q4) |
 
 **Key insight:** The entire archive-assembly, column-encoding, and metadata-serialization machinery already exists in the writer. Phase 4's only genuinely new code is the `ImagingSpectrum → mzdata Spectrum` impedance match plus the three-line column registration.
 
@@ -322,18 +326,18 @@ For OUT-03/SPA-04, the `RunProvenance` → `file_description` mapping (UUID→`I
 **How to avoid:** This matches CONTEXT Area 3 (route by representation; only Profile → data). Document that an `Unknown`-representation pixel lands in `spectra_peaks`. The synthetic fixture should use explicit Profile and Centroid pixels so routing is deterministic; decide whether `Unknown` is even reachable for the fixture.
 **Warning signs:** Profile pixels appearing in `spectra_peaks.parquet`, or vice versa — check the `signal_continuity` set on the reconstructed spectrum.
 
-### Pitfall 6: `write_peaks` from raw arrays requires a peak-derivable arrays map
-**What goes wrong:** For a centroid spectrum supplied as raw arrays, the writer takes the `RefPeakDataLevel::RawData` + `Centroid` branch and calls `writer.write_peaks(spectrum_index, time, peaks)` where `peaks = spectrum.peaks()` (base.rs:738-742, 703). `spectrum.peaks()` on a `MultiLayerSpectrum` with only raw arrays returns a `RefPeakDataLevel` derived from the arrays — confirm a raw-array centroid spectrum produces non-empty peaks at write time.
-**Why it happens:** The peaks view is computed from whatever data level is present.
-**How to avoid:** In the fixture, exercise at least one centroid spectrum and assert (via the smoke test or a `len()` check) that `spectra_peaks` received its points. If raw-array centroids do not surface peaks as expected, the fallback is to populate the centroid peak list explicitly. Resolve during execution (Open Question 3).
-**Warning signs:** Empty `spectra_peaks.parquet` for centroid input.
+### Pitfall 6: `write_peaks` from raw arrays — confirmed to ingest the array map directly
+**What goes wrong:** A previously-feared failure mode (empty `spectra_peaks` for raw-array centroids) does NOT occur. For a centroid spectrum supplied as raw arrays, the writer takes the `RefPeakDataLevel::RawData` + `Centroid` branch and calls `writer.write_peaks(spectrum_index, time, peaks)` where `peaks = spectrum.peaks()` (base.rs:738-742). `peaks()` on an arrays-only `MultiLayerSpectrum` returns `RefPeakDataLevel::RawData(arrays)` (spectrum_types.rs:1019), and `MiniPeakWriter::write_peaks` has an explicit `RawData(arrays)` arm that converts the array map directly via `array_map_to_schema_arrays_and_excess` + `add_arrays` (mini_peak.rs:78-89). No explicit peak list is required.
+**Why it happens:** The peak writer is array-map aware; `n = peaks.len()` = the raw m/z point count (peaks.rs:649-656).
+**How to avoid:** Still assert non-empty `spectra_peaks` for the centroid fixture pixel in the smoke test as a regression guard — but the code path is now verified at source (Open Questions Q3, RESOLVED), so no explicit peak-list fallback is needed.
+**Warning signs:** Empty `spectra_peaks.parquet` for centroid input would indicate a different bug (e.g. arrays not attached), not the feared peaks() behavior.
 
 ## Code Examples
 
 ### Full convert + finish sequence (the canonical write path)
 ```rust
 // Sources: examples/convert.rs (build/copy_metadata_from/write_spectrum/finish),
-// writer/builder.rs:281 (build), writer.rs:1117 (finish)
+// writer/builder.rs:281 (build), writer.rs:1111 (finish_parquet), archive/sync.rs:217 (add_index_metadata)
 use std::fs::File;
 use mzpeak_prototyping::writer::{AbstractMzPeakWriter, MzPeakWriterType, CustomBuilderFromParameter};
 use arrow::datatypes::DataType;
@@ -348,7 +352,7 @@ pub fn convert(reader: ImagingReader, out_path: &std::path::Path) -> Result<(), 
     // build(writer, mask_zero_intensity_runs); pass true to mirror the example.
     let mut writer = builder.build(handle, true);
 
-    // OUT-03 metadata (copy_metadata_from + softwares/data_processings + file_description).
+    // OUT-03 metadata (copy_metadata_from + softwares/data_processings + file_description.add_param).
     // ... map RunProvenance + ImagingRunMetadata here ...
 
     for item in reader {                       // streaming, one at a time (IN-08)
@@ -357,14 +361,15 @@ pub fn convert(reader: ImagingReader, out_path: &std::path::Path) -> Result<(), 
         writer.write_spectrum(&mz_spec)?;      // auto-routes by signal_continuity
     }
 
-    // metadata.imaging insert into FileIndex.metadata happens at/before finish
-    // (exact insertion seam: see archive/file_index.rs:179-196 per Phase-3 metadata.rs doc).
-
-    writer.finish()?;                          // flush all facets + emit ZIP + mzpeak_index.json
+    // OUT-03: flush Parquet but KEEP the ZIP open, inject metadata.imaging, then finalize.
+    let mut zip = writer.finish_parquet()?;            // -> ZipArchiveWriter (writer.rs:1111)
+    zip.add_index_metadata("imaging", &imaging_block)  // -> FileIndex.metadata (sync.rs:217)
+        .map_err(WriteError::Json)?;
+    zip.finish()?;                                     // writes mzpeak_index.json WITH the imaging key
     Ok(())
 }
 ```
-Note: `finish(&mut self)` (writer.rs:1117) returns `Result<(), parquet::errors::ParquetError>`; `WriteError` must wrap it. `write_spectrum` returns `io::Result<()>`. Map both into the `thiserror` enum.
+Note: `finish_parquet(self)` (writer.rs:1111) returns `Result<ZipArchiveWriter<W>, parquet::errors::ParquetError>` and consumes the writer; `add_index_metadata` returns `Result<(), serde_json::Error>`; `ZipArchiveWriter::finish(self)` returns `ZipResult<()>` (sync.rs:211) and writes the index. `write_spectrum` returns `io::Result<()>`. Map all into the `thiserror` enum. (If no imaging block were needed, plain `writer.finish()` would suffice — but OUT-03 requires the imaging block, so use the `finish_parquet` path.)
 
 ### Round-trip column-resolution smoke test (criterion 4 / OUT-04)
 ```rust
@@ -394,32 +399,39 @@ The reader recovers `IMS:1000050` because `parse_column_to_curie("IMS_1000050_po
 
 ## Assumptions Log
 
-| # | Claim | Section | Risk if Wrong |
-|---|-------|---------|---------------|
-| A1 | `Param::builder().name(..).curie(..).value(..).build()` is the exact value-attachment API; `.value()` accepts an `i64` via `Into<Value>` | Pattern 2 | LOW — `ParamBuilder` confirmed at params.rs:1747-1768 (`curie`, `unit`, `build` present); `Param::new_key_value<V: Into<Value>>` confirms `i64: Into<Value>`. The `.value()` builder method name should be confirmed at execution. If absent, use `Param::new_key_value("position x", s.x)` then `.curie(curie!(IMS:1000050))` on a mutable Param. |
-| A2 | `descr.acquisition.scans.push(scan)` is the correct way to attach a scan event | Pattern 2 | LOW — `Acquisition.scans: ScanEventList` is a public field (scan_properties.rs:294); `ScanEventList` is a Vec alias. `push` is standard. |
-| A3 | A raw-array centroid `MultiLayerSpectrum` yields non-empty `peaks()` so `spectra_peaks` is populated | Pitfall 6 | MEDIUM — the write path calls `spectrum.peaks()` for the Centroid raw-array branch; whether that derives peaks from raw arrays needs a runtime check. Mitigated by the inline smoke test on the centroid fixture pixel. |
-| A4 | `file_description_mut()` (or equivalent) is the `MSDataFileMetadata` accessor for attaching provenance CV params | Pattern 3 | LOW — delegated trait provides file-description access; exact accessor name confirmed at execution against mzdata 0.63.3 `MSDataFileMetadata`. |
-| A5 | Inserting `metadata.imaging` into `FileIndex.metadata` is reachable through the writer/finish path | Code Examples, OUT-03 | MEDIUM — Phase-3 `metadata.rs` documents the insertion against `archive/file_index.rs:179-196`, but the WRITER's exposure of that map (vs. constructing the index) must be confirmed in `writer.rs`/`archive/sync.rs` at execution. If the writer does not expose the metadata map, the imaging block may need to be set via a builder/finish hook. |
+> All four entries below were originally `[ASSUMED]` pending source confirmation. As of the 2026-06-03 resolution pass (see Open Questions (RESOLVED)), A1, A2, A3, and A4/A5 are confirmed against the vendored source at file:line. They are retained here for traceability; none remain open.
 
-## Open Questions
+| # | Claim | Section | Risk if Wrong | Status |
+|---|-------|---------|---------------|--------|
+| A1 | `Param::builder().name(..).curie(..).value(..).build()` is the exact value-attachment API; `.value()` accepts an `i64` via `Into<Value>` | Pattern 2 | RESOLVED — `ParamBuilder::value<V: Into<Value>>` at params.rs:1730; `param_value_int!(i64)` at params.rs:577 supplies `i64: Into<Value>`; `.name()`, `.curie(CURIE)`, `.build()` at params.rs:1725/1747/1759. | CONFIRMED |
+| A2 | `descr.acquisition.scans.push(scan)` is the correct way to attach a scan event | Pattern 2 | RESOLVED — `Acquisition.scans: ScanEventList` public field (scan_properties.rs:294); `ScanEventList = Vec<ScanEvent>` (scan_properties.rs:224). | CONFIRMED |
+| A3 | A raw-array centroid `MultiLayerSpectrum` populates `spectra_peaks` | Pitfall 6 | RESOLVED — `MiniPeakWriter::write_peaks` has an explicit `RefPeakDataLevel::RawData(arrays)` arm (mini_peak.rs:78-89) that ingests the array map; `peaks()` returns `RawData` for arrays-only spectra (spectrum_types.rs:1019). Not runtime-dependent. | CONFIRMED |
+| A4 | `file_description_mut()` is the `MSDataFileMetadata` accessor for attaching provenance CV params | Pattern 3 | RESOLVED — `MSDataFileMetadata::file_description_mut(&mut self) -> &mut FileDescription` (meta/traits.rs:46); `FileDescription: ParamDescribed` (meta/file_description.rs:113) provides `.add_param`. | CONFIRMED |
+| A5 | Inserting `metadata.imaging` into `FileIndex.metadata` is reachable through the writer/finish path | Code Examples, OUT-03 | RESOLVED — `ZipArchiveWriter::add_index_metadata(key, &value)` (sync.rs:217) inserts into `FileIndex.metadata`; reachable via `writer.finish_parquet() -> ZipArchiveWriter` (writer.rs:1111) before `.finish()` writes the index. | CONFIRMED |
+
+## Open Questions (RESOLVED)
+
+> All four questions raised during initial research have been resolved against the vendored source on 2026-06-03 (`mzpeak_prototyping@d1aaaf8`, `mzdata 0.63.3`). No question remains open. Q1–Q4 are confirmed at source (file:line); none required an assert-at-runtime fallback.
 
 1. **Exact `Param` value-attachment + `ScanEvent` push API in mzdata 0.63.3.**
    - What we know: `ParamBuilder` has `.curie()`, `.unit()`, `.build()` (params.rs:1747); `Param::new_key_value<V: Into<Value>>` proves `i64` converts; `Acquisition.scans` is a public `ScanEventList`.
    - What's unclear: whether the builder exposes a `.value()` setter or whether you set `param.value` after `new_key_value`.
-   - Recommendation: confirm in `vendor/mzdata/src/params.rs` during the first execution task; trivially adjusted.
+   - **RESOLVED:** `ParamBuilder` DOES expose a fluent `.value()` setter: `pub fn value<V: Into<Value>>(mut self, value: V) -> Self` at `mzdata-0.63.3/src/params.rs:1730`. `i64: Into<Value>` is provided by the macro invocation `param_value_int!(i64)` at `params.rs:577` (mapping to `Value::Int(value as i64)`). The full chain `Param::builder().name(S).curie(CURIE).value(i64).build()` is valid: `name` at `params.rs:1725`, `curie` at `params.rs:1747`, `build` at `params.rs:1759`. Attaching the param uses `add_param`, a default method on the `ParamDescribed` trait (`params.rs:2261`); `ScanEvent` gets that trait via `impl_param_described_deferred!(SelectedIon, Acquisition, ScanEvent)` at `scan_properties.rs:819`. The scan event is pushed onto `Acquisition.scans`, a public `ScanEventList` (`= Vec<ScanEvent>`, `scan_properties.rs:224`) field at `scan_properties.rs:294`, so `.push(scan)` is correct. No post-hoc `param.value` mutation needed. (Pattern 2 in this doc already matches this exact API.)
 
 2. **The exact `MSDataFileMetadata` accessor for file-description provenance params.**
    - What we know: writer delegates the full trait (writer.rs:598); `softwares_mut`/`data_processings_mut` confirmed used in examples.
    - What's unclear: exact method name for mutable file-description access.
-   - Recommendation: check the mzdata `MSDataFileMetadata` trait surface (`vendor/mzdata`); map SPA-04 params there per the Phase-3 `metadata.rs` plan.
+   - **RESOLVED:** The accessor is `file_description_mut(&mut self) -> &mut FileDescription`, declared on the `MSDataFileMetadata` trait at `mzdata-0.63.3/src/meta/traits.rs:46` (alongside `file_description(&self) -> &FileDescription` at `:22`, `softwares_mut` at `:48`, `data_processings_mut` at `:41`). The writer delegates the whole trait via `mzdata::delegate_impl_metadata_trait!(mz_metadata)` (`writer.rs:598`), so `writer.file_description_mut()` is available. `FileDescription` implements `ParamDescribed` (`meta/file_description.rs:113`; it has a `pub params: ParamList` field at `:30`), so the SPA-04 provenance CV terms attach via `writer.file_description_mut().add_param(Param::builder()...build())`.
 
 3. **Centroid raw-array → `spectra_peaks` population.**
    - What we know: routing branch calls `write_peaks(idx, time, spectrum.peaks())` (base.rs:742).
    - What's unclear: whether `peaks()` on a raw-array-only spectrum surfaces points.
-   - Recommendation: assert non-empty `spectra_peaks` for the centroid fixture pixel in the smoke test; if empty, populate the peak list explicitly in `to_mzdata` for centroid representation.
+   - **RESOLVED:** This is NOT runtime-dependent — it is decided in source. `MultiLayerSpectrum::peaks()` (the `SpectrumLike` impl at `mzdata-0.63.3/src/spectrum/spectrum_types.rs:1019`) returns `RefPeakDataLevel::RawData(arrays)` when only `self.arrays` is populated (i.e. neither `peaks` nor `deconvoluted_peaks` is set). The writer's `Centroid | Unknown` branch (`base.rs:738-744`) calls `get_or_create_spectrum_peak_writer().write_peaks(spectrum_index, time, peaks)` with that `RawData` level. `MiniPeakWriter::write_peaks` (`writer/mini_peak.rs:52`) has an explicit `RefPeakDataLevel::RawData(arrays)` match arm (`mini_peak.rs:78-89`) that calls `array_map_to_schema_arrays_and_excess(BufferContext::Spectrum, arrays, n, ...)` then `self.buffers.add_arrays(fields, cols, n, false)`, where `n = peaks.len()` and `RefPeakDataLevel::len()` for `RawData` returns `SummaryOps::len(arrays)` = the m/z point count (`peaks.rs:649-656`). So a raw-array centroid spectrum populates `spectra_peaks` directly from the array map; NO explicit peak-list construction is required in `to_mzdata`. The smoke-test non-empty assertion is kept only as a regression guard, not because the behavior is uncertain.
 
-4. **`metadata.imaging` insertion seam through the writer.** See Assumption A5 — confirm whether `MzPeakWriterType` exposes the `FileIndex.metadata` map or whether the block is injected at `finish`/builder time.
+4. **`metadata.imaging` insertion seam through the writer.**
+   - What we know: `FileIndex.metadata: HashMap<String, serde_json::Value>` exists (archive/file_index.rs:181).
+   - What was unclear: whether `MzPeakWriterType` exposes the map, or whether the block is injected at builder/finish time, or by post-`finish()` JSON mutation.
+   - **RESOLVED:** The seam is a dedicated writer-side hook, NOT the builder and NOT post-`finish()` mutation. `ZipArchiveWriter::add_index_metadata(&mut self, key: &str, value: &impl serde::Serialize) -> Result<(), serde_json::Error>` (`d1aaaf8/src/archive/sync.rs:217-226`) inserts directly into `FileIndex.metadata` via `self.index.metadata.insert(key.to_string(), serde_json::to_value(value)?)`. The `ZipArchiveWriter` is obtained from the writer by calling `MzPeakWriterType::finish_parquet(self) -> Result<ZipArchiveWriter<W>, ParquetError>` (`writer.rs:1111`), whose doc comment states: "Use this method when you want to add additional files to the ZIP archive after the Parquet entries are finished" (`writer.rs:1101-1106`). The `mzpeak_index.json` is written only by `ZipArchiveWriter::finish(self)` / its `Drop` impl via `write_index()` (`sync.rs:200-214, 75`), which runs AFTER `add_index_metadata`. Therefore the correct sequence is: `let zip = writer.finish_parquet()?; zip.add_index_metadata("imaging", &imaging_block)?; zip.finish()?;`. The plain `writer.finish()` convenience method (`writer.rs:1117`) does `finish_parquet_inner()` then immediately `writer.finish()` with no insertion point, so it must NOT be used when an imaging block is required. (This supersedes the earlier note that cited `archive/file_index.rs:179-196` as the seam — the field exists there, but the *write-time mutation hook* is `add_index_metadata` in `sync.rs`.)
 
 ## Environment Availability
 
@@ -496,17 +508,22 @@ The reader recovers `IMS:1000050` because `parse_column_to_curie("IMS_1000050_po
   - `examples/convert.rs` — canonical builder→`build`→`write_spectrum`→`finish` flow, `copy_metadata_from`, `softwares_mut`, `data_processings_mut`.
   - `src/writer/builder.rs:127,227,281` — `add_spectrum_array_override`, `add_spectrum_scan_field<T: StructVisitorBuilder<ScanEvent>>`, `build`.
   - `src/writer/visitor.rs:90,136,155,197,238,305-364` — `StructVisitorBuilder`, `inflect_cv_term_to_column_name`, `CustomBuilderFromParameter`, `from_spec`, the Int64/`unimplemented!` dtype gate, `append_value`/`get_param_by_curie`.
-  - `src/writer/base.rs:307,446,694-757` — `AbstractMzPeakWriter`, `write_spectrum`, `write_spectrum_data` routing (Profile→data / Centroid|Unknown→peaks).
-  - `src/writer.rs:596-599,607,664,1111,1117` — `MSDataFileMetadata` delegation, `builder`, `ZipArchiveWriter`, `finish_parquet`, `finish`.
+  - `src/writer/base.rs:233,307,446,608,694-757` — `write_peaks` (pub + trait), `AbstractMzPeakWriter`, `write_spectrum`, `write_spectrum_data` routing (Profile→data / Centroid|Unknown→peaks).
+  - `src/writer/mini_peak.rs:52-105` — `MiniPeakWriter::write_peaks` with the explicit `RefPeakDataLevel::RawData(arrays)` arm (Q3).
+  - `src/writer.rs:463,494,596-599,607,664,857,1111,1117` — `archive_writer` field, `append_key_value_metadata`, `MSDataFileMetadata` delegation, `builder`, `ZipArchiveWriter::new`, `finish_parquet_inner`, `finish_parquet`, `finish`.
+  - `src/archive/sync.rs:69,75,200-214,217-226` — `ZipArchiveWriter` struct, `Drop`→`write_index`, `write_index`/`finish`, `add_index_metadata` (Q4).
+  - `src/archive/file_index.rs:179-196` — `FileIndex` struct, `metadata: HashMap<String, serde_json::Value>` field, `index_file_name`.
   - `src/reader.rs:307,920,1228` — `MzPeakReader::new`, `get_spectrum_metadata`, `get_spectrum`.
   - `src/reader/visitor.rs:93,130,2264` — `parse_delimited_curie`, `parse_column_to_curie`, `MzScanVisitor::visit_as_param`.
-  - `src/archive/file_index.rs` — `FileIndex.metadata` map (per Phase-3 `metadata.rs` cite of `:179-196`).
 - Vendored/registry `mzdata 0.63.3`:
-  - `src/params.rs:1922,1747-1768,2178,2221` — `ControlledVocabulary::IMS`, `ParamBuilder`, IMS prefix parse, `ParamDescribedMut::add_param`.
-  - `src/spectrum/spectrum_types.rs:360,1520` — `MultiLayerSpectrum::new`, `Spectrum = MultiLayerSpectrum<CentroidPeak, DeconvolutedPeak>`.
-  - `src/spectrum/scan_properties.rs:137,294,304-308,717-737` — `ScanEvent`, `Acquisition.scans`, `first_scan(_mut)`, `SpectrumDescription` public fields.
+  - `src/params.rs:577,1716-1768,1791,1922,2178,2261` — `param_value_int!(i64)` (`i64: Into<Value>`), `ParamBuilder` (`name`/`value`/`curie`/`build`), `new_key_value`, `ControlledVocabulary::IMS`, IMS prefix parse, `ParamDescribed::add_param`.
+  - `src/spectrum/spectrum_types.rs:360,1019,1520` — `MultiLayerSpectrum::new`, `SpectrumLike::peaks` (RawData fallthrough), `Spectrum = MultiLayerSpectrum<CentroidPeak, DeconvolutedPeak>`.
+  - `src/spectrum/peaks.rs:568,649-656` — `RefPeakDataLevel` enum, `len()` for `RawData` (= array point count).
+  - `src/spectrum/scan_properties.rs:137,224,294,304-308,717-737,819` — `ScanEvent`, `ScanEventList = Vec<ScanEvent>`, `Acquisition.scans`, `first_scan(_mut)`, `SpectrumDescription` public fields, `impl_param_described_deferred!` for `ScanEvent`.
   - `src/spectrum/bindata/array.rs:146,166` — `DataArray::wrap`, `update_buffer` (dtype-size assertion).
   - `src/spectrum/bindata/map.rs:27,149` — `BinaryArrayMap::new`, `add`.
+  - `src/meta/traits.rs:13,22,41,46,48,59` — `MSDataFileMetadata` trait: `file_description`, `data_processings_mut`, `file_description_mut`, `softwares_mut`, `copy_metadata_from`.
+  - `src/meta/file_description.rs:30,73,113` — `FileDescription.params`, struct, `impl ParamDescribed for FileDescription`.
 - Project source: `src/read/record.rs`, `src/read/stream.rs`, `src/schema/{columns,metadata,geometry,tolerance,mod}.rs`, `Cargo.toml`, `Cargo.lock`.
 - `docs/mzpeak-spec-conformance-issues.md` — Groups A (schema≠code), B (spec≠code), C1/C5 (Python IMS crash), B4 (no scan PK).
 - `.planning/phases/04-mzpeak-write-layer/04-CONTEXT.md`, `.planning/REQUIREMENTS.md`, `.planning/STATE.md`, `.planning/config.json`.
@@ -523,7 +540,7 @@ The reader recovers `IMS:1000050` because `parse_column_to_curie("IMS_1000050_po
 - Standard stack: HIGH — all versions pinned `=`, Cargo.lock committed, ENV-01 complete.
 - Architecture / call sequence: HIGH — every API verified file:line against vendored `d1aaaf8`.
 - Pitfalls: HIGH — derived directly from the writer/reader source and the conformance doc.
-- Open Questions (Param/scan API exact names, centroid peak surfacing, metadata.imaging insertion seam): MEDIUM — confirmable trivially at the first execution task; do not block planning.
+- Open Questions (Param/scan API, file-description accessor, centroid peak surfacing, metadata.imaging seam): HIGH — all four resolved at source file:line on 2026-06-03 (Q1 params.rs:1730/577; Q2 meta/traits.rs:46; Q3 mini_peak.rs:78-89; Q4 archive/sync.rs:217). No open items remain.
 
 **Research date:** 2026-06-03
 **Valid until:** 2026-07-03 (stable — pinned deps, vendored source; only re-verify if the `mzpeak_prototyping` rev is bumped).

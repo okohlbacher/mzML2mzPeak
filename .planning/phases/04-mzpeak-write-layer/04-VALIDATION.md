@@ -1,8 +1,8 @@
 ---
 phase: 4
 slug: mzpeak-write-layer
-status: draft
-nyquist_compliant: false
+status: ready
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-06-03
 ---
@@ -40,10 +40,12 @@ created: 2026-06-03
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 4-xx | TBD | TBD | OUT-01 | T-4-zip | ZIP/Parquet archive written; no path traversal in archive entry names | integration | `cargo test write::archive_valid` | ❌ W0 | ⬜ pending |
-| 4-xx | TBD | TBD | OUT-02 | — | coordinate columns registered via `add_spectrum_scan_field`/`from_spec` only; zero core-struct edits | integration | `cargo test write::scan_fields` | ❌ W0 | ⬜ pending |
-| 4-xx | TBD | TBD | OUT-03 | — | PSI-MS/IMS metadata + `metadata.imaging` block land in archive | integration | `cargo test write::metadata_imaging` | ❌ W0 | ⬜ pending |
-| 4-xx | TBD | TBD | OUT-04 | — | reference reader resolves `IMS:1000050`/`1000051` by accession | integration | `cargo test write::roundtrip_resolve_accession` | ❌ W0 | ⬜ pending |
+| Plan01-T1 | 04-01 | 1 | OUT-02 | T-04-SC | `write` module declared; single mzdata/arrow copy (no pin fracture) | build | `cargo build 2>&1 \| tail -5` | ❌ W0 | ⬜ pending |
+| Plan01-T2 | 04-01 | 1 | OUT-02 | T-04-01 | `to_mzdata` re-attaches `IMS:1000050/51/52` scan params; source dtype preserved; no panic on empty/ms0 | unit | `cargo test --lib write::spectrum` | ❌ W0 | ⬜ pending |
+| Plan02-T1 | 04-02 | 2 | OUT-02 | — | coordinate columns registered via `add_spectrum_scan_field`/`from_spec` only; zero core-struct edits | unit | `cargo test --lib write::writer` | ❌ W0 | ⬜ pending |
+| Plan02-T2 | 04-02 | 2 | OUT-03 | — | PSI-MS/IMS metadata + provenance→file_description by accession | unit | `cargo test --lib write::writer` | ❌ W0 | ⬜ pending |
+| Plan03-T1 | 04-03 | 3 | OUT-01 | T-04-zip | streaming `convert()`; `finish_parquet→add_index_metadata("imaging")→finish` seam; `WriteError::Io` propagates | unit | `cargo test --lib write::convert` | ❌ W0 | ⬜ pending |
+| Plan03-T2 | 04-03 | 3 | OUT-01/02/03/04 | T-04-zip | archive opens in reference reader; resolves `IMS:1000050`/`1000051` by accession (value-equality); `metadata.imaging` present | integration | `cargo test --test write_roundtrip` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -71,11 +73,11 @@ created: 2026-06-03
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 120s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (write-layer fixtures created in Plan 03 Task 2)
+- [x] No watch-mode flags
+- [x] Feedback latency < 120s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-06-03 (per-task map aligned to finalized 3-plan breakdown; `wave_0_complete` flips true once `tests/write_roundtrip.rs` lands in Plan 03 Task 2)
