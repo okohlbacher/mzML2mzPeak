@@ -28,9 +28,15 @@ use std::path::Path;
 use mzpeak_prototyping::archive::ZipArchiveWriter;
 use mzpeak_prototyping::writer::{CustomBuilderFromParameter, MzPeakWriterType};
 
+use mzdata::curie;
+use mzdata::meta::{DataProcessing, ProcessingMethod, Software, custom_software_name};
+use mzdata::params::Param;
+use mzdata::prelude::{MSDataFileMetadata, ParamDescribed};
 use mzdata::spectrum::MultiLayerSpectrum;
 
-use crate::schema::ImagingMetadata;
+use crate::read::{RunProvenance, StorageMode};
+use crate::schema::{ImagingMetadata, ImagingRunMetadata};
+use crate::schema::metadata::{AxisPair, PixelCount};
 
 /// A typed write-layer failure.
 ///
@@ -120,6 +126,125 @@ impl ImagingWriter {
         Ok(())
     }
 
+    /// Wire run-level metadata (OUT-03) and assemble the `metadata.imaging` block.
+    ///
+    /// In order:
+    ///   (a) copies all source PSI-MS + IMS metadata from `source` (`copy_metadata_from`);
+    ///   (b) records `imzml2mzpeak` conversion provenance — a [`Software`] entry plus a
+    ///       conversion [`DataProcessing`] / [`ProcessingMethod`];
+    ///   (c) maps [`RunProvenance`] into `file_description` by IMS accession (SPA-04, per
+    ///       `src/schema/metadata.rs`): UUID→`IMS:1000080`, checksum→`IMS:1000091` (SHA-1) /
+    ///       `IMS:1000090` (MD5) keyed on `ibd_checksum_type`, mode→`IMS:1000031` (processed) /
+    ///       `IMS:1000030` (continuous);
+    ///   (d) ASSEMBLES the [`ImagingMetadata`] block from `geom` + `prov` and STORES it on the
+    ///       writer (exposed via [`ImagingWriter::imaging_metadata`]).
+    ///
+    /// It does NOT insert the imaging block into the archive index — that is the finish-stage
+    /// `add_index_metadata("imaging", ..)` call on the `ZipArchiveWriter`, owned by Plan 03
+    /// (RESEARCH.md Q4, RESOLVED). No CV params are hand-invented beyond what source/provenance
+    /// supplies (CONTEXT Area 4); no JSON-schema validator is added (CONTEXT Area 2).
+    pub fn write_run_metadata(
+        &mut self,
+        source: &impl MSDataFileMetadata,
+        prov: &RunProvenance,
+        geom: Option<&ImagingRunMetadata>,
+    ) -> Result<(), WriteError> {
+        // (a) Copy all source PSI-MS + IMS metadata verbatim.
+        self.inner.copy_metadata_from(source);
+
+        // (b) Record imzml2mzpeak conversion provenance (software + data_processing),
+        //     adapting the reference example's add_processing_metadata shape.
+        self.inner.softwares_mut().push(Software::new(
+            "imzml2mzpeak".into(),
+            env!("CARGO_PKG_VERSION").into(),
+            vec![custom_software_name("imzml2mzpeak")],
+        ));
+        self.inner.data_processings_mut().push(DataProcessing {
+            id: "imzml2mzpeak_conversion".to_string(),
+            methods: vec![ProcessingMethod {
+                order: 1,
+                software_reference: "imzml2mzpeak".to_string(),
+                params: vec![Param::new_key_value(
+                    "conversion",
+                    "imzML to imaging mzPeak",
+                )],
+            }],
+        });
+
+        // (c) Map RunProvenance → file_description by IMS accession (SPA-04). Attach via the
+        //     MSDataFileMetadata file_description accessor (FileDescription: ParamDescribed).
+        let fd = self.inner.file_description_mut();
+        if let Some(uuid) = prov.uuid.as_deref() {
+            // IMS:1000080 — universally unique identifier (linkage/provenance only, V6).
+            fd.add_param(
+                Param::builder()
+                    .name("universally unique identifier")
+                    .curie(curie!(IMS:1000080))
+                    .value(uuid)
+                    .build(),
+            );
+        }
+        if let Some(checksum) = prov.ibd_checksum.as_deref() {
+            // Key the checksum accession on the declared algorithm: SHA-1 → IMS:1000091,
+            // MD5 → IMS:1000090. An unrecognized/absent type is not hand-invented (skip).
+            let kind = prov.ibd_checksum_type.as_deref().unwrap_or("");
+            if kind.eq_ignore_ascii_case("SHA-1") || kind.eq_ignore_ascii_case("SHA1") {
+                fd.add_param(
+                    Param::builder()
+                        .name("ibd SHA-1")
+                        .curie(curie!(IMS:1000091))
+                        .value(checksum)
+                        .build(),
+                );
+            } else if kind.eq_ignore_ascii_case("MD5") {
+                fd.add_param(
+                    Param::builder()
+                        .name("ibd MD5")
+                        .curie(curie!(IMS:1000090))
+                        .value(checksum)
+                        .build(),
+                );
+            }
+        }
+        match prov.data_mode {
+            // Mode is a presence-only CV term (no value): processed → IMS:1000031,
+            // continuous → IMS:1000030. Unknown is not backfilled (no accession emitted).
+            StorageMode::Processed => fd.add_param(
+                Param::builder()
+                    .name("processed")
+                    .curie(curie!(IMS:1000031))
+                    .build(),
+            ),
+            StorageMode::Continuous => fd.add_param(
+                Param::builder()
+                    .name("continuous")
+                    .curie(curie!(IMS:1000030))
+                    .build(),
+            ),
+            StorageMode::Unknown => {}
+        }
+
+        // (d) Assemble + store the metadata.imaging block from geometry + provenance. The
+        //     typed block is passed through to Plan 03's add_index_metadata, which serializes
+        //     it; building serde_json::to_value here is NOT required.
+        self.imaging_block = Some(assemble_imaging_metadata(geom));
+
+        Ok(())
+    }
+
+    /// The assembled `metadata.imaging` block, for Plan 03 to insert at the finish stage via
+    /// `zip.add_index_metadata("imaging", writer.imaging_metadata())`. Returns the discovery
+    /// block assembled by [`ImagingWriter::write_run_metadata`].
+    ///
+    /// # Panics
+    /// Panics if called before `write_run_metadata` has run (the block is unset). Plan 03
+    /// always wires metadata before finishing, so this is a programming-error guard.
+    pub fn imaging_metadata(&self) -> &ImagingMetadata {
+        self.imaging_block
+            .as_ref()
+            .expect("imaging metadata block assembled by write_run_metadata before finish")
+    }
+
     /// Flush the Parquet facets and return the still-open `ZipArchiveWriter`.
     ///
     /// This deliberately does NOT write `mzpeak_index.json`. Plan 03's orchestrator owns the
@@ -130,6 +255,39 @@ impl ImagingWriter {
     pub fn finish_parquet(self) -> Result<ZipArchiveWriter<File>, WriteError> {
         let zip = self.inner.finish_parquet()?;
         Ok(zip)
+    }
+}
+
+/// Assemble the `metadata.imaging` discovery block from parsed run geometry.
+///
+/// `is_imaging` is always `true` and `coordinate_base` is fixed at `1` (top-left origin,
+/// 1-based, no flip — §5.1). Every geometry field is OPTIONAL and only populated when BOTH
+/// axes are present (an `{x, y}` pair is meaningless with one axis missing); absent geometry
+/// stays `None` and is omitted from the emitted JSON via `skip_serializing_if`. No CV terms
+/// are hand-invented — only what the geometry parse supplied (CONTEXT Area 4).
+fn assemble_imaging_metadata(geom: Option<&ImagingRunMetadata>) -> ImagingMetadata {
+    let pixel_count = geom.and_then(|g| match (g.grid_x, g.grid_y) {
+        (Some(x), Some(y)) => Some(PixelCount { x, y }),
+        _ => None,
+    });
+    let pixel_size_um = geom.and_then(|g| match (g.pixel_size_x, g.pixel_size_y) {
+        (Some(x), Some(y)) => Some(AxisPair { x, y }),
+        _ => None,
+    });
+    let max_dimension_um = geom.and_then(|g| match (g.max_dimension_x, g.max_dimension_y) {
+        (Some(x), Some(y)) => Some(AxisPair { x, y }),
+        _ => None,
+    });
+    ImagingMetadata {
+        is_imaging: true,
+        pixel_count,
+        pixel_size_um,
+        max_dimension_um,
+        scan_pattern: geom.and_then(|g| g.scan_pattern.clone()),
+        scan_type: geom.and_then(|g| g.scan_type.clone()),
+        line_scan_direction: geom.and_then(|g| g.line_scan_direction.clone()),
+        linescan_sequence: geom.and_then(|g| g.linescan_sequence.clone()),
+        coordinate_base: 1,
     }
 }
 
@@ -176,6 +334,95 @@ mod tests {
         // finish_parquet hands back an open ZIP; dropping it finalizes the (empty) archive.
         let zip = w.finish_parquet().expect("finish_parquet yields an open ZipArchiveWriter");
         drop(zip);
+        let _ = std::fs::remove_file(&out);
+    }
+
+    /// write_run_metadata maps RunProvenance into file_description by IMS accession and
+    /// assembles the metadata.imaging block (OUT-03 / SPA-04).
+    #[test]
+    fn write_run_metadata_maps_provenance_and_assembles_block() {
+        use mzdata::meta::FileMetadataConfig;
+        use mzdata::prelude::ParamDescribed;
+
+        let mut out = std::env::temp_dir();
+        out.push(format!("imzml2mzpeak_writer_meta_{}.mzpeak", std::process::id()));
+        let mut w = ImagingWriter::new(&out).expect("build writer");
+
+        let prov = RunProvenance {
+            uuid: Some("4f8c2e1a-0000-4000-8000-000000000abc".to_string()),
+            data_mode: StorageMode::Processed,
+            ibd_checksum: Some("da39a3ee5e6b4b0d3255bfef95601890afd80709".to_string()),
+            ibd_checksum_type: Some("SHA-1".to_string()),
+        };
+        let geom = ImagingRunMetadata {
+            grid_x: Some(260),
+            grid_y: Some(134),
+            scan_pattern: Some("IMS:1000413".to_string()),
+            ..Default::default()
+        };
+        let source = FileMetadataConfig::default();
+
+        w.write_run_metadata(&source, &prov, Some(&geom))
+            .expect("metadata wiring succeeds");
+
+        // file_description carries the provenance params, resolvable by accession.
+        let fd = w.inner.file_description_mut();
+        let uuid_param = fd
+            .get_param_by_curie(&curie!(IMS:1000080))
+            .expect("UUID maps to IMS:1000080");
+        assert_eq!(uuid_param.value.to_string(), "4f8c2e1a-0000-4000-8000-000000000abc");
+        assert!(
+            fd.get_param_by_curie(&curie!(IMS:1000031)).is_some(),
+            "Processed mode maps to IMS:1000031"
+        );
+        assert!(
+            fd.get_param_by_curie(&curie!(IMS:1000091)).is_some(),
+            "SHA-1 checksum maps to IMS:1000091"
+        );
+        assert!(
+            fd.get_param_by_curie(&curie!(IMS:1000030)).is_none(),
+            "continuous accession (IMS:1000030) NOT emitted for processed mode"
+        );
+
+        // The assembled imaging block reflects the parsed geometry.
+        let block = w.imaging_metadata();
+        assert!(block.is_imaging);
+        assert_eq!(block.coordinate_base, 1);
+        let pc = block.pixel_count.expect("pixel_count assembled from grid_x/grid_y");
+        assert_eq!(pc.x, 260);
+        assert_eq!(pc.y, 134);
+        assert_eq!(block.scan_pattern.as_deref(), Some("IMS:1000413"));
+        // pixel_size omitted (only one... actually neither axis present) → None.
+        assert!(block.pixel_size_um.is_none(), "no pixel size → omitted");
+
+        let _ = std::fs::remove_file(&out);
+    }
+
+    /// An all-`None` geometry (or `None` geom) assembles a minimal block: is_imaging + base.
+    #[test]
+    fn write_run_metadata_minimal_geometry() {
+        use mzdata::meta::FileMetadataConfig;
+
+        let mut out = std::env::temp_dir();
+        out.push(format!("imzml2mzpeak_writer_min_{}.mzpeak", std::process::id()));
+        let mut w = ImagingWriter::new(&out).expect("build writer");
+
+        let prov = RunProvenance {
+            uuid: None,
+            data_mode: StorageMode::Unknown,
+            ibd_checksum: None,
+            ibd_checksum_type: None,
+        };
+        let source = FileMetadataConfig::default();
+        w.write_run_metadata(&source, &prov, None)
+            .expect("metadata wiring succeeds with no geometry");
+
+        let block = w.imaging_metadata();
+        assert!(block.is_imaging);
+        assert_eq!(block.coordinate_base, 1);
+        assert!(block.pixel_count.is_none());
+        assert!(block.scan_pattern.is_none());
+
         let _ = std::fs::remove_file(&out);
     }
 }
