@@ -1,14 +1,20 @@
-//! Coordinate column descriptors (STUB — Plan 03-01 Task 2 fills the body).
+//! Coordinate column descriptors (SCH-01, SCH-03).
 //!
 //! Declares the per-pixel coordinate scan columns shaped for the writer's
-//! `CustomBuilderFromParameter::from_spec` (SCH-01/SCH-03). Filled in Task 2.
+//! `CustomBuilderFromParameter::from_spec`. Each descriptor is an
+//! `(accession, name, Int64, required)` quad that Phase 4 feeds through `from_spec` +
+//! `add_spectrum_scan_field`. Coordinate accessions are taken VERBATIM from `imagingMS.obo`
+//! (`IMS:1000050/51/52`); no new accessions are minted (spec §3.3, SCH-03). All three use
+//! `DataType::Int64` — the reference writer's `from_spec` hits `unimplemented!` on any other
+//! dtype (§4.1, verified at `visitor.rs:238`).
 
 use arrow::datatypes::DataType;
+use mzdata::curie;
 use mzpeak_prototyping::param::CURIE;
 
-/// A coordinate scan-column descriptor shaped for `from_spec` (placeholder fields).
+/// A coordinate scan-column descriptor shaped for `from_spec`.
 pub struct ImagingColumnSpec {
-    /// The IMS coordinate accession (e.g. `IMS:1000050`).
+    /// The IMS coordinate accession (e.g. `IMS:1000050`), matched verbatim from imagingMS.obo.
     pub curie: CURIE,
     /// Exact IMS term name; the writer's inflection cleans it to a column name.
     pub name: &'static str,
@@ -18,15 +24,38 @@ pub struct ImagingColumnSpec {
     pub required: bool,
 }
 
-/// The imaging coordinate scan-column descriptors (STUB — Task 2 fills the body).
+/// The three per-pixel coordinate scan-column descriptors (spec v0.3 §4.1).
+///
+/// `position x` (`IMS:1000050`) and `position y` (`IMS:1000051`) are REQUIRED; `position z`
+/// (`IMS:1000052`) is OPTIONAL. All are `Int64`. Their inflected column names byte-match the
+/// reference reader's `inflect_cv_term_to_column_name` output
+/// (`IMS_1000050_position_x` etc.) so round-trip resolution holds (SCH-03).
 pub fn imaging_scan_fields() -> Vec<ImagingColumnSpec> {
-    Vec::new()
+    vec![
+        ImagingColumnSpec {
+            curie: curie!(IMS: 1000050),
+            name: "position x",
+            dtype: DataType::Int64,
+            required: true,
+        },
+        ImagingColumnSpec {
+            curie: curie!(IMS: 1000051),
+            name: "position y",
+            dtype: DataType::Int64,
+            required: true,
+        },
+        ImagingColumnSpec {
+            curie: curie!(IMS: 1000052),
+            name: "position z",
+            dtype: DataType::Int64,
+            required: false,
+        },
+    ]
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mzdata::curie;
     use mzpeak_prototyping::writer::{
         CustomBuilderFromParameter, inflect_cv_term_to_column_name,
     };
