@@ -21,7 +21,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **IN-04**: Correctly decode binary arrays from the `.ibd` preserving **source dtype** (32- and 64-bit float, little-endian) for both m/z and intensity — NO dtype widening/narrowing (supports L1 bit-for-bit). NOTE: zlib-compressed `.ibd` arrays are NOT supported by the `mzdata` imzML reader (`NoCompression` only) → uncompressed `.ibd` is in scope; compressed `.ibd` is out of scope for v1.
 - [x] **IN-05**: Preserve the profile-vs-centroid spectrum-type flag as-is (orthogonal to storage mode)
 - [x] **IN-06**: Carry MS level and essential per-spectrum metadata through the pipeline
-- [ ] **IN-07**: Converter-owned integrity preflight — hard-fail on UUID mismatch and `.ibd` SHA-1 mismatch (do not rely on `mzdata`, which only warns)
+- [x] **IN-07**: Converter-owned integrity preflight — hard-fail on UUID mismatch and `.ibd` SHA-1 mismatch (do not rely on `mzdata`, which only warns)
 - [ ] **IN-08**: Stream spectra rather than loading the whole dataset into memory (must handle ~35k spectra / large `.ibd`)
 
 ### Spatial — Coordinate & Imaging Metadata
@@ -106,7 +106,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | IN-04 | Phase 2 | Complete |
 | IN-05 | Phase 2 | Complete |
 | IN-06 | Phase 2 | Complete |
-| IN-07 | Phase 2 | Pending |
+| IN-07 | Phase 2 | Complete |
 | IN-08 | Phase 2 | Pending |
 | SPA-01 | Phase 2 | Pending |
 | SPA-02 | Phase 2 | Complete |
