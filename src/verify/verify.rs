@@ -12,12 +12,17 @@
 //!     tests reach it without forging an `.ibd`.
 //!
 //! The orchestrator BRANCHES on the SOURCE [`Representation`](crate::read::Representation)
-//! (Pitfall 1 — never infer the facet from which one has data): `Profile` → the `spectra_data`
-//! facet via `get_spectrum_arrays` (the L1 reference, compared at the SOURCE stored width);
-//! `Centroid` → the `spectra_peaks` facet via `get_spectrum_peaks_for`, where the SOURCE side
-//! is the L1 reference (CONTEXT Area 2) — a Float32-source centroid m/z is WIDENED to f64 in
-//! the peaks facet, which is NOT an L1 failure (Pitfall 2): intensity (f32→f32) is L1-checked,
-//! m/z is only relative-error-checked under L2.
+//! (Pitfall 1 — never infer the facet from which one has data): `Profile` AND `Unknown` → the
+//! `spectra_data` facet via `get_spectrum_arrays` (the L1 reference, compared at the SOURCE
+//! stored width); `Centroid` → the `spectra_peaks` facet via `get_spectrum_peaks_for`, where
+//! the SOURCE side is the L1 reference (CONTEXT Area 2) — a Float32-source centroid m/z is
+//! WIDENED to f64 in the peaks facet, which is NOT an L1 failure (Pitfall 2): intensity
+//! (f32→f32) is L1-checked, m/z is only relative-error-checked under L2.
+//!
+//! `Unknown` is grouped with `Profile` to MATCH the Phase-4 writer's routing exactly
+//! (`src/write/spectrum.rs`: `Profile | Unknown => None` for the peaks list, so an `Unknown`
+//! pixel is written to `spectra_data` only). Routing `Unknown` to the peaks facet here would
+//! spuriously fail a faithful `Unknown`-continuity round-trip (WR-01, iteration 2).
 //!
 //! Tolerances come from the Phase-3 [`ToleranceContract`] (imported, never re-encoded — CONTEXT
 //! Area 1). No `unwrap()` on a fallible read: every read surfaces a [`VerifyError`] (T-05-07 /
@@ -152,8 +157,14 @@ pub fn verify_against_source(
         let coord: CoordKey = (s.x, s.y, s.z);
 
         match s.representation {
-            Representation::Profile => {
-                // Profile -> spectra_data facet; the L1 reference, compared at SOURCE width.
+            // WR-01 (iter 2): `Unknown` is grouped with `Profile`, MATCHING the writer's own
+            // routing (`src/write/spectrum.rs:155-158`: `Profile | Unknown => None` for the
+            // peaks list, so an `Unknown` pixel is written with raw arrays ONLY and lands in
+            // the `spectra_data` facet). The verifier must seek `Unknown` in the SAME facet the
+            // writer populated; routing it to `spectra_peaks` would spuriously fail a faithful
+            // `Unknown`-continuity round-trip with `MissingPeaksFacet`.
+            Representation::Profile | Representation::Unknown => {
+                // Profile/Unknown -> spectra_data facet; the L1 reference, compared at SOURCE width.
                 let arrays = reader
                     .get_spectrum_arrays(out_idx)
                     .map_err(VerifyError::OpenOutput)?
@@ -198,7 +209,7 @@ pub fn verify_against_source(
                     })?;
                 out_coords_tics.push(((s.x, s.y), out_int_f64.iter().sum()));
             }
-            Representation::Centroid | Representation::Unknown => {
+            Representation::Centroid => {
                 // Centroid -> spectra_peaks facet; SOURCE is the L1 reference (CONTEXT Area 2).
                 let peaks = reader
                     .get_spectrum_peaks_for(out_idx)

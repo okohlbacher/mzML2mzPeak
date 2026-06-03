@@ -516,6 +516,61 @@ fn centroid_f64_intensity_is_stored_width_divergence_under_l1() {
     let _ = std::fs::remove_file(&out);
 }
 
+/// WR-01 (iteration 2 — cross-module facet-routing alignment): an `Unknown`-representation pixel
+/// is written by the Phase-4 writer to the `spectra_data` (Profile-style) facet ONLY — the writer
+/// groups `Profile | Unknown => None` for the peaks list (`src/write/spectrum.rs`). The verifier
+/// MUST seek it in that SAME facet. Before the fix the verifier grouped `Unknown` with `Centroid`
+/// and looked in `spectra_peaks`, hitting `MissingPeaksFacet` and FAILING a faithful round-trip.
+///
+/// This test writes a single `Unknown`-continuity pixel (data carried verbatim at source dtype),
+/// then verifies it under L1: the report must `passed()` with a Δ=0 m/z + intensity, and crucially
+/// `verify_against_source` must NOT error with `MissingPeaksFacet`.
+#[test]
+fn unknown_representation_pixel_roundtrips_via_data_facet() {
+    let out = temp_out("unknown");
+    // A single Unknown-continuity pixel; F64 m/z + F32 intensity, both carried verbatim.
+    let fx = vec![ImagingSpectrum {
+        x: 1,
+        y: 1,
+        z: None,
+        mz: NumArray::F64(vec![123.0, 456.5, 789.25]),
+        intensity: NumArray::F32(vec![11.0, 22.0, 33.0]),
+        representation: Representation::Unknown,
+        ms_level: 1,
+        native_id: "spectrum=1".to_string(),
+    }];
+    write_fixture(&out, &fx).expect("Unknown-continuity fixture writes a valid archive");
+
+    // The decisive assertion: verification returns a report (no MissingPeaksFacet error) because
+    // the verifier now routes Unknown to the SAME data facet the writer populated (WR-01).
+    let report = verify_against_source(&fx, &out, ConformanceLevel::L1BitForBit).expect(
+        "Unknown pixel verifies via the spectra_data facet without a spurious MissingPeaksFacet",
+    );
+
+    assert!(report.count.passed, "count gate passes for the Unknown pixel: {:?}", report.count);
+    assert!(
+        report.coordinates.passed,
+        "Unknown pixel pairs by coordinate: {:?}",
+        report.coordinates
+    );
+    assert!(
+        report.mz.passed,
+        "Unknown-pixel m/z compares Δ=0 at source width in the data facet: {:?}, mismatches={:?}",
+        report.mz, report.mismatches
+    );
+    assert!(
+        report.intensity.passed,
+        "Unknown-pixel intensity compares Δ=0 in the data facet: {:?}",
+        report.intensity
+    );
+    assert!(
+        report.passed(),
+        "a faithful Unknown-continuity round-trip passes every L1 gate (WR-01): {report:?}"
+    );
+
+    let _ = std::fs::remove_file(&out);
+}
+
 /// VER-04 (sparse / non-rectangular): the set {(1,1),(3,1),(2,3)} runs through the verifier
 /// WITHOUT panicking — the presence mask handles the absent cells (Pitfall 4). The test simply
 /// COMPLETING with a returned report (not an abort/panic) IS the assertion; we additionally
