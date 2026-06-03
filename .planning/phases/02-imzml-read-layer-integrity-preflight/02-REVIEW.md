@@ -34,3 +34,6 @@ EXECUTE-READY: no — dtype-preservation contract, non-zero preflight proof, bou
 EXECUTE-READY: no — dtype-preservation contract, non-zero preflight proof, bounded parser, and full streaming proof are blockers
 
 _Verified during triage: zlib .ibd unsupported by vendored reader (NoCompression only, reader.rs:991); HR2MSI .ibd = 'no compression'; ibd_file_name (IMS:1000070) surfaced by reader. IN-04/ROADMAP scoped to uncompressed + source-dtype preservation._
+
+## Round 2 (revised plans) — verified after codex exit
+All 13 findings RESOLVED · NEW: none · **EXECUTE-READY: yes**.
