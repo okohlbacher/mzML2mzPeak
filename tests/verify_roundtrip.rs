@@ -440,6 +440,82 @@ fn ion_image_sanity() {
     let _ = std::fs::remove_file(&out);
 }
 
+/// WR-03 (source-side duplicate coordinate): an HONEST archive is written with three distinct
+/// coordinates, but the verifier is then driven with a SOURCE slice (same count) where two pixels
+/// COLLIDE on the same `(x,y,z)`. The "one scan per pixel" invariant must hold on the SOURCE side
+/// too, not only the output — so the coordinate check must FAIL even though counts are equal.
+#[test]
+fn source_side_duplicate_coordinate_fails_coordinates() {
+    let out = temp_out("srcdup");
+    let honest = fixture();
+    write_fixture(&out, &honest).expect("honest fixture writes");
+
+    // A 3-pixel source where pixels 0 and 1 collide on (1,1); count still equals the output (3).
+    let mut colliding = fixture();
+    colliding[1].x = colliding[0].x; // (3,1) -> (1,1): now two source pixels at (1,1)
+    colliding[1].y = colliding[0].y;
+
+    let report = verify_against_source(&colliding, &out, ConformanceLevel::L1BitForBit)
+        .expect("verify returns a report (duplicate source coord is a soft FAIL, not an error)");
+
+    assert!(
+        report.count.passed,
+        "counts are still equal (3 == 3); the gate must catch the dup elsewhere"
+    );
+    assert!(
+        !report.coordinates.passed,
+        "a source-side duplicate coordinate fails the coordinate check (WR-03): {:?}",
+        report.coordinates
+    );
+    assert!(!report.passed(), "the overall report does not pass with a colliding source");
+
+    let _ = std::fs::remove_file(&out);
+}
+
+/// WR-04 (F64-source centroid intensity vs the f32 peaks facet): a stored-width DIVERGENCE is
+/// reported as an L1 mismatch via the explicit divergence rule (no f32→f64 widening). The fixture
+/// pixel below is a centroid whose intensity is `F64` (the upstream peaks facet stores intensity
+/// f32), so under L1 the intensity axis must report a mismatch at the centroid pixel.
+#[test]
+fn centroid_f64_intensity_is_stored_width_divergence_under_l1() {
+    let out = temp_out("centf64int");
+    // Single centroid pixel with an F64 SOURCE intensity (diverges from the f32 peaks facet).
+    let fx = vec![ImagingSpectrum {
+        x: 1,
+        y: 1,
+        z: None,
+        mz: NumArray::F64(vec![150.0, 275.0]),
+        intensity: NumArray::F64(vec![55.0, 3.0]),
+        representation: Representation::Centroid,
+        ms_level: 1,
+        native_id: "spectrum=1".to_string(),
+    }];
+    write_fixture(&out, &fx).expect("centroid-F64-intensity fixture writes");
+
+    let report = verify_against_source(&fx, &out, ConformanceLevel::L1BitForBit)
+        .expect("verify returns a report");
+
+    // The peaks facet is f32; an F64 source intensity is a stored-width divergence, reported as a
+    // mismatch under L1 (WR-04) rather than silently widened.
+    assert!(
+        !report.intensity.passed,
+        "F64-source centroid intensity vs f32 peaks facet is an L1 divergence: {:?}",
+        report.intensity
+    );
+    assert!(
+        report.intensity.mismatch_count >= 1,
+        "the divergence surfaces as at least one intensity mismatch (WR-04)"
+    );
+    let int_mismatches = report
+        .mismatches
+        .iter()
+        .filter(|m| matches!(m.axis, imzml2mzpeak::verify::MismatchAxis::Intensity))
+        .count();
+    assert!(int_mismatches >= 1, "an intensity Mismatch record is retained for the divergence");
+
+    let _ = std::fs::remove_file(&out);
+}
+
 /// VER-04 (sparse / non-rectangular): the set {(1,1),(3,1),(2,3)} runs through the verifier
 /// WITHOUT panicking — the presence mask handles the absent cells (Pitfall 4). The test simply
 /// COMPLETING with a returned report (not an abort/panic) IS the assertion; we additionally

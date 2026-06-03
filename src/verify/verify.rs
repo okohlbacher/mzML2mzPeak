@@ -120,10 +120,20 @@ pub fn verify_against_source(
     let coord_to_index = build_coord_index(&mut reader, out_count)?;
 
     // --- STEP 2b: pair each source pixel to an output index by coordinate key. -------------
+    // The OUTPUT side already rejects duplicate coordinates in `build_coord_index`
+    // (VER-02 / spec §4.2: exactly one scan per pixel). But with EQUAL counts, two source
+    // pixels sharing a `(x,y,z)` would both pair to the SAME single output index and slip
+    // through as `passed` (WR-03). Detect source-side collisions here so a colliding source
+    // also fails the coordinate check — the "one scan per pixel" invariant must hold on BOTH
+    // sides, not only the output.
     let mut paired: Vec<(usize, u64)> = Vec::with_capacity(source.len()); // (source idx, out idx)
+    let mut seen_src: HashMap<CoordKey, ()> = HashMap::with_capacity(source.len());
     let mut coordinates_ok = true;
     for (s_idx, s) in source.iter().enumerate() {
         let key: CoordKey = (s.x, s.y, s.z);
+        if seen_src.insert(key, ()).is_some() {
+            coordinates_ok = false; // source-side duplicate coordinate -> coordinate check fails
+        }
         match coord_to_index.get(&key) {
             Some(&out_idx) => paired.push((s_idx, out_idx)),
             None => coordinates_ok = false, // unpaired source pixel -> coordinate check fails
@@ -226,17 +236,37 @@ pub fn verify_against_source(
                     NumArray::F32(src_i) => {
                         first_mismatch_f32(src_i, &out_int, tol.intensity_rel_err as f32, level)
                     }
-                    // An F64-source intensity vs the f32 peaks facet is a stored-width divergence
-                    // (the peaks facet is f32 by upstream schema); report at the shorter length.
-                    NumArray::F64(src_i) => {
-                        if src_i.len() != out_int.len() {
-                            Some(src_i.len().min(out_int.len()))
-                        } else {
-                            // Compare via f64 widening of the output (informational under L2).
-                            let out_i_f64: Vec<f64> = out_int.iter().map(|&x| x as f64).collect();
-                            first_mismatch_f64(src_i, &out_i_f64, tol.intensity_rel_err, level)
+                    // An F64-source intensity vs the f32 peaks facet is a stored-width DIVERGENCE
+                    // (the peaks facet is f32 by upstream schema). This mirrors `compare_axis`'s
+                    // dtype-divergence rule (compare.rs:108-109): under L1 the stored widths MUST
+                    // match, so the divergence is itself a mismatch — reported at the first element
+                    // WITHOUT widening the f32 output to f64 (the module-wide no-widen rule, WR-04).
+                    // Under L2 the relaxed bound still applies AFTER the source is narrowed to the
+                    // peaks-facet f32 width: compare f32-vs-f32 so the comparison happens at the
+                    // OUTPUT stored width, never by widening f32→f64.
+                    NumArray::F64(src_i) => match level {
+                        ConformanceLevel::L1BitForBit => {
+                            // Empty arrays trivially agree; any non-empty F64-vs-f32 is a divergence.
+                            if src_i.is_empty() && out_int.is_empty() {
+                                None
+                            } else if src_i.len() != out_int.len() {
+                                Some(src_i.len().min(out_int.len()))
+                            } else {
+                                Some(0)
+                            }
                         }
-                    }
+                        ConformanceLevel::L2Transformed => {
+                            // L2 narrows the source to the output stored width (f32) and applies
+                            // the relative-error bound at f32 — never widening the output to f64.
+                            let src_i_f32: Vec<f32> = src_i.iter().map(|&x| x as f32).collect();
+                            first_mismatch_f32(
+                                &src_i_f32,
+                                &out_int,
+                                tol.intensity_rel_err as f32,
+                                level,
+                            )
+                        }
+                    },
                 };
                 if let Some(elem) = int_first {
                     int_mismatch_pixels += 1;
@@ -272,7 +302,15 @@ pub fn verify_against_source(
         .collect();
     let src_img = IonImage::build(&src_coords_tics, dims);
     let out_img = IonImage::build(&out_coords_tics, dims);
-    let disagreeing = src_img.disagreeing_cells(&out_img, tol.intensity_rel_err);
+    let cell_disagreements = src_img.disagreeing_cells(&out_img, tol.intensity_rel_err);
+    // WR-02: when `dims` comes from `metadata.imaging.pixel_count`, a pixel whose coordinate
+    // falls OUTSIDE the declared grid extent is dropped from BOTH grids identically (so it never
+    // shows as a per-cell diff) — a SILENT SPATIAL LOSS. `IonImage::dropped` counts exactly those
+    // out-of-extent writes; fold both sides into the disagreement total so the gate FAILS on a
+    // dropped pixel instead of passing blind. (With `dims = None` the grid is sized to observed
+    // maxima, so `dropped` is always 0 and this is a no-op on that path.)
+    let dropped = src_img.dropped + out_img.dropped;
+    let disagreeing = cell_disagreements + dropped;
     report.ion_image = IonImageResult { passed: disagreeing == 0, disagreeing_cells: disagreeing };
 
     Ok(report)

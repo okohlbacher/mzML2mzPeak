@@ -36,6 +36,12 @@ pub struct IonImage {
     pub tic: Vec<Vec<f64>>,
     /// Presence mask, indexed `[row = y - 1][col = x - 1]`. `true` iff a pixel exists there.
     pub present: Vec<Vec<bool>>,
+    /// Count of input pixels SKIPPED because their coordinate fell outside the derived grid
+    /// extent (`< 1` or `>= cols`/`>= rows`). With a metadata-supplied `dims`, a non-zero
+    /// `dropped` means a real pixel landed beyond the declared `pixel_count` extent — a SPATIAL
+    /// LOSS the ion-image gate (VER-04) must surface, NOT silently discard (WR-02). With
+    /// `dims = None` the grid is sized to the observed maxima, so `dropped` is always `0`.
+    pub dropped: usize,
 }
 
 /// Sum an intensity [`NumArray`] as `f64` — the per-pixel TIC (spec §5.2).
@@ -74,28 +80,49 @@ impl IonImage {
         // Row-by-row allocation (no single cols*rows multiply — T-05-05).
         let mut tic = vec![vec![0.0_f64; cols]; rows];
         let mut present = vec![vec![false; cols]; rows];
+        // Count writes skipped because they fell outside the derived extent (WR-02): under a
+        // metadata-supplied `dims` this is a real out-of-grid pixel = spatial loss, surfaced by
+        // the caller as a VER-04 disagreement rather than silently dropped.
+        let mut dropped = 0usize;
 
         for &((x, y), value) in coords_and_tics {
             // Bounds-check EVERY write (Pitfall 4 / Security V5): 1-based coords must be >= 1
             // and within the derived extent. Out-of-extent coordinates are skipped, not indexed.
             if x < 1 || y < 1 {
+                dropped += 1;
                 continue;
             }
             let (col, row) = ((x - 1) as usize, (y - 1) as usize);
             if row >= rows || col >= cols {
+                dropped += 1;
                 continue;
             }
             tic[row][col] = value; // M[row=y][col=x], NO axis flip (spec §5.1)
             present[row][col] = true;
         }
 
-        IonImage { cols, rows, tic, present }
+        IonImage { cols, rows, tic, present, dropped }
+    }
+
+    /// `true` iff `self` and `other` have IDENTICAL grid extents (`rows` and `cols`). A
+    /// dimension mismatch is a STRUCTURAL defect (the two TIC grids were sized to different
+    /// extents) — distinct from a per-cell presence/TIC disagreement (WR-05). The orchestrator
+    /// sizes both grids from the same `dims`, so this is `true` on the production path; it is
+    /// exposed so callers that build images independently can surface a structural mismatch
+    /// rather than folding it into per-cell presence diffs.
+    pub fn same_extent(&self, other: &IonImage) -> bool {
+        self.rows == other.rows && self.cols == other.cols
     }
 
     /// Count cells where `self` and `other` disagree: either their presence flags differ, OR
     /// (both present) their TICs differ beyond `intensity_rel_err` (the VER-04 source-vs-output
     /// sanity comparison). Comparison runs only on present cells (Pitfall 4) — a cell absent in
     /// both images never contributes. A relative-error of `0.0` (L1) requires exact TIC equality.
+    ///
+    /// NOTE: a genuine grid-DIMENSION mismatch (`!self.same_extent(other)`) is a structural
+    /// defect, not a per-cell diff — query [`IonImage::same_extent`] explicitly for that (WR-05).
+    /// When extents differ, this still compares cell-wise over `max(rows) × max(cols)`, treating
+    /// out-of-bounds cells of the smaller grid as not-present.
     pub fn disagreeing_cells(&self, other: &IonImage, intensity_rel_err: f64) -> usize {
         let rows = self.rows.max(other.rows);
         let cols = self.cols.max(other.cols);
@@ -203,6 +230,50 @@ mod tests {
         // (9,9), (0,0), (-1,2) all skipped — no panic, no presence set beyond extent.
         let total_present: usize = img.present.iter().flatten().filter(|&&p| p).count();
         assert_eq!(total_present, 1, "only the in-extent (1,1) pixel is present");
+        // WR-02: the three out-of-extent coords are COUNTED as dropped, not silently lost.
+        assert_eq!(img.dropped, 3, "(9,9),(0,0),(-1,2) are counted as dropped writes");
+    }
+
+    #[test]
+    fn observed_maxima_path_never_drops() {
+        // dims = None sizes to observed maxima, so every coord lands in-extent: dropped == 0.
+        let pixels = [((1, 1), 1.0), ((3, 1), 2.0), ((2, 3), 3.0)];
+        let img = IonImage::build(&pixels, None);
+        assert_eq!(img.dropped, 0, "the observed-maxima path drops nothing (WR-02)");
+    }
+
+    #[test]
+    fn out_of_extent_pixel_surfaces_as_a_disagreement_not_silent_loss() {
+        // WR-02 regression: the metadata extent is (2,2), but a real pixel lives at (9,9). It is
+        // dropped from BOTH the src and out grids identically, so per-cell `disagreeing_cells`
+        // sees ZERO diff — yet the pixel was LOST. The `dropped` count is the signal that the
+        // orchestrator folds in so VER-04 FAILS. Here we prove the build records it on both sides.
+        let dims = Some((2, 2));
+        let src = IonImage::build(&[((1, 1), 1.0), ((9, 9), 99.0)], dims);
+        let out = IonImage::build(&[((1, 1), 1.0), ((9, 9), 99.0)], dims);
+        // The per-cell comparison is blind to the loss (the bug WR-02 describes):
+        assert_eq!(
+            src.disagreeing_cells(&out, 0.0),
+            0,
+            "per-cell diff alone is blind to an out-of-extent dropped pixel"
+        );
+        // But `dropped` catches it — the orchestrator FAILS on `disagreeing + dropped > 0`.
+        assert_eq!(src.dropped, 1, "src grid dropped the (9,9) out-of-extent pixel");
+        assert_eq!(out.dropped, 1, "out grid dropped the (9,9) out-of-extent pixel");
+        assert!(
+            src.dropped + out.dropped > 0,
+            "the dropped count makes the out-of-extent loss visible (WR-02)"
+        );
+    }
+
+    #[test]
+    fn same_extent_distinguishes_dimension_mismatch_from_cell_diffs() {
+        // WR-05: a genuine grid-dimension mismatch is a STRUCTURAL defect surfaced via
+        // same_extent, distinct from per-cell presence/TIC diffs.
+        let a = IonImage::build(&[((1, 1), 1.0)], Some((2, 2)));
+        let b = IonImage::build(&[((1, 1), 1.0)], Some((3, 3)));
+        assert!(a.same_extent(&a), "identical extents agree");
+        assert!(!a.same_extent(&b), "differing extents are flagged structurally (WR-05)");
     }
 
     #[test]
