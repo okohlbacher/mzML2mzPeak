@@ -28,3 +28,7 @@ EXECUTE-READY: no — scoped continuous proof, real m/z accessor handling, coord
 - MINOR: `open_path` derives `.ibd`/`.IBD`; copied sibling names match. Fix: include a `test -f "${imzml%.imzML}.ibd"` style check for both fixtures.
 - MINOR: The plan’s `pixels=34840` grep is valid only for HR2MSI. Continuous fixture has `spectrumList count="9"`. Fix: assert `pixels=34840` under processed and `pixels=9` under continuous.
 EXECUTE-READY: no — scoped continuous proof, real m/z accessor handling, coordinate completeness checks, and continuous materialization evidence are blockers.
+
+## Round 2 (revised plan) — verified after codex exit
+All 12 findings RESOLVED · NEW: none · **EXECUTE-READY: yes**
+(Monitor briefly false-fired on the round-1 verdict echoed from this file's cat; real verdict confirmed in the post-exit final block.)
