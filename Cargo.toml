@@ -1,0 +1,28 @@
+[package]
+name = "imzml2mzpeak"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+
+[dependencies]
+# --- CORE compatibility crates: pinned EXACTLY (these fracture the arrow/mzdata
+# type graph if they drift). Versions mirror mzpeak_prototyping's own Cargo.toml. ---
+arrow = "=57.0.0"
+parquet = { version = "=57.0.0", features = ["encryption"] }
+zip = "=4.1.0"
+# imzml is the NON-default addition that makes `mzdata::io::imzml` exist; the other
+# features mirror upstream so the unioned single copy is identical to upstream + imzml.
+mzdata = { version = "=0.63.3", features = ["imzml", "serde", "bruker_tdf", "nalgebra", "zstd", "numpress"] }
+mzpeaks = "=1.0.9"
+
+# --- Write path: git-only reference implementation, pinned to a CONCRETE commit rev.
+# default-features = false drops the async/object_store/opendal/tokio stack
+# (STACK.md local-file-only v1 variant). ---
+mzpeak_prototyping = { git = "https://github.com/HUPO-PSI/mzPeak", rev = "d1aaaf84595202e2e7f622c576c1d6ba9154e379", default-features = false }
+
+# --- Application-boundary helpers: pinned with `=` at upstream-aligned versions. ---
+anyhow = "=1.0.102"
+thiserror = "=2.0.18"
+clap = { version = "=4.5.38", features = ["derive"] }
+log = "=0.4.27"
+env_logger = "=0.11.8"
