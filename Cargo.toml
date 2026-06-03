@@ -7,6 +7,12 @@ edition = "2024"
 # build floor. The project pins/tests 1.96.0 via rust-toolchain.toml.
 rust-version = "1.87"
 
+# The crate is now a LIBRARY consumed by the bins (spike_coords, verify_ibd) and the
+# Phase 4 writer. The [[bin]] targets and src/main.rs remain; this only adds the lib face.
+[lib]
+name = "imzml2mzpeak"
+path = "src/lib.rs"
+
 [dependencies]
 # --- CORE compatibility crates: pinned EXACTLY (these fracture the arrow/mzdata
 # type graph if they drift). Versions mirror mzpeak_prototyping's own Cargo.toml. ---
