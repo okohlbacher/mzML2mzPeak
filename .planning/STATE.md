@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 02-02-PLAN.md — integrity preflight (IN-07): bounded header parse + UUID/checksum gate + preflight bin non-zero exit"
-last_updated: "2026-06-03T16:52:31.548Z"
+stopped_at: Completed 02-03-PLAN.md
+last_updated: "2026-06-03T17:16:52.303Z"
 last_activity: 2026-06-03
 progress:
   total_phases: 7
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 5
-  percent: 29
+  completed_plans: 6
+  percent: 43
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-03)
 ## Current Position
 
 Phase: 2 (imzML Read Layer + Integrity Preflight) — EXECUTING
-Plan: 2 of 3 complete (next: 02-02 integrity preflight)
+Plan: 3 of 3 complete (next: 02-02 integrity preflight)
 Status: Ready to execute
 Last activity: 2026-06-03
 
@@ -57,6 +57,7 @@ Progress: [███████░░░] 67%
 | Phase 01 P01 | 18 | 3 tasks | 4 files |
 | Phase 02 P01 | 2 | 2 tasks | 5 files |
 | Phase 02 P02 | 6 | 2 tasks | 10 files |
+| Phase 02 P03 | 8m | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,8 @@ Recent decisions affecting current work:
 - [Phase 02]: Read-layer numeric axes are a dtype-preserving NumArray { F32 | F64 } enum carrying the imzML-declared source dtype verbatim — no coercion at the record boundary (IN-04, L1 bit-for-bit); as_f64() is the only (NON-CANONICAL) coercing accessor, no as_f32().
 - [Phase 02]: ImagingSpectrum coords 1-based (x,y,z), NO axis flip (SPA-02); ms_level carried unchanged incl. 0 (IN-06); RunProvenance uuid is a normalized lowercase String, not uuid::Uuid (no new dep).
 - [Phase ?]: [Phase 02]: Converter-owned preflight (IN-07) hard-fails on UUID mismatch / checksum mismatch / missing .ibd via typed IntegrityError AND a real non-zero process exit (preflight bin -> ExitCode::FAILURE), proven by spawned std::process::Command tests; bounded Latin-1 header parse stops at <spectrumList; checksums via pinned sha1/md-5/sha2 streamed in 64KiB chunks; .ibd resolved by IMS:1000070 then sibling fallback.
+- [Phase 02]: Surface decode errors via ImzMLReader::read_into (fallible) not next()/read_next() which collapse parse/IO errors into None; EOF is the only clean-end signal (T-02-09)
+- [Phase 02]: Storage mode auto-detected from data_mode only (IN-03); absent data_mode maps to Unknown, never backfilled from spectrum shape/signal_continuity
 
 ### Pending Todos
 
@@ -97,6 +100,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-03T16:52:23.936Z
-Stopped at: Completed 02-02-PLAN.md — integrity preflight (IN-07): bounded header parse + UUID/checksum gate + preflight bin non-zero exit
+Last session: 2026-06-03T17:16:01.686Z
+Stopped at: Completed 02-03-PLAN.md
 Resume file: None

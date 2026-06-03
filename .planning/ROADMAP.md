@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 0: Environment & Foundations** - Pinned Rust 2024 toolchain, exact dependency pins, git-pinned writer, and a UUID/SHA-1-verified `.ibd` in `data/` (completed 2026-06-03)
 - [x] **Phase 1: Coordinate-Exposure Spike (blocking gate)** - Confirm pinned `mzdata` + `imzml` feature compiles and surfaces per-pixel x/y for both storage modes before any layer is built (completed 2026-06-03)
-- [ ] **Phase 2: imzML Read Layer + Integrity Preflight** - Streaming reader yielding per-spectrum coordinates, arrays, and metadata, with a converter-owned hard-fail integrity gate
+- [x] **Phase 2: imzML Read Layer + Integrity Preflight** - Streaming reader yielding per-spectrum coordinates, arrays, and metadata, with a converter-owned hard-fail integrity gate (completed 2026-06-03)
 - [ ] **Phase 3: Imaging-Schema Layer** - Lock the imaging mzPeak extension (scan-facet coordinate columns, run-level params, provenance, tolerance contract) per spec v0.3
 - [ ] **Phase 4: mzPeak Write Layer** - Streaming writer that emits a valid imaging mzPeak archive via the public extension seam
 - [ ] **Phase 5: Verification / Roundtrip Layer** - Reload-and-compare harness proving count, coordinate, and numerical fidelity plus an ion-image reconstruction
@@ -73,7 +73,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
   - [x] 02-01-PLAN.md — Library skeleton + record contracts: NumArray (dtype-preserving axes), ImagingSpectrum/RunProvenance/Representation/StorageMode types, coordinate semantics doc (IN-04, IN-05, IN-06, SPA-02)
   - [x] 02-02-PLAN.md — Converter-owned integrity preflight: Latin-1 header parse + RFC-4122 UUID + whole-file checksum hard-fail on mismatch/missing .ibd (IN-07)
-  - [ ] 02-03-PLAN.md — Streaming ImagingReader: preflight-gated open, data_mode auto-detect, per-pixel coords + decoded arrays, bounded-memory Iterator over both modes (IN-01..04, IN-06, IN-08, SPA-01)
+  - [x] 02-03-PLAN.md — Streaming ImagingReader: preflight-gated open, data_mode auto-detect, per-pixel coords + decoded arrays, bounded-memory Iterator over both modes (IN-01..04, IN-06, IN-08, SPA-01)
 
 ### Phase 3: Imaging-Schema Layer
 
@@ -145,7 +145,7 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 0. Environment & Foundations | 2/2 | Complete   | 2026-06-03 |
 | 1. Coordinate-Exposure Spike | 1/1 | Complete   | 2026-06-03 |
-| 2. imzML Read Layer + Integrity Preflight | 2/3 | In Progress|  |
+| 2. imzML Read Layer + Integrity Preflight | 3/3 | Complete   | 2026-06-03 |
 | 3. Imaging-Schema Layer | 0/TBD | Not started | - |
 | 4. mzPeak Write Layer | 0/TBD | Not started | - |
 | 5. Verification / Roundtrip Layer | 0/TBD | Not started | - |
