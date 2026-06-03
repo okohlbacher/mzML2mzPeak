@@ -413,16 +413,16 @@ pub fn verify_roundtrip(
 | A2 | `PeakDataLevel::iter()` yields peaks in stored (source) order, so the i-th peak pairs with source point i. | Pattern 2 | LOW — write side used `PeakSetVec::wrap` (no sort, spectrum.rs:177-199); reader reads rows in stored order. If a future reader sorts peaks, pairing must switch to nearest-m/z matching. |
 | A3 | Deriving grid extent from max observed `(x,y)` is acceptable when `metadata.imaging.pixel_count` is absent. | Pattern 4 / Pitfall 3 | LOW — for a sanity check this is sufficient; a sparse grid whose true extent exceeds the observed max (no pixel at the far corner) would under-size the grid, but TIC sanity only compares present cells, so this does not produce false mismatches. Note for the planner. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should the L2 centroid m/z check compare against the source (widened to f64) or skip the peaks facet entirely?**
    - What we know: L1 uses the source as reference and ignores peaks-facet widening; L2 allows m/z rel-err ≤ 1e-7.
    - What's unclear: whether the single required L2 test should assert the peaks-facet f64 m/z is within 1e-7 of `source_f32 as f64` (it will be, exactly, since the widening is value-preserving), or whether L2 only meaningfully applies to profile pixels.
-   - Recommendation: Make the L2 test a PROFILE pixel (where L2's relative-error semantics are the genuine relaxation vs L1) and document that centroid m/z widening is value-preserving and trivially within L2. Planner's discretion on the exact L2 fixture.
+   - **RESOLVED:** Make the single required L2 test a PROFILE pixel (where L2's relative-error semantics are the genuine relaxation vs L1); centroid m/z widening is value-preserving and trivially within L2. Implemented in plan 05-03 Task 2 (`values_l2` targets a profile pixel).
 
 2. **N for first-N mismatch reporting.**
    - What we know: CONTEXT Area 4 leaves N to the planner; the report must be actionable, not a flood.
-   - Recommendation: A small bounded N (e.g. 10–20) with a total-mismatch count alongside, so the report shows the first offenders without unbounded growth on a fully-wrong file. Planner's call.
+   - **RESOLVED:** Bounded N with a total-mismatch count alongside, so the report shows the first offenders without unbounded growth on a fully-wrong file. Implemented in plan 05-01 Task 1 as `MAX_REPORTED_MISMATCHES = 20`.
 
 ## Environment Availability
 
