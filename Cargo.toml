@@ -2,7 +2,10 @@
 name = "imzml2mzpeak"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+# True MSRV floor: mzpeak_prototyping@d1aaaf84 uses stdlib APIs stabilized in 1.87
+# (io_error_more, const String::as_bytes). 1.85 is only edition-2024's floor, not the
+# build floor. The project pins/tests 1.96.0 via rust-toolchain.toml.
+rust-version = "1.87"
 
 [dependencies]
 # --- CORE compatibility crates: pinned EXACTLY (these fracture the arrow/mzdata
