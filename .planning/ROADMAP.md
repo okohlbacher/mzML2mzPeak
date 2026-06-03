@@ -52,7 +52,9 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. `data_mode`, UUID, and `.ibd` checksum term are shown reachable from `reader.imzml_metadata`; if any expected field is absent, the fallback (direct `quick-xml` header parse) is documented.
   4. An adversarial CODEX/CLI review runs at phase start and end; the spike either confirms the architecture or the documented pivot is reviewed before proceeding.
 
-**Plans**: TBD
+**Plans**: 1 plan
+
+  - [ ] 01-01-PLAN.md — Spike: prove per-pixel coords + run metadata reachable for processed & continuous via mzdata get_param_by_curie; commit fixtures + 01-FINDINGS.md verdict (ENV-03)
 
 ### Phase 2: imzML Read Layer + Integrity Preflight
 
@@ -138,7 +140,7 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 0. Environment & Foundations | 2/2 | Complete   | 2026-06-03 |
-| 1. Coordinate-Exposure Spike | 0/TBD | Not started | - |
+| 1. Coordinate-Exposure Spike | 0/1 | Not started | - |
 | 2. imzML Read Layer + Integrity Preflight | 0/TBD | Not started | - |
 | 3. Imaging-Schema Layer | 0/TBD | Not started | - |
 | 4. mzPeak Write Layer | 0/TBD | Not started | - |
