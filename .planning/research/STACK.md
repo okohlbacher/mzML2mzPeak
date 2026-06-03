@@ -54,7 +54,7 @@ let y = scan.get_param_by_curie(&curie!(IMS:1000051)).and_then(|p| p.to_i64().ok
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| **Rust toolchain** | 1.85+ (stable) | Compiler | `mzpeak_prototyping` is `edition = "2024"` (Cargo.toml), which requires Rust 1.85+. Pin via `rust-toolchain.toml`. |
+| **Rust toolchain** | **1.96.0** (pinned) | Compiler | `mzpeak_prototyping` is `edition = "2024"` (Cargo.toml). **1.85 is edition-2024's floor, NOT the build floor:** the git-pinned writer `mzpeak_prototyping@d1aaaf84` has an *undeclared* MSRV of ~1.87 — it uses `io::ErrorKind::InvalidFilename` (feature `io_error_more`) and const `String::as_bytes` (feature `const_vec_string_slice`), both stabilized in **Rust 1.87.0**. The writer's `Cargo.toml` declares no `rust-version`, so nothing flags this at resolve time. The project therefore pins **1.96.0** (latest local stable) in `rust-toolchain.toml`; edition 2024 is unaffected (it only requires ≥1.85). |
 | **mzdata** | `0.63.5` (latest on crates.io; pin to **`0.63.3`** to match upstream — see compat note) | imzML reader + shared spectrum data model | Only actively-maintained Rust imzML reader; same author as mzPeak; exposes IMS coordinates (verified above). Updated 2026-05-12. |
 | **mzpeak_prototyping** | git `HUPO-PSI/mzPeak`, branch `main` (crate version `0.1.0`) | mzPeak writer/reader we extend | The reference mzPeak implementation. **NOT published to crates.io** — git-only. Repo moved from `mobiusklein/mzpeak_prototyping` → `HUPO-PSI/mzPeak` (pushed 2026-06-03); crate name unchanged. |
 | **mzpeaks** | `1.0.9` | Peak/centroid types (`CentroidPeak`, `DeconvolutedPeak`) shared by both halves | Transitive requirement of both crates; pin to the exact version mzpeak_prototyping uses to avoid two incompatible copies in the dep graph. |
@@ -86,7 +86,7 @@ let y = scan.get_param_by_curie(&curie!(IMS:1000051)).and_then(|p| p.to_i64().ok
 
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| `rust-toolchain.toml` | Pin toolchain to 1.85+ stable | Required for edition 2024. |
+| `rust-toolchain.toml` | Pin toolchain to **1.96.0** | Edition 2024 needs ≥1.85, but the git-pinned `mzpeak_prototyping@d1aaaf84` has an undeclared ~1.87 MSRV (io_error_more + const as_bytes). Pin 1.96.0 to clear the writer's real build floor. |
 | `cargo` (workspace) | Build/test | Single-binary crate is sufficient; no workspace needed for v1. |
 | `cargo nextest` (optional) | Faster test runs | Roundtrip/fidelity tests will be I/O-heavy; nice-to-have. |
 
@@ -226,7 +226,7 @@ arrow `57.0.0`, parquet `57.0.0` (+`encryption`), zip `4.1.0`, mzdata `0.63.3` (
 | `mzpeak_prototyping` (main) | `mzdata = 0.63.3` | Upstream's exact pin. Our `0.63.3` request unifies to one copy. mzdata 0.63.5 *should* be semver-compatible (`^0.63.3`), but pin 0.63.3 to be safe and re-test if you bump. |
 | `mzpeak_prototyping` | `arrow/parquet = 57.0.0`, `zip = 4.1.0`, `mzpeaks = 1.0.9` | Hard pins — match exactly. |
 | `mzdata 0.63.x` | feature `imzml` | `imzml` pulls `mzml` + `uuid`. Available since at least 0.63.3 (verified 2025-12-06 release). |
-| Rust toolchain | `edition 2024` | Requires Rust ≥ 1.85. |
+| Rust toolchain | `edition 2024` | Edition 2024 requires Rust ≥ 1.85, but the actual build floor is ~1.87 (the writer `mzpeak_prototyping@d1aaaf84` uses 1.87-stabilized stdlib: `io_error_more` + const `String::as_bytes`). Project pins **1.96.0**. |
 | `mzdata` master | `0.64.0` (unreleased; edition 2021) | Repo HEAD is ahead of crates.io 0.63.5. Don't track master unless upstream mzpeak does; stay on published 0.63.x. |
 
 ---

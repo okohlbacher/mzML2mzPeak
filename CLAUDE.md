@@ -34,7 +34,7 @@ A command-line converter that reads imzML mass spectrometry **imaging** (MSI) fi
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| **Rust toolchain** | 1.85+ (stable) | Compiler | `mzpeak_prototyping` is `edition = "2024"` (Cargo.toml), which requires Rust 1.85+. Pin via `rust-toolchain.toml`. |
+| **Rust toolchain** | **1.96.0** (pinned) | Compiler | `mzpeak_prototyping` is `edition = "2024"`. 1.85 is edition-2024's floor, NOT the build floor: the writer `mzpeak_prototyping@d1aaaf84` has an undeclared ~1.87 MSRV (`io_error_more` + const `String::as_bytes`, both stabilized in 1.87). Project pins **1.96.0** via `rust-toolchain.toml`. |
 | **mzdata** | `0.63.5` (latest on crates.io; pin to **`0.63.3`** to match upstream — see compat note) | imzML reader + shared spectrum data model | Only actively-maintained Rust imzML reader; same author as mzPeak; exposes IMS coordinates (verified above). Updated 2026-05-12. |
 | **mzpeak_prototyping** | git `HUPO-PSI/mzPeak`, branch `main` (crate version `0.1.0`) | mzPeak writer/reader we extend | The reference mzPeak implementation. **NOT published to crates.io** — git-only. Repo moved from `mobiusklein/mzpeak_prototyping` → `HUPO-PSI/mzPeak` (pushed 2026-06-03); crate name unchanged. |
 | **mzpeaks** | `1.0.9` | Peak/centroid types (`CentroidPeak`, `DeconvolutedPeak`) shared by both halves | Transitive requirement of both crates; pin to the exact version mzpeak_prototyping uses to avoid two incompatible copies in the dep graph. |
