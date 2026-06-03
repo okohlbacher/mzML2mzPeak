@@ -39,7 +39,29 @@ completed: 2026-06-03
 
 # Phase 0 Plan 01: Pinned edition-2024 Build Skeleton Summary
 
-**Toolchain + manifests are pinned and authored correctly, but the plan is BLOCKED: `mzdata`'s `imzml` feature does not compile in any published 0.63.x — `cargo build` cannot pass without a planning-level decision.**
+**Toolchain + manifests are pinned and authored correctly. The mzdata `imzml` E0046 defect is now RESOLVED via the user-approved vendored-fork patch (commit `55477f3`) — mzdata compiles with `imzml` on 1.85.0. The plan is STILL BLOCKED on a NEW, distinct issue: the git-pinned writer `mzpeak_prototyping@d1aaaf84` uses Rust 1.87 stdlib features and does not compile on the plan-pinned toolchain 1.85.0. `cargo build` cannot pass without a planning-level toolchain decision that is outside the approved vendored-patch scope.**
+
+## UPDATE 2026-06-03 (vendored mzdata patch applied; new blocker found)
+
+- **mzdata E0046 RESOLVED.** Per the user-approved resolution, the published `mzdata 0.63.3`
+  source was copied to `vendor/mzdata/` (version kept `0.63.3`), the single missing required
+  method was added to the imzML `ChromatogramSource` impl
+  (`fn count_chromatograms(&self) -> usize { 0 }`, `vendor/mzdata/src/io/imzml/reader.rs`,
+  mirroring unpublished master), and the root `Cargo.toml` now carries
+  `[patch.crates-io] mzdata = { path = "vendor/mzdata" }` with the existing `=0.63.3` + `imzml`
+  dependency line unchanged. Only ONE required method was missing — no others. Verified: `mzdata`
+  compiles cleanly with the `imzml` feature on the pinned 1.85.0 toolchain (the build now advances
+  past `mzdata` to `mzpeak_prototyping`). Committed as `55477f3`.
+- **NEW BLOCKER (outside approved scope, NOT auto-fixed):** with mzdata fixed, `mzpeak_prototyping`
+  at the plan-pinned rev `d1aaaf84` fails to compile on Rust 1.85.0:
+  - `error[E0658]` `io::ErrorKind::InvalidFilename` (feature `io_error_more`) — `src/archive/sync.rs:181`
+  - `error` const `String::as_bytes` (feature `const_vec_string_slice`) — `src/buffer_descriptors.rs:596`
+  - Both stabilized in **Rust 1.87.0**. The writer declares no `rust-version`, so it was not caught
+    at resolve time. Fixing this requires bumping the pinned toolchain (>=1.87) or changing the
+    writer rev — neither was authorized under the vendored-mzdata-patch approval. Recommended 1-line
+    re-plan: set `rust-toolchain.toml` `channel` to a concrete `>=1.87` (latest stable 1.96.0 is
+    installed locally). Full diagnosis + upstream mzdata issue draft in `deferred-items.md`.
+- **Tasks 2 (build) and 3 (cargo tree proofs) remain NOT PASSING** pending the toolchain decision.
 
 ## Performance
 

@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: milestone
 status: executing
-stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated
-last_updated: "2026-06-03T14:18:04.348Z"
+stopped_at: 00-01 mzdata E0046 RESOLVED via vendored patch (55477f3); BLOCKED on new writer-MSRV issue (mzpeak_prototyping@d1aaaf84 needs Rust >=1.87, plan pins 1.85.0) — awaiting re-plan toolchain decision
+last_updated: "2026-06-03T14:29:16.393Z"
 last_activity: 2026-06-03 -- Phase 0 execution started
 progress:
   total_phases: 7
@@ -75,7 +75,8 @@ None yet.
 - Pitfall #1: `mzpeak_prototyping` pins `mzdata` WITHOUT the `imzml` feature; workspace must reconcile to a single `mzdata` copy with `features=["imzml"]` (validated in Phase 0/1).
 - The PXD001283 `.ibd` binary is missing locally and must be fetched + UUID-verified in Phase 0 before any read path runs.
 - Continuous-mode m/z materialization behavior and run-level scanSettings retention (`IMS:1000046/47`) are unresolved until Phases 1/3.
-- Phase 0 plan 00-01 BLOCKED at Task 2: mzdata 'imzml' feature does not compile in ANY published 0.63.x (0.63.3/0.63.4/0.63.5). rustc E0046 - ChromatogramSource impl for ImzMLReaderType is missing required method count_chromatograms. Fix exists only in unpublished mzdata git master (0.64.0, edition 2021), which STACK.md forbids tracking. Needs a planning decision (vendor/patch 0.63.3 OR adopt 0.64.0 and re-pin the set) before 00-01 can pass.
+- Phase 0 plan 00-01 STILL BLOCKED at Task 2 — but the mzdata defect is RESOLVED. The user-approved vendored-fork patch (commit 55477f3: vendor/mzdata 0.63.3 + count_chromatograms() -> 0, wired via [patch.crates-io]) fixes the mzdata E0046; mzdata now compiles with the imzml feature on 1.85.0. NEW distinct blocker surfaced downstream: the git-pinned writer mzpeak_prototyping@d1aaaf84 uses Rust 1.87 stdlib features (io::ErrorKind::InvalidFilename / const String::as_bytes), so cargo build fails on the plan-pinned toolchain 1.85.0. This is OUTSIDE the approved vendored-patch scope and was deliberately NOT auto-fixed. Recommended 1-line re-plan: bump rust-toolchain.toml channel from 1.85.0 to >=1.87 (latest stable 1.96.0 installed locally) and update STACK.md's "1.85+" note. Full diagnosis + upstream mzdata issue draft in .planning/phases/00-environment-foundations/deferred-items.md.
+- 00-01: mzdata E0046 resolved via vendored patch (55477f3); now blocked on mzpeak_prototyping@d1aaaf84 requiring Rust >=1.87 vs pinned 1.85.0 — needs re-plan toolchain bump (outside approved vendored-patch scope)
 
 ## Deferred Items
 
@@ -88,5 +89,5 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-06-03
-Stopped at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated
-Resume file: None
+Stopped at: 00-01 mzdata E0046 RESOLVED via vendored patch (55477f3); BLOCKED on new writer-MSRV issue (mzpeak_prototyping@d1aaaf84 needs Rust >=1.87, plan pins 1.85.0) — awaiting re-plan toolchain decision
+Resume file: .planning/phases/00-environment-foundations/00-01-PLAN.md
