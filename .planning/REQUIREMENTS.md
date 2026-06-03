@@ -41,7 +41,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Output — mzPeak Writing
 
 - [ ] **OUT-01**: Write a valid mzPeak archive (ZIP of Parquet files + `mzpeak_index.json`) via the `mzpeak_prototyping` writer
-- [ ] **OUT-02**: Register imaging coordinate columns through the writer's public extension seam (`add_spectrum_scan_field` + `CustomBuilderFromParameter::from_spec`), without forking core writer structs
+- [x] **OUT-02**: Register imaging coordinate columns through the writer's public extension seam (`add_spectrum_scan_field` + `CustomBuilderFromParameter::from_spec`), without forking core writer structs
 - [ ] **OUT-03**: Map imzML/mzML PSI-MS + IMS controlled-vocabulary metadata into the mzPeak metadata model
 - [ ] **OUT-04**: Produce output that round-trips: imaging columns are re-readable by accession through `mzpeak_prototyping`'s reader
 
@@ -117,7 +117,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | SCH-03 | Phase 3 | Complete |
 | SCH-04 | Phase 3 | Complete |
 | OUT-01 | Phase 4 | Pending |
-| OUT-02 | Phase 4 | Pending |
+| OUT-02 | Phase 4 | Complete |
 | OUT-03 | Phase 4 | Pending |
 | OUT-04 | Phase 4 | Pending |
 | VER-01 | Phase 5 | Pending |

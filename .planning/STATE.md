@@ -4,13 +4,13 @@ milestone: v0.3
 milestone_name: milestone
 status: executing
 stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-06-03T20:59:24.920Z"
-last_activity: 2026-06-03 -- Phase 04 execution started
+last_updated: "2026-06-03T21:05:26.546Z"
+last_activity: 2026-06-03
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 12
-  completed_plans: 9
+  completed_plans: 10
   percent: 57
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-03)
 ## Current Position
 
 Phase: 04 (mzpeak-write-layer) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 04
-Last activity: 2026-06-03 -- Phase 04 execution started
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-06-03
 
 Progress: [███████░░░] 67%
 
@@ -61,6 +61,7 @@ Progress: [███████░░░] 67%
 | Phase 03 P01 | 5 | 3 tasks | 7 files |
 | Phase 03 P02 | 9 | 3 tasks | 7 files |
 | Phase 03 P03 | 2m | 2 tasks | 4 files |
+| Phase 04 P01 | 4m | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,7 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 03]: ToleranceContract single source of truth in src/schema/tolerance.rs (re-exported from schema::mod) — L1 Δ=0 bit-for-bit, L2 m/z 1e-7 / intensity 1e-3 (spec v0.3 §8), consumed by the Phase 5 verifier.
 - [Phase ?]: [Phase 03]: scanSettings geometry parser honors the ISO-8859-1 prolog via explicit encoding_rs::WINDOWS_1252 decode of raw cvParam bytes (quick-xml encoding feature stays OFF); read_event_into does not UTF-8-validate while tokenizing so Latin-1 high bytes before scanSettings never abort; bounded stop at </scanSettings>; dispatch on accession only; lenient numeric str::parse->None (D-03). Proven on real HR2MSI grid 260x134 + child terms IMS:1000401/413/480/491 (SPA-03 primary path).
 - [Phase 03]: ImagingMetadata serde struct serializes to metadata.imaging with all 7 geometry fields skip_serializing_if=Option::is_none (pixel_count omitted when None — D-03/D-06); only is_imaging + coordinate_base(const 1, §5.1) non-optional; SPA-04 provenance->file_description vs geometry->ms_run.parameters+metadata.imaging split documented (D-04); serde/serde_json declared as direct deps at resolved single-copy versions; schema validated by focused structural assertion (no validator crate, D-06).
+- [Phase 04]: write::to_mzdata reconstructs an mzdata MultiLayerSpectrum from ImagingSpectrum: re-attaches IMS:1000050/51/52 as ScanEvent params (writer reads coords by accession at write-time, Pitfall 1) and re-encodes NumArray F32->Float32/F64->Float64 with no widening. — MultiLayerSpectrum::new is the 4-arg (descr, Some(arrays), None, None) constructor at mzdata spectrum_types.rs:1063; RESEARCH Pattern 2 mis-cited the 2-arg RawSpectrum::new at :360 (corrected in Plan 04-01 Task 2).
 
 ### Pending Todos
 
@@ -108,6 +110,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-03T19:55:16.075Z
+Last session: 2026-06-03T21:04:53.032Z
 Stopped at: Completed 03-01-PLAN.md
 Resume file: None
