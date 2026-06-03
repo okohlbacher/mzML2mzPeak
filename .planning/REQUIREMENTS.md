@@ -33,10 +33,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Schema — Imaging mzPeak Extension
 
-- [ ] **SCH-01**: Define the imaging extension to the mzPeak schema (coordinate column names, types, and where they live — scan columns in `spectra_metadata.parquet` per the identified extension point)
+- [x] **SCH-01**: Define the imaging extension to the mzPeak schema (coordinate column names, types, and where they live — scan columns in `spectra_metadata.parquet` per the identified extension point)
 - [ ] **SCH-02**: Define a convention for run-level imaging metadata in `mzpeak_index.json` (and/or a `schema/imaging.json`)
-- [ ] **SCH-03**: Keep the extension faithful to mzPeak design (PSI-MS/IMS CV accessions, Parquet idioms) so output stays readable by `mzpeak_prototyping`'s reader — mergeable-by-design
-- [ ] **SCH-04**: Define the numerical-fidelity tolerance contract (per-axis tolerances for m/z vs intensity)
+- [x] **SCH-03**: Keep the extension faithful to mzPeak design (PSI-MS/IMS CV accessions, Parquet idioms) so output stays readable by `mzpeak_prototyping`'s reader — mergeable-by-design
+- [x] **SCH-04**: Define the numerical-fidelity tolerance contract (per-axis tolerances for m/z vs intensity)
 
 ### Output — mzPeak Writing
 
@@ -112,10 +112,10 @@ Which phases cover which requirements. Populated during roadmap creation.
 | SPA-02 | Phase 2 | Complete |
 | SPA-03 | Phase 3 | Pending |
 | SPA-04 | Phase 3 | Pending |
-| SCH-01 | Phase 3 | Pending |
+| SCH-01 | Phase 3 | Complete |
 | SCH-02 | Phase 3 | Pending |
-| SCH-03 | Phase 3 | Pending |
-| SCH-04 | Phase 3 | Pending |
+| SCH-03 | Phase 3 | Complete |
+| SCH-04 | Phase 3 | Complete |
 | OUT-01 | Phase 4 | Pending |
 | OUT-02 | Phase 4 | Pending |
 | OUT-03 | Phase 4 | Pending |

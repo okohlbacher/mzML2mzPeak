@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: milestone
 status: executing
-stopped_at: Phase 3 context gathered
-last_updated: "2026-06-03T19:30:16.103Z"
-last_activity: 2026-06-03 -- Phase 03 planning complete
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-06-03T19:42:45.431Z"
+last_activity: 2026-06-03
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 9
-  completed_plans: 6
+  completed_plans: 7
   percent: 43
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-03)
 
 **Core value:** Convert an arbitrary imzML imaging dataset into a valid imaging mzPeak file without losing spatial or spectral information — every pixel's coordinates and its m/z + intensity data survive the roundtrip.
-**Current focus:** Phase 2 — imzML Read Layer + Integrity Preflight
+**Current focus:** Phase 03 — imaging-schema-layer
 
 ## Current Position
 
-Phase: 2 (imzML Read Layer + Integrity Preflight) — EXECUTING
-Plan: 3 of 3 complete (next: 02-02 integrity preflight)
+Phase: 03 (imaging-schema-layer) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-06-03 -- Phase 03 planning complete
+Last activity: 2026-06-03
 
 Progress: [███████░░░] 67%
 
@@ -58,6 +58,7 @@ Progress: [███████░░░] 67%
 | Phase 02 P01 | 2 | 2 tasks | 5 files |
 | Phase 02 P02 | 6 | 2 tasks | 10 files |
 | Phase 02 P03 | 8m | 2 tasks | 6 files |
+| Phase 03 P01 | 5 | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 02]: Converter-owned preflight (IN-07) hard-fails on UUID mismatch / checksum mismatch / missing .ibd via typed IntegrityError AND a real non-zero process exit (preflight bin -> ExitCode::FAILURE), proven by spawned std::process::Command tests; bounded Latin-1 header parse stops at <spectrumList; checksums via pinned sha1/md-5/sha2 streamed in 64KiB chunks; .ibd resolved by IMS:1000070 then sibling fallback.
 - [Phase 02]: Surface decode errors via ImzMLReader::read_into (fallible) not next()/read_next() which collapse parse/IO errors into None; EOF is the only clean-end signal (T-02-09)
 - [Phase 02]: Storage mode auto-detected from data_mode only (IN-03); absent data_mode maps to Unknown, never backfilled from spectrum shape/signal_continuity
+- [Phase ?]: [Phase 03]: quick-xml encoding feature CANNOT be enabled — in 0.30 it gates Attribute::unescape_value behind cfg(not(encoding)), breaking vendored mzdata (48 E0599); depend on quick-xml =0.30.0 WITHOUT encoding and handle the ISO-8859-1 prolog via encoding_rs in Plan 03-02.
+- [Phase ?]: [Phase 03]: imaging_scan_fields() declares IMS:1000050/51/52 as Int64 scan-facet specs (x,y required, z optional); from_spec compile-binding proof adopted (accession round-trips), full writer wiring deferred to Phase 4.
+- [Phase ?]: [Phase 03]: ToleranceContract single source of truth in src/schema/tolerance.rs (re-exported from schema::mod) — L1 Δ=0 bit-for-bit, L2 m/z 1e-7 / intensity 1e-3 (spec v0.3 §8), consumed by the Phase 5 verifier.
 
 ### Pending Todos
 
@@ -100,6 +104,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-03T18:19:49.838Z
-Stopped at: Phase 3 context gathered
-Resume file: .planning/phases/03-imaging-schema-layer/03-CONTEXT.md
+Last session: 2026-06-03T19:42:45.427Z
+Stopped at: Completed 03-01-PLAN.md
+Resume file: None
