@@ -445,16 +445,18 @@ IMS:1000031 processed / IMS:1000030 continuous  (storage mode)
 
 **Note:** All critical-path claims (quick-xml/encoding_rs presence + version, encoding auto-detection mechanism, `from_spec` signature + accepted dtypes, inflection output, CURIE Display format, `FileIndex.metadata` shape, real `<scanSettings>` layout) are `[VERIFIED: source]` in this session, not assumed.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should Phase 3 compile-bind one `from_spec` call to prove the descriptor shape (D-05 says "may"; researcher recommends yes)?**
    - What we know: `from_spec(curie!(IMS:1000050), "position x", DataType::Int64)` is verified to compile against the accepted-dtype arms and satisfy `StructVisitorBuilder<ScanEvent>`.
    - What's unclear: whether the planner wants the live binding in Phase 3 or a pure descriptor table deferred to Phase 4.
    - Recommendation: include ONE compile-asserting unit test in Phase 3 (`from_spec(...).accession() == curie!(IMS:1000050)` and the inflected field name equals `IMS_1000050_position_x`). It is cheap, de-risks Phase 4, and directly satisfies criterion 1. Full wiring into a writer stays in Phase 4.
+   - **RESOLVED:** Yes — adopted in plan 03-01 Task 2, which includes the `binds_int64` compile-asserting unit test per the D-05 recommendation. Full writer wiring remains deferred to Phase 4.
 
 2. **Where exactly does the `ToleranceContract` live — `src/schema/tolerance.rs` or a shared `src/fidelity/`?**
    - What we know: D-07 leaves placement to the planner; Phase 5 is the consumer.
    - Recommendation: `src/schema/tolerance.rs`, re-exported from `schema::mod`, so the contract sits with the rest of the spec-encoding layer and Phase 5 imports `imzml2mzpeak::schema::ToleranceContract`.
+   - **RESOLVED:** `src/schema/tolerance.rs`, re-exported from `schema::mod` — adopted in plan 03-01 Task 3.
 
 ## Environment Availability
 
