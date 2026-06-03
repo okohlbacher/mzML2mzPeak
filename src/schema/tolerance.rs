@@ -19,3 +19,22 @@ pub struct ToleranceContract {
     /// Intensity max relative error.
     pub intensity_rel_err: f64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn l1_is_bit_for_bit() {
+        assert_eq!(ToleranceContract::L1.level, ConformanceLevel::L1BitForBit);
+        assert_eq!(ToleranceContract::L1.mz_rel_err, 0.0);
+        assert_eq!(ToleranceContract::L1.intensity_rel_err, 0.0);
+    }
+
+    #[test]
+    fn l2_matches_spec_section_8() {
+        assert_eq!(ToleranceContract::L2.level, ConformanceLevel::L2Transformed);
+        assert_eq!(ToleranceContract::L2.mz_rel_err, 1e-7);
+        assert_eq!(ToleranceContract::L2.intensity_rel_err, 1e-3);
+    }
+}
