@@ -94,7 +94,7 @@ fn write_fixture(out: &Path, geom: Option<&ImagingRunMetadata>) -> Result<(), Wr
 
     // Streaming write loop (one spectrum at a time; routing is automatic by signal_continuity).
     for s in fixture() {
-        let mz_spec = to_mzdata(&s);
+        let mz_spec = to_mzdata(&s)?;
         writer.write_spectrum(&mz_spec)?;
     }
 
@@ -104,7 +104,7 @@ fn write_fixture(out: &Path, geom: Option<&ImagingRunMetadata>) -> Result<(), Wr
 
     // Terminal sequence (the load-bearing finish seam, RESEARCH Q4): clone the block BEFORE
     // finish_parquet consumes the writer, insert it, then finalize the ZIP + index.
-    let block = writer.imaging_metadata().clone();
+    let block = writer.imaging_metadata()?.clone();
     let mut zip = writer.finish_parquet()?;
     zip.add_index_metadata("imaging", &block)
         .map_err(WriteError::Json)?;

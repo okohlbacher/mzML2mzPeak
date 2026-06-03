@@ -53,7 +53,9 @@ pub fn convert(reader: ImagingReader, out_path: &Path) -> Result<(), WriteError>
     //     dispatches on signal_continuity (set verbatim in to_mzdata) — NO branch here.
     for item in reader {
         let s = item?;
-        let mz_spec = to_mzdata(&s);
+        // to_mzdata is fallible (WR-01 axis-length, CR-02 non-finite m/z, WR-03 coordinate
+        // validation); a data-dependent defect surfaces as a typed WriteError, never a panic.
+        let mz_spec = to_mzdata(&s)?;
         writer.write_spectrum(&mz_spec)?;
     }
 
@@ -69,7 +71,7 @@ pub fn convert(reader: ImagingReader, out_path: &Path) -> Result<(), WriteError>
     //     open ZipArchiveWriter so the imaging block can be inserted before the index is
     //     written. finish_parquet(self) CONSUMES the writer, so the imaging block is cloned
     //     out FIRST (per Plan 02 handoff note; ImagingMetadata: Clone).
-    let block = writer.imaging_metadata().clone();
+    let block = writer.imaging_metadata()?.clone();
     let mut zip = writer.finish_parquet()?;
     zip.add_index_metadata("imaging", &block)
         .map_err(WriteError::Json)?;

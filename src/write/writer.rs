@@ -72,6 +72,42 @@ pub enum WriteError {
     /// (Plan 03's `add_index_metadata`).
     #[error("JSON error serializing imaging metadata block: {0}")]
     Json(#[from] serde_json::Error),
+
+    /// A spectrum's m/z and intensity axes differ in length (WR-01). Pairing them by index
+    /// would silently drop the trailing points of the longer array, losing spectral data.
+    #[error(
+        "spectrum {native_id}: m/z and intensity axes differ in length \
+         (m/z {mz}, intensity {intensity}) — would lose spectral data"
+    )]
+    AxisLengthMismatch {
+        native_id: String,
+        mz: usize,
+        intensity: usize,
+    },
+
+    /// A centroid spectrum carries a non-finite (NaN/±∞) m/z value (CR-02). Surfaced as a typed
+    /// error rather than allowed to panic the peaks-facet sort via `partial_cmp().unwrap()`.
+    #[error("spectrum {native_id}: non-finite m/z at index {index} (NaN/±∞ is not writable)")]
+    NonFiniteMz { native_id: String, index: usize },
+
+    /// A coordinate is not a positive 1-based pixel index (WR-03): `x < 1`, `y < 1`, or a
+    /// present `z < 1`. Coordinates are 1-based per SPA-02; a non-positive value would surface
+    /// a nonsensical pixel in the reference reader's Int64 coordinate columns.
+    #[error(
+        "spectrum {native_id}: non-positive coordinate (x={x}, y={y}, z={z:?}) — \
+         coordinates are 1-based positive pixel indices"
+    )]
+    NonPositiveCoordinate {
+        native_id: String,
+        x: i64,
+        y: i64,
+        z: Option<i64>,
+    },
+
+    /// [`ImagingWriter::imaging_metadata`] was called before `write_run_metadata` wired the
+    /// block (WR-02). Returned instead of panicking so callers handle the unwired case.
+    #[error("imaging metadata block not wired — call write_run_metadata before imaging_metadata")]
+    MetadataNotWired,
 }
 
 /// Wraps the reference `mzpeak_prototyping` writer for imaging output.
@@ -247,16 +283,19 @@ impl ImagingWriter {
     }
 
     /// The assembled `metadata.imaging` block, for Plan 03 to insert at the finish stage via
-    /// `zip.add_index_metadata("imaging", writer.imaging_metadata())`. Returns the discovery
+    /// `zip.add_index_metadata("imaging", writer.imaging_metadata()?)`. Returns the discovery
     /// block assembled by [`ImagingWriter::write_run_metadata`].
     ///
-    /// # Panics
-    /// Panics if called before `write_run_metadata` has run (the block is unset). Plan 03
-    /// always wires metadata before finishing, so this is a programming-error guard.
-    pub fn imaging_metadata(&self) -> &ImagingMetadata {
+    /// # Errors
+    /// Returns [`WriteError::MetadataNotWired`] if called before `write_run_metadata` has run
+    /// (the block is unset). This is a public method on a public type with no compile-time
+    /// ordering guarantee, so it surfaces a typed error rather than panicking (WR-02): a
+    /// caller (or a refactor of `convert`) that flushes before wiring metadata gets a handled
+    /// error instead of a crash.
+    pub fn imaging_metadata(&self) -> Result<&ImagingMetadata, WriteError> {
         self.imaging_block
             .as_ref()
-            .expect("imaging metadata block assembled by write_run_metadata before finish")
+            .ok_or(WriteError::MetadataNotWired)
     }
 
     /// Ensure the archive carries a `chromatograms_*` metadata facet — emitted EMPTY, with no
@@ -273,6 +312,16 @@ impl ImagingWriter {
     /// exactly one EMPTY chromatogram (default description, empty array map, zero data points).
     /// This is a structural placeholder, not total-ion-current data — the `chromatograms_*`
     /// facet exists but carries no fabricated signal, honoring "emit empty chromatograms".
+    ///
+    /// UPSTREAM COUPLING (WR-04): the empty array map carries a (zero-length) `TimeArray` +
+    /// `IntensityArray` SPECIFICALLY because the pinned writer rev (`d1aaaf84…`)
+    /// `write_chromatogram_arrays` unwraps the `TimeArray` (base.rs:385). The ONLY thing
+    /// preventing a panic inside the vendored writer here is that this buffer set matches what
+    /// that `unwrap` expects. If a future `mzpeak_prototyping` rev bump changes that expected
+    /// array set, this empty chromatogram could panic from inside the vendored writer on the
+    /// production `convert()` path — re-verify on any rev bump. The
+    /// `empty_chromatogram_writes_and_finishes` test below exercises this end-to-end so a
+    /// mismatch fails loudly in CI rather than at runtime.
     pub fn ensure_chromatogram_facet(&mut self) -> Result<(), WriteError> {
         // An empty Chromatogram: zero data points. `write_chromatogram_arrays` unwraps the
         // TimeArray (base.rs:385), so the array map MUST carry a (zero-length) TimeArray +
@@ -379,6 +428,11 @@ mod tests {
         let w = ImagingWriter::new(&out).expect("ImagingWriter::new builds with column registration");
         // The imaging block is not yet assembled (that is write_run_metadata's job, Task 2).
         assert!(w.imaging_block.is_none(), "imaging block unset until metadata is wired");
+        // WR-02: imaging_metadata() returns a typed error (not a panic) before metadata wiring.
+        assert!(
+            matches!(w.imaging_metadata(), Err(WriteError::MetadataNotWired)),
+            "imaging_metadata before write_run_metadata returns WriteError::MetadataNotWired"
+        );
         // finish_parquet hands back an open ZIP; dropping it finalizes the (empty) archive.
         let zip = w.finish_parquet().expect("finish_parquet yields an open ZipArchiveWriter");
         drop(zip);
@@ -433,7 +487,7 @@ mod tests {
         );
 
         // The assembled imaging block reflects the parsed geometry.
-        let block = w.imaging_metadata();
+        let block = w.imaging_metadata().expect("metadata wired");
         assert!(block.is_imaging);
         assert_eq!(block.coordinate_base, 1);
         let pc = block.pixel_count.expect("pixel_count assembled from grid_x/grid_y");
@@ -465,11 +519,50 @@ mod tests {
         w.write_run_metadata(&source, &prov, None)
             .expect("metadata wiring succeeds with no geometry");
 
-        let block = w.imaging_metadata();
+        let block = w.imaging_metadata().expect("metadata wired");
         assert!(block.is_imaging);
         assert_eq!(block.coordinate_base, 1);
         assert!(block.pixel_count.is_none());
         assert!(block.scan_pattern.is_none());
+
+        let _ = std::fs::remove_file(&out);
+    }
+
+    /// WR-04: the empty-chromatogram placeholder must round-trip through `write_chromatogram`
+    /// (which unwraps `TimeArray` in the pinned upstream writer) + `finish_parquet`/`finish`
+    /// WITHOUT panicking. This pins the upstream-rev coupling: if a future rev changes the
+    /// array set `write_chromatogram_arrays` expects, this test fails loudly (panic surfaces as
+    /// a test failure) rather than crashing only on the production path.
+    #[test]
+    fn empty_chromatogram_writes_and_finishes() {
+        use mzdata::meta::FileMetadataConfig;
+
+        let mut out = std::env::temp_dir();
+        out.push(format!("imzml2mzpeak_writer_chrom_{}.mzpeak", std::process::id()));
+        let mut w = ImagingWriter::new(&out).expect("build writer");
+
+        let prov = RunProvenance {
+            uuid: None,
+            data_mode: StorageMode::Unknown,
+            ibd_checksum: None,
+            ibd_checksum_type: None,
+        };
+        let source = FileMetadataConfig::default();
+        w.write_run_metadata(&source, &prov, None)
+            .expect("metadata wiring succeeds");
+
+        // The load-bearing call: must not panic on the upstream TimeArray unwrap.
+        w.ensure_chromatogram_facet()
+            .expect("empty chromatogram writes without panicking (upstream TimeArray unwrap)");
+
+        let block = w.imaging_metadata().expect("metadata wired").clone();
+        let mut zip = w.finish_parquet().expect("finish_parquet");
+        zip.add_index_metadata("imaging", &block)
+            .map_err(WriteError::Json)
+            .expect("index metadata");
+        zip.finish()
+            .map_err(|e| WriteError::Io(std::io::Error::other(e)))
+            .expect("finish");
 
         let _ = std::fs::remove_file(&out);
     }
