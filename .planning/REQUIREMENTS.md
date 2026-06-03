@@ -18,7 +18,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **IN-01**: Read imzML in **processed** mode (per-spectrum m/z arrays) via `mzdata`
 - [ ] **IN-02**: Read imzML in **continuous** mode (shared m/z axis) via `mzdata`
 - [ ] **IN-03**: Auto-detect storage mode from the imzML CV params (do not infer from spectrum type)
-- [ ] **IN-04**: Correctly decode binary arrays (32/64-bit float, zlib compression, endianness) from the `.ibd`
+- [ ] **IN-04**: Correctly decode binary arrays from the `.ibd` preserving **source dtype** (32- and 64-bit float, little-endian) for both m/z and intensity — NO dtype widening/narrowing (supports L1 bit-for-bit). NOTE: zlib-compressed `.ibd` arrays are NOT supported by the `mzdata` imzML reader (`NoCompression` only) → uncompressed `.ibd` is in scope; compressed `.ibd` is out of scope for v1.
 - [ ] **IN-05**: Preserve the profile-vs-centroid spectrum-type flag as-is (orthogonal to storage mode)
 - [ ] **IN-06**: Carry MS level and essential per-spectrum metadata through the pipeline
 - [ ] **IN-07**: Converter-owned integrity preflight — hard-fail on UUID mismatch and `.ibd` SHA-1 mismatch (do not rely on `mzdata`, which only warns)

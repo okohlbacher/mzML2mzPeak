@@ -63,7 +63,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Requirements**: IN-01, IN-02, IN-03, IN-04, IN-05, IN-06, IN-07, IN-08, SPA-01, SPA-02
 **Success Criteria** (what must be TRUE):
 
-  1. Both processed and continuous fixtures iterate to completion yielding per-spectrum `(x, y, z?, m/z[], intensity[])` with correctly decoded binary arrays (32/64-bit float, zlib and uncompressed, correct endianness).
+  1. Both processed and continuous fixtures iterate to completion yielding per-spectrum `(x, y, z?, m/z[], intensity[])` with arrays decoded at **source dtype** (32- and 64-bit float, little-endian) — no widening/narrowing. (Uncompressed `.ibd` only; zlib `.ibd` is unsupported by the mzdata reader and out of scope.)
   2. Storage mode is auto-detected from the `IMS:1000030/31` CV param (not inferred from spectrum type), and the profile/centroid flag and MS level are carried through unchanged.
   3. A converter-owned preflight hard-fails (non-zero exit, clear message) on a deliberately mismatched UUID or `.ibd` checksum, and on a missing `.ibd` — not merely warning as `mzdata` does.
   4. The full local file streams one spectrum at a time with bounded memory (no collect-all), and extracted coordinates preserve imzML semantics (1-based, no axis flip).
