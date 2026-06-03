@@ -14,3 +14,6 @@
 - MINOR: `00-02` says `.ibd` SHA-1 over “whole .ibd”; correct, but make explicit that this includes the first 16 UUID bytes.
 - MINOR: `ROADMAP` Phase 0 success criteria require UUID verification but omit SHA-1, while plan requires both. Fix: update roadmap success criteria to include `IMS:1000091`.
 EXECUTE-READY: no — fix UUID byte order, Cargo.lock/artifact gaps, and PRIDE API/download-resolution step.
+
+## Round 2 (revised plans)
+CRIT-1, MAJOR-1..6, MINOR-1..4 all RESOLVED · NEW: none · **EXECUTE-READY: yes**
