@@ -69,6 +69,14 @@ quick-xml = "=0.30.0"
 # This is the RESEARCH "Alternatives Considered" sanctioned fallback, already in the tree. ---
 encoding_rs = "=0.8.35"
 
+# --- Serde serialization (Plan 03-03): ImagingMetadata serializes to the metadata.imaging
+# serde_json::Value inserted into mzPeak's open FileIndex.metadata map. Both crates are
+# CLAUDE.md-sanctioned stack members (serde 1.0.219 / serde_json 1.0.140 minimums) and were
+# ALREADY in the dep graph transitively — pinned with `=` at the resolved single-copy
+# versions (no new copy, no graph fracture; verified present in Cargo.lock). ---
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+
 # --- Application-boundary helpers: pinned with `=` at upstream-aligned versions. ---
 anyhow = "=1.0.102"
 thiserror = "=2.0.18"
