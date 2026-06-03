@@ -151,7 +151,7 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4 → 5 → 6
 | 0. Environment & Foundations | 2/2 | Complete   | 2026-06-03 |
 | 1. Coordinate-Exposure Spike | 1/1 | Complete   | 2026-06-03 |
 | 2. imzML Read Layer + Integrity Preflight | 3/3 | Complete   | 2026-06-03 |
-| 3. Imaging-Schema Layer | 3/3 | Complete   | 2026-06-03 |
+| 3. Imaging-Schema Layer | 3/3 | Complete    | 2026-06-03 |
 | 4. mzPeak Write Layer | 0/TBD | Not started | - |
 | 5. Verification / Roundtrip Layer | 0/TBD | Not started | - |
 | 6. CLI/UX Layer + PXD001283 Acceptance Gate | 0/TBD | Not started | - |
