@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Coordinate-Exposure Spike (blocking gate)** - Confirm pinned `mzdata` + `imzml` feature compiles and surfaces per-pixel x/y for both storage modes before any layer is built (completed 2026-06-03)
 - [x] **Phase 2: imzML Read Layer + Integrity Preflight** - Streaming reader yielding per-spectrum coordinates, arrays, and metadata, with a converter-owned hard-fail integrity gate (completed 2026-06-03)
 - [x] **Phase 3: Imaging-Schema Layer** - Lock the imaging mzPeak extension (scan-facet coordinate columns, run-level params, provenance, tolerance contract) per spec v0.3 (completed 2026-06-03)
-- [ ] **Phase 4: mzPeak Write Layer** - Streaming writer that emits a valid imaging mzPeak archive via the public extension seam
+- [x] **Phase 4: mzPeak Write Layer** - Streaming writer that emits a valid imaging mzPeak archive via the public extension seam (completed 2026-06-03)
 - [ ] **Phase 5: Verification / Roundtrip Layer** - Reload-and-compare harness proving count, coordinate, and numerical fidelity plus an ion-image reconstruction
 - [ ] **Phase 6: CLI/UX Layer + PXD001283 Acceptance Gate** - Full CLI (convert, dry-run, progress, errors) assembled end-to-end and run on the full 34,840-spectrum dataset
 
@@ -113,7 +113,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
   - [x] 04-01-PLAN.md — Write module scaffold + `to_mzdata` ImagingSpectrum→mzdata reconstruction (coord params + dtype-preserving arrays + signal_continuity) (OUT-02)
   - [x] 04-02-PLAN.md — `ImagingWriter`: coordinate-column registration via `add_spectrum_scan_field`/`from_spec` + metadata mapping (copy_metadata_from, provenance→file_description, metadata.imaging block) + `WriteError` (OUT-02, OUT-03)
-  - [ ] 04-03-PLAN.md — `convert()` streaming orchestrator + synthetic fixture + round-trip smoke test (reference reader resolves IMS coord columns by accession) (OUT-01, OUT-02, OUT-03, OUT-04)
+  - [x] 04-03-PLAN.md — `convert()` streaming orchestrator + synthetic fixture + round-trip smoke test (reference reader resolves IMS coord columns by accession) (OUT-01, OUT-02, OUT-03, OUT-04)
 
 ### Phase 5: Verification / Roundtrip Layer
 
@@ -156,6 +156,6 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4 → 5 → 6
 | 1. Coordinate-Exposure Spike | 1/1 | Complete   | 2026-06-03 |
 | 2. imzML Read Layer + Integrity Preflight | 3/3 | Complete   | 2026-06-03 |
 | 3. Imaging-Schema Layer | 3/3 | Complete    | 2026-06-03 |
-| 4. mzPeak Write Layer | 2/3 | In Progress|  |
+| 4. mzPeak Write Layer | 3/3 | Complete   | 2026-06-03 |
 | 5. Verification / Roundtrip Layer | 0/TBD | Not started | - |
 | 6. CLI/UX Layer + PXD001283 Acceptance Gate | 0/TBD | Not started | - |
