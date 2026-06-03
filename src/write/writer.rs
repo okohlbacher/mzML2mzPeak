@@ -26,7 +26,12 @@ use std::fs::File;
 use std::path::Path;
 
 use mzpeak_prototyping::archive::ZipArchiveWriter;
-use mzpeak_prototyping::writer::{CustomBuilderFromParameter, MzPeakWriterType};
+use mzpeak_prototyping::writer::{
+    AbstractMzPeakWriter, CustomBuilderFromParameter, MzPeakWriterType,
+};
+use mzdata::spectrum::{Chromatogram, ChromatogramDescription};
+use mzpeaks::CentroidPeak;
+use mzdata::spectrum::bindata::{ArrayType, BinaryArrayMap, BinaryDataArrayType, DataArray};
 
 use mzdata::curie;
 use mzdata::meta::{DataProcessing, ProcessingMethod, Software, custom_software_name};
@@ -106,6 +111,15 @@ impl ImagingWriter {
                 spec.dtype.clone(),
             ));
         }
+
+        // Register the m/z + intensity DATA columns (CRITICAL — without this the spectra_data /
+        // spectra_peaks schema carries only `spectrum_index` and every m/z / intensity value is
+        // routed to auxiliary storage, leaving the main columns NULL; the streaming writer has
+        // no sample source to infer the schema the way the reference `examples/convert.rs` does
+        // via `sample_array_types_from_spectrum_source`). `CentroidPeak` registers the canonical
+        // m/z + intensity columns and marks the m/z array primary, exactly as the sampling path
+        // would — covering BOTH the profile (spectra_data) and centroid (spectra_peaks) facets.
+        builder = builder.add_spectrum_peak_type::<CentroidPeak>();
 
         // Build the ZIP-archive-packed writer. `mask_zero_intensity_runs = true` mirrors the
         // reference example (examples/convert.rs:420). We do NOT call `.encryption_properties`
@@ -243,6 +257,40 @@ impl ImagingWriter {
         self.imaging_block
             .as_ref()
             .expect("imaging metadata block assembled by write_run_metadata before finish")
+    }
+
+    /// Ensure the archive carries a `chromatograms_*` metadata facet — emitted EMPTY, with no
+    /// synthesized TIC (CONTEXT Area 3).
+    ///
+    /// Imaging sources have no chromatograms, so we never fabricate a total-ion-current
+    /// signal. However, the reference `MzPeakReader` eagerly loads the chromatogram metadata
+    /// facet at open time (`load_chromatogram_auxiliary_array_count`, reader.rs:349) and
+    /// returns `NotFound` ("Chromatogram metadata entry not found") if the facet is absent —
+    /// the writer only emits the facet when `chromatogram_metadata_buffer` is non-empty
+    /// (writer.rs:1034). So a spectra-only archive is UNREADABLE by the verification target.
+    ///
+    /// To keep the produced archive openable (OUT-01) WITHOUT synthesizing a TIC, we register
+    /// exactly one EMPTY chromatogram (default description, empty array map, zero data points).
+    /// This is a structural placeholder, not total-ion-current data — the `chromatograms_*`
+    /// facet exists but carries no fabricated signal, honoring "emit empty chromatograms".
+    pub fn ensure_chromatogram_facet(&mut self) -> Result<(), WriteError> {
+        // An empty Chromatogram: zero data points. `write_chromatogram_arrays` unwraps the
+        // TimeArray (base.rs:385), so the array map MUST carry a (zero-length) TimeArray +
+        // IntensityArray — both empty Float64 buffers. No fabricated TIC signal is written.
+        let mut arrays = BinaryArrayMap::new();
+        arrays.add(DataArray::wrap(
+            &ArrayType::TimeArray,
+            BinaryDataArrayType::Float64,
+            Vec::new(),
+        ));
+        arrays.add(DataArray::wrap(
+            &ArrayType::IntensityArray,
+            BinaryDataArrayType::Float64,
+            Vec::new(),
+        ));
+        let empty = Chromatogram::new(ChromatogramDescription::default(), arrays);
+        self.inner.write_chromatogram(&empty)?;
+        Ok(())
     }
 
     /// Flush the Parquet facets and return the still-open `ZipArchiveWriter`.

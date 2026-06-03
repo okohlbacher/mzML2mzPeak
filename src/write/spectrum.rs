@@ -85,13 +85,58 @@ pub fn to_mzdata(s: &ImagingSpectrum) -> MultiLayerSpectrum {
     }
     descr.acquisition.scans.push(scan);
 
-    // Arrays present (and no peak/deconvoluted-peak list) ⇒ `peaks()` reports
-    // `RefPeakDataLevel::RawData`; routing is automatic in the writer.
+    // Profile / Unknown: supply raw arrays only ⇒ `peaks()` reports
+    // `RefPeakDataLevel::RawData`; the writer routes Profile → spectra_data automatically.
+    //
+    // Centroid: ALSO attach an explicit `CentroidPeak` list (RESEARCH.md Pitfall 6 documented
+    // fallback). The reference writer's separate peaks facet (MiniPeakWriter / spectra_peaks)
+    // only recognizes the canonical `CentroidPeak` column schema (m/z Float64 + intensity
+    // Float32); a raw-array centroid's dtype-suffixed `mz_f64`/`intensity_f32` columns do NOT
+    // map into it, so without an explicit peak list the centroid's m/z + intensity serialize
+    // as NULL even though the rows are written. Attaching the peak list makes the writer take
+    // the `RefPeakDataLevel::Centroid(_)` branch (base.rs:746), which uses
+    // `CentroidPeak::to_arrays` and lands real values. NOTE: the peaks facet stores m/z as
+    // Float64 + intensity as Float32 by the reference schema's design — for a centroid whose
+    // source m/z is Float32 this widens m/z in the PEAKS facet (the raw arrays remain attached
+    // at source dtype for any data-facet consumer). This is a constraint of the upstream peaks
+    // schema, not a read-side coercion.
     // NOTE: `MultiLayerSpectrum::new` is the 4-arg constructor
     // `(description, Option<arrays>, Option<peaks>, Option<deconvoluted_peaks>)`
-    // (spectrum_types.rs:1063) — RESEARCH.md Pattern 2 mis-cited the 2-arg `RawSpectrum::new`
-    // at :360. We supply the raw arrays and no peak lists.
-    MultiLayerSpectrum::new(descr, Some(arrays), None, None)
+    // (spectrum_types.rs:1063).
+    let peaks = match s.representation {
+        Representation::Centroid => Some(centroid_peak_set(s)),
+        Representation::Profile | Representation::Unknown => None,
+    };
+    MultiLayerSpectrum::new(descr, Some(arrays), peaks, None)
+}
+
+/// Build a `CentroidPeak` set from a centroid spectrum's m/z + intensity axes, pairing the
+/// `i`-th m/z with the `i`-th intensity. m/z is read at its source width (via the non-coercing
+/// `NumArray` accessors — `as_f64` only widens F32, never narrows F64) and intensity is taken
+/// at f32 to match the `CentroidPeak` shape (the reference peaks facet stores intensity as
+/// Float32). The peak `index` is the point's position in the spectrum.
+fn centroid_peak_set(s: &ImagingSpectrum) -> mzpeaks::PeakSet {
+    use mzpeaks::{CentroidPeak, peak_set::PeakSetVec};
+
+    let mzs = s.mz.as_f64();
+    let intensities = intensity_as_f32(&s.intensity);
+    let peaks: Vec<CentroidPeak> = mzs
+        .iter()
+        .zip(intensities.iter())
+        .enumerate()
+        .map(|(i, (&mz, &inten))| CentroidPeak::new(mz, inten, i as u32))
+        .collect();
+    PeakSetVec::new(peaks)
+}
+
+/// Intensity values as `f32` (the `CentroidPeak` intensity width). An `F32` axis is returned
+/// verbatim; an `F64` axis is narrowed to `f32` ONLY for the peaks-facet representation (the
+/// source `F64` array stays attached at full width for the data facet).
+fn intensity_as_f32(arr: &NumArray) -> Vec<f32> {
+    match arr {
+        NumArray::F32(v) => v.clone(),
+        NumArray::F64(v) => v.iter().map(|&x| x as f32).collect(),
+    }
 }
 
 /// Re-encode one [`NumArray`] into a dtype-matched [`DataArray`], preserving the source

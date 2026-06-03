@@ -57,6 +57,13 @@ pub fn convert(reader: ImagingReader, out_path: &Path) -> Result<(), WriteError>
         writer.write_spectrum(&mz_spec)?;
     }
 
+    // Ensure the chromatograms_* facet exists (emitted EMPTY — no TIC synthesized). The
+    // reference reader eagerly loads chromatogram metadata at open and fails if the facet is
+    // absent (spectra-only archives are otherwise unreadable); this registers one empty
+    // placeholder chromatogram, not a fabricated total-ion-current. See
+    // ImagingWriter::ensure_chromatogram_facet for the full rationale (CONTEXT Area 3 + OUT-01).
+    writer.ensure_chromatogram_facet()?;
+
     // (4) Terminal sequence (RESEARCH.md Q4, RESOLVED — the authoritative seam). NOT a plain
     //     writer.finish(): finish_parquet flushes the Parquet facets and hands back the still-
     //     open ZipArchiveWriter so the imaging block can be inserted before the index is
