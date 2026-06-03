@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<mzML xmlns="http://psi.hupo.org/ms/mzml" version="1.1">
+  <fileDescription>
+    <fileContent>
+      <cvParam cvRef="MS" accession="MS:1000579" name="MS1 spectrum"/>
+      <cvParam cvRef="IMS" accession="IMS:1000080" name="universally unique identifier" value="00000000-0000-0000-0000-000000000001"/>
+      <cvParam cvRef="IMS" accession="IMS:1000031" name="processed"/>
+    </fileContent>
+  </fileDescription>
+  <scanSettingsList count="1">
+    <scanSettings id="scansettings1">
+      <cvParam cvRef="IMS" accession="IMS:1000401" name="top down"/>
+      <cvParam cvRef="IMS" accession="IMS:1000413" name="flyback"/>
+      <cvParam cvRef="IMS" accession="IMS:1000480" name="horizontal line scan"/>
+      <cvParam cvRef="IMS" accession="IMS:1000491" name="linescan left right"/>
+      <cvParam cvRef="IMS" accession="IMS:1000042" name="max count of pixels x" value="3"/>
+      <cvParam cvRef="IMS" accession="IMS:1000043" name="max count of pixels y" value="3"/>
+      <cvParam cvRef="IMS" accession="IMS:1000044" name="max dimension x" value="300" unitCvRef="UO" unitAccession="UO:0000017" unitName="micrometer"/>
+      <cvParam cvRef="IMS" accession="IMS:1000045" name="max dimension y" value="300" unitCvRef="UO" unitAccession="UO:0000017" unitName="micrometer"/>
+      <cvParam cvRef="IMS" accession="IMS:1000046" name="pixel size x" value="100.0" unitCvRef="UO" unitAccession="UO:0000017" unitName="micrometer"/>
+      <cvParam cvRef="IMS" accession="IMS:1000047" name="pixel size y" value="100.0" unitCvRef="UO" unitAccession="UO:0000017" unitName="micrometer"/>
+    </scanSettings>
+  </scanSettingsList>
+  <run defaultInstrumentConfigurationRef="ic1" id="run1">
+    <spectrumList count="0" defaultDataProcessingRef="dp1"></spectrumList>
+  </run>
+</mzML>

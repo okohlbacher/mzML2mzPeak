@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<mzML xmlns="http://psi.hupo.org/ms/mzml" version="1.1">
+  <fileDescription>
+    <fileContent>
+      <cvParam cvRef="MS" accession="MS:1000579" name="MS1 spectrum"/>
+      <cvParam cvRef="IMS" accession="IMS:1000080" name="universally unique identifier" value="00000000-0000-0000-0000-000000000002"/>
+      <cvParam cvRef="IMS" accession="IMS:1000031" name="processed"/>
+    </fileContent>
+  </fileDescription>
+  <scanSettingsList count="1">
+    <scanSettings id="scansettings1">
+      <cvParam cvRef="IMS" accession="IMS:1000401" name="top down" value=""/>
+      <cvParam cvRef="IMS" accession="IMS:1000413" name="flyback" value=""/>
+      <cvParam cvRef="IMS" accession="IMS:1000480" name="horizontal line scan" value=""/>
+      <cvParam cvRef="IMS" accession="IMS:1000491" name="linescan left right" value=""/>
+    </scanSettings>
+  </scanSettingsList>
+  <run defaultInstrumentConfigurationRef="ic1" id="run1">
+    <spectrumList count="0" defaultDataProcessingRef="dp1"></spectrumList>
+  </run>
+</mzML>

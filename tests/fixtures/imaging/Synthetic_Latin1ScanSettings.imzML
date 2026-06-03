@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<mzML xmlns="http://psi.hupo.org/ms/mzml" version="1.1">
+  <fileDescription>
+    <fileContent>
+      <cvParam cvRef="MS" accession="MS:1000579" name="MS1 spectrum"/>
+      <cvParam cvRef="IMS" accession="IMS:1000080" name="universally unique identifier" value="00000000-0000-0000-0000-000000000003"/>
+    </fileContent>
+    <contact>
+      <cvParam cvRef="MS" accession="MS:1000586" name="contact name" value="Gießen Mäller"/>
+    </contact>
+  </fileDescription>
+  <scanSettingsList count="1">
+    <scanSettings id="scansettings1">
+      <cvParam cvRef="IMS" accession="IMS:1000042" name="max count of pixel x" value="5"/>
+      <cvParam cvRef="IMS" accession="IMS:1000043" name="max count of pixel y" value="7"/>
+    </scanSettings>
+  </scanSettingsList>
+  <run id="run1"><spectrumList count="0"></spectrumList></run>
+</mzML>
