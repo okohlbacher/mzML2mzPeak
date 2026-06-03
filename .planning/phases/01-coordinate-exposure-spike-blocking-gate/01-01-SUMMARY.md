@@ -52,7 +52,7 @@ completed: 2026-06-03
 
 # Phase 1 Plan 01: Coordinate-Exposure Spike Summary
 
-**Empirically proved on the pinned/patched stack that mzdata 0.63.3 surfaces complete per-pixel IMS coordinates and run metadata for both processed (34,840px) and continuous (9px) imzML, with the continuous shared m/z axis materialized per spectrum — Verdict: GO.**
+**Empirically proved on the pinned/patched stack that mzdata 0.63.3 surfaces complete per-pixel IMS coordinates and run metadata for both processed (34,840px) and continuous (9px) imzML, with the continuous shared m/z axis materialized per spectrum; the GO gate was then strengthened to ENFORCE (not merely print) the four metadata fields + the continuous m/z offset, plus a fast `--continuous-only` run path — Verdict: GO (genuinely enforced).**
 
 ## Performance
 
@@ -63,7 +63,7 @@ completed: 2026-06-03
 - **Files modified:** 4 created (spike bin, 2 fixtures, FINDINGS)
 
 ## Accomplishments
-- Built a throwaway spike binary (`src/bin/spike_coords.rs`) that opens both an imzML processed file and a continuous fixture via `ImzMLReader::open_path`, reads coordinates as IMS CV params off each spectrum's first scan, and enforces a per-mode completeness gate.
+- Built a throwaway spike binary (`src/bin/spike_coords.rs`) that opens both an imzML processed file and a continuous fixture via `ImzMLReader::open_path`, reads coordinates as IMS CV params off each spectrum's first scan, and enforces a per-mode gate (completeness + run-metadata validation + continuous m/z-offset presence).
 - PROCESSED (HR2MSI, all 34,840 pixels iterated): `coord_ok=34840 coord_missing=0 no_scan=0 mz_missing=0`, head-sample n_mz in 890–2266 range, all > 0.
 - CONTINUOUS (committed fixture, 9 pixels): `coord_ok=9 coord_missing=0 no_scan=0 mz_missing=0`, every head spectrum `n_mz=8399 mz_offset=16` — the repeated offset proving shared-axis materialization.
 - All four gating metadata fields (`data_mode`, `uuid`, `ibd_checksum`, `ibd_checksum_type`) reachable from `reader.imzml_metadata` for both modes; processed UUID + SHA-1 cross-match the Phase 0 `verify_ibd` gate.
@@ -108,10 +108,18 @@ completed: 2026-06-03
 - **Verification:** `cargo build --bin spike_coords` succeeds.
 - **Committed in:** `cd64993` (Task 2 commit)
 
+**3. [End-of-phase review remediation] Gate strengthened to ENFORCE (not just print) metadata + continuous mz_offset, and continuous-only run path added**
+- **Found during:** Phase-1 end-of-phase adversarial review (PHASE1-VERDICT: FAIL) — the conclusion (coords reachable both modes; continuous m/z materialized) was independently CONFIRMED; the gap was gate enforcement + run feasibility.
+- **Issue:** (CRITICAL-1) `Counts::passes()` printed `data_mode`/`uuid`/`ibd_checksum`/`ibd_checksum_type` but never validated them. (CRITICAL-2) the continuous head-sample `mz_offset` was printed but not gated, so a Latin-1 scan regression (ABSENT offset) would pass silently. (MAJOR-3) no feasible continuous-only run path — the binary always ran the 34,840-spectrum processed file first.
+- **Fix:** `Counts` now captures `data_mode`/`uuid_present`/`ibd_checksum_present`/`ibd_checksum_type_present` and the per-head `sampled_mz_offset`. `passes(expected_pixels, expected_mode, require_mz_offset)` now also requires `data_mode == Some(expected_mode)`, the three other fields PRESENT, and (continuous) every sampled offset PRESENT. Added a `--continuous-only` flag (fast, partial/diagnostic verdict `GATE: PASS (continuous)`) plus positional path-arg overrides; exit code reflects only what ran. `ibd_file_name` stays optional/non-gating.
+- **Files modified:** src/bin/spike_coords.rs
+- **Verification:** `--continuous-only` → `pixels=9 coord_ok=9`, head `n_mz=8399 mz_offset=16`, four metadata fields PRESENT, `GATE: PASS (continuous)`, exit 0. Full both-mode run → `GATE: PASS (both modes)`, exit 0, under the now-enforced metadata + offset checks.
+- **Committed in:** this remediation commit.
+
 ---
 
-**Total deviations:** 2 auto-fixed (1 bug, 1 blocking)
-**Impact on plan:** Both essential to produce the required scoped evidence. No scope creep — the spike remains a flat throwaway bin with no new dependency.
+**Total deviations:** 3 auto-fixed (1 bug, 1 blocking, 1 end-of-phase-review remediation)
+**Impact on plan:** Deviations 1-2 were essential to produce the required scoped evidence. Deviation 3 (this remediation) closes the FAIL verdict by making the GO gate genuinely enforce what it claims, and adds a fast partial run path. No scope creep — the spike remains a flat throwaway bin with no new dependency.
 
 ## Issues Encountered
 - mzdata logs a non-fatal `ERROR ... Expected a dateTime value conforming to ISO 8601 standard` while parsing both files (the imzML `<run>` start time is empty/non-ISO). It does not affect coordinate, m/z, or metadata extraction and is out of scope for this read-only spike; noted for Phase 2 awareness.
@@ -126,7 +134,9 @@ None - no external service configuration required.
 
 ## Self-Check: PASSED
 
-All created files exist on disk (spike_coords.rs, both continuous fixtures, 01-FINDINGS.md, 01-01-SUMMARY.md) and all three task commits (`7f5c446`, `cd64993`, `bd318e4`) are present in git history.
+All created files exist on disk (spike_coords.rs, both continuous fixtures, 01-FINDINGS.md, 01-01-SUMMARY.md) and all three original task commits (`7f5c446`, `cd64993`, `bd318e4`) are present in git history.
+
+**End-of-phase remediation self-check (PHASE1-VERDICT: FAIL → resolved):** The strengthened gate was re-run. `--continuous-only` exits 0 with `GATE: PASS (continuous)` (pixels=9, four metadata fields PRESENT, head `mz_offset=16` enforced). The full both-mode run exits 0 with `GATE: PASS (both modes)` under the now-enforced metadata + continuous-offset checks. `data/*.ibd` confirmed git-ignored (not staged). Verdict remains GO — now genuinely enforced.
 
 ---
 *Phase: 01-coordinate-exposure-spike-blocking-gate*

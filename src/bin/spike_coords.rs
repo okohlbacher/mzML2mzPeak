@@ -22,9 +22,24 @@
 //! repeats the same m/z external offset, and the reader's load_ibd_arrays() performs a
 //! per-spectrum seek+read of that region).
 //!
-//! Gate: exits non-zero unless BOTH modes satisfy
-//!   coord_ok == pixels && coord_missing == 0 && no_scan == 0 && mz_missing == 0
-//! and every sampled n_mz > 0. A partial pass is a FAILURE.
+//! GATE (strengthened per Phase-1 end-of-phase review). A mode PASSES only if ALL hold:
+//!   - coord_ok == pixels && coord_missing == 0 && no_scan == 0 && mz_missing == 0
+//!   - every sampled n_mz > 0
+//!   - data_mode == the expected mode for that subject (Processed / Continuous)
+//!   - uuid, ibd_checksum, ibd_checksum_type are all PRESENT (ibd_file_name stays optional)
+//!   - CONTINUOUS additionally requires the sampled m/z external offset to be PRESENT for
+//!     every head-sample spectrum (ABSENT ⇒ fail; this catches a Latin-1 scan regression).
+//! A partial pass is a FAILURE.
+//!
+//! Run paths:
+//!   - default (no args): run BOTH modes (PROCESSED then CONTINUOUS); exit 0 only on
+//!     `GATE: PASS (both modes)`. This is the FULL GO verdict the phase gate requires.
+//!   - `--continuous-only`: run ONLY the continuous fixture (fast, ~seconds); exit code
+//!     reflects ONLY that run (`GATE: PASS (continuous)`). This is an explicitly PARTIAL /
+//!     diagnostic run — it does NOT constitute the full GO verdict.
+//!   - positional path args override the default file paths:
+//!       spike_coords <processed.imzML> [continuous.imzML]
+//!       spike_coords --continuous-only [continuous.imzML]
 
 use std::fs::File;
 use std::process::ExitCode;
@@ -40,7 +55,8 @@ const PROCESSED_PATH: &str = "data/HR2MSImouseurinarybladderS096.imzML";
 const CONTINUOUS_PATH: &str = "tests/fixtures/imaging/Example_Continuous.imzML";
 const HEAD_SAMPLE: usize = 5;
 
-/// Per-mode tallies. The gate is: coord_ok == pixels && the three failure counts are 0.
+/// Per-mode tallies and captured run metadata. The strengthened gate validates BOTH the
+/// completeness counts AND the run metadata (it no longer merely prints metadata).
 #[derive(Default, Debug)]
 struct Counts {
     pixels: usize,
@@ -50,18 +66,53 @@ struct Counts {
     mz_missing: usize,
     /// n_mz of the head-sample spectra actually inspected (must all be > 0).
     sampled_n_mz: Vec<usize>,
+    /// m/z external offset captured per inspected head-sample spectrum (in spectrum order).
+    /// `None` means the offset could not be read for that head spectrum.
+    sampled_mz_offset: Vec<Option<i64>>,
+    // --- captured run metadata (now GATED, not just printed) ---
+    data_mode: Option<IbdDataMode>,
+    uuid_present: bool,
+    ibd_checksum_present: bool,
+    ibd_checksum_type_present: bool,
 }
 
 impl Counts {
-    /// GO condition for this mode.
-    fn passes(&self, expected_pixels: usize) -> bool {
-        self.pixels == expected_pixels
+    /// GO condition for this mode. `expected_mode` is the data_mode this subject MUST
+    /// report. `require_mz_offset` is true for continuous mode, where observing the m/z
+    /// external offset is part of the materialization proof — an ABSENT offset fails.
+    fn passes(
+        &self,
+        expected_pixels: usize,
+        expected_mode: IbdDataMode,
+        require_mz_offset: bool,
+    ) -> bool {
+        let completeness = self.pixels == expected_pixels
             && self.coord_ok == self.pixels
             && self.coord_missing == 0
             && self.no_scan == 0
             && self.mz_missing == 0
             && !self.sampled_n_mz.is_empty()
-            && self.sampled_n_mz.iter().all(|&n| n > 0)
+            && self.sampled_n_mz.iter().all(|&n| n > 0);
+
+        // CRITICAL-1: the four run-metadata fields must now be VALIDATED, not just printed.
+        // data_mode must equal the expected mode; uuid/ibd_checksum/ibd_checksum_type must
+        // all be PRESENT. ibd_file_name remains optional and non-gating.
+        let metadata = self.data_mode == Some(expected_mode)
+            && self.uuid_present
+            && self.ibd_checksum_present
+            && self.ibd_checksum_type_present;
+
+        // CRITICAL-2: continuous mode requires the sampled m/z external offset to be PRESENT
+        // for every inspected head spectrum (the materialization conclusion depends on
+        // observing it; an ABSENT offset — e.g. a Latin-1 scan regression — fails the gate).
+        let mz_offset_ok = if require_mz_offset {
+            !self.sampled_mz_offset.is_empty()
+                && self.sampled_mz_offset.iter().all(|o| o.is_some())
+        } else {
+            true
+        };
+
+        completeness && metadata && mz_offset_ok
     }
 }
 
@@ -152,13 +203,13 @@ fn opt_str(v: &Option<String>) -> String {
 }
 
 /// Open `imzml_path`, print the per-mode metadata + head sample + completeness tally,
-/// and return the tallies. Coordinates are read from every spectrum (cheap scan params);
-/// n_mz is only materialized for the HEAD_SAMPLE spectra to bound .ibd I/O on the 815MB
-/// processed sidecar.
+/// capture the run metadata into the returned `Counts`, and return the tallies.
+/// Coordinates are read from every spectrum (cheap scan params); n_mz is only materialized
+/// for the HEAD_SAMPLE spectra to bound .ibd I/O on the 815MB processed sidecar.
 fn report(imzml_path: &str, mz_offsets: &[Option<i64>]) -> anyhow::Result<Counts> {
     let reader = ImzMLReader::<File, File>::open_path(imzml_path)?;
 
-    // (a) Run-level imaging metadata.
+    // (a) Run-level imaging metadata — printed AND captured for the gate.
     let md = &reader.imzml_metadata;
     println!("data_mode={}", fmt_data_mode(md.data_mode));
     println!(
@@ -171,8 +222,15 @@ fn report(imzml_path: &str, mz_offsets: &[Option<i64>]) -> anyhow::Result<Counts
     println!("ibd_checksum_type={}", opt_str(&md.ibd_checksum_type));
     println!("ibd_file_name={}", opt_str(&md.ibd_file_name));
 
+    let mut c = Counts {
+        data_mode: md.data_mode,
+        uuid_present: md.uuid.is_some(),
+        ibd_checksum_present: md.ibd_checksum.is_some(),
+        ibd_checksum_type_present: md.ibd_checksum_type.is_some(),
+        ..Counts::default()
+    };
+
     // (b) Stream every spectrum; never collect a Vec<Spectrum> (bounded memory).
-    let mut c = Counts::default();
     for (idx, spec) in reader.enumerate() {
         c.pixels += 1;
         let head = idx < HEAD_SAMPLE;
@@ -216,11 +274,13 @@ fn report(imzml_path: &str, mz_offsets: &[Option<i64>]) -> anyhow::Result<Counts
             match n_mz {
                 Some(n) if n > 0 => {
                     c.sampled_n_mz.push(n);
+                    let offset = mz_offsets.get(idx).copied().flatten();
+                    c.sampled_mz_offset.push(offset);
                     let z_part = match z {
                         Some(zv) => format!(" z={zv}"),
                         None => String::new(),
                     };
-                    let off_part = match mz_offsets.get(idx).copied().flatten() {
+                    let off_part = match offset {
                         Some(off) => format!(" mz_offset={off}"),
                         None => " mz_offset=ABSENT".to_string(),
                     };
@@ -244,46 +304,93 @@ fn report(imzml_path: &str, mz_offsets: &[Option<i64>]) -> anyhow::Result<Counts
     Ok(c)
 }
 
-fn run_mode(banner: &str, path: &str, expected_pixels: usize) -> anyhow::Result<bool> {
+fn run_mode(
+    banner: &str,
+    path: &str,
+    expected_pixels: usize,
+    expected_mode: IbdDataMode,
+    require_mz_offset: bool,
+) -> anyhow::Result<bool> {
     println!("=== {banner} ===");
     // Pre-read the head-sample m/z external offsets from the XML (bounded).
     let offsets = mz_offsets_from_xml(path, HEAD_SAMPLE);
     let counts = report(path, &offsets)?;
-    let ok = counts.passes(expected_pixels);
+    let ok = counts.passes(expected_pixels, expected_mode, require_mz_offset);
     if !ok {
         eprintln!(
-            "FAIL: {banner} did not meet the gate (expected pixels={expected_pixels}; got {counts:?})"
+            "FAIL: {banner} did not meet the strengthened gate \
+             (expected pixels={expected_pixels}, expected data_mode={:?}, \
+             require_mz_offset={require_mz_offset}; got {counts:?})",
+            expected_mode
         );
     }
     Ok(ok)
 }
 
-fn main() -> ExitCode {
-    env_logger::init();
-
-    let proc_ok = match run_mode(
-        &format!("PROCESSED: {PROCESSED_PATH}"),
-        PROCESSED_PATH,
+fn run_processed(path: &str) -> bool {
+    match run_mode(
+        &format!("PROCESSED: {path}"),
+        path,
         34_840,
+        IbdDataMode::Processed,
+        false, // processed: per-spectrum offsets vary; not part of its gate
     ) {
         Ok(v) => v,
         Err(e) => {
             eprintln!("FAIL: PROCESSED errored: {e:#}");
             false
         }
-    };
+    }
+}
 
-    let cont_ok = match run_mode(
-        &format!("CONTINUOUS: {CONTINUOUS_PATH}"),
-        CONTINUOUS_PATH,
+fn run_continuous(path: &str) -> bool {
+    match run_mode(
+        &format!("CONTINUOUS: {path}"),
+        path,
         9,
+        IbdDataMode::Continuous,
+        true, // continuous: m/z external offset MUST be observed (materialization proof)
     ) {
         Ok(v) => v,
         Err(e) => {
             eprintln!("FAIL: CONTINUOUS errored: {e:#}");
             false
         }
-    };
+    }
+}
+
+fn main() -> ExitCode {
+    env_logger::init();
+
+    // Minimal arg handling (no clap; this is a throwaway spike). Supported forms:
+    //   spike_coords                                   -> both modes, default paths
+    //   spike_coords <processed> [continuous]          -> both modes, overridden paths
+    //   spike_coords --continuous-only [continuous]    -> continuous only, partial verdict
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let continuous_only = args.iter().any(|a| a == "--continuous-only");
+    let positional: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
+
+    if continuous_only {
+        let cont_path = positional.first().map(|s| s.as_str()).unwrap_or(CONTINUOUS_PATH);
+        eprintln!(
+            "NOTE: --continuous-only is a PARTIAL/diagnostic run. The full Phase-1 GO \
+             verdict requires BOTH modes (run with no flag)."
+        );
+        let cont_ok = run_continuous(cont_path);
+        return if cont_ok {
+            println!("GATE: PASS (continuous)");
+            ExitCode::SUCCESS
+        } else {
+            eprintln!("GATE: FAIL (continuous — blocking; partial pass is a failure)");
+            ExitCode::FAILURE
+        };
+    }
+
+    let proc_path = positional.first().map(|s| s.as_str()).unwrap_or(PROCESSED_PATH);
+    let cont_path = positional.get(1).map(|s| s.as_str()).unwrap_or(CONTINUOUS_PATH);
+
+    let proc_ok = run_processed(proc_path);
+    let cont_ok = run_continuous(cont_path);
 
     if proc_ok && cont_ok {
         println!("GATE: PASS (both modes)");

@@ -11,13 +11,78 @@
 
 Verdict: GO
 
-For **both** storage modes, on the pinned + patched stack, the spike proved:
+For **both** storage modes, on the pinned + patched stack, the spike proved (under the
+**strengthened, enforced** gate — see "Enforced gate" below):
 
 - per-pixel x/y coordinates are reachable and **complete** (`coord_ok == pixels`, with zero `coord_missing`, zero `no_scan`),
 - every sampled spectrum materializes a non-empty m/z array (`n_mz > 0`, zero `mz_missing`),
-- the four gating run-metadata fields (`data_mode`, `uuid`, `ibd_checksum`, `ibd_checksum_type`) are reachable from `reader.imzml_metadata`.
+- the four gating run-metadata fields (`data_mode`, `uuid`, `ibd_checksum`, `ibd_checksum_type`) are reachable from `reader.imzml_metadata` **and the gate now VALIDATES them** (data_mode == expected mode; the other three PRESENT),
+- the continuous m/z external offset is **observed and enforced** for every sampled head spectrum.
 
-The spike's own completeness gate exited `0` (`GATE: PASS (both modes)`). The Phase 2 read-layer design — read via `mzdata`, treat coordinates as CV params on each spectrum's scan event — is **confirmed on fact** and proceeds as architected.
+The spike's own enforced gate exited `0` (`GATE: PASS (both modes)`). The Phase 2 read-layer design — read via `mzdata`, treat coordinates as CV params on each spectrum's scan event — is **confirmed on fact** and proceeds as architected.
+
+### Enforced gate (post end-of-phase-review remediation)
+
+The end-of-phase adversarial review (PHASE1-VERDICT: FAIL) found the GO gate *printed* run
+metadata and the continuous offset but never *validated* them, and that there was no feasible
+continuous-only run path. The conclusion was independently CONFIRMED; the gap was enforcement.
+The spike binary (`src/bin/spike_coords.rs`) was strengthened so a mode PASSES only if ALL hold:
+
+- `coord_ok == pixels && coord_missing == 0 && no_scan == 0 && mz_missing == 0`,
+- every sampled `n_mz > 0`,
+- `data_mode == Some(<expected mode for that subject>)` (Processed for HR2MSI, Continuous for the fixture),
+- `uuid`, `ibd_checksum`, `ibd_checksum_type` all PRESENT (`ibd_file_name` stays optional, non-gating),
+- **continuous only:** the sampled m/z external offset is PRESENT for every head spectrum (ABSENT ⇒ fail — this catches the Latin-1 scan regression rather than hiding it).
+
+Run paths added:
+
+- default (no flag): runs BOTH modes; exit 0 only on `GATE: PASS (both modes)` — this is the FULL GO verdict.
+- `--continuous-only`: runs ONLY the continuous fixture (fast, ~seconds); exit code reflects ONLY that run (`GATE: PASS (continuous)`). Explicitly a PARTIAL/diagnostic run — it does NOT constitute the full GO verdict.
+
+Enforced-gate run outputs (verbatim, this remediation):
+
+```
+=== CONTINUOUS: tests/fixtures/imaging/Example_Continuous.imzML ===   (--continuous-only)
+data_mode=Continuous
+uuid=554a27fa-79d2-4766-9a2c-862e6d78b1f3
+ibd_checksum=a5be532d25997b71be6d20c76561ddc4d5307ddd
+ibd_checksum_type=SHA1
+ibd_file_name=ABSENT
+idx=0 x=1 y=1 n_mz=8399 mz_offset=16
+idx=1 x=2 y=1 n_mz=8399 mz_offset=16
+idx=2 x=3 y=1 n_mz=8399 mz_offset=16
+idx=3 x=1 y=2 n_mz=8399 mz_offset=16
+idx=4 x=2 y=2 n_mz=8399 mz_offset=16
+pixels=9 coord_ok=9 coord_missing=0 no_scan=0 mz_missing=0
+GATE: PASS (continuous)        # exit 0
+```
+
+```
+=== PROCESSED: data/HR2MSImouseurinarybladderS096.imzML ===           (full both-mode run)
+data_mode=Processed
+uuid=c7822330-f1a8-4d11-ad30-504b30b33722
+ibd_checksum=F8C24417B294BFA168D75A470BBB361009BC2671
+ibd_checksum_type=SHA1
+ibd_file_name=ABSENT
+idx=0 x=1 y=1 n_mz=1129 mz_offset=16
+idx=1 x=2 y=1 n_mz=890 mz_offset=13564
+idx=2 x=3 y=1 n_mz=1878 mz_offset=24244
+idx=3 x=4 y=1 n_mz=2266 mz_offset=46780
+idx=4 x=5 y=1 n_mz=1981 mz_offset=73972
+pixels=34840 coord_ok=34840 coord_missing=0 no_scan=0 mz_missing=0
+=== CONTINUOUS: tests/fixtures/imaging/Example_Continuous.imzML ===
+data_mode=Continuous
+uuid=554a27fa-79d2-4766-9a2c-862e6d78b1f3
+ibd_checksum=a5be532d25997b71be6d20c76561ddc4d5307ddd
+ibd_checksum_type=SHA1
+ibd_file_name=ABSENT
+idx=0 x=1 y=1 n_mz=8399 mz_offset=16
+... (idx 1-4 identical: n_mz=8399 mz_offset=16) ...
+pixels=9 coord_ok=9 coord_missing=0 no_scan=0 mz_missing=0
+GATE: PASS (both modes)        # exit 0
+```
+
+Both runs PASS the strengthened gate — the GO verdict is now genuinely enforced, not merely printed.
 
 ---
 
