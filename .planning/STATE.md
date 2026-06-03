@@ -4,13 +4,13 @@ milestone: v0.3
 milestone_name: milestone
 status: executing
 stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-06-03T23:10:53.666Z"
+last_updated: "2026-06-03T23:18:46.952Z"
 last_activity: 2026-06-03
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 15
-  completed_plans: 13
+  completed_plans: 14
   percent: 71
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-03)
 ## Current Position
 
 Phase: 05 (verification-roundtrip-layer) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-06-03
 
@@ -65,6 +65,7 @@ Progress: [███████░░░] 67%
 | Phase 04 P02 | 4m | 2 tasks | 2 files |
 | Phase 04 P03 | 38m | 2 tasks | 4 files |
 | Phase 05 P01 | 9 | 2 tasks | 4 files |
+| Phase 05 P02 | 11 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,9 @@ Recent decisions affecting current work:
 - [Phase 04]: streaming writer must register data/peak columns explicitly via add_spectrum_peak_type::<CentroidPeak>() (no sample source like examples/convert.rs); centroid spectra attach an explicit CentroidPeak list (RESEARCH Pitfall 6) so the SEPARATE peaks facet gets real values; an EMPTY chromatogram facet (no TIC) is required for MzPeakReader to open the archive (it eagerly loads chromatogram metadata). Peaks facet stores m/z f64 / intensity f32 by the upstream schema — L1 note for the Phase-5 verifier (compare against raw arrays at source dtype).
 - [Phase ?]: [Phase 05]: verify comparator compares at SOURCE stored float width (f32-vs-f32, f64-vs-f64) for L1 Δ=0 — never widens via NON-CANONICAL NumArray::as_f64() (grep gate = 0); a source/output dtype-width divergence is itself a mismatch, not a silent widen (T-05-03).
 - [Phase ?]: [Phase 05]: compare.rs imports ToleranceContract::{L1,L2}/ConformanceLevel and re-exposes L1_CONTRACT/L2_CONTRACT as those constants — numbers never re-encoded (T-05-02); VerificationReport caps the mismatch Vec at MAX_REPORTED_MISMATCHES=20 with a total_mismatches counter (T-05-01).
+- [Phase ?]: [Phase 05]: verify orchestrator SPLIT — path-based verify_roundtrip materializes source then delegates to slice-based verify_against_source (test-reachable without .ibd, Pitfall 5); path wrapper is the only collect-all site so the Phase-6 34k iterator switch is one function.
+- [Phase ?]: [Phase 05]: verify STEP3 branches on SOURCE Representation (Profile->get_spectrum_arrays data facet at source width; Centroid->get_spectrum_peaks_for peaks facet, source is L1 ref); F32-source centroid m/z widening is NOT an L1 failure (skipped L1, rel-err L2, Pitfall 2).
+- [Phase ?]: [Phase 05]: count gate returns report (count.passed=false) not CountMismatch error — the report is the deliverable; ion-image grid row-allocated + bounds-checked every write (no sparse-grid OOB panic, T-05-04/05).
 
 ### Pending Todos
 
@@ -118,6 +122,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-03T23:10:28.626Z
+Last session: 2026-06-03T23:17:42.565Z
 Stopped at: Completed 03-01-PLAN.md
 Resume file: None

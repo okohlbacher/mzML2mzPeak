@@ -131,7 +131,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans
 
   - [x] 05-01-PLAN.md — verify module scaffold + VerificationReport/Mismatch/VerifyError contracts + per-axis L1/L2 comparator (VER-03)
-  - [ ] 05-02-PLAN.md — ion-image M[row=y][col=x] TIC reconstruction + verify_roundtrip/verify_against_source orchestrator (count→coords→per-axis→ion-image) (VER-01, VER-02, VER-03, VER-04)
+  - [x] 05-02-PLAN.md — ion-image M[row=y][col=x] TIC reconstruction + verify_roundtrip/verify_against_source orchestrator (count→coords→per-axis→ion-image) (VER-01, VER-02, VER-03, VER-04)
   - [ ] 05-03-PLAN.md — integration harness: extended fixture (profile+F32-profile+centroid+sparse) → write → verify; L1 raw-facet bit-for-bit, centroid source-reference, ≥1 L2, ion-image sanity (VER-01..VER-04)
 
 ### Phase 6: CLI/UX Layer + PXD001283 Acceptance Gate
@@ -161,5 +161,5 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4 → 5 → 6
 | 2. imzML Read Layer + Integrity Preflight | 3/3 | Complete   | 2026-06-03 |
 | 3. Imaging-Schema Layer | 3/3 | Complete    | 2026-06-03 |
 | 4. mzPeak Write Layer | 3/3 | Complete   | 2026-06-03 |
-| 5. Verification / Roundtrip Layer | 1/3 | In Progress|  |
+| 5. Verification / Roundtrip Layer | 2/3 | In Progress|  |
 | 6. CLI/UX Layer + PXD001283 Acceptance Gate | 0/TBD | Not started | - |

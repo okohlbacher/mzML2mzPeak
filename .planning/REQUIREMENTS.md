@@ -47,10 +47,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Verification — Roundtrip & Numerical Fidelity
 
-- [ ] **VER-01**: Verify spectrum count in the output equals the source
-- [ ] **VER-02**: Verify every pixel's x/y(/z) coordinates match the source
+- [x] **VER-01**: Verify spectrum count in the output equals the source
+- [x] **VER-02**: Verify every pixel's x/y(/z) coordinates match the source
 - [x] **VER-03**: Verify m/z and intensity values match the source within the defined tolerance
-- [ ] **VER-04**: Reconstruct an ion image from the output and sanity-check it against the source as an end-to-end check
+- [x] **VER-04**: Reconstruct an ion image from the output and sanity-check it against the source as an end-to-end check
 
 ### CLI & UX
 
@@ -120,10 +120,10 @@ Which phases cover which requirements. Populated during roadmap creation.
 | OUT-02 | Phase 4 | Complete |
 | OUT-03 | Phase 4 | Complete |
 | OUT-04 | Phase 4 | Complete |
-| VER-01 | Phase 5 | Pending |
-| VER-02 | Phase 5 | Pending |
+| VER-01 | Phase 5 | Complete |
+| VER-02 | Phase 5 | Complete |
 | VER-03 | Phase 5 | Complete |
-| VER-04 | Phase 5 | Pending |
+| VER-04 | Phase 5 | Complete |
 | CLI-01 | Phase 6 | Pending |
 | CLI-02 | Phase 6 | Pending |
 | CLI-03 | Phase 6 | Pending |
