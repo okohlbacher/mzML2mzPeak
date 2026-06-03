@@ -88,7 +88,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. The numerical-fidelity tolerance contract is written down: L1 bit-for-bit default (no dtype widening) and L2 opt-in per-axis bounds (m/z rel-err ≤ 1e-7, intensity ≤ 1e-3) per spec v0.3 §8.
   5. An adversarial CODEX/CLI review runs at phase start and end; the schema design passes review for mergeability before the writer is built.
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+  - [ ] 03-01-PLAN.md — Schema module skeleton + quick-xml dep + Int64 coordinate column descriptors (from_spec binding proof) + L1/L2 tolerance contract (SCH-01, SCH-03, SCH-04)
+  - [ ] 03-02-PLAN.md — quick-xml `<scanSettings>` geometry parser (lenient, Latin-1-safe) + synthetic fixtures + real-HR2MSI ground-truth tests (SPA-03)
+  - [ ] 03-03-PLAN.md — ImagingMetadata serde struct + hand-authored `schema/imaging.json` (pixel_count optional) + SPA-04 provenance mapping (SCH-02, SCH-03, SPA-04)
 **UI hint**: no
 
 ### Phase 4: mzPeak Write Layer
@@ -146,7 +150,7 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4 → 5 → 6
 | 0. Environment & Foundations | 2/2 | Complete   | 2026-06-03 |
 | 1. Coordinate-Exposure Spike | 1/1 | Complete   | 2026-06-03 |
 | 2. imzML Read Layer + Integrity Preflight | 3/3 | Complete   | 2026-06-03 |
-| 3. Imaging-Schema Layer | 0/TBD | Not started | - |
+| 3. Imaging-Schema Layer | 0/3 | In progress | - |
 | 4. mzPeak Write Layer | 0/TBD | Not started | - |
 | 5. Verification / Roundtrip Layer | 0/TBD | Not started | - |
 | 6. CLI/UX Layer + PXD001283 Acceptance Gate | 0/TBD | Not started | - |
