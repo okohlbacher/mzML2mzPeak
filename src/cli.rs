@@ -382,6 +382,13 @@ pub fn classify_exit(e: &anyhow::Error) -> ExitCode {
         return ExitCode::from(EXIT_VERIFY);
     }
 
+    // 1b) A reverse (mzPeak → imzML) failure → its own per-variant class via the shared
+    //     5-code contract (RCLI-01). Checked among the most-specific arms since ReverseError
+    //     is a distinct concrete type that never reaches the forward Read/Write/Verify arms.
+    if let Some(re) = e.downcast_ref::<crate::reverse::ReverseError>() {
+        return classify_reverse_error(re);
+    }
+
     // 2) Unsupported input (dtype / .ibd compression) → code 3. Checked before the broader
     //    integrity / coordinate classes since those error enums also reach this chain.
     if let Some(re) = e.downcast_ref::<ReadError>() {
@@ -459,6 +466,37 @@ fn classify_integrity_error(ie: &IntegrityError) -> ExitCode {
         | IntegrityError::MissingChecksumDeclaration
         | IntegrityError::UuidMismatch { .. }
         | IntegrityError::ChecksumMismatch { .. } => ExitCode::from(EXIT_INTEGRITY),
+    }
+}
+
+/// Classify a reverse [`crate::reverse::ReverseError`] into the SAME 5-code contract the forward
+/// path uses (RCLI-01, T-10-EXIT) — no new exit code is introduced. Mirrors the forward classes:
+///   - coordinate failures (`NotImaging` / `CoordMissing` / `NoScan`) → code 4, mirroring
+///     `ReadError::CoordMissing` / `ReadError::NoScan`;
+///   - malformed / unsupported input shape (`UnsupportedDtype` / `ArrayLengthMismatch` /
+///     `MissingArray` / `MissingDataFacet`) → code 3, mirroring `ReadError::UnsupportedDtype`;
+///   - `Integrity` delegates to [`classify_integrity_error`] (same UUID/checksum class, no
+///     duplicate logic — proves the .ibd-digest path shares the forward integrity codes);
+///   - every remaining transport/structural arm (`IbdWrite`, `XmlEmit`, `IbdOverflow`,
+///     `IbdPoisoned`, `OpenArchive`, `MissingMetadata`, `ArrayDecode`) → the generic code 1.
+fn classify_reverse_error(re: &crate::reverse::ReverseError) -> ExitCode {
+    use crate::reverse::ReverseError as R;
+    match re {
+        R::NotImaging | R::CoordMissing { .. } | R::NoScan { .. } => {
+            ExitCode::from(EXIT_COORDINATE)
+        }
+        R::UnsupportedDtype { .. }
+        | R::ArrayLengthMismatch { .. }
+        | R::MissingArray { .. }
+        | R::MissingDataFacet { .. } => ExitCode::from(EXIT_UNSUPPORTED),
+        R::Integrity(ie) => classify_integrity_error(ie),
+        R::IbdWrite(_)
+        | R::XmlEmit(_)
+        | R::IbdOverflow { .. }
+        | R::IbdPoisoned
+        | R::OpenArchive(_)
+        | R::MissingMetadata { .. }
+        | R::ArrayDecode { .. } => ExitCode::from(EXIT_GENERIC),
     }
 }
 
@@ -578,6 +616,57 @@ mod tests {
         assert_eq!(
             format!("{:?}", classify_exit(&e)),
             format!("{:?}", ExitCode::from(EXIT_INTEGRITY))
+        );
+    }
+
+    // --- Task 2: reverse-error exit-code classification ----------------------------------
+
+    #[test]
+    fn reverse_not_imaging_maps_to_code_four() {
+        let e = anyhow::Error::new(crate::reverse::ReverseError::NotImaging);
+        assert_eq!(
+            format!("{:?}", classify_exit(&e)),
+            format!("{:?}", ExitCode::from(EXIT_COORDINATE))
+        );
+    }
+
+    #[test]
+    fn reverse_unsupported_dtype_maps_to_code_three() {
+        let e = anyhow::Error::new(crate::reverse::ReverseError::UnsupportedDtype {
+            index: 2,
+            axis: "m/z",
+            dtype: mzdata::spectrum::bindata::BinaryDataArrayType::Int32,
+        });
+        assert_eq!(
+            format!("{:?}", classify_exit(&e)),
+            format!("{:?}", ExitCode::from(EXIT_UNSUPPORTED))
+        );
+    }
+
+    #[test]
+    fn reverse_integrity_delegates_to_integrity_code_two() {
+        // Delegation proof: ReverseError::Integrity(ChecksumMismatch) must route through
+        // classify_integrity_error to the shared integrity code 2.
+        let e = anyhow::Error::new(crate::reverse::ReverseError::Integrity(
+            IntegrityError::ChecksumMismatch {
+                kind: crate::integrity::header::ChecksumType::Md5,
+                declared: "aa".into(),
+                computed: "bb".into(),
+            },
+        ));
+        assert_eq!(
+            format!("{:?}", classify_exit(&e)),
+            format!("{:?}", ExitCode::from(EXIT_INTEGRITY))
+        );
+    }
+
+    #[test]
+    fn reverse_ibd_write_maps_to_generic_code_one() {
+        let io = std::io::Error::new(std::io::ErrorKind::WriteZero, "disk full");
+        let e = anyhow::Error::new(crate::reverse::ReverseError::IbdWrite(io));
+        assert_eq!(
+            format!("{:?}", classify_exit(&e)),
+            format!("{:?}", ExitCode::from(EXIT_GENERIC))
         );
     }
 }
