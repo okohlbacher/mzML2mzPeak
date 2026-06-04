@@ -685,6 +685,26 @@ fn compare_profile_masked(
         return Err(VerifyError::NonMonotonicSourceMz { index, coord, element });
     }
 
+    // FAIL-CLOSED precondition (WR-01, iteration 2): `merge_masked` bounds its two-pointer loop
+    // (and its source/output tails) on the m/z LENGTH but indexes the paired INTENSITY array
+    // with the same pointer (`src_int[i]` / `out_int[j]`). A source pixel whose intensity array
+    // is SHORTER than its m/z array would index out of bounds and PANIC instead of surfacing a
+    // typed error. The read layer decodes the two axes INDEPENDENTLY and does not enforce equal
+    // lengths (unlike the write path's `WriteError::AxisLengthMismatch`), and the public verify
+    // entry points are reachable independently of `convert`. We therefore guard the SOURCE axis
+    // lengths here, before the merge runs, mirroring `to_mzdata`'s WR-01 guard and naming the
+    // offending pixel. (`merge_masked` itself additionally bounds on `src_int`/`out_int` length
+    // as defense-in-depth, so it can never index past either intensity array even if this guard
+    // is ever bypassed.)
+    if s.mz.len() != s.intensity.len() {
+        return Err(VerifyError::SourceAxisLengthMismatch {
+            index,
+            coord,
+            mz: s.mz.len(),
+            intensity: s.intensity.len(),
+        });
+    }
+
     // Per-axis L1/L2 predicates, specialized to the stored width. L1 → exact `!=`; L2 → the
     // relative-error bound `|a-b|/|b| > rel_err` with a `b==0` exact-inequality guard (mirrors
     // `first_mismatch_*`).
@@ -971,6 +991,48 @@ mod tests {
             crate::verify::compare::MergeOutcome::default(),
             "ascending source with only zero-intensity drops is lossless"
         );
+    }
+
+    /// WR-01 regression (iteration 2): a profile pixel whose SOURCE m/z and intensity axes
+    /// differ in length MUST surface a typed `VerifyError::SourceAxisLengthMismatch` rather than
+    /// panic the masking-aware merge by indexing the shorter intensity array out of bounds.
+    /// (Before the fix, `merge_masked` bounded its loop on `src_mz.len()` but indexed
+    /// `src_int[i]`, so a shorter intensity array panicked the verifier.)
+    #[test]
+    fn wr01_source_axis_length_mismatch_fails_closed_not_panic() {
+        // Strictly-ascending source m/z (so the CR-01 monotonicity guard passes) but the
+        // intensity array is SHORTER than the m/z array — the unequal-axis condition.
+        let s = profile_spectrum(
+            NumArray::F64(vec![100.0, 200.0, 300.0]),
+            NumArray::F32(vec![10.0, 20.0]), // only 2 intensities for 3 m/z values
+        );
+        let (mz_da, int_da) = out_arrays(&[100.0, 200.0, 300.0], &[10.0, 20.0, 30.0]);
+        let result = compare_profile_masked(
+            &s,
+            &mz_da,
+            &int_da,
+            ConformanceLevel::L1BitForBit,
+            &ToleranceContract::L1,
+            7,
+            (4, 5, None),
+        );
+        match result {
+            Err(VerifyError::SourceAxisLengthMismatch {
+                index,
+                coord,
+                mz,
+                intensity,
+            }) => {
+                assert_eq!(index, 7);
+                assert_eq!(coord, (4, 5, None));
+                assert_eq!(mz, 3);
+                assert_eq!(intensity, 2);
+            }
+            other => panic!(
+                "unequal source m/z vs intensity lengths must fail CLOSED as \
+                 SourceAxisLengthMismatch (not panic), got: {other:?}"
+            ),
+        }
     }
 
     /// The path-based entry on a non-existent SOURCE surfaces a `VerifyError::Read` (the source

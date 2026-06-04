@@ -226,16 +226,29 @@ where
             if outcome.mz.is_none() && mz_mismatch(smz, omz) {
                 outcome.mz = Some(AxisMismatch { src_element: i });
             }
-            if outcome.intensity.is_none() && int_mismatch(src_int[i], out_int[j]) {
-                outcome.intensity = Some(AxisMismatch { src_element: i });
+            // Defense-in-depth (WR-01, iteration 2): index the intensity arrays via `.get`,
+            // never `[i]`/`[j]`. The caller (`compare_profile_masked`) already guards
+            // `src.mz.len() == src.intensity.len()` and the writer pairs the output arrays, so
+            // both reads normally succeed; but bounding here guarantees a malformed
+            // shorter-intensity array can NEVER index out of bounds and panic the merge.
+            if outcome.intensity.is_none() {
+                if let (Some(&sv), Some(&ov)) = (src_int.get(i), out_int.get(j)) {
+                    if int_mismatch(sv, ov) {
+                        outcome.intensity = Some(AxisMismatch { src_element: i });
+                    }
+                }
             }
             i += 1;
             j += 1;
         } else if smz < omz {
             // Source point DROPPED from the output. It MUST have had zero intensity (the writer
             // only drops zero-intensity points). A non-zero dropped point is genuine signal loss.
-            if outcome.intensity.is_none() && !int_is_zero(src_int[i]) {
-                outcome.intensity = Some(AxisMismatch { src_element: i });
+            if outcome.intensity.is_none() {
+                if let Some(&sv) = src_int.get(i) {
+                    if !int_is_zero(sv) {
+                        outcome.intensity = Some(AxisMismatch { src_element: i });
+                    }
+                }
             }
             i += 1;
         } else {
@@ -250,8 +263,13 @@ where
 
     // Source tail: remaining source points were dropped — each must be zero-intensity.
     while i < src_mz.len() {
-        if outcome.intensity.is_none() && !int_is_zero(src_int[i]) {
-            outcome.intensity = Some(AxisMismatch { src_element: i });
+        // Defense-in-depth: `.get(i)` not `src_int[i]` (see the surviving-point note above).
+        if outcome.intensity.is_none() {
+            if let Some(&sv) = src_int.get(i) {
+                if !int_is_zero(sv) {
+                    outcome.intensity = Some(AxisMismatch { src_element: i });
+                }
+            }
         }
         i += 1;
     }

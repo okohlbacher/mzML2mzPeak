@@ -244,6 +244,29 @@ pub enum VerifyError {
         coord: (i64, i64, Option<i64>),
         element: usize,
     },
+
+    /// The SOURCE profile spectrum at `index` has m/z and intensity axes of UNEQUAL length
+    /// (WR-01, iteration 2). The masking-aware two-pointer merge
+    /// ([`crate::verify::compare::merge_masked`]) bounds its loop on the m/z length but indexes
+    /// the paired intensity array with the same pointer; a source pixel whose intensity array
+    /// is SHORTER than its m/z array would index out of bounds and PANIC the verifier instead
+    /// of surfacing a typed error. The read layer (`src/read/stream.rs`) decodes the two axes
+    /// INDEPENDENTLY and does not enforce equal lengths (unlike the write path's
+    /// [`crate::write::WriteError::AxisLengthMismatch`] guard), and the public verify entry
+    /// points are reachable independently of `convert`. The verifier therefore checks the axis
+    /// lengths BEFORE the merge and FAILS CLOSED here. The `coord` locates the offending pixel.
+    #[error(
+        "source spectrum {index} (pixel x={}, y={}, z={:?}): m/z and intensity axes differ in \
+         length (m/z {mz}, intensity {intensity}) — masking-aware verification cannot run safely \
+         (fail-closed; see WR-01)",
+        coord.0, coord.1, coord.2
+    )]
+    SourceAxisLengthMismatch {
+        index: u64,
+        coord: (i64, i64, Option<i64>),
+        mz: usize,
+        intensity: usize,
+    },
 }
 
 #[cfg(test)]
