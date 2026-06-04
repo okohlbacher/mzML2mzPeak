@@ -347,6 +347,95 @@ fn raw_facet_bit_for_bit() {
     let _ = std::fs::remove_file(&out);
 }
 
+/// DAT-01 (the decisive write-fix proof): after converting the fixture, the `spectra_data`
+/// `point.mz` / `point.intensity` columns are GENUINELY POPULATED (non-NULL) for the profile
+/// pixels — NOT spilled to `spectrum.auxiliary_arrays`. This reads the `spectra_data.parquet`
+/// facet DIRECTLY out of the archive (unzip + arrow), so unlike `raw_facet_bit_for_bit` (which
+/// goes through `MzPeakReader::get_spectrum_arrays`, which silently merges auxiliary arrays and
+/// would therefore PASS even with the bug) it cannot be satisfied by aux-array fallback.
+///
+/// The fixture has F64-m/z (pixel A) and F32-m/z (pixel B) profile spectra; both widths must
+/// appear in the POINT columns — F64 in `mz_f64`, F32 in the primary `mz` — proving THE CRUX
+/// (source width preserved, no widening). Every profile point must have exactly one non-null
+/// m/z value across the two width columns, and a non-null intensity.
+#[test]
+fn point_columns_populated_not_auxiliary() {
+    use arrow::array::{Array, AsArray};
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+
+    let out = temp_out("pointcols");
+    let fx = fixture();
+    write_fixture(&out, &fx).expect("fixture writes");
+
+    // Extract spectra_data.parquet from the .mzpeak ZIP to a sibling temp file (a `File` is a
+    // `ChunkReader`, and writing to a path avoids any extra crate dependency). Removed at the end.
+    let file = std::fs::File::open(&out).expect("open archive");
+    let mut zip = zip::ZipArchive::new(file).expect("open zip");
+    let data_path = out.with_extension("spectra_data.parquet");
+    {
+        let mut f = zip
+            .by_name("spectra_data.parquet")
+            .expect("spectra_data.parquet present in archive");
+        let mut tmp = std::fs::File::create(&data_path).expect("create temp parquet");
+        std::io::copy(&mut f, &mut tmp).expect("copy parquet bytes");
+    }
+    let tmp = std::fs::File::open(&data_path).expect("reopen temp parquet");
+
+    let reader = ParquetRecordBatchReaderBuilder::try_new(tmp)
+        .expect("parquet reader builder")
+        .build()
+        .expect("parquet reader");
+
+    // The two profile pixels contribute 3 + 4 = 7 POINT rows. Walk every row of the nested
+    // `point` struct and assert: at least one m/z width column is non-null, and intensity is
+    // non-null. Also confirm BOTH widths actually occur (F64 from pixel A, F32 from pixel B).
+    let mut total_points = 0usize;
+    let mut saw_f64_mz = false;
+    let mut saw_f32_mz = false;
+    for batch in reader {
+        let batch = batch.expect("record batch");
+        let point = batch
+            .column_by_name("point")
+            .expect("point struct column")
+            .as_struct();
+
+        // Locate the m/z columns by name: the writer collapses the first-registered (Float32)
+        // variant to the bare primary `mz`, and the Float64 sibling keeps the dtype+unit suffix
+        // `mz_f64_mz` (f64 dtype, m/z unit). Pixel B (F32) populates `mz`; pixel A (F64) `mz_f64_mz`.
+        let mz_f32 = point.column_by_name("mz").map(|c| c.as_primitive::<arrow::datatypes::Float32Type>());
+        let mz_f64 = point.column_by_name("mz_f64_mz").map(|c| c.as_primitive::<arrow::datatypes::Float64Type>());
+        let intensity = point
+            .column_by_name("intensity")
+            .expect("intensity column present")
+            .as_primitive::<arrow::datatypes::Float32Type>();
+
+        let n = point.len();
+        total_points += n;
+        for i in 0..n {
+            let f64_present = mz_f64.map(|a| a.is_valid(i)).unwrap_or(false);
+            let f32_present = mz_f32.map(|a| a.is_valid(i)).unwrap_or(false);
+            saw_f64_mz |= f64_present;
+            saw_f32_mz |= f32_present;
+            assert!(
+                f64_present ^ f32_present,
+                "point {i}: exactly one m/z width column must be non-null (got f64={f64_present}, f32={f32_present}) \
+                 — NOT spilled to auxiliary_arrays (DAT-01)"
+            );
+            assert!(
+                intensity.is_valid(i),
+                "point {i}: intensity must be non-null in the spectra_data POINT column (DAT-01)"
+            );
+        }
+    }
+
+    assert_eq!(total_points, 7, "profile pixels contribute 3 + 4 = 7 POINT rows");
+    assert!(saw_f64_mz, "the F64-m/z profile pixel populated the `mz_f64` POINT column (no widening)");
+    assert!(saw_f32_mz, "the F32-m/z profile pixel populated the primary `mz` POINT column (THE CRUX)");
+
+    let _ = std::fs::remove_file(&data_path);
+    let _ = std::fs::remove_file(&out);
+}
+
 /// VER-03 (centroid, the source-as-L1-reference contract): the centroid pixel (pixel C) verifies
 /// under L1 with intensity Δ=0 (source f32 vs peaks-facet f32). Pixel C has a F64-source m/z, so
 /// its m/z is compared (source-as-f64 vs peaks-facet f64) and matches — and crucially, an honest
@@ -517,17 +606,22 @@ fn centroid_f64_intensity_is_stored_width_divergence_under_l1() {
     let _ = std::fs::remove_file(&out);
 }
 
-/// WR-01 (iteration 2 — cross-module facet-routing alignment): an `Unknown`-representation pixel
-/// is written by the Phase-4 writer to the `spectra_data` (Profile-style) facet ONLY — the writer
-/// groups `Profile | Unknown => None` for the peaks list (`src/write/spectrum.rs`). The verifier
-/// MUST seek it in that SAME facet. Before the fix the verifier grouped `Unknown` with `Centroid`
-/// and looked in `spectra_peaks`, hitting `MissingPeaksFacet` and FAILING a faithful round-trip.
+/// Cross-module facet-routing alignment: an `Unknown`-continuity pixel is written by the
+/// reference writer to the `spectra_peaks` facet (its `write_spectrum_data` routes RAW arrays to
+/// `spectra_data` ONLY for `SignalContinuity::Profile`; `Centroid` AND `Unknown` go to
+/// `spectra_peaks` via `write_peaks`). With the DAT-01 fix (canonical units on the reconstructed
+/// arrays) the Unknown pixel's m/z + intensity populate the peaks POINT columns with ZERO
+/// auxiliary arrays, so the verifier — which now groups `Unknown` with `Centroid` — reads them
+/// from `spectra_peaks` and the round-trip is faithful.
 ///
-/// This test writes a single `Unknown`-continuity pixel (data carried verbatim at source dtype),
-/// then verifies it under L1: the report must `passed()` with a Δ=0 m/z + intensity, and crucially
-/// `verify_against_source` must NOT error with `MissingPeaksFacet`.
+/// (Before DAT-01 the data spilled to `auxiliary_arrays`; the verifier grouped `Unknown` with
+/// `Profile` and `get_spectrum_arrays` silently merged the aux arrays, so the test passed for the
+/// wrong reason. Removing the aux spill exposed the true peaks-facet routing.)
+///
+/// This pixel has a Float64 m/z that the peaks facet preserves exactly, so m/z + intensity both
+/// compare Δ=0 under L1 and the report `passed()`.
 #[test]
-fn unknown_representation_pixel_roundtrips_via_data_facet() {
+fn unknown_representation_pixel_roundtrips_via_peaks_facet() {
     let out = temp_out("unknown");
     // A single Unknown-continuity pixel; F64 m/z + F32 intensity, both carried verbatim.
     let fx = vec![ImagingSpectrum {
@@ -542,11 +636,10 @@ fn unknown_representation_pixel_roundtrips_via_data_facet() {
     }];
     write_fixture(&out, &fx).expect("Unknown-continuity fixture writes a valid archive");
 
-    // The decisive assertion: verification returns a report (no MissingPeaksFacet error) because
-    // the verifier now routes Unknown to the SAME data facet the writer populated (WR-01).
-    let report = verify_against_source(&fx, &out, ConformanceLevel::L1BitForBit).expect(
-        "Unknown pixel verifies via the spectra_data facet without a spurious MissingPeaksFacet",
-    );
+    // Verification returns a report (no MissingPeaksFacet error) because the verifier now routes
+    // Unknown to the SAME spectra_peaks facet the writer populated.
+    let report = verify_against_source(&fx, &out, ConformanceLevel::L1BitForBit)
+        .expect("Unknown pixel verifies via the spectra_peaks facet");
 
     assert!(report.count.passed, "count gate passes for the Unknown pixel: {:?}", report.count);
     assert!(
@@ -556,17 +649,17 @@ fn unknown_representation_pixel_roundtrips_via_data_facet() {
     );
     assert!(
         report.mz.passed,
-        "Unknown-pixel m/z compares Δ=0 at source width in the data facet: {:?}, mismatches={:?}",
+        "Unknown-pixel F64 m/z compares Δ=0 against the peaks facet (exact, no widening): {:?}, mismatches={:?}",
         report.mz, report.mismatches
     );
     assert!(
         report.intensity.passed,
-        "Unknown-pixel intensity compares Δ=0 in the data facet: {:?}",
+        "Unknown-pixel intensity compares Δ=0 (f32 peaks facet): {:?}",
         report.intensity
     );
     assert!(
         report.passed(),
-        "a faithful Unknown-continuity round-trip passes every L1 gate (WR-01): {report:?}"
+        "a faithful Unknown-continuity round-trip passes every L1 gate: {report:?}"
     );
 
     let _ = std::fs::remove_file(&out);

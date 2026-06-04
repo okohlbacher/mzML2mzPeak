@@ -24,7 +24,7 @@
 //! `ms_level` (including the legal value 0) and `native_id` are carried unchanged.
 
 use mzdata::curie;
-use mzdata::params::Param;
+use mzdata::params::{Param, Unit};
 use mzdata::prelude::ParamDescribed;
 use mzdata::spectrum::bindata::{ArrayType, BinaryArrayMap, BinaryDataArrayType, DataArray};
 use mzdata::spectrum::{MultiLayerSpectrum, ScanEvent, SignalContinuity, SpectrumDescription};
@@ -90,10 +90,20 @@ pub fn to_mzdata(s: &ImagingSpectrum) -> Result<MultiLayerSpectrum, WriteError> 
         }
     }
 
-    // (1) dtype-preserving arrays: wrap each axis at its SOURCE dtype, raw LE bytes.
+    // (1) dtype-preserving arrays: wrap each axis at its SOURCE dtype, raw LE bytes. The axis
+    //     UNIT is set to the canonical PSI-MS term (m/z → Unit::MZ, intensity →
+    //     Unit::DetectorCounts) so the reconstructed array's `BufferName` matches the writer's
+    //     registered POINT columns AND the canonical peaks-facet columns by (array_type, dtype,
+    //     unit) — without this the m/z/intensity fall through to `auxiliary_arrays` in BOTH the
+    //     spectra_data and (for Centroid/Unknown raw-array routing) spectra_peaks facets (DAT-01).
+    //     This is metadata only; the raw LE bytes are untouched, so L1 bit-for-bit is preserved.
     let mut arrays = BinaryArrayMap::new();
-    arrays.add(num_to_dataarray(ArrayType::MZArray, &s.mz));
-    arrays.add(num_to_dataarray(ArrayType::IntensityArray, &s.intensity));
+    arrays.add(num_to_dataarray(ArrayType::MZArray, Unit::MZ, &s.mz));
+    arrays.add(num_to_dataarray(
+        ArrayType::IntensityArray,
+        Unit::DetectorCounts,
+        &s.intensity,
+    ));
 
     // (2) description: id + ms_level carried verbatim; signal_continuity from Representation
     //     (drives the writer's profile/centroid routing — never inferred from data shape).
@@ -213,8 +223,8 @@ fn intensity_as_f32(arr: &NumArray) -> Vec<f32> {
 /// dtype bit-for-bit. `F32 → Float32`, `F64 → Float64`. `update_buffer` asserts the dtype
 /// size matches the element size, so no widening/narrowing can occur (IN-04 / L1). NEVER
 /// calls `as_f64()` (lossy for F32).
-fn num_to_dataarray(name: ArrayType, arr: &NumArray) -> DataArray {
-    match arr {
+fn num_to_dataarray(name: ArrayType, unit: Unit, arr: &NumArray) -> DataArray {
+    let mut da = match arr {
         NumArray::F32(v) => {
             let mut da = DataArray::wrap(&name, BinaryDataArrayType::Float32, Vec::new());
             da.update_buffer(v.as_slice())
@@ -227,7 +237,11 @@ fn num_to_dataarray(name: ArrayType, arr: &NumArray) -> DataArray {
                 .expect("f64 slice into Float64 DataArray: dtype size matches");
             da
         }
-    }
+    };
+    // Tag the canonical unit so the writer's column matching (which keys on array_type + dtype
+    // + unit) routes the array into the POINT columns rather than auxiliary storage.
+    da.unit = unit;
+    da
 }
 
 #[cfg(test)]

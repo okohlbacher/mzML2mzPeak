@@ -12,17 +12,20 @@
 //!     tests reach it without forging an `.ibd`.
 //!
 //! The orchestrator BRANCHES on the SOURCE [`Representation`](crate::read::Representation)
-//! (Pitfall 1 — never infer the facet from which one has data): `Profile` AND `Unknown` → the
+//! (Pitfall 1 — never infer the facet from which one has data): `Profile` → the
 //! `spectra_data` facet via `get_spectrum_arrays` (the L1 reference, compared at the SOURCE
-//! stored width); `Centroid` → the `spectra_peaks` facet via `get_spectrum_peaks_for`, where
-//! the SOURCE side is the L1 reference (CONTEXT Area 2) — a Float32-source centroid m/z is
-//! WIDENED to f64 in the peaks facet, which is NOT an L1 failure (Pitfall 2): intensity
-//! (f32→f32) is L1-checked, m/z is only relative-error-checked under L2.
+//! stored width); `Centroid` AND `Unknown` → the `spectra_peaks` facet via
+//! `get_spectrum_peaks_for`, where the SOURCE side is the L1 reference (CONTEXT Area 2) — a
+//! Float32-source centroid m/z is WIDENED to f64 in the peaks facet, which is NOT an L1 failure
+//! (Pitfall 2): intensity (f32→f32) is L1-checked, m/z is only relative-error-checked under L2.
 //!
-//! `Unknown` is grouped with `Profile` to MATCH the Phase-4 writer's routing exactly
-//! (`src/write/spectrum.rs`: `Profile | Unknown => None` for the peaks list, so an `Unknown`
-//! pixel is written to `spectra_data` only). Routing `Unknown` to the peaks facet here would
-//! spuriously fail a faithful `Unknown`-continuity round-trip (WR-01, iteration 2).
+//! `Unknown` is grouped with `Centroid` (NOT `Profile`) to MATCH the reference writer's actual
+//! routing: `write_spectrum_data` (vendored base.rs:733-744) sends RAW arrays to `spectra_data`
+//! ONLY for `SignalContinuity::Profile`; `Centroid` and `Unknown` raw arrays both go to
+//! `spectra_peaks` via `write_peaks`. (A prior revision grouped `Unknown` with `Profile` on the
+//! mistaken belief it landed in `spectra_data`; that only appeared to work because the m/z +
+//! intensity were spilling to `auxiliary_arrays`, which `get_spectrum_arrays` silently merges —
+//! the DAT-01 fix removed that spill, exposing the true peaks-facet routing.)
 //!
 //! Tolerances come from the Phase-3 [`ToleranceContract`] (imported, never re-encoded — CONTEXT
 //! Area 1). No `unwrap()` on a fallible read: every read surfaces a [`VerifyError`] (T-05-07 /
@@ -477,14 +480,17 @@ fn compare_paired_pixel(
     let coord: CoordKey = (s.x, s.y, s.z);
 
     match s.representation {
-        // WR-01 (iter 2): `Unknown` is grouped with `Profile`, MATCHING the writer's own
-        // routing (`src/write/spectrum.rs:155-158`: `Profile | Unknown => None` for the
-        // peaks list, so an `Unknown` pixel is written with raw arrays ONLY and lands in
-        // the `spectra_data` facet). The verifier must seek `Unknown` in the SAME facet the
-        // writer populated; routing it to `spectra_peaks` would spuriously fail a faithful
-        // `Unknown`-continuity round-trip with `MissingPeaksFacet`.
-        Representation::Profile | Representation::Unknown => {
-            // Profile/Unknown -> spectra_data facet; the L1 reference, compared at SOURCE width.
+        // `Profile` → the `spectra_data` facet (raw arrays at SOURCE width, the L1 reference).
+        // `Unknown` is NOT grouped here: the reference writer's `write_spectrum_data`
+        // (vendored base.rs:733-744) routes the RAW arrays of a `RawData` spectrum to the
+        // `spectra_data` facet ONLY for `SignalContinuity::Profile`; both `Centroid` AND
+        // `Unknown` raw arrays are routed to the `spectra_peaks` facet via `write_peaks`. So an
+        // `Unknown`-continuity pixel lands in `spectra_peaks` (verified empirically: m/z + the
+        // intensity populate the peaks POINT columns, zero auxiliary arrays). It is therefore
+        // grouped with `Centroid` below. (A prior comment here claimed `Unknown` lands in
+        // `spectra_data`; that was masked by auxiliary-array fallback before DAT-01 and is wrong.)
+        Representation::Profile => {
+            // Profile -> spectra_data facet; the L1 reference, compared at SOURCE width.
             let arrays = reader
                 .get_spectrum_arrays(out_idx)
                 .map_err(VerifyError::OpenOutput)?
@@ -529,8 +535,11 @@ fn compare_paired_pixel(
                 })?;
             Ok(out_int_f64.iter().sum())
         }
-        Representation::Centroid => {
-            // Centroid -> spectra_peaks facet; SOURCE is the L1 reference (CONTEXT Area 2).
+        Representation::Centroid | Representation::Unknown => {
+            // Centroid AND Unknown -> spectra_peaks facet (see the routing note above); SOURCE
+            // is the L1 reference (CONTEXT Area 2). An `Unknown` pixel typically carries a
+            // Float64 m/z that the peaks facet preserves exactly; the Float32-source widening
+            // handling below applies identically.
             let peaks = reader
                 .get_spectrum_peaks_for(out_idx)
                 .map_err(VerifyError::OpenOutput)?

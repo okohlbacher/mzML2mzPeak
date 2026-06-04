@@ -2,13 +2,18 @@
 //!
 //! [`ImagingWriter`] owns a configured `MzPeakWriterType<File>` and is the single place that
 //! couples the pure schema-layer descriptors ([`crate::schema::imaging_scan_fields`]) to the
-//! reference writer's public extension seam. Three concerns live here:
+//! reference writer's public extension seam. Four concerns live here:
 //!
 //!   1. **Coordinate-column registration (OUT-02).** At `new`, the three IMS coordinate
 //!      columns (`IMS:1000050/51/52`) are registered SOLELY via
 //!      `add_spectrum_scan_field(CustomBuilderFromParameter::from_spec(..))`, with ZERO edits
 //!      to any core `mzpeak_prototyping` struct (CONTEXT Area 1, OUT-02). `from_spec` only
 //!      accepts `Int64` for these; all three specs already declare `DataType::Int64`.
+//!   1b. **Data-column registration (DAT-01).** At `new`, the spectra_data POINT columns
+//!      (m/z + intensity, BOTH Float64 and Float32 variants, at the canonical PSI-MS units) are
+//!      registered via `add_spectrum_field` so profile/processed per-spectrum m/z + intensity
+//!      populate `point.mz` / `point.intensity` at the SOURCE width instead of spilling to
+//!      `spectrum.auxiliary_arrays`. See [`spectra_data_point_fields`] for the mechanism.
 //!   2. **Metadata mapping (OUT-03).** `write_run_metadata` copies source PSI-MS + IMS
 //!      metadata, records `imzml2mzpeak` conversion provenance, and maps [`RunProvenance`]
 //!      into `file_description` by IMS accession (SPA-04). It ALSO assembles + stores the
@@ -29,8 +34,8 @@ use mzpeak_prototyping::archive::ZipArchiveWriter;
 use mzpeak_prototyping::writer::{
     AbstractMzPeakWriter, CustomBuilderFromParameter, MzPeakWriterType,
 };
+use mzpeak_prototyping::BufferContext;
 use mzdata::spectrum::{Chromatogram, ChromatogramDescription};
-use mzpeaks::CentroidPeak;
 use mzdata::spectrum::bindata::{ArrayType, BinaryArrayMap, BinaryDataArrayType, DataArray};
 
 use mzdata::curie;
@@ -148,14 +153,29 @@ impl ImagingWriter {
             ));
         }
 
-        // Register the m/z + intensity DATA columns (CRITICAL — without this the spectra_data /
-        // spectra_peaks schema carries only `spectrum_index` and every m/z / intensity value is
-        // routed to auxiliary storage, leaving the main columns NULL; the streaming writer has
-        // no sample source to infer the schema the way the reference `examples/convert.rs` does
-        // via `sample_array_types_from_spectrum_source`). `CentroidPeak` registers the canonical
-        // m/z + intensity columns and marks the m/z array primary, exactly as the sampling path
-        // would — covering BOTH the profile (spectra_data) and centroid (spectra_peaks) facets.
-        builder = builder.add_spectrum_peak_type::<CentroidPeak>();
+        // Register the spectra_data POINT columns so profile/processed m/z + intensity land in
+        // `point.mz` / `point.intensity` instead of falling through to `spectrum.auxiliary_arrays`
+        // (DAT-01). The previous `add_spectrum_peak_type::<CentroidPeak>()` registered a FIXED
+        // Float64-m/z (Unit::MZ) + Float32-intensity (Unit::DetectorCounts) schema; at write time
+        // the reference matches an incoming array to a schema column by FIELD NAME, which encodes
+        // (array_type, dtype, unit). Our reconstructed arrays (`to_mzdata`) carry the SOURCE dtype
+        // (F32 *or* F64) at `Unit::Unknown`, so NONE matched the fixed Float64/MZ-unit column and
+        // every value serialized NULL in the POINT columns while the real data spilled to aux.
+        //
+        // Fix: register BOTH the Float64 and Float32 variants of m/z and intensity at
+        // `Unit::Unknown` — exactly the (array_type, dtype, unit) tuples `to_mzdata` emits. The
+        // writer's `mark_primary_arrays` collapses the first-registered variant of each axis to
+        // the bare `mz` / `intensity` primary column and keeps the other as a dtype-suffixed
+        // sibling, so whichever width a given spectrum carries finds a matching column. THE CRUX:
+        // an F32 array stays in the f32 column and an F64 array in the f64 column — never widened.
+        // (Real imzML is dtype-homogeneous per file, so only one width is populated and the other
+        // column stays all-NULL, which Parquet stores near-free; a mixed-width file — e.g. the
+        // verification fixture — populates both.) The centroid `spectra_peaks` facet needs NO
+        // registration here: its writer is created on demand with the canonical CentroidPeak
+        // schema by the reference writer itself (writer.rs `get_or_create_peak_writer`).
+        for field in spectra_data_point_fields() {
+            builder = builder.add_spectrum_field(field);
+        }
 
         // Build the ZIP-archive-packed writer. `mask_zero_intensity_runs = true` mirrors the
         // reference example (examples/convert.rs:420). We do NOT call `.encryption_properties`
@@ -199,80 +219,11 @@ impl ImagingWriter {
         prov: &RunProvenance,
         geom: Option<&ImagingRunMetadata>,
     ) -> Result<(), WriteError> {
-        // (a) Copy all source PSI-MS + IMS metadata verbatim.
+        // (a) Copy all source PSI-MS + IMS metadata verbatim, then (b)+(c) record imzml2mzpeak
+        //     conversion provenance + map RunProvenance into file_description (in
+        //     `wire_metadata_into`, shared so the logic has one home).
         self.inner.copy_metadata_from(source);
-
-        // (b) Record imzml2mzpeak conversion provenance (software + data_processing),
-        //     adapting the reference example's add_processing_metadata shape.
-        self.inner.softwares_mut().push(Software::new(
-            "imzml2mzpeak".into(),
-            env!("CARGO_PKG_VERSION").into(),
-            vec![custom_software_name("imzml2mzpeak")],
-        ));
-        self.inner.data_processings_mut().push(DataProcessing {
-            id: "imzml2mzpeak_conversion".to_string(),
-            methods: vec![ProcessingMethod {
-                order: 1,
-                software_reference: "imzml2mzpeak".to_string(),
-                params: vec![Param::new_key_value(
-                    "conversion",
-                    "imzML to imaging mzPeak",
-                )],
-            }],
-        });
-
-        // (c) Map RunProvenance → file_description by IMS accession (SPA-04). Attach via the
-        //     MSDataFileMetadata file_description accessor (FileDescription: ParamDescribed).
-        let fd = self.inner.file_description_mut();
-        if let Some(uuid) = prov.uuid.as_deref() {
-            // IMS:1000080 — universally unique identifier (linkage/provenance only, V6).
-            fd.add_param(
-                Param::builder()
-                    .name("universally unique identifier")
-                    .curie(curie!(IMS:1000080))
-                    .value(uuid)
-                    .build(),
-            );
-        }
-        if let Some(checksum) = prov.ibd_checksum.as_deref() {
-            // Key the checksum accession on the declared algorithm: SHA-1 → IMS:1000091,
-            // MD5 → IMS:1000090. An unrecognized/absent type is not hand-invented (skip).
-            let kind = prov.ibd_checksum_type.as_deref().unwrap_or("");
-            if kind.eq_ignore_ascii_case("SHA-1") || kind.eq_ignore_ascii_case("SHA1") {
-                fd.add_param(
-                    Param::builder()
-                        .name("ibd SHA-1")
-                        .curie(curie!(IMS:1000091))
-                        .value(checksum)
-                        .build(),
-                );
-            } else if kind.eq_ignore_ascii_case("MD5") {
-                fd.add_param(
-                    Param::builder()
-                        .name("ibd MD5")
-                        .curie(curie!(IMS:1000090))
-                        .value(checksum)
-                        .build(),
-                );
-            }
-        }
-        match prov.data_mode {
-            // Mode is a presence-only CV term (no value): processed → IMS:1000031,
-            // continuous → IMS:1000030. Unknown is not backfilled (no accession emitted).
-            StorageMode::Processed => fd.add_param(
-                Param::builder()
-                    .name("processed")
-                    .curie(curie!(IMS:1000031))
-                    .build(),
-            ),
-            StorageMode::Continuous => fd.add_param(
-                Param::builder()
-                    .name("continuous")
-                    .curie(curie!(IMS:1000030))
-                    .build(),
-            ),
-            StorageMode::Unknown => {}
-        }
+        wire_metadata_into(&mut self.inner, prov);
 
         // (d) Assemble + store the metadata.imaging block from geometry + provenance. The
         //     typed block is passed through to Plan 03's add_index_metadata, which serializes
@@ -352,6 +303,126 @@ impl ImagingWriter {
     pub fn finish_parquet(self) -> Result<ZipArchiveWriter<File>, WriteError> {
         let zip = self.inner.finish_parquet()?;
         Ok(zip)
+    }
+}
+
+/// The spectra_data POINT columns to register on the writer builder: BOTH the Float64 and
+/// Float32 variants of m/z and intensity, at `Unit::Unknown` (the unit `to_mzdata`'s
+/// reconstructed arrays carry). Registering both widths means whichever dtype a given spectrum
+/// holds finds a matching POINT column, so its values land in `point.mz` / `point.intensity`
+/// rather than `auxiliary_arrays` — at the SOURCE width (THE CRUX: no f32→f64 widening).
+///
+/// The first-registered variant of each axis becomes the writer's bare `mz` / `intensity`
+/// primary column; the sibling keeps a dtype-suffixed name. Ordered (m/z Float64, m/z Float32,
+/// intensity Float64, intensity Float32) so the Float64 variants are the primaries, matching
+/// the reference's canonical layout.
+fn spectra_data_point_fields() -> Vec<arrow::datatypes::FieldRef> {
+    use mzdata::params::Unit;
+    use mzpeak_prototyping::BufferName;
+    // The `spectrum_index` field MUST be included: once any field is registered the writer
+    // skips its default-field path (which would otherwise add the index column), so omitting it
+    // leaves the POINT struct with no `spectrum_index` and panics at write time in
+    // `PointBuffers::add_arrays` ("Unexpected field spectrum_index").
+    //
+    // Each axis is registered at BOTH widths with the SAME canonical unit `to_mzdata` tags onto
+    // its arrays (m/z → Unit::MZ, intensity → Unit::DetectorCounts), so the write-time
+    // `BufferName::from_data_array` matches a column by (array_type, dtype, unit). The units
+    // also match the reference's canonical schema, keeping the layout mergeable-by-design.
+    let mut fields = vec![BufferContext::Spectrum.index_field()];
+    for (array_type, dtype, unit) in [
+        (ArrayType::MZArray, BinaryDataArrayType::Float64, Unit::MZ),
+        (ArrayType::MZArray, BinaryDataArrayType::Float32, Unit::MZ),
+        (
+            ArrayType::IntensityArray,
+            BinaryDataArrayType::Float64,
+            Unit::DetectorCounts,
+        ),
+        (
+            ArrayType::IntensityArray,
+            BinaryDataArrayType::Float32,
+            Unit::DetectorCounts,
+        ),
+    ] {
+        fields.push(
+            BufferName::new(BufferContext::Spectrum, array_type, dtype)
+                .with_unit(unit)
+                .to_field(),
+        );
+    }
+    fields
+}
+
+/// Wire imzml2mzpeak conversion provenance into a metadata target (steps (b)+(c) of
+/// [`ImagingWriter::write_run_metadata`]): a [`Software`] entry, a conversion
+/// [`DataProcessing`], and the [`RunProvenance`] → `file_description` IMS-accession mapping
+/// (SPA-04). Generic over `impl MSDataFileMetadata` so the wiring logic has one home,
+/// independent of the concrete writer type.
+fn wire_metadata_into(target: &mut impl MSDataFileMetadata, prov: &RunProvenance) {
+    // (b) Record imzml2mzpeak conversion provenance (software + data_processing).
+    target.softwares_mut().push(Software::new(
+        "imzml2mzpeak".into(),
+        env!("CARGO_PKG_VERSION").into(),
+        vec![custom_software_name("imzml2mzpeak")],
+    ));
+    target.data_processings_mut().push(DataProcessing {
+        id: "imzml2mzpeak_conversion".to_string(),
+        methods: vec![ProcessingMethod {
+            order: 1,
+            software_reference: "imzml2mzpeak".to_string(),
+            params: vec![Param::new_key_value("conversion", "imzML to imaging mzPeak")],
+        }],
+    });
+
+    // (c) Map RunProvenance → file_description by IMS accession (SPA-04).
+    let fd = target.file_description_mut();
+    if let Some(uuid) = prov.uuid.as_deref() {
+        // IMS:1000080 — universally unique identifier (linkage/provenance only, V6).
+        fd.add_param(
+            Param::builder()
+                .name("universally unique identifier")
+                .curie(curie!(IMS:1000080))
+                .value(uuid)
+                .build(),
+        );
+    }
+    if let Some(checksum) = prov.ibd_checksum.as_deref() {
+        // Key the checksum accession on the declared algorithm: SHA-1 → IMS:1000091,
+        // MD5 → IMS:1000090. An unrecognized/absent type is not hand-invented (skip).
+        let kind = prov.ibd_checksum_type.as_deref().unwrap_or("");
+        if kind.eq_ignore_ascii_case("SHA-1") || kind.eq_ignore_ascii_case("SHA1") {
+            fd.add_param(
+                Param::builder()
+                    .name("ibd SHA-1")
+                    .curie(curie!(IMS:1000091))
+                    .value(checksum)
+                    .build(),
+            );
+        } else if kind.eq_ignore_ascii_case("MD5") {
+            fd.add_param(
+                Param::builder()
+                    .name("ibd MD5")
+                    .curie(curie!(IMS:1000090))
+                    .value(checksum)
+                    .build(),
+            );
+        }
+    }
+    match prov.data_mode {
+        // Mode is a presence-only CV term (no value): processed → IMS:1000031,
+        // continuous → IMS:1000030. Unknown is not backfilled (no accession emitted).
+        StorageMode::Processed => fd.add_param(
+            Param::builder()
+                .name("processed")
+                .curie(curie!(IMS:1000031))
+                .build(),
+        ),
+        StorageMode::Continuous => fd.add_param(
+            Param::builder()
+                .name("continuous")
+                .curie(curie!(IMS:1000030))
+                .build(),
+        ),
+        StorageMode::Unknown => {}
     }
 }
 
