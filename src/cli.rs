@@ -60,7 +60,9 @@ pub struct ConvertCli {
     pub dry_run: bool,
 
     /// After converting, re-open the source and verify the written archive bit-for-bit (L1).
-    #[arg(long)]
+    /// Hidden from `--help`: off by default, kept functional for the acceptance harness; the
+    /// extra pass re-digests the `.ibd` + re-decodes the source (~3s on PXD001283).
+    #[arg(long, hide = true)]
     pub verify: bool,
 }
 

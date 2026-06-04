@@ -42,7 +42,9 @@ fn help_and_arg_parse() {
     assert!(stdout.contains("input"), "usage names the input arg: {stdout}");
     assert!(stdout.contains("output"), "usage names the output arg: {stdout}");
     assert!(stdout.contains("--dry-run"), "usage names --dry-run: {stdout}");
-    assert!(stdout.contains("--verify"), "usage names --verify: {stdout}");
+    // --verify is intentionally hidden from --help (off by default, retained only for the
+    // acceptance harness which calls verify_streaming directly).
+    assert!(!stdout.contains("--verify"), "usage must NOT advertise the hidden --verify: {stdout}");
 }
 
 /// CLI-03: `--dry-run` on a clean fixture reports storage mode + spectrum count + grid dims,
