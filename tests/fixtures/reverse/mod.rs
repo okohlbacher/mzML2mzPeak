@@ -53,12 +53,18 @@ fn provenance() -> RunProvenance {
     }
 }
 
-/// A unique temp output path (process id + tag) so concurrent test binaries do not collide.
-/// The caller removes the file.
+/// A unique temp output path (process id + tag + a per-call monotonic counter) so neither
+/// concurrent test BINARIES nor concurrent test THREADS within one binary collide. The counter
+/// is load-bearing: multiple tests in `tests/reverse_read_spike.rs` call the SAME builder in
+/// parallel, and a process-id-only path would let one test `remove_file` the archive out from
+/// under another mid-read. The caller removes the file.
 fn temp_out(tag: &str) -> PathBuf {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static SEQ: AtomicU64 = AtomicU64::new(0);
+    let n = SEQ.fetch_add(1, Ordering::Relaxed);
     let mut p = std::env::temp_dir();
     p.push(format!(
-        "imzml2mzpeak_reverse_{tag}_{}.mzpeak",
+        "imzml2mzpeak_reverse_{tag}_{}_{n}.mzpeak",
         std::process::id()
     ));
     p
