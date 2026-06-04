@@ -11,18 +11,17 @@ files_reviewed_list:
   - src/integrity/preflight.rs
 findings:
   critical: 0
-  warning: 2
+  warning: 0
   info: 3
-  total: 5
-status: issues_found
+  total: 3
+status: clean
 ---
 
 # Phase 8: Code Review Report
 
 **Reviewed:** 2026-06-04
 **Depth:** standard
-**Files Reviewed:** 5
-**Status:** issues_found
+**Status:** clean (re-review iteration 2 — both Warnings resolved; 3 Info deferred)
 
 ## Summary
 
@@ -59,7 +58,10 @@ correctness bugs in the on-disk layout.
 
 ## Warnings
 
-### WR-01: Overflow guards use `.expect()` panics, violating the module's own "never panic" error contract
+_Both Warnings resolved in iteration 2 (commits 461e97c, 9a05abc). Original text retained
+below for audit trail; see the Re-review (iteration 2) section for verdicts._
+
+### WR-01 (RESOLVED): Overflow guards use `.expect()` panics, violating the module's own "never panic" error contract
 
 **File:** `src/reverse/ibd.rs:124-130`
 **Issue:** `append` computes `encoded_len` and advances `cursor` with `checked_mul`/`checked_add`
@@ -93,7 +95,7 @@ self.cursor = self
     .ok_or(ReverseError::IbdOverflow { count, size: dtype_size })?;
 ```
 
-### WR-02: A mid-array write failure leaves the file and cursor inconsistent with no truncation/cleanup
+### WR-02 (RESOLVED): A mid-array write failure leaves the file and cursor inconsistent with no truncation/cleanup
 
 **File:** `src/reverse/ibd.rs:105-120`
 **Issue:** `append` writes elements one at a time and `?`-propagates on the first failing
@@ -153,6 +155,59 @@ mutation) if the writer is later reused in a multi-process context.
 
 ---
 
-_Reviewed: 2026-06-04_
+## Re-review (iteration 2)
+
+**Re-reviewed:** 2026-06-04 — focused verification of WR-01 and WR-02 fixes (commits 461e97c,
+9a05abc). `cargo build --lib` clean (only the pre-existing vendored-mzdata warning); all 6
+`reverse::ibd` unit tests pass.
+
+### WR-01 — RESOLVED
+
+The two `.expect()` panics on the overflow guards are gone. `append` now does
+`checked_mul(...).ok_or(ReverseError::IbdOverflow { count, size: dtype_size })?` (ibd.rs:131-133)
+and `checked_add(...).ok_or(ReverseError::IbdOverflow { ... })?` (ibd.rs:134-137). The checked
+arithmetic itself is unchanged — only the failure mode flips from panic to a typed `Result`. The
+new arm exists in error.rs:89-94 with matching field names (`count`, `size`) and a documented
+T-08-OF / never-panic rationale. Verified by grep that NO `expect`/`unwrap`/`panic` remain in the
+non-test body of ibd.rs. Honors the error.rs:14-16 and CLAUDE.md never-panic-in-library contract.
+
+### WR-02 — RESOLVED
+
+`append` restructured (ibd.rs:117-160): `offset` is captured from `self.cursor` BEFORE writing
+(line 121); `encoded_len` and `next_cursor` are computed BEFORE the write loop (lines 131-137);
+the write loop is a `try_for_each` whose first error sets `poisoned = true` and returns
+`IbdWrite(e)` WITHOUT touching `self.cursor` (lines 149-152); `self.cursor = next_cursor` runs
+ONLY after a fully-successful array write (line 154). Both `append` (118-120) and `finish`
+(173-175) fast-fail with `ReverseError::IbdPoisoned` once poisoned. A `poisoned: bool` field
+(ibd.rs:85) plus a documented "Post-failure contract" on the struct (69-77) and both methods
+(113-116, 170-171) make the single-use-after-failure invariant explicit. New `IbdPoisoned` arm
+in error.rs:96-100.
+
+**Offset-arithmetic regression check (required):** No regression. The prior code advanced the
+cursor in place via `checked_add` AFTER the loop; the new code computes `next_cursor` from the
+unchanged `self.cursor` BEFORE the loop and assigns it AFTER success. On the success path the
+result is byte-identical: `cursor_after = cursor_before + encoded_len`. The invariant
+`offset(N) = 16 + Σ encoded_len(prior)` still holds — cursor inits to 16 (line 103), `offset`
+reads cursor pre-mutation, and cursor increments by exactly `encoded_len` only on full success.
+Confirmed by the passing `offset_accumulation_mixed_dtype` (16/40/52/60, 68 total) and
+`empty_array_append` (cursor unchanged across a zero-byte append) tests.
+
+### Deferred (acceptable)
+
+- **IN-01 / IN-02 / IN-03** intentionally not fixed — clarity/scope items, no correctness impact.
+- **No new failure-path unit test** — accepted. The overflow path requires a `count × size`
+  near `u64::MAX` (an unallocatable Vec), and poison injection requires a sink that fails
+  mid-write; the concrete `BufWriter<File>` sink is not trait-abstracted, so a fault-injecting
+  sink cannot be substituted without a generic refactor. Both failure branches are trivially
+  simple (one `.ok_or(...)?` and one `if let Err` arm) and the success/edge paths are covered by
+  the existing 6 tests. Minor observation only: a generic `BufWriter<W>` sink would have enabled
+  a poison-path test without touching the success behavior — worth considering if the writer is
+  later parameterized, but not a blocker for v0.4.
+
+**Verdict:** both Warnings RESOLVED; status promoted to `clean` (3 Info deferred is acceptable).
+
+---
+
+_Reviewed: 2026-06-04 (iteration 1) / re-reviewed 2026-06-04 (iteration 2)_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
