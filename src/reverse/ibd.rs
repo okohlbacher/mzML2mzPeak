@@ -101,3 +101,125 @@ impl IbdWriter {
         todo!("Task 3: flush + drop sink, compute_digest(path, Md5), map IntegrityError via From")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    /// Minimal unique temp dir under the OS temp root (no `tempfile` dep — mirrors
+    /// `tests/integrity_preflight.rs::tempdir`).
+    fn tempdir() -> PathBuf {
+        let mut p = std::env::temp_dir();
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        p.push(format!(
+            "imzml2mzpeak-ibd-test-{}-{:?}",
+            nanos,
+            std::thread::current().id()
+        ));
+        fs::create_dir_all(&p).unwrap();
+        p
+    }
+
+    /// The four-array mixed-dtype sequence from 08-RESEARCH.md's hand-computed table.
+    /// Spectrum 0: mz=F64[100,200,300], int=F32[1,2,3]; Spectrum 1: mz=F64[150], int=F32[9,8].
+    fn fixture_arrays() -> [NumArray; 4] {
+        [
+            NumArray::F64(vec![100.0, 200.0, 300.0]),
+            NumArray::F32(vec![1.0, 2.0, 3.0]),
+            NumArray::F64(vec![150.0]),
+            NumArray::F32(vec![9.0, 8.0]),
+        ]
+    }
+
+    /// SC-2 (mixed dtype) + SC-4 (multi-spectrum offset accumulation): the four appends return
+    /// exactly the four ArrayRefs from the hand-computed table.
+    #[test]
+    fn offset_accumulation_mixed_dtype() {
+        let dir = tempdir();
+        let path = dir.join("offsets.ibd");
+        let uuid = Uuid::new_v4();
+        let mut w = IbdWriter::new(&path, uuid).unwrap();
+
+        let [mz0, int0, mz1, int1] = fixture_arrays();
+        let r0 = w.append(&mz0).unwrap();
+        let r1 = w.append(&int0).unwrap();
+        let r2 = w.append(&mz1).unwrap();
+        let r3 = w.append(&int1).unwrap();
+
+        assert_eq!(r0, ArrayRef { offset: 16, count: 3, encoded_len: 24 });
+        assert_eq!(r1, ArrayRef { offset: 40, count: 3, encoded_len: 12 });
+        assert_eq!(r2, ArrayRef { offset: 52, count: 1, encoded_len: 8 });
+        assert_eq!(r3, ArrayRef { offset: 60, count: 2, encoded_len: 8 });
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// IMS:1000103 = ELEMENT count (not bytes); IMS:1000104 = count × dtype_size, f32 AND f64.
+    #[test]
+    fn count_is_elements_encoded_is_bytes() {
+        let dir = tempdir();
+        let path = dir.join("counts.ibd");
+        let mut w = IbdWriter::new(&path, Uuid::new_v4()).unwrap();
+
+        let f32_arr = NumArray::F32(vec![0.0; 5]);
+        let r32 = w.append(&f32_arr).unwrap();
+        assert_eq!(r32.count, 5, "count is element count");
+        assert_eq!(r32.encoded_len, 5 * 4, "f32 encoded_len = count * 4");
+
+        let f64_arr = NumArray::F64(vec![0.0; 7]);
+        let r64 = w.append(&f64_arr).unwrap();
+        assert_eq!(r64.count, 7, "count is element count");
+        assert_eq!(r64.encoded_len, 7 * 8, "f64 encoded_len = count * 8");
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// IBD-01 byte-exactness: 16-byte UUID header + raw-LE arrays, file is exactly 68 bytes and
+    /// each region equals its `to_le_bytes` concatenation.
+    #[test]
+    fn header_and_arrays_byte_exact() {
+        let dir = tempdir();
+        let path = dir.join("exact.ibd");
+        let uuid = Uuid::new_v4();
+        let mut w = IbdWriter::new(&path, uuid).unwrap();
+
+        let [mz0, int0, mz1, int1] = fixture_arrays();
+        w.append(&mz0).unwrap();
+        w.append(&int0).unwrap();
+        w.append(&mz1).unwrap();
+        w.append(&int1).unwrap();
+        // finish() flushes; Task 2 needs the bytes on disk, so finish here (digest unused).
+        let _ = w.finish().unwrap();
+
+        let bytes = fs::read(&path).unwrap();
+        assert_eq!(bytes.len(), 68, "16-byte header + 24 + 12 + 8 + 8 = 68");
+        assert_eq!(&bytes[0..16], uuid.as_bytes(), "header = raw UUID bytes");
+
+        let mut expected_mz0 = Vec::new();
+        for x in [100.0_f64, 200.0, 300.0] {
+            expected_mz0.extend_from_slice(&x.to_le_bytes());
+        }
+        assert_eq!(&bytes[16..40], expected_mz0.as_slice());
+
+        let mut expected_int0 = Vec::new();
+        for x in [1.0_f32, 2.0, 3.0] {
+            expected_int0.extend_from_slice(&x.to_le_bytes());
+        }
+        assert_eq!(&bytes[40..52], expected_int0.as_slice());
+
+        assert_eq!(&bytes[52..60], &150.0_f64.to_le_bytes());
+
+        let mut expected_int1 = Vec::new();
+        for x in [9.0_f32, 8.0] {
+            expected_int1.extend_from_slice(&x.to_le_bytes());
+        }
+        assert_eq!(&bytes[60..68], expected_int1.as_slice());
+
+        fs::remove_dir_all(&dir).ok();
+    }
+}
