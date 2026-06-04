@@ -18,3 +18,7 @@ pub mod integrity;
 pub mod schema;
 pub mod write;
 pub mod verify;
+
+// Binary-only front-end (CLI-01..CLI-04, Plan 06-02). `anyhow`/`indicatif` are confined to
+// this module — the read/write/verify/schema/integrity layers stay free of both (CLAUDE.md).
+pub mod cli;

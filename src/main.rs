@@ -1,20 +1,28 @@
-//! imzml2mzpeak — skeleton binary entry point.
+//! imzml2mzpeak — converter binary entry point (CLI-01..CLI-04, Plan 06-02).
 //!
-//! This file is a compile-proof for the pinned dependency graph (plan 00-01):
-//! it forces both the git-pinned mzPeak writer symbol and the non-default mzdata
-//! `imzml` feature module to resolve at compile time. No conversion logic lives
-//! here yet — that arrives in later phases.
+//! Thin shell: initialize logging, parse argv into [`ConvertCli`], dispatch to
+//! [`imzml2mzpeak::cli::run`], and translate the outcome into a per-class process exit code
+//! via [`imzml2mzpeak::cli::classify_exit`]. All conversion logic lives in the library; this
+//! file only owns the `main() -> ExitCode` shape (mirrors `src/bin/preflight.rs`).
+//!
+//! The error chain is printed with `{e:#}` so the full anyhow context (e.g. "conversion
+//! failed: integrity preflight failed: …") reaches the user; the typed cause then drives the
+//! distinct non-zero exit code (T-6-exit / T-6-panic — no raw panic on fallible paths).
 
-// Proof that the EXACT re-exported writer symbol resolves with default-features = false.
-#[allow(unused_imports)]
-use mzpeak_prototyping::MzPeakWriter;
+use std::process::ExitCode;
 
-// Proof that the non-default mzdata `imzml` feature module compiles in
-// (the module is `#![cfg(feature = "imzml")]`, so this only resolves with the feature ON).
-#[allow(unused_imports)]
-use mzdata::io::imzml::ImzMLReaderType;
+use clap::Parser;
 
-fn main() {
+use imzml2mzpeak::cli::{self, ConvertCli};
+
+fn main() -> ExitCode {
     env_logger::init();
-    log::info!("imzml2mzpeak skeleton: pinned build OK (writer + mzdata imzml feature linked)");
+
+    match cli::run(ConvertCli::parse()) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("{e:#}");
+            cli::classify_exit(&e)
+        }
+    }
 }

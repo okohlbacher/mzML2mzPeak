@@ -20,6 +20,12 @@ path = "src/lib.rs"
 name = "preflight"
 path = "src/bin/preflight.rs"
 
+# The converter CLI (Plan 06-02). Declared explicitly so CARGO_BIN_EXE_imzml2mzpeak is
+# unambiguous for the spawned-process integration tests (mirrors the preflight bin block).
+[[bin]]
+name = "imzml2mzpeak"
+path = "src/main.rs"
+
 [dependencies]
 # --- CORE compatibility crates: pinned EXACTLY (these fracture the arrow/mzdata
 # type graph if they drift). Versions mirror mzpeak_prototyping's own Cargo.toml. ---
