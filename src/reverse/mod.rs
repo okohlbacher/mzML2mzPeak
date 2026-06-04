@@ -14,7 +14,9 @@
 pub mod error;
 pub mod ibd;
 pub mod imzml_writer;
+pub mod source;
 
 pub use error::ReverseError;
 pub use ibd::{ArrayRef, IbdWriter};
 pub use imzml_writer::ImzmlWriter;
+pub use source::{ReversePixel, decode_axis, read_pixel};

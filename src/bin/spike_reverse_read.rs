@@ -39,133 +39,16 @@
 
 use std::process::ExitCode;
 
-use mzdata::curie;
-use mzdata::prelude::{ParamDescribed, ParamValue};
-use mzdata::spectrum::SignalContinuity;
-use mzdata::spectrum::bindata::{ArrayType, BinaryDataArrayType, ByteArrayView, DataArray};
-use mzpeaks::prelude::*;
 use mzpeak_prototyping::MzPeakReader;
 
 use imzml2mzpeak::read::record::{NumArray, Representation};
-use imzml2mzpeak::reverse::ReverseError;
+// read_pixel / decode_axis / ReversePixel now live in the LIBRARY (src/reverse/source.rs) —
+// the spike imports the single implementation rather than carrying a duplicate (Plan 10-01 Task 2).
+use imzml2mzpeak::reverse::{ReverseError, read_pixel};
 use imzml2mzpeak::verify::ion_image::grid_dims_from_metadata;
 
 const ARCHIVE_PATH: &str = "out/HR2MSI.mzpeak"; // v0.3 forward output, 34,840 pixels
 const HEAD_SAMPLE: usize = 5;
-
-/// One reverse-read pixel record — the exact shape Phase 8 promotes into
-/// `src/reverse/source.rs`. (Mirrors `tests/reverse_read_spike.rs::ReversePixel`.)
-#[derive(Debug)]
-struct ReversePixel {
-    x: i64,
-    y: i64,
-    z: Option<i64>,
-    representation: Representation,
-    mz: NumArray,
-    intensity: NumArray,
-}
-
-/// Read ONE pixel from an already-primed reader (single-index → bounded memory). Coordinates by
-/// IMS accession (SpectrumDescription form `p.value.to_i64()`); arrays decoded at SOURCE dtype
-/// via a `DataArray::dtype()` branch (never `mzs()`/`intensities()`); Profile → `spectra_data`,
-/// Centroid/Unknown → `spectra_peaks` (Pattern E). A first-spectrum scan lacking x AND y is
-/// `ReverseError::NotImaging` (RMZ-04). Mirrors the test helper byte-for-byte in intent.
-fn read_pixel(reader: &mut MzPeakReader, index: u64) -> Result<ReversePixel, ReverseError> {
-    let descr = reader
-        .get_spectrum_metadata(index)
-        .map_err(ReverseError::OpenArchive)?
-        .ok_or(ReverseError::MissingMetadata { index })?;
-
-    let scan = match descr.acquisition.first_scan() {
-        Some(scan) => scan,
-        None => {
-            return Err(if index == 0 {
-                ReverseError::NotImaging
-            } else {
-                ReverseError::NoScan { index }
-            });
-        }
-    };
-    let x = scan
-        .get_param_by_curie(&curie!(IMS:1000050))
-        .and_then(|p| p.value.to_i64().ok());
-    let y = scan
-        .get_param_by_curie(&curie!(IMS:1000051))
-        .and_then(|p| p.value.to_i64().ok());
-    let z = scan
-        .get_param_by_curie(&curie!(IMS:1000052))
-        .and_then(|p| p.value.to_i64().ok());
-    let (Some(x), Some(y)) = (x, y) else {
-        return Err(if index == 0 {
-            ReverseError::NotImaging
-        } else {
-            ReverseError::CoordMissing { index }
-        });
-    };
-
-    let representation: Representation = match descr.signal_continuity {
-        SignalContinuity::Profile => Representation::Profile,
-        SignalContinuity::Centroid => Representation::Centroid,
-        SignalContinuity::Unknown => Representation::Unknown,
-    };
-
-    let (mz, intensity) = match representation {
-        Representation::Profile => {
-            let arrays = reader
-                .get_spectrum_arrays(index)
-                .map_err(ReverseError::OpenArchive)?
-                .ok_or(ReverseError::MissingDataFacet { index })?;
-            let mz_da = arrays
-                .get(&ArrayType::MZArray)
-                .ok_or(ReverseError::MissingArray { index, axis: "m/z" })?;
-            let int_da = arrays
-                .get(&ArrayType::IntensityArray)
-                .ok_or(ReverseError::MissingArray { index, axis: "intensity" })?;
-            (
-                decode_axis(mz_da, index, "m/z")?,
-                decode_axis(int_da, index, "intensity")?,
-            )
-        }
-        // Centroid AND Unknown → spectra_peaks facet (Pattern E). NOT a silent coercion: the
-        // upstream `spectra_peaks` schema is FIXED-WIDTH BY DESIGN. `get_spectrum_peaks_for`
-        // is the only surface for it and materializes mzpeaks `CentroidPeak`s whose `mz()` is
-        // `f64` and `intensity()` is `f32` at the TYPE level — there is NO narrower/wider
-        // source dtype to recover (unlike the Profile `spectra_data` facet `decode_axis`
-        // branches on). The `NumArray` widths below RECORD the schema; they do not widen an
-        // f32/f64 source. Because this f32 width is FABRICATED (not decoded from a source
-        // array), the gate's `saw_f32_axis` no-widening proof deliberately counts ONLY axes
-        // that came through the Profile/`decode_axis` path — see WR-01/WR-03 in gate().
-        Representation::Centroid | Representation::Unknown => {
-            let peaks = reader
-                .get_spectrum_peaks_for(index)
-                .map_err(ReverseError::OpenArchive)?
-                .ok_or(ReverseError::MissingDataFacet { index })?;
-            let mz: Vec<f64> = peaks.iter().map(|p| p.mz()).collect();
-            let intensity: Vec<f32> = peaks.iter().map(|p| p.intensity()).collect();
-            (NumArray::F64(mz), NumArray::F32(intensity))
-        }
-    };
-
-    Ok(ReversePixel { x, y, z, representation, mz, intensity })
-}
-
-/// Decode one `DataArray` at its SOURCE dtype, rejecting dtypes outside `{Float32, Float64}` with
-/// `ReverseError::UnsupportedDtype` (threat T-07-02 — reject, never cast). No coercing accessors.
-fn decode_axis(da: &DataArray, index: u64, axis: &'static str) -> Result<NumArray, ReverseError> {
-    match da.dtype() {
-        BinaryDataArrayType::Float32 => Ok(NumArray::F32(
-            da.to_f32()
-                .map_err(|e| ReverseError::ArrayDecode { index, axis, source: e.into() })?
-                .into_owned(),
-        )),
-        BinaryDataArrayType::Float64 => Ok(NumArray::F64(
-            da.to_f64()
-                .map_err(|e| ReverseError::ArrayDecode { index, axis, source: e.into() })?
-                .into_owned(),
-        )),
-        other => Err(ReverseError::UnsupportedDtype { index, axis, dtype: other }),
-    }
-}
 
 fn dtype_tag(a: &NumArray) -> &'static str {
     match a {
