@@ -86,6 +86,19 @@ pub enum ReverseError {
     #[error("failed to write .ibd: {0}")]
     IbdWrite(#[source] std::io::Error),
 
+    /// `.ibd` offset/length arithmetic overflowed `u64` — the `encoded_len = count × dtype_size`
+    /// product or the running `cursor` advance exceeded `u64::MAX`. "Impossible by construction"
+    /// for realistic data, but represented as a typed error rather than a panic so the overflow
+    /// guard honors the module's never-panic contract (Security V5 / threat T-08-OF). Phase 8.
+    #[error(".ibd offset arithmetic overflow: {count} elements × {size} bytes exceeds u64")]
+    IbdOverflow { count: u64, size: u64 },
+
+    /// A prior [`crate::reverse::ibd::IbdWriter::append`] failed mid-array, poisoning the writer.
+    /// Any subsequent `append`/`finish` fails fast with this arm rather than writing at a `cursor`
+    /// that no longer matches the true (partially-written) file position. Phase 8 IBD-02.
+    #[error(".ibd writer is poisoned: a prior append failed mid-array; discard the partial file")]
+    IbdPoisoned,
+
     /// Computing the streamed MD5 (`IMS:1000090`) checksum of the finished `.ibd` failed.
     /// Composes [`crate::integrity::header::IntegrityError`] via `#[from]` so
     /// [`crate::reverse::ibd::IbdWriter::finish`] can `?`-propagate the digest error. This is

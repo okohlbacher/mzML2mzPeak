@@ -123,11 +123,11 @@ impl IbdWriter {
         // impossible-by-construction rather than relying on the data range.
         let encoded_len = count
             .checked_mul(dtype_size)
-            .expect("encoded_len overflow: count * dtype_size exceeds u64");
+            .ok_or(ReverseError::IbdOverflow { count, size: dtype_size })?;
         self.cursor = self
             .cursor
             .checked_add(encoded_len)
-            .expect("cursor overflow: .ibd offset exceeds u64");
+            .ok_or(ReverseError::IbdOverflow { count, size: dtype_size })?;
         Ok(ArrayRef {
             offset,
             count,
