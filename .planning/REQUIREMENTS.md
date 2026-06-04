@@ -50,4 +50,23 @@ explicitly NOT a goal (v0.3 forward masks zero-intensity runs).
 - Broad third-party (non-v0.3) imaging-mzPeak variability hardening beyond best-effort
 
 ## Traceability
-(Filled by the roadmapper — maps each REQ-ID to its phase.)
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| RMZ-01 | Phase 7 | Pending |
+| RMZ-02 | Phase 7 | Pending |
+| RMZ-03 | Phase 7 | Pending |
+| RMZ-04 | Phase 7 | Pending |
+| IBD-01 | Phase 8 | Pending |
+| IBD-02 | Phase 8 | Pending |
+| IBD-03 | Phase 8 | Pending |
+| IXML-01 | Phase 9 | Pending |
+| IXML-02 | Phase 9 | Pending |
+| IXML-03 | Phase 9 | Pending |
+| RCLI-01 | Phase 10 | Pending |
+| RCLI-02 | Phase 10 | Pending |
+| RVER-01 | Phase 11 | Pending |
+| RVER-02 | Phase 11 | Pending |
+| RDAT-01 | Phase 11 | Pending |
+
+**Coverage:** 15/15 v0.4 requirements mapped · no orphans · no duplicates.
