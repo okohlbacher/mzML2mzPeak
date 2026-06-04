@@ -4,13 +4,13 @@ milestone: v0.4
 milestone_name: — Reverse Converter
 status: executing
 stopped_at: ROADMAP.md / REQUIREMENTS.md traceability / STATE.md written.
-last_updated: "2026-06-04T16:05:01.795Z"
-last_activity: 2026-06-04 -- Phase 7 planning complete
+last_updated: "2026-06-04T16:13:06.683Z"
+last_activity: 2026-06-04
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 3
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-03)
 
 **Core value:** Reconstruct a valid imzML (`.imzML` + `.ibd`, UUID linkage) from any conformant imaging mzPeak archive without losing per-pixel coordinates or surviving m/z+intensity — `mzPeak → imzML → mzPeak` round-trips at L1 (surviving points bit-for-bit).
-**Current focus:** Phase 7 — Reverse Read-Spike & Dependency Audit (v0.4 kickoff)
+**Current focus:** Phase 07 — reverse-read-spike-dependency-audit
 
 ## Current Position
 
-Phase: 7 — Reverse Read-Spike & Dependency Audit (not started)
-Plan: —
+Phase: 07 (reverse-read-spike-dependency-audit) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-06-04 -- Phase 7 planning complete
+Last activity: 2026-06-04
 Progress: [░░░░░░░░░░] 0/5 phases
 
 ## Performance Metrics
@@ -55,6 +55,7 @@ Progress: [░░░░░░░░░░] 0/5 phases
 - Trend: —
 
 *Updated after each plan completion*
+| Phase 07 P01 | 15 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,9 @@ Recent decisions affecting current (v0.4) work:
 - Process: adversarial CODEX/CLI review at the START and END of every phase (hard requirement, carried from v0.3).
 
 (v0.3 phase-level decisions retained in milestones/v0.3-* and prior STATE history; key reuse anchors below.)
+
+- [Phase ?]: Plan 07-01: seed src/reverse/ with ONLY ReverseError (library-public) so integration tests can import it; read logic stays in the Plan-02 spike.
+- [Phase ?]: Plan 07-01: non_imaging fixture suppresses coords by reconstructing MultiLayerSpectrum directly with no scan event (to_mzdata always emits IMS:1000050/51) -- resolves RESEARCH Open Q3.
 
 ### Reuse Anchors (from shipped v0.3)
 
@@ -107,6 +111,6 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-04 — v0.4 roadmap created (Phases 7–11).
+Last session: 2026-06-04T16:13:06.680Z
 Stopped at: ROADMAP.md / REQUIREMENTS.md traceability / STATE.md written.
-Resume file: None — next step is `/gsd:plan-phase 7`.
+Resume file: None
