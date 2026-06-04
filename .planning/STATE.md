@@ -4,13 +4,13 @@ milestone: v0.4
 milestone_name: — Reverse Converter
 status: executing
 stopped_at: ROADMAP.md / REQUIREMENTS.md traceability / STATE.md written.
-last_updated: "2026-06-04T16:13:06.683Z"
+last_updated: "2026-06-04T16:22:41.440Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-03)
 ## Current Position
 
 Phase: 07 (reverse-read-spike-dependency-audit) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-06-04
 Progress: [░░░░░░░░░░] 0/5 phases
@@ -56,6 +56,7 @@ Progress: [░░░░░░░░░░] 0/5 phases
 
 *Updated after each plan completion*
 | Phase 07 P01 | 15 | 2 tasks | 4 files |
+| Phase 07 P02 | 20 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,7 @@ Recent decisions affecting current (v0.4) work:
 
 - [Phase ?]: Plan 07-01: seed src/reverse/ with ONLY ReverseError (library-public) so integration tests can import it; read logic stays in the Plan-02 spike.
 - [Phase ?]: Plan 07-01: non_imaging fixture suppresses coords by reconstructing MultiLayerSpectrum directly with no scan event (to_mzdata always emits IMS:1000050/51) -- resolves RESEARCH Open Q3.
+- [Phase ?]: Plan 07-02: read_pixel single-index helper (dtype-preserving F32/F64, accession coords, Profile/Centroid facet routing, fail-closed NotImaging) is the Phase-8 src/reverse/source.rs read shape; 4 tests green + real-archive GATE: PASS on out/HR2MSI.mzpeak (count=34840, mz=F64 int=F32 no-widen, metadata.imaging absent->None).
 
 ### Reuse Anchors (from shipped v0.3)
 
@@ -111,6 +113,6 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-04T16:13:06.680Z
+Last session: 2026-06-04T16:22:11.735Z
 Stopped at: ROADMAP.md / REQUIREMENTS.md traceability / STATE.md written.
 Resume file: None

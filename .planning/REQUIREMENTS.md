@@ -13,9 +13,9 @@ explicitly NOT a goal (v0.3 forward masks zero-intensity runs).
 
 ### Read mzPeak (RMZ)
 
-- [ ] **RMZ-01**: Read a conformant imaging mzPeak archive via `mzpeak_prototyping::MzPeakReader` — spectrum count + per-spectrum m/z+intensity arrays at **source dtype** (no widening), streaming/bounded memory
-- [ ] **RMZ-02**: Extract per-pixel coordinates (`IMS:1000050`/`51`/`52`, 1-based) by accession from each spectrum's scan event
-- [ ] **RMZ-03**: Read run-level `metadata.imaging` (grid dims, pixel size) from `file_index().metadata["imaging"]`; degrade gracefully (omit `<scanSettings>` detail) when absent — never fabricate
+- [x] **RMZ-01**: Read a conformant imaging mzPeak archive via `mzpeak_prototyping::MzPeakReader` — spectrum count + per-spectrum m/z+intensity arrays at **source dtype** (no widening), streaming/bounded memory
+- [x] **RMZ-02**: Extract per-pixel coordinates (`IMS:1000050`/`51`/`52`, 1-based) by accession from each spectrum's scan event
+- [x] **RMZ-03**: Read run-level `metadata.imaging` (grid dims, pixel size) from `file_index().metadata["imaging"]`; degrade gracefully (omit `<scanSettings>` detail) when absent — never fabricate
 - [x] **RMZ-04**: Hard-fail with a clear typed error on a non-imaging mzPeak (no IMS coordinate columns / not an imaging archive)
 
 ### Write .ibd binary (IBD)
@@ -61,9 +61,9 @@ explicitly NOT a goal (v0.3 forward masks zero-intensity runs).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RMZ-01 | Phase 7 | Pending |
-| RMZ-02 | Phase 7 | Pending |
-| RMZ-03 | Phase 7 | Pending |
+| RMZ-01 | Phase 7 | Complete |
+| RMZ-02 | Phase 7 | Complete |
+| RMZ-03 | Phase 7 | Complete |
 | RMZ-04 | Phase 7 | Complete |
 | IBD-01 | Phase 8 | Pending |
 | IBD-02 | Phase 8 | Pending |

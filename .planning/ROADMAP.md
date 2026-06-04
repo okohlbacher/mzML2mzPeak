@@ -51,7 +51,7 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 **Plans**: 3 plans
 
 - [x] 07-01-PLAN.md — Seed ReverseError typed-error contract + synthetic imaging/non-imaging .mzpeak fixtures (RMZ-04 foundation)
-- [ ] 07-02-PLAN.md — Read-capability proof: tests + throwaway spike harness for count/source-dtype arrays/coords/metadata + NotImaging hard-fail (RMZ-01..04)
+- [x] 07-02-PLAN.md — Read-capability proof: tests + throwaway spike harness for count/source-dtype arrays/coords/metadata + NotImaging hard-fail (RMZ-01..04)
 - [ ] 07-03-PLAN.md — cargo tree checksum audit + 07-FINDINGS.md decision (MD5 IMS:1000090 default) + read-spike evidence + adversarial review
 
 ### Phase 8: `.ibd` Binary Writer (CRUX)
@@ -115,7 +115,7 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 7. Reverse Read-Spike & Dependency Audit | 1/3 | In Progress|  |
+| 7. Reverse Read-Spike & Dependency Audit | 2/3 | In Progress|  |
 | 8. `.ibd` Binary Writer (CRUX) | 0/? | Not started | - |
 | 9. `.imzML` XML Emitter | 0/? | Not started | - |
 | 10. Streaming Reverse Orchestration & `reverse` CLI | 0/? | Not started | - |
