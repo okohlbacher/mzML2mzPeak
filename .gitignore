@@ -1,9 +1,8 @@
 # Rust build artifacts
 /target
 
-# Large binary sidecar fetched in plan 00-02 — must never be committed.
-# (The small .imzML header in data/ IS tracked and is intentionally not ignored.)
-data/*.ibd
+# Local dataset directory — kept entirely out of the repo (large binaries + sample data).
+/data/
 
 # Local conversion outputs / acceptance artifacts (large)
 /out/
