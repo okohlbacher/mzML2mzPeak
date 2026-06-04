@@ -4,7 +4,7 @@ milestone: v0.4
 milestone_name: — Reverse Converter
 status: verifying
 stopped_at: Completed 08-01-PLAN.md (phase 08 ready_for_verification)
-last_updated: "2026-06-04T17:19:51.891Z"
+last_updated: "2026-06-04T17:33:20.830Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 5
@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-06-03)
 
 ## Current Position
 
-Phase: 08 (ibd-binary-writer-crux) — EXECUTING
-Plan: 1 of 1
+Phase: 9
+Plan: Not started
 Status: Phase complete — ready for verification
 Last activity: 2026-06-04
 Progress: [░░░░░░░░░░] 0/5 phases
@@ -49,6 +49,7 @@ Progress: [░░░░░░░░░░] 0/5 phases
 | 10 | 0 | - | - |
 | 11 | 0 | - | - |
 | 07 | 3 | - | - |
+| 08 | 1 | - | - |
 
 **Recent Trend:**
 

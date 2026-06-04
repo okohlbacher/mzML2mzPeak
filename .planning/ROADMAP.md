@@ -118,7 +118,7 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 7. Reverse Read-Spike & Dependency Audit | 3/3 | Complete    | 2026-06-04 |
-| 8. `.ibd` Binary Writer (CRUX) | 1/1 | Complete   | 2026-06-04 |
+| 8. `.ibd` Binary Writer (CRUX) | 1/1 | Complete    | 2026-06-04 |
 | 9. `.imzML` XML Emitter | 0/? | Not started | - |
 | 10. Streaming Reverse Orchestration & `reverse` CLI | 0/? | Not started | - |
 | 11. Reverse Roundtrip Verification & PXD001283 Acceptance | 0/? | Not started | - |
