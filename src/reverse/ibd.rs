@@ -78,15 +78,61 @@ impl IbdWriter {
     /// The UUID is minted by the caller (`Uuid::new_v4()` at the conversion-orchestrator level)
     /// and passed in so the same value reaches Phase 9's XML emitter.
     pub fn new(path: impl AsRef<Path>, uuid: Uuid) -> Result<Self, ReverseError> {
-        let _ = (path.as_ref(), uuid);
-        todo!("Task 2: open BufWriter, write uuid.as_bytes(), set cursor = 16")
+        let path = path.as_ref().to_path_buf();
+        let mut sink = BufWriter::new(File::create(&path).map_err(ReverseError::IbdWrite)?);
+        // 16 RAW RFC-4122 bytes — NOT the dashed string, NO .NET mixed-endian swap. The reader
+        // does `Uuid::from_bytes(first 16)` (reader.rs:600); the preflight HARD-compares these.
+        sink.write_all(uuid.as_bytes())
+            .map_err(ReverseError::IbdWrite)?;
+        Ok(Self {
+            sink,
+            path,
+            cursor: 16, // every array offset is measured from after the header
+            uuid,
+        })
     }
 
     /// Append one array's raw little-endian bytes (at its source width — never widened) and
     /// return its `(offset, count, encoded_len)` triple. Advances the cursor by `encoded_len`.
     pub fn append(&mut self, arr: &NumArray) -> Result<ArrayRef, ReverseError> {
-        let _ = arr;
-        todo!("Task 2: write to_le_bytes per element, return ArrayRef, advance cursor")
+        let offset = self.cursor; // IMS:1000102 — captured BEFORE writing (≥ 16 even when empty)
+        let count = arr.len() as u64; // IMS:1000103 — ELEMENT count, NOT bytes
+        let dtype_size: u64 = match arr {
+            NumArray::F32(_) => 4,
+            NumArray::F64(_) => 8,
+        };
+        // Write at native width — NEVER as_f64() (it widens and breaks dtype/byte width).
+        match arr {
+            NumArray::F32(v) => {
+                for &x in v {
+                    self.sink
+                        .write_all(&x.to_le_bytes())
+                        .map_err(ReverseError::IbdWrite)?;
+                }
+            }
+            NumArray::F64(v) => {
+                for &x in v {
+                    self.sink
+                        .write_all(&x.to_le_bytes())
+                        .map_err(ReverseError::IbdWrite)?;
+                }
+            }
+        }
+        // u64 arithmetic (threat T-08-OF): realistic data is far below u64::MAX; use checked_mul
+        // for the count×size product and checked_add for the cursor advance to make overflow
+        // impossible-by-construction rather than relying on the data range.
+        let encoded_len = count
+            .checked_mul(dtype_size)
+            .expect("encoded_len overflow: count * dtype_size exceeds u64");
+        self.cursor = self
+            .cursor
+            .checked_add(encoded_len)
+            .expect("cursor overflow: .ibd offset exceeds u64");
+        Ok(ArrayRef {
+            offset,
+            count,
+            encoded_len,
+        })
     }
 
     /// The caller-minted UUID embedded in the header (for Phase 9 `IMS:1000080` linkage).
@@ -96,9 +142,17 @@ impl IbdWriter {
 
     /// Flush the sink, then stream the MD5 (`IMS:1000090`) of the WHOLE finished file (header
     /// included) via the shipped [`crate::integrity::compute_digest`]. Returns lowercase hex.
-    pub fn finish(self) -> Result<String, ReverseError> {
-        let _ = (&self.path, ChecksumType::Md5, crate::integrity::compute_digest as fn(&Path, ChecksumType) -> _);
-        todo!("Task 3: flush + drop sink, compute_digest(path, Md5), map IntegrityError via From")
+    pub fn finish(mut self) -> Result<String, ReverseError> {
+        // Pitfall 4: flush the BufWriter BEFORE re-reading, or the digest hashes a truncated
+        // file (and the on-disk .ibd would be short).
+        self.sink.flush().map_err(ReverseError::IbdWrite)?;
+        // Close the handle before re-opening to hash.
+        drop(self.sink);
+        // Reuse the shipped 64KiB-chunk digest over byte 0..EOF (header INCLUDED — Pitfall 3).
+        // MD5 = IMS:1000090, the Phase-7-locked default. `?` composes IntegrityError via the
+        // ReverseError::Integrity(#[from]) arm. No new hasher, no new crate.
+        let hex = crate::integrity::compute_digest(&self.path, ChecksumType::Md5)?;
+        Ok(hex)
     }
 }
 
