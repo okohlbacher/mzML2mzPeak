@@ -1,7 +1,7 @@
 ---
 phase: 06-cli-ux-acceptance-gate
 verified: 2026-06-04T14:40:00Z
-status: human_needed
+status: passed
 score: 4/5
 overrides_applied: 0
 human_verification:
