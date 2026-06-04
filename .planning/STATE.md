@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.4
 milestone_name: — Reverse Converter
-status: executing
-stopped_at: Completed 08-01-PLAN.md (phase 08 ready_for_verification)
-last_updated: "2026-06-04T18:02:50.356Z"
+status: verifying
+stopped_at: Completed 09-02-PLAN.md
+last_updated: "2026-06-04T18:09:42.600Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 5
-  percent: 40
+  completed_plans: 6
+  percent: 60
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-03)
 
 Phase: 09 (imzml-xml-emitter) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-04
 Progress: [░░░░░░░░░░] 0/5 phases
 
@@ -62,6 +62,7 @@ Progress: [░░░░░░░░░░] 0/5 phases
 | Phase 07 P03 | 10 min | 2 tasks | 1 files |
 | Phase 08 P01 | 25 min | 3 tasks | 5 files |
 | Phase 09 P01 | 5 min | 2 tasks | 3 files |
+| Phase 09 P02 | 8min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,8 @@ Recent decisions affecting current (v0.4) work:
 - [Phase ?]: Phase 8 (08-01): compute_digest promoted to pub(crate); reused for .ibd whole-file MD5 (no duplicate hash loop)
 - [Phase ?]: Phase 8 (08-01): IbdWriter uses explicit u64 cursor + checked arithmetic; IMS:1000103=element count, checksum covers 16-byte UUID header
 - [Phase ?]: Plan 09-01: ImzmlWriter streaming emitter emits spec-rich processed-mode .imzML; per-array dtype/array-type cvParams DIRECT for HR2MSI mixed f64/f32; scanSettings degrades to count=0 when imaging None; ReverseError::XmlEmit added
+- [Phase ?]: 09-02: drive ImzMLReader via read_into fallible inherent path (not Iterator::next which collapses errors to None)
+- [Phase ?]: 09-02: SC-4 array-shape proof asserts round-read element counts (data_len) — proves dtype-term width since reader sizes count x dtype.size_of()
 
 ### Reuse Anchors (from shipped v0.3)
 
@@ -122,6 +125,6 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-04T18:02:09.376Z
-Stopped at: Completed 08-01-PLAN.md (phase 08 ready_for_verification)
+Last session: 2026-06-04T18:09:42.596Z
+Stopped at: Completed 09-02-PLAN.md
 Resume file: None
