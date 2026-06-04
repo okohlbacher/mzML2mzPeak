@@ -20,9 +20,9 @@ explicitly NOT a goal (v0.3 forward masks zero-intensity runs).
 
 ### Write .ibd binary (IBD)
 
-- [ ] **IBD-01**: Write the `.ibd` — 16-byte UUID header then arrays concatenated raw little-endian (uncompressed, NoCompression), incrementally, tracking each array's byte offset
-- [ ] **IBD-02**: For every binary array emit correct external-data CV refs — `IMS:1000102` (byte offset), `IMS:1000103` (element count), `IMS:1000104` (encoded bytes = len × dtype size)
-- [ ] **IBD-03**: Compute the `.ibd` checksum and write the matching `<fileContent>` term + `IMS:1000080` UUID, with UUID linkage consistent between `.imzML` and `.ibd` (zero-new-crates: prefer MD5 `IMS:1000090` unless R0 audit finds SHA-1 already available)
+- [x] **IBD-01**: Write the `.ibd` — 16-byte UUID header then arrays concatenated raw little-endian (uncompressed, NoCompression), incrementally, tracking each array's byte offset
+- [x] **IBD-02**: For every binary array emit correct external-data CV refs — `IMS:1000102` (byte offset), `IMS:1000103` (element count), `IMS:1000104` (encoded bytes = len × dtype size)
+- [x] **IBD-03**: Compute the `.ibd` checksum and write the matching `<fileContent>` term + `IMS:1000080` UUID, with UUID linkage consistent between `.imzML` and `.ibd` (zero-new-crates: prefer MD5 `IMS:1000090` unless R0 audit finds SHA-1 already available)
 
 ### Write .imzML XML (IXML)
 
@@ -65,9 +65,9 @@ explicitly NOT a goal (v0.3 forward masks zero-intensity runs).
 | RMZ-02 | Phase 7 | Complete |
 | RMZ-03 | Phase 7 | Complete |
 | RMZ-04 | Phase 7 | Complete |
-| IBD-01 | Phase 8 | Pending |
-| IBD-02 | Phase 8 | Pending |
-| IBD-03 | Phase 8 | Pending |
+| IBD-01 | Phase 8 | Complete |
+| IBD-02 | Phase 8 | Complete |
+| IBD-03 | Phase 8 | Complete |
 | IXML-01 | Phase 9 | Pending |
 | IXML-02 | Phase 9 | Pending |
 | IXML-03 | Phase 9 | Pending |

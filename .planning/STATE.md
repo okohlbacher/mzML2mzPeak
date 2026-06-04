@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.4
 milestone_name: — Reverse Converter
-status: executing
-stopped_at: Completed 07-03-PLAN.md (phase 07 ready_for_verification)
-last_updated: "2026-06-04T17:12:22.407Z"
-last_activity: 2026-06-04 -- Phase 8 planning complete
+status: verifying
+stopped_at: Completed 08-01-PLAN.md (phase 08 ready_for_verification)
+last_updated: "2026-06-04T17:19:51.891Z"
+last_activity: 2026-06-04
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
-  percent: 20
+  completed_plans: 4
+  percent: 40
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-03)
 
 **Core value:** Reconstruct a valid imzML (`.imzML` + `.ibd`, UUID linkage) from any conformant imaging mzPeak archive without losing per-pixel coordinates or surviving m/z+intensity — `mzPeak → imzML → mzPeak` round-trips at L1 (surviving points bit-for-bit).
-**Current focus:** Phase 07 — reverse-read-spike-dependency-audit
+**Current focus:** Phase 08 — ibd-binary-writer-crux
 
 ## Current Position
 
-Phase: 8
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-06-04 -- Phase 8 planning complete
+Phase: 08 (ibd-binary-writer-crux) — EXECUTING
+Plan: 1 of 1
+Status: Phase complete — ready for verification
+Last activity: 2026-06-04
 Progress: [░░░░░░░░░░] 0/5 phases
 
 ## Performance Metrics
@@ -59,6 +59,7 @@ Progress: [░░░░░░░░░░] 0/5 phases
 | Phase 07 P01 | 15 | 2 tasks | 4 files |
 | Phase 07 P02 | 20 min | 2 tasks | 4 files |
 | Phase 07 P03 | 10 min | 2 tasks | 1 files |
+| Phase 08 P01 | 25 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,8 @@ Recent decisions affecting current (v0.4) work:
 - [Phase ?]: Plan 07-01: non_imaging fixture suppresses coords by reconstructing MultiLayerSpectrum directly with no scan event (to_mzdata always emits IMS:1000050/51) -- resolves RESEARCH Open Q3.
 - [Phase ?]: Plan 07-02: read_pixel single-index helper (dtype-preserving F32/F64, accession coords, Profile/Centroid facet routing, fail-closed NotImaging) is the Phase-8 src/reverse/source.rs read shape; 4 tests green + real-archive GATE: PASS on out/HR2MSI.mzpeak (count=34840, mz=F64 int=F32 no-widen, metadata.imaging absent->None).
 - [Phase ?]: Plan 07-03: checksum DECISION for Phase 8 IBD-03 — emit MD5 (IMS:1000090) as default (zero new crates: md-5 already a direct dep; community/HR2MSI + existing preflight default); SHA-1 (IMS:1000091) recorded as an equally-zero-cost one-line ChecksumType flip. Live cargo tree -i confirms both sha1 and md-5 are direct deps; reuse compute_digest, no cargo add.
+- [Phase ?]: Phase 8 (08-01): compute_digest promoted to pub(crate); reused for .ibd whole-file MD5 (no duplicate hash loop)
+- [Phase ?]: Phase 8 (08-01): IbdWriter uses explicit u64 cursor + checked arithmetic; IMS:1000103=element count, checksum covers 16-byte UUID header
 
 ### Reuse Anchors (from shipped v0.3)
 
@@ -116,6 +119,6 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-04T16:30:40.436Z
-Stopped at: Completed 07-03-PLAN.md (phase 07 ready_for_verification)
+Last session: 2026-06-04T17:19:51.888Z
+Stopped at: Completed 08-01-PLAN.md (phase 08 ready_for_verification)
 Resume file: None

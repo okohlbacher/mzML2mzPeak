@@ -28,7 +28,7 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 ## Phases
 
 - [x] **Phase 7: Reverse Read-Spike & Dependency Audit** - Confirm `MzPeakReader` yields per-pixel coords + source-dtype arrays on a real archive; settle the checksum (SHA-1 vs MD5) zero-new-crates decision; hard-fail non-imaging input. (completed 2026-06-04)
-- [ ] **Phase 8: `.ibd` Binary Writer (CRUX)** - Incremental UUID-header + raw-LE array writer that returns exact `(offset, element_count, encoded_bytes)` per array, with streamed checksum.
+- [x] **Phase 8: `.ibd` Binary Writer (CRUX)** - Incremental UUID-header + raw-LE array writer that returns exact `(offset, element_count, encoded_bytes)` per array, with streamed checksum. (completed 2026-06-04)
 - [ ] **Phase 9: `.imzML` XML Emitter** - Latin-1-safe processed-mode imzML that `mzdata` re-reads: per-spectrum scan coords, two external `<binaryDataArray>`, `<fileContent>` integrity terms, `<scanSettings>`.
 - [ ] **Phase 10: Streaming Reverse Orchestration & `reverse` CLI** - Bounded-memory read-pixel→append-`.ibd`→emit-XML pipeline behind a `reverse` subcommand with distinct exit codes.
 - [ ] **Phase 11: Reverse Roundtrip Verification & PXD001283 Acceptance** - `mzPeak → imzML → mzPeak` L1 roundtrip reusing `src/verify`, with integer-exact coordinate survival, proven end-to-end on the real 34,840-spectrum archive.
@@ -68,7 +68,7 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 
 **Plans**: 1 plan
 
-- [ ] 08-01-PLAN.md — IbdWriter: 16-byte UUID header + raw-LE array appends returning (offset, element count, encoded bytes), streamed whole-file MD5, unit-tested against hand-computed triples
+- [x] 08-01-PLAN.md — IbdWriter: 16-byte UUID header + raw-LE array appends returning (offset, element count, encoded bytes), streamed whole-file MD5, unit-tested against hand-computed triples
 
 ### Phase 9: `.imzML` XML Emitter
 
@@ -118,7 +118,7 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 7. Reverse Read-Spike & Dependency Audit | 3/3 | Complete    | 2026-06-04 |
-| 8. `.ibd` Binary Writer (CRUX) | 0/1 | Not started | - |
+| 8. `.ibd` Binary Writer (CRUX) | 1/1 | Complete   | 2026-06-04 |
 | 9. `.imzML` XML Emitter | 0/? | Not started | - |
 | 10. Streaming Reverse Orchestration & `reverse` CLI | 0/? | Not started | - |
 | 11. Reverse Roundtrip Verification & PXD001283 Acceptance | 0/? | Not started | - |
