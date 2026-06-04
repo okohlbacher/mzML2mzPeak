@@ -45,7 +45,10 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
   3. Run-level `metadata.imaging` (grid dims, pixel size) is read from `file_index().metadata["imaging"]` when present, and its absence is handled gracefully (no fabricated geometry).
   4. A non-imaging mzPeak (no IMS coordinate columns) fails fast with a clear typed error rather than producing garbage output.
   5. A `cargo tree` dependency audit records whether SHA-1 is already reachable; the milestone's checksum term (`IMS:1000091` SHA-1 vs `IMS:1000090` MD5) is decided and documented, defaulting to the zero-new-crates choice. Opening + closing adversarial review recorded.
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 07-01-PLAN.md — Seed ReverseError typed-error contract + synthetic imaging/non-imaging .mzpeak fixtures (RMZ-04 foundation)
+- [ ] 07-02-PLAN.md — Read-capability proof: tests + throwaway spike harness for count/source-dtype arrays/coords/metadata + NotImaging hard-fail (RMZ-01..04)
+- [ ] 07-03-PLAN.md — cargo tree checksum audit + 07-FINDINGS.md decision (MD5 IMS:1000090 default) + read-spike evidence + adversarial review
 
 ### Phase 8: `.ibd` Binary Writer (CRUX)
 **Goal**: Produce a byte-exact `.ibd` sidecar — the highest-risk artifact of the milestone — whose offsets and lengths the imzML reader will accept. Pure byte arithmetic, unit-tested in isolation.
@@ -96,7 +99,7 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 7. Reverse Read-Spike & Dependency Audit | 0/? | Not started | - |
+| 7. Reverse Read-Spike & Dependency Audit | 0/3 | Planned | - |
 | 8. `.ibd` Binary Writer (CRUX) | 0/? | Not started | - |
 | 9. `.imzML` XML Emitter | 0/? | Not started | - |
 | 10. Streaming Reverse Orchestration & `reverse` CLI | 0/? | Not started | - |
