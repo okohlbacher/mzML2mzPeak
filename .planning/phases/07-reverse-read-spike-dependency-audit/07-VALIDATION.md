@@ -1,9 +1,9 @@
 ---
 phase: 7
 slug: reverse-read-spike-dependency-audit
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-06-04
 ---
 
@@ -38,7 +38,12 @@ created: 2026-06-04
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| (planner to fill) | | | RMZ-01..04 | | | unit/integration | `cargo test reverse` | ❌ W0 | ⬜ pending |
+| 07-01-01 | 01 | 1 | RMZ-04 | malformed input | typed `ReverseError`, no panic | unit | `cargo build --lib` | ✅ (created in task) | ⬜ pending |
+| 07-01-02 | 01 | 1 | RMZ-04 | — | deterministic synthetic fixtures | unit | `cargo build --tests` | ✅ (created in task) | ⬜ pending |
+| 07-02-01 | 02 | 2 | RMZ-01, RMZ-02, RMZ-03, RMZ-04 | non-imaging fail-closed | source-dtype, accession coords, graceful metadata absence, hard-fail | integration | `cargo test --test reverse_read_spike` | ✅ (created in task) | ⬜ pending |
+| 07-02-02 | 02 | 2 | RMZ-01, RMZ-02, RMZ-03 | bounded memory | real-archive GATE (spike binary) | gate harness | `cargo build --bin spike_reverse_read` | ✅ (created in task) | ⬜ pending |
+| 07-03-01 | 03 | 3 | checksum gate | — | zero-new-crates audit | manual audit | `cargo tree -i md-5 && cargo tree -i sha1` | n/a (audit) | ⬜ pending |
+| 07-03-02 | 03 | 3 | RMZ-01..04 | — | documented decision (IMS:1000090) | doc | `test -f 07-FINDINGS.md && grep -q IMS:1000090` | ✅ (created in task) | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -63,11 +68,11 @@ created: 2026-06-04
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 60s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (fixtures created within phase wave 1)
+- [x] No watch-mode flags
+- [x] Feedback latency < 60s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-06-04
