@@ -11,6 +11,8 @@
 
 pub mod error;
 pub mod ibd;
+pub mod imzml_writer;
 
 pub use error::ReverseError;
 pub use ibd::{ArrayRef, IbdWriter};
+pub use imzml_writer::ImzmlWriter;

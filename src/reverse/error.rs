@@ -86,6 +86,15 @@ pub enum ReverseError {
     #[error("failed to write .ibd: {0}")]
     IbdWrite(#[source] std::io::Error),
 
+    /// A streamed write to the `.imzML` XML document (prolog, header scaffolding, or one
+    /// `<spectrum>` element) failed. Uses `#[source]` rather than `#[from]` — consistent with
+    /// the module's io-not-`#[from]` rule (see the `OpenArchive`/`ArrayDecode`/`IbdWrite` arms)
+    /// — so the multiple io-carrying arms never generate conflicting `From<io::Error>` impls.
+    /// Distinct from [`Self::IbdWrite`] (a different output file) so the error message names the
+    /// right artifact. Phase 9 IXML-01.
+    #[error("failed to write .imzML: {0}")]
+    XmlEmit(#[source] std::io::Error),
+
     /// `.ibd` offset/length arithmetic overflowed `u64` — the `encoded_len = count × dtype_size`
     /// product or the running `cursor` advance exceeded `u64::MAX`. "Impossible by construction"
     /// for realistic data, but represented as a typed error rather than a panic so the overflow
