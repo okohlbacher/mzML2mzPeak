@@ -109,7 +109,7 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 
 ### Phase 11: Reverse Roundtrip Verification & PXD001283 Acceptance
 
-**Goal**: Prove the reverse path is lossless at the milestone's fidelity bar by feeding its output back through the v0.3 forward converter and the existing verifier — then prove it on the real dataset.
+**Goal**: Prove the reverse path is lossless at the milestone's fidelity bar by feeding its output back through the v0.3 forward `convert()` and the existing verifier — then prove it on the real dataset.
 **Depends on**: Phase 10 (working `reverse` pipeline); reuses shipped `src/verify` and forward `convert()` verbatim.
 **Requirements**: RVER-01, RVER-02, RDAT-01
 **Success Criteria** (what must be TRUE):
@@ -119,7 +119,9 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
   3. The real PXD001283-derived imaging mzPeak archive (34,840 spectra) reverses end-to-end and passes the L1 roundtrip under bounded memory.
   4. The acceptance run is captured as a repeatable test/gate. Opening + closing adversarial review recorded; milestone-close audit performed.
 
-**Plans**: TBD
+**Plans**: 1 plan
+
+- [ ] 11-01-PLAN.md — MzPeakSource streaming adapter + reverse→forward chain helper, default-suite L1 roundtrip (RVER-01/02), and #[ignore]-gated PXD001283 acceptance (RDAT-01, graceful skip, bounded memory)
 
 ## Progress
 
@@ -129,4 +131,4 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 | 8. `.ibd` Binary Writer (CRUX) | 1/1 | Complete    | 2026-06-04 |
 | 9. `.imzML` XML Emitter | 2/2 | Complete    | 2026-06-04 |
 | 10. Streaming Reverse Orchestration & `reverse` CLI | 3/3 | Complete    | 2026-06-04 |
-| 11. Reverse Roundtrip Verification & PXD001283 Acceptance | 0/? | Not started | - |
+| 11. Reverse Roundtrip Verification & PXD001283 Acceptance | 0/1 | Not started | - |
