@@ -41,6 +41,15 @@ impl ChecksumType {
             ChecksumType::Sha256 => "SHA-256",
         }
     }
+
+    /// The IMS accession that declares this checksum algorithm.
+    pub fn accession(self) -> &'static str {
+        match self {
+            ChecksumType::Md5 => "IMS:1000090",
+            ChecksumType::Sha1 => "IMS:1000091",
+            ChecksumType::Sha256 => "IMS:1000092",
+        }
+    }
 }
 
 /// The integrity-relevant params parsed from the imzML header.
@@ -156,20 +165,20 @@ pub fn parse_imzml_header_counted(path: &Path) -> Result<HeaderParseReport, Inte
             break;
         }
 
-        if uuid.is_none() && line.contains(r#"accession="IMS:1000080""#) {
-            if let Some(v) = parse_value_attr(&line) {
+        if uuid.is_none() {
+            if let Some(v) = parse_value_for_accession(&line, "IMS:1000080") {
                 uuid = Some(normalize_uuid(&v));
             }
         }
         if checksum.is_none() {
             if let Some(kind) = checksum_type_of(&line) {
-                if let Some(v) = parse_value_attr(&line) {
+                if let Some(v) = parse_value_for_accession(&line, kind.accession()) {
                     checksum = Some((kind, v.trim().to_lowercase()));
                 }
             }
         }
-        if ibd_file_name.is_none() && line.contains(r#"accession="IMS:1000070""#) {
-            if let Some(v) = parse_value_attr(&line) {
+        if ibd_file_name.is_none() {
+            if let Some(v) = parse_value_for_accession(&line, "IMS:1000070") {
                 ibd_file_name = Some(v.trim().to_string());
             }
         }
@@ -212,6 +221,18 @@ fn parse_value_attr(line: &str) -> Option<String> {
     let rest = &line[start..];
     let end = rest.find('"')?;
     Some(rest[..end].to_string())
+}
+
+/// Extract the `value="..."` attribute belonging to the cvParam that declares `accession` on
+/// this line. Scopes extraction to the slice STARTING at the accession token so that a line
+/// carrying MULTIPLE cvParams (e.g. the reverse emitter writes `<fileContent>` + IMS:1000080 +
+/// IMS:1000090 on one physical line, with no newline between them) resolves each accession to
+/// its OWN value rather than the first `value="..."` on the line. Returns `None` when the
+/// accession is absent or has no following value attribute.
+fn parse_value_for_accession(line: &str, accession: &str) -> Option<String> {
+    let needle = format!(r#"accession="{accession}""#);
+    let at = line.find(&needle)?;
+    parse_value_attr(&line[at..])
 }
 
 /// Extract the `count="..."` attribute from the `<spectrumList ...>` line (the string between

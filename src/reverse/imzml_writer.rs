@@ -38,6 +38,7 @@ use mzdata::io::imzml::Uuid;
 use mzdata::spectrum::bindata::BinaryDataArrayType;
 use quick_xml::escape::escape;
 
+use crate::read::record::Representation;
 use crate::reverse::error::ReverseError;
 use crate::schema::metadata::ImagingMetadata;
 
@@ -394,6 +395,7 @@ impl ImzmlWriter {
         x: i64,
         y: i64,
         z: Option<i64>,
+        representation: Representation,
         mz: ArrayEmit,
         intensity: ArrayEmit,
     ) -> Result<(), ReverseError> {
@@ -422,6 +424,33 @@ impl ImzmlWriter {
         self.write_raw("\" defaultArrayLength=\"")?;
         self.write_escaped(&mz.1.count.to_string())?;
         self.write_raw("\">")?;
+
+        // Spectrum-level CV terms required for the output to be RE-CONVERTIBLE (the round-trip's
+        // point): without `MS:1000511 ms level` a re-reading consumer sees ms_level 0 and cannot
+        // infer the spectrum type (the mzpeak forward writer panics: "Couldn't infer spectrum type
+        // from MS level"). Emit the MS1-spectrum type term explicitly plus ms level = 1. Reverse
+        // output is always MS1 imaging data (the milestone scope), so a fixed MS1 declaration is
+        // correct; this is a presence/level CV pair, not a value coercion (WR-01 fix).
+        self.write_raw(
+            "<cvParam cvRef=\"MS\" accession=\"MS:1000579\" name=\"MS1 spectrum\" value=\"\"/>",
+        )?;
+        self.cv_param("MS", "MS:1000511", "ms level", "1")?;
+
+        // Spectrum-representation CV term (WR-01) — REQUIRED for the round-trip to preserve
+        // profile-vs-centroid continuity. Without it a re-reading consumer (mzdata) sees
+        // SignalContinuity::Unknown, and the forward mzpeak writer then routes the arrays to the
+        // `spectra_peaks` facet instead of `spectra_data` — silently moving Profile data to the
+        // wrong facet and breaking the L1 roundtrip. `MS:1000128 profile spectrum` /
+        // `MS:1000127 centroid spectrum`; Unknown emits neither (no faithful CV term to assert).
+        match representation {
+            Representation::Profile => self.write_raw(
+                "<cvParam cvRef=\"MS\" accession=\"MS:1000128\" name=\"profile spectrum\" value=\"\"/>",
+            )?,
+            Representation::Centroid => self.write_raw(
+                "<cvParam cvRef=\"MS\" accession=\"MS:1000127\" name=\"centroid spectrum\" value=\"\"/>",
+            )?,
+            Representation::Unknown => {}
+        }
 
         // scanList / scan — 1-based IMS coords (z only when Some).
         self.write_raw("<scanList count=\"1\">")?;
@@ -708,6 +737,7 @@ mod tests {
             1,
             2,
             None,
+            Representation::Profile,
             (BinaryDataArrayType::Float64, mz_ref),
             (BinaryDataArrayType::Float32, int_ref),
         )
@@ -800,6 +830,7 @@ mod tests {
                 1,
                 2,
                 None,
+                Representation::Profile,
                 (BinaryDataArrayType::Float64, mz_ref),
                 (BinaryDataArrayType::Float32, int_ref),
             )
@@ -941,7 +972,8 @@ mod tests {
         )
         .unwrap();
         for (i, (x, y, mz, int)) in emit_args.into_iter().enumerate() {
-            xml.write_spectrum(i as u64, x, y, None, mz, int).unwrap();
+            xml.write_spectrum(i as u64, x, y, None, Representation::Profile, mz, int)
+                .unwrap();
         }
         xml.finish().unwrap();
 

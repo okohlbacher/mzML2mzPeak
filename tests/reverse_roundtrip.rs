@@ -182,3 +182,49 @@ fn peak_rss_kb() -> Option<u64> {
         None
     }
 }
+
+/// RVER-01 + RVER-02 (always-on regression gate, DEFAULT suite — no `#[ignore]`).
+///
+/// Builds a 64-pixel synthetic imaging mzPeak, round-trips it (`mzPeak → imzML → mzPeak`), and
+/// drives the SHIPPED `verify_streaming` at L1BitForBit with the ORIGINAL archive as the verify
+/// SOURCE. Asserts the full L1 verdict (RVER-01) plus the per-pixel coordinate gate and
+/// paired/count equality (RVER-02). For the small fixture the source MAY materialize into a Vec
+/// (mirrors `tests/verify_roundtrip.rs:1005`); the streaming path is exercised by the RDAT-01
+/// acceptance test instead.
+#[test]
+fn small_fixture_l1_roundtrip() {
+    let dir = tempdir("small");
+    let orig = reverse_fixtures::imaging_archive_n(64); // 64-pixel grid (all Profile)
+    let rt = roundtrip(&orig, &dir);
+
+    // Small fixture: a Vec source is acceptable (verify_roundtrip.rs:1005 convention). Prime the
+    // original reader's metadata cache once, then materialize the source pixels.
+    let mut src = MzPeakReader::new(&orig).expect("open original mzPeak");
+    let n = src.len() as u64;
+    src.load_all_spectrum_metadata().expect("prime metadata cache once");
+    let source: Vec<ImagingSpectrum> = (0..n)
+        .map(|i| to_imaging(read_pixel(&mut src, i).expect("read source pixel")))
+        .collect();
+
+    let report = verify_streaming(
+        source.into_iter().map(Ok::<_, ReadError>),
+        &rt,
+        ConformanceLevel::L1BitForBit,
+    )
+    .expect("verification runs without a typed error");
+
+    assert!(report.passed(), "RVER-01 L1 roundtrip must pass: {report:?}");
+    assert!(report.coordinates.passed, "RVER-02: coordinates integer-exact");
+    assert_eq!(
+        report.coordinates.paired_count, report.count.source_count,
+        "RVER-02: every source pixel paired"
+    );
+    assert_eq!(
+        report.count.source_count, report.count.output_count,
+        "VER-01 count gate"
+    );
+
+    // Cleanup: the temp work dir (rt.imzML/rt.ibd/rt.mzpeak) and the synthetic orig archive.
+    std::fs::remove_dir_all(&dir).ok();
+    std::fs::remove_file(&orig).ok();
+}
