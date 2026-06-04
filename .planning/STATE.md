@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.4
 milestone_name: — Reverse Converter
-status: executing
-stopped_at: ROADMAP.md / REQUIREMENTS.md traceability / STATE.md written.
-last_updated: "2026-06-04T16:22:41.440Z"
+status: verifying
+stopped_at: Completed 07-03-PLAN.md (phase 07 ready_for_verification)
+last_updated: "2026-06-04T16:30:52.528Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
-  percent: 0
+  completed_plans: 3
+  percent: 20
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-03)
 
 Phase: 07 (reverse-read-spike-dependency-audit) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-04
 Progress: [░░░░░░░░░░] 0/5 phases
 
@@ -57,6 +57,7 @@ Progress: [░░░░░░░░░░] 0/5 phases
 *Updated after each plan completion*
 | Phase 07 P01 | 15 | 2 tasks | 4 files |
 | Phase 07 P02 | 20 min | 2 tasks | 4 files |
+| Phase 07 P03 | 10 min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -77,6 +78,7 @@ Recent decisions affecting current (v0.4) work:
 - [Phase ?]: Plan 07-01: seed src/reverse/ with ONLY ReverseError (library-public) so integration tests can import it; read logic stays in the Plan-02 spike.
 - [Phase ?]: Plan 07-01: non_imaging fixture suppresses coords by reconstructing MultiLayerSpectrum directly with no scan event (to_mzdata always emits IMS:1000050/51) -- resolves RESEARCH Open Q3.
 - [Phase ?]: Plan 07-02: read_pixel single-index helper (dtype-preserving F32/F64, accession coords, Profile/Centroid facet routing, fail-closed NotImaging) is the Phase-8 src/reverse/source.rs read shape; 4 tests green + real-archive GATE: PASS on out/HR2MSI.mzpeak (count=34840, mz=F64 int=F32 no-widen, metadata.imaging absent->None).
+- [Phase ?]: Plan 07-03: checksum DECISION for Phase 8 IBD-03 — emit MD5 (IMS:1000090) as default (zero new crates: md-5 already a direct dep; community/HR2MSI + existing preflight default); SHA-1 (IMS:1000091) recorded as an equally-zero-cost one-line ChecksumType flip. Live cargo tree -i confirms both sha1 and md-5 are direct deps; reuse compute_digest, no cargo add.
 
 ### Reuse Anchors (from shipped v0.3)
 
@@ -113,6 +115,6 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-04T16:22:11.735Z
-Stopped at: ROADMAP.md / REQUIREMENTS.md traceability / STATE.md written.
+Last session: 2026-06-04T16:30:40.436Z
+Stopped at: Completed 07-03-PLAN.md (phase 07 ready_for_verification)
 Resume file: None

@@ -27,7 +27,7 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 
 ## Phases
 
-- [ ] **Phase 7: Reverse Read-Spike & Dependency Audit** - Confirm `MzPeakReader` yields per-pixel coords + source-dtype arrays on a real archive; settle the checksum (SHA-1 vs MD5) zero-new-crates decision; hard-fail non-imaging input.
+- [x] **Phase 7: Reverse Read-Spike & Dependency Audit** - Confirm `MzPeakReader` yields per-pixel coords + source-dtype arrays on a real archive; settle the checksum (SHA-1 vs MD5) zero-new-crates decision; hard-fail non-imaging input. (completed 2026-06-04)
 - [ ] **Phase 8: `.ibd` Binary Writer (CRUX)** - Incremental UUID-header + raw-LE array writer that returns exact `(offset, element_count, encoded_bytes)` per array, with streamed checksum.
 - [ ] **Phase 9: `.imzML` XML Emitter** - Latin-1-safe processed-mode imzML that `mzdata` re-reads: per-spectrum scan coords, two external `<binaryDataArray>`, `<fileContent>` integrity terms, `<scanSettings>`.
 - [ ] **Phase 10: Streaming Reverse Orchestration & `reverse` CLI** - Bounded-memory read-pixel→append-`.ibd`→emit-XML pipeline behind a `reverse` subcommand with distinct exit codes.
@@ -52,7 +52,7 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 
 - [x] 07-01-PLAN.md — Seed ReverseError typed-error contract + synthetic imaging/non-imaging .mzpeak fixtures (RMZ-04 foundation)
 - [x] 07-02-PLAN.md — Read-capability proof: tests + throwaway spike harness for count/source-dtype arrays/coords/metadata + NotImaging hard-fail (RMZ-01..04)
-- [ ] 07-03-PLAN.md — cargo tree checksum audit + 07-FINDINGS.md decision (MD5 IMS:1000090 default) + read-spike evidence + adversarial review
+- [x] 07-03-PLAN.md — cargo tree checksum audit + 07-FINDINGS.md decision (MD5 IMS:1000090 default) + read-spike evidence + adversarial review
 
 ### Phase 8: `.ibd` Binary Writer (CRUX)
 
@@ -115,7 +115,7 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 7. Reverse Read-Spike & Dependency Audit | 2/3 | In Progress|  |
+| 7. Reverse Read-Spike & Dependency Audit | 3/3 | Complete   | 2026-06-04 |
 | 8. `.ibd` Binary Writer (CRUX) | 0/? | Not started | - |
 | 9. `.imzML` XML Emitter | 0/? | Not started | - |
 | 10. Streaming Reverse Orchestration & `reverse` CLI | 0/? | Not started | - |
