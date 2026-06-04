@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v0.4
 milestone_name: — Reverse Converter
-status: verifying
+status: Awaiting next milestone
 stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-06-04T21:10:59.094Z"
-last_activity: 2026-06-04
+last_updated: "2026-06-04T21:16:46.676Z"
+last_activity: 2026-06-04 — Milestone v0.4 completed and archived
 progress:
   total_phases: 5
   completed_phases: 5
@@ -25,11 +25,10 @@ See: .planning/PROJECT.md (updated 2026-06-03)
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-06-04
-Progress: [░░░░░░░░░░] 0/5 phases
+Phase: Milestone v0.4 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-04 — Milestone v0.4 completed and archived
 
 ## Performance Metrics
 
@@ -139,3 +138,7 @@ Items acknowledged and carried forward:
 Last session: 2026-06-04T20:44:22.162Z
 Stopped at: Completed 10-01-PLAN.md
 Resume file: None
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd:new-milestone

@@ -10,46 +10,44 @@ Convert an arbitrary imzML imaging dataset into a valid imaging mzPeak file **wi
 
 ## Current State
 
-**v0.3 shipped (2026-06-04)** — the forward converter (imzML → imaging mzPeak) is complete and
-proven on the full real PXD001283 dataset (34,840 spectra): converts + masking-aware L1 roundtrip
-in ~7 s, 366 MB bounded. Tag `v0.3`; see `MILESTONES.md`.
+**v0.4 shipped (2026-06-04)** — the **reverse** converter (imaging mzPeak → imzML) is complete.
+The binary now converts **both directions** (direction inferred from the input extension:
+`.imzML` → forward, `.mzpeak` → reverse). The reverse path hand-rolls a byte-exact `.ibd` writer
++ a UTF-8 spec-rich processed-mode `.imzML` emitter, streamed under bounded memory. Proven on the
+full real PXD001283 archive (34,840 spectra): `mzPeak → imzML → mzPeak` L1 bit-for-bit roundtrip
+green in ~11 s, ~535 MB bounded. Milestone audit passed (15/15 reqs, 5/5 integration). Tag `v0.4`.
 
-## Current Milestone: v0.4 Reverse Converter (imaging mzPeak → imzML)
+**v0.3 shipped (2026-06-04)** — the forward converter (imzML → imaging mzPeak), proven on the
+full real PXD001283 dataset: converts + masking-aware L1 roundtrip in ~7 s, 366 MB bounded.
+Tag `v0.3`; see `MILESTONES.md`.
 
-**Goal:** Reconstruct a valid imzML (`.imzML` XML + paired `.ibd` binary, UUID linkage) from an
-imaging mzPeak archive, round-tripping with the v0.3 forward converter — preserving per-pixel
-coordinates and m/z+intensity.
+## Next Milestone
 
-**Target features:**
-- Read any **conformant imaging mzPeak** archive (not just our own v0.3 output) via the
-  `mzpeak_prototyping` reader — coordinates by IMS accession, per-pixel m/z+intensity.
-- Write a valid **processed-mode imzML** (`.imzML` XML + `.ibd` binary with correct offsets,
-  UUID linkage, SHA-1 checksum) that `mzdata` re-reads.
-- **Reverse subcommand** on the existing CLI (forward + reverse in one binary).
-- **Roundtrip fidelity bar:** `mzPeak → imzML → mzPeak` matches at **L1** (surviving points
-  bit-for-bit, reusing the v0.3 verify layer) — sidestepping zero-run-masking irrecoverability.
-
-**Key context:** v0.3's forward writer masks zero-intensity runs (lossy for those zeros), so the
-reverse roundtrip is defined as mzPeak→imzML→mzPeak L1 rather than bit-for-bit imzML reproduction.
-There is no known Rust imzML *writer* (mzdata reads imzML; mzpeak_prototyping writes mzPeak) — the
-`.imzML` XML + `.ibd` binary emit is likely hand-rolled and is the milestone's main design risk.
+Not yet scoped. Run `/gsd:new-milestone` to define the next version. Candidate directions carried
+forward from v0.4 deferrals: continuous-mode imzML emission (mirror source mode), copying source
+`<sourceFileList>` provenance into reverse output, and hardening against third-party (non-v0.3)
+imaging-mzPeak variability beyond best-effort.
 
 ## Requirements
 
 ### Validated
 
+- **v0.4 (shipped 2026-06-04) — Reverse converter.** All 15 v0.4 requirements
+  (RMZ/IBD/IXML/RCLI/RVER/RDAT) delivered and proven on real data (full PXD001283, 34,840
+  spectra, `mzPeak → imzML → mzPeak` L1 bit-for-bit roundtrip, ~535 MB bounded). Notable outcomes:
+  checksum = MD5 `IMS:1000090` (zero new crates — both `md-5` and `sha1` already pinned); imzML
+  emitted as UTF-8 (not Latin-1) + spec-rich; CLI direction inferred from input extension (no verb).
+  See `milestones/v0.4-REQUIREMENTS.md` / `milestones/v0.4-MILESTONE-AUDIT.md`.
 - **v0.3 (shipped 2026-06-04) — Forward converter.** All 30 v0.3 requirements
   (ENV/IN/SPA/SCH/OUT/VER/CLI/DAT) delivered and proven on real data (full PXD001283, 34,840
   spectra, masking-aware L1 roundtrip). See `MILESTONES.md` / `milestones/v0.3-REQUIREMENTS.md`.
 
-### Active (v0.4 — reverse converter; refined into REQ-IDs in REQUIREMENTS.md)
+### Active (next milestone — not yet scoped)
 
-- [ ] Read a conformant **imaging mzPeak** archive (coordinates by IMS accession, per-pixel m/z+intensity, run-level imaging metadata) via the `mzpeak_prototyping` reader
-- [ ] Reconstruct **processed-mode imzML**: emit the `.imzML` XML (mzML structure + IMS scan CV params) and the paired `.ibd` binary (correct external offsets/lengths, UUID, SHA-1)
-- [ ] Preserve per-pixel **coordinates** and **m/z+intensity** (source dtype) into the reverse output
-- [ ] Add a **reverse subcommand** to the existing CLI (forward + reverse in one binary)
-- [ ] **Reverse roundtrip verification:** `mzPeak → imzML → mzPeak` matches at L1 (surviving points bit-for-bit), reusing the v0.3 verify layer
-- [ ] Prove the reverse path on the real PXD001283-derived mzPeak archive end-to-end
+Run `/gsd:new-milestone` to define. Carried-forward candidates from v0.4 deferrals:
+- [ ] Continuous-mode imzML emission (mirror the source's data mode rather than always processed)
+- [ ] Copy source `<sourceFileList>` provenance into the reverse `.imzML`
+- [ ] Harden against third-party (non-v0.3) imaging-mzPeak variability beyond best-effort
 
 ### Out of Scope
 
