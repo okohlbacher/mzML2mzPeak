@@ -66,7 +66,9 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
   3. The checksum is computed in a streamed fashion over the `.ibd` and matches the decided algorithm/term; the UUID embedded in the `.ibd` header is byte-consistent with the one the XML will reference.
   4. Offsets remain correct across a multi-spectrum sequence (offset of array N = 16 + Σ encoded lengths of all prior arrays), proven by a multi-array test. Opening + closing adversarial review recorded.
 
-**Plans**: TBD
+**Plans**: 1 plan
+
+- [ ] 08-01-PLAN.md — IbdWriter: 16-byte UUID header + raw-LE array appends returning (offset, element count, encoded bytes), streamed whole-file MD5, unit-tested against hand-computed triples
 
 ### Phase 9: `.imzML` XML Emitter
 
@@ -116,7 +118,7 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 7. Reverse Read-Spike & Dependency Audit | 3/3 | Complete    | 2026-06-04 |
-| 8. `.ibd` Binary Writer (CRUX) | 0/? | Not started | - |
+| 8. `.ibd` Binary Writer (CRUX) | 0/1 | Not started | - |
 | 9. `.imzML` XML Emitter | 0/? | Not started | - |
 | 10. Streaming Reverse Orchestration & `reverse` CLI | 0/? | Not started | - |
 | 11. Reverse Roundtrip Verification & PXD001283 Acceptance | 0/? | Not started | - |
