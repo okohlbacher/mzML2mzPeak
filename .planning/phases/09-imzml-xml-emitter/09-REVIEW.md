@@ -1,6 +1,7 @@
 ---
 phase: 09-imzml-xml-emitter
 reviewed: 2026-06-04T00:00:00Z
+rereviewed: 2026-06-04T00:00:00Z
 depth: standard
 files_reviewed: 3
 files_reviewed_list:
@@ -9,10 +10,10 @@ files_reviewed_list:
   - src/reverse/mod.rs
 findings:
   critical: 0
-  warning: 3
-  info: 3
-  total: 6
-status: issues_found
+  warning: 0
+  info: 1
+  total: 1
+status: clean
 ---
 
 # Phase 9: Code Review Report
@@ -20,7 +21,7 @@ status: issues_found
 **Reviewed:** 2026-06-04
 **Depth:** standard
 **Files Reviewed:** 3
-**Status:** issues_found
+**Status:** clean (all 3 Warnings resolved at iteration 2; 1 Info partially deferred)
 
 ## Summary
 
@@ -164,6 +165,72 @@ that emits a technically-malformed file URI. Neither breaks mzdata re-read (both
 optional), so this is quality only.
 **Fix:** Source the version from `env!("CARGO_PKG_VERSION")` so it tracks the crate, and either
 emit a real source-file location or drop the `location` attribute rather than a placeholder URI.
+
+---
+
+## Re-review (iteration 2)
+
+**Re-reviewed:** 2026-06-04
+**Commits verified:** `49b8f7f` (WR-01), `b6f2be9` (WR-02), `3937286` (WR-03), `0398d00` (IN-02/IN-03)
+**Tests:** `cargo test --lib reverse::imzml_writer` → 13 passed, 0 failed (108 total suite green per context).
+**Verdict:** All 3 Warnings RESOLVED. Status promoted `issues_found` → `clean`. One Info (IN-03)
+partially-resolved; IN-01 intentionally deferred (no fix required). Frontmatter `info` re-counted to 1
+(IN-03 residual sourceFile placeholder); IN-01 and IN-02 closed.
+
+### WR-01 — RESOLVED
+
+The guard is the FIRST statement in `write_spectrum` (`imzml_writer.rs:323-329`), executing before
+`dtype_cv` resolution (333-334) and before the first `write_raw("<spectrum id=...")` at 336.
+Adversarially traced: on `mz.1.count != intensity.1.count` the function `return Err(...)` with no
+prior sink write, so NO partial `<spectrum>` reaches disk — confirmed by `count_mismatch_rejected`
+(`imzml_writer.rs:699-729`) asserting `!text.contains("<spectrum")` after the error. The new
+`ReverseError::ArrayLengthMismatch { index, mz, intensity }` arm exists with documented fields
+(`error.rs:107-116`) and the test pattern-matches all three fields (index=0, mz=3, intensity=2).
+`defaultArrayLength` (line 341) is now provably written from a count equal to the intensity count.
+Fail-closed-before-any-write requirement met.
+
+### WR-02 — RESOLVED
+
+`debug_assert!(arr.offset != 0 || arr.count != 0, ...)` added at the head of
+`write_binary_data_array` (`imzml_writer.rs:401-405`), firing per array, documenting the
+cross-module offset≥16 invariant from `ibd.rs` at the point of emission. The requested conformance
+fixture exists: `zero_length_array_roundreads` (`imzml_writer.rs:994-1039`) emits a real
+both-empty array (count=0) preceded by a non-empty pixel so its offset is >16, then re-reads the
+pair through the real `mzdata::ImzMLReader` oracle without the reader rejecting it as "missing
+external data" — passes. Note (not blocking): `debug_assert!` compiles out in release, so the
+runtime guarantee in release rests on the conformance test + the `ibd.rs` invariant, not the
+assertion. This matches what the prior review explicitly prescribed; no new finding.
+
+### WR-03 — RESOLVED
+
+`format_f64` now returns `Option<String>`, yielding `None` for non-finite via
+`v.is_finite().then(|| v.to_string())` (`imzml_writer.rs:451-453`). Both call sites guard with
+`if let Some(..)` (lines 294-299), so a NaN/±inf pixel size OMITS the cvParam rather than emitting
+an invalid numeric token. Well-formedness confirmed: cvParams are independent siblings inside
+`<scanSettings>`, so dropping one breaks no required ordering — the emitted file stays valid XML.
+`nonfinite_pixel_size_omitted` (`imzml_writer.rs:734-766`) proves NaN x is omitted
+(`!text.contains("NaN")`, no `IMS:1000046`) while finite y is still emitted (`IMS:1000047`,
+`value="25"`), and `filecontent_and_scansettings` re-reads a populated scanSettings via mzdata
+without error. Graceful-degrade discipline (T-09-FAB) honored.
+
+### IN-02 — RESOLVED
+
+`mod.rs:1-13` and `error.rs:1-18` now describe the shipped surface (`ReverseError`, `IbdWriter`/
+`ArrayRef`, `ImzmlWriter` as real in-tree modules). The stale "holds ONLY the typed-error
+contract" / "throwaway Phase-7 spike" / "promoted in Phase 8" narrative is gone.
+
+### IN-03 — PARTIALLY-RESOLVED
+
+The substantive half is fixed: `<software version=...>` is now sourced from
+`env!("CARGO_PKG_VERSION")` (`imzml_writer.rs:230-231`), so the version tracks the crate. The
+`<sourceFile ... location="file://">` placeholder (empty authority) remains
+(`imzml_writer.rs:218-223`). Quality-only, does not affect mzdata re-read; acceptable to defer.
+
+### IN-01 — DEFERRED (no fix required, as the prior review stated)
+
+_Re-reviewed: 2026-06-04 (iteration 2)_
+_Reviewer: Claude (gsd-code-reviewer)_
+_Depth: standard (focused re-verification)_
 
 ---
 
