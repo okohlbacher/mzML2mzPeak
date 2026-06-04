@@ -84,7 +84,7 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 
 **Plans**: 2 plans
 
-- [ ] 09-01-PLAN.md — ImzmlWriter streaming emitter (new/write_spectrum/finish): UTF-8 + quick-xml escaping, fileContent integrity terms, two external binaryDataArrays per spectrum, dtype CV mapping, scanSettings graceful degrade (IXML-01/02/03 emit)
+- [x] 09-01-PLAN.md — ImzmlWriter streaming emitter (new/write_spectrum/finish): UTF-8 + quick-xml escaping, fileContent integrity terms, two external binaryDataArrays per spectrum, dtype CV mapping, scanSettings graceful degrade (IXML-01/02/03 emit)
 - [ ] 09-02-PLAN.md — mzdata::ImzMLReader conformance: SC-1 (re-opens without error) + SC-4 (round-read coords + array shapes) + absent-metadata re-read (IXML-01/02/03 oracle)
 
 **UI hint**: no
@@ -123,6 +123,6 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 |-------|----------------|--------|-----------|
 | 7. Reverse Read-Spike & Dependency Audit | 3/3 | Complete    | 2026-06-04 |
 | 8. `.ibd` Binary Writer (CRUX) | 1/1 | Complete    | 2026-06-04 |
-| 9. `.imzML` XML Emitter | 0/2 | Planned     | - |
+| 9. `.imzML` XML Emitter | 1/2 | In Progress|  |
 | 10. Streaming Reverse Orchestration & `reverse` CLI | 0/? | Not started | - |
 | 11. Reverse Roundtrip Verification & PXD001283 Acceptance | 0/? | Not started | - |

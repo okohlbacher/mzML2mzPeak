@@ -26,9 +26,9 @@ explicitly NOT a goal (v0.3 forward masks zero-intensity runs).
 
 ### Write .imzML XML (IXML)
 
-- [ ] **IXML-01**: Emit a well-formed, Latin-1-safe processed-mode `.imzML` (mzML structure) that `mzdata`'s imzML reader re-reads without error
-- [ ] **IXML-02**: Emit per-`<spectrum>` `<scanList><scan>` IMS coordinates + two `<binaryDataArray>` (m/z, intensity) with the external-data refs from IBD-02 and empty `<binary/>`
-- [ ] **IXML-03**: Emit `<fileContent>` integrity terms (UUID, checksum, processed mode `IMS:1000031`) and `<scanSettings>` populated from `metadata.imaging` where available
+- [x] **IXML-01**: Emit a well-formed, Latin-1-safe processed-mode `.imzML` (mzML structure) that `mzdata`'s imzML reader re-reads without error
+- [x] **IXML-02**: Emit per-`<spectrum>` `<scanList><scan>` IMS coordinates + two `<binaryDataArray>` (m/z, intensity) with the external-data refs from IBD-02 and empty `<binary/>`
+- [x] **IXML-03**: Emit `<fileContent>` integrity terms (UUID, checksum, processed mode `IMS:1000031`) and `<scanSettings>` populated from `metadata.imaging` where available
 
 ### CLI & orchestration (RCLI)
 
@@ -68,9 +68,9 @@ explicitly NOT a goal (v0.3 forward masks zero-intensity runs).
 | IBD-01 | Phase 8 | Complete |
 | IBD-02 | Phase 8 | Complete |
 | IBD-03 | Phase 8 | Complete |
-| IXML-01 | Phase 9 | Pending |
-| IXML-02 | Phase 9 | Pending |
-| IXML-03 | Phase 9 | Pending |
+| IXML-01 | Phase 9 | Complete |
+| IXML-02 | Phase 9 | Complete |
+| IXML-03 | Phase 9 | Complete |
 | RCLI-01 | Phase 10 | Pending |
 | RCLI-02 | Phase 10 | Pending |
 | RVER-01 | Phase 11 | Pending |

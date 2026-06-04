@@ -4,13 +4,13 @@ milestone: v0.4
 milestone_name: — Reverse Converter
 status: executing
 stopped_at: Completed 08-01-PLAN.md (phase 08 ready_for_verification)
-last_updated: "2026-06-04T17:54:34.373Z"
-last_activity: 2026-06-04 -- Phase 9 planning complete
+last_updated: "2026-06-04T18:02:50.356Z"
+last_activity: 2026-06-04
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
   percent: 40
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-03)
 
 **Core value:** Reconstruct a valid imzML (`.imzML` + `.ibd`, UUID linkage) from any conformant imaging mzPeak archive without losing per-pixel coordinates or surviving m/z+intensity — `mzPeak → imzML → mzPeak` round-trips at L1 (surviving points bit-for-bit).
-**Current focus:** Phase 08 — ibd-binary-writer-crux
+**Current focus:** Phase 09 — imzml-xml-emitter
 
 ## Current Position
 
-Phase: 9
-Plan: Not started
+Phase: 09 (imzml-xml-emitter) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-06-04 -- Phase 9 planning complete
+Last activity: 2026-06-04
 Progress: [░░░░░░░░░░] 0/5 phases
 
 ## Performance Metrics
@@ -61,6 +61,7 @@ Progress: [░░░░░░░░░░] 0/5 phases
 | Phase 07 P02 | 20 min | 2 tasks | 4 files |
 | Phase 07 P03 | 10 min | 2 tasks | 1 files |
 | Phase 08 P01 | 25 min | 3 tasks | 5 files |
+| Phase 09 P01 | 5 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -84,6 +85,7 @@ Recent decisions affecting current (v0.4) work:
 - [Phase ?]: Plan 07-03: checksum DECISION for Phase 8 IBD-03 — emit MD5 (IMS:1000090) as default (zero new crates: md-5 already a direct dep; community/HR2MSI + existing preflight default); SHA-1 (IMS:1000091) recorded as an equally-zero-cost one-line ChecksumType flip. Live cargo tree -i confirms both sha1 and md-5 are direct deps; reuse compute_digest, no cargo add.
 - [Phase ?]: Phase 8 (08-01): compute_digest promoted to pub(crate); reused for .ibd whole-file MD5 (no duplicate hash loop)
 - [Phase ?]: Phase 8 (08-01): IbdWriter uses explicit u64 cursor + checked arithmetic; IMS:1000103=element count, checksum covers 16-byte UUID header
+- [Phase ?]: Plan 09-01: ImzmlWriter streaming emitter emits spec-rich processed-mode .imzML; per-array dtype/array-type cvParams DIRECT for HR2MSI mixed f64/f32; scanSettings degrades to count=0 when imaging None; ReverseError::XmlEmit added
 
 ### Reuse Anchors (from shipped v0.3)
 
@@ -120,6 +122,6 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-04T17:19:51.888Z
+Last session: 2026-06-04T18:02:09.376Z
 Stopped at: Completed 08-01-PLAN.md (phase 08 ready_for_verification)
 Resume file: None
