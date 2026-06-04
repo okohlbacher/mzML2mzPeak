@@ -54,10 +54,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### CLI & UX
 
-- [ ] **CLI-01**: Command-line interface accepting input `.imzML` path and output `.mzpeak` path
+- [x] **CLI-01**: Command-line interface accepting input `.imzML` path and output `.mzpeak` path
 - [x] **CLI-02**: Progress reporting suitable for ~35k-spectrum conversions
-- [ ] **CLI-03**: A validate / dry-run mode that checks input integrity and reports a conversion plan without writing output
-- [ ] **CLI-04**: Clear, actionable error messages on integrity failure, unsupported input, or coordinate-extraction failure
+- [x] **CLI-03**: A validate / dry-run mode that checks input integrity and reports a conversion plan without writing output
+- [x] **CLI-04**: Clear, actionable error messages on integrity failure, unsupported input, or coordinate-extraction failure
 
 ### Acceptance Dataset
 
@@ -124,10 +124,10 @@ Which phases cover which requirements. Populated during roadmap creation.
 | VER-02 | Phase 5 | Complete |
 | VER-03 | Phase 5 | Complete |
 | VER-04 | Phase 5 | Complete |
-| CLI-01 | Phase 6 | Pending |
+| CLI-01 | Phase 6 | Complete |
 | CLI-02 | Phase 6 | Complete |
-| CLI-03 | Phase 6 | Pending |
-| CLI-04 | Phase 6 | Pending |
+| CLI-03 | Phase 6 | Complete |
+| CLI-04 | Phase 6 | Complete |
 | DAT-01 | Phase 6 | Complete |
 
 **Coverage:**

@@ -4,13 +4,13 @@ milestone: v0.3
 milestone_name: milestone
 status: executing
 stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-06-04T00:21:21.997Z"
+last_updated: "2026-06-04T00:29:03.226Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 18
-  completed_plans: 16
+  completed_plans: 17
   percent: 86
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-03)
 ## Current Position
 
 Phase: 06 (cli-ux-acceptance-gate) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-06-04
 
@@ -68,6 +68,7 @@ Progress: [███████░░░] 67%
 | Phase 05 P02 | 11 | 2 tasks | 4 files |
 | Phase 05 P03 | 3 | 2 tasks | 1 files |
 | Phase 06 P01 | 6 | 2 tasks | 7 files |
+| Phase 06 P02 | 4min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,7 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 05]: peaks-facet centroid m/z widening (Float32->Float64) documented in-test as out-of-L1-scope; centroid pixel contributes zero L1 mismatch (Pitfall 2); raw_facet_bit_for_bit pins spectra_data as the authoritative L1 reference at source stored width.
 - [Phase ?]: [Phase 06]: verify_streaming (DAT-01) is the loop-inverted twin of verify_against_source — builds the OUTPUT coord index first (build_coord_index, ~1.4MB), then streams the source ONCE reading back only the single paired output spectrum per pixel; NEVER collects Vec<ImagingSpectrum> (T-6-mem bounded). Generic over IntoIterator<Item=Result<ImagingSpectrum,ReadError>> so ImagingReader drives the 34k path and an in-memory adapter drives the no-.ibd fixture equivalence test. compare_paired_pixel extracted so both verify entries share ONE comparison path verbatim — streaming==slice proven byte-equal at L1+L2.
 - [Phase ?]: [Phase 06]: ImzmlHeader.spectrum_count extracted from <spectrumList count> on the terminating line BEFORE the bounded-parse break (Some(34840) real file / Some(9) continuous fixture / None absent, lenient str::parse().ok() never panics, T-6-count); indicatif promoted to a DIRECT dep pinned =0.17.11 (NOT 0.17.10) preserving the single resolved copy (cargo tree -i indicatif = 1 path), binary-only intent.
+- [Phase 06]: CLI classify_exit maps typed library errors to DISTINCT non-zero exit codes via anyhow downcast (integrity=2, unsupported=3, coordinate=4, verify-fail=5, generic=1); IntegrityError::Io is generic(1) not integrity(2); anyhow+indicatif confined to cli.rs+main.rs (binary-only boundary).
 
 ### Pending Todos
 
@@ -128,6 +130,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-04T00:21:21.993Z
+Last session: 2026-06-04T00:28:46.695Z
 Stopped at: Completed 06-01-PLAN.md
 Resume file: None
