@@ -141,7 +141,12 @@ fn resolve_ibd_path(imzml_path: &Path, declared_name: Option<&str>) -> Result<Pa
 
 /// Compute the whole-file digest of `path` with the declared algorithm, streaming in
 /// fixed-size chunks. Returns the lowercase hex digest. Never loads the whole file.
-fn compute_digest(path: &Path, kind: ChecksumType) -> Result<String, IntegrityError> {
+///
+/// `pub(crate)` so the reverse `.ibd` writer ([`crate::reverse::ibd::IbdWriter::finish`])
+/// can hash the finished sidecar (byte 0..EOF, UUID header included) without re-implementing
+/// the chunked digest loop. The signature is unchanged — the v0.3 preflight tests are
+/// unaffected. `stream_digest`/`CHUNK` stay private (no external caller needs them).
+pub(crate) fn compute_digest(path: &Path, kind: ChecksumType) -> Result<String, IntegrityError> {
     let mut f = File::open(path)?;
     let mut buf = vec![0u8; CHUNK];
     match kind {

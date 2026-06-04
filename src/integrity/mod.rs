@@ -18,3 +18,9 @@ pub mod preflight;
 
 pub use header::{ChecksumType, ImzmlHeader, IntegrityError};
 pub use preflight::PreflightReport;
+
+/// Re-export the streamed whole-file digest helper for the reverse `.ibd` writer
+/// (`src/reverse/ibd.rs`). `pub(crate)` keeps it crate-internal — it is not part of the
+/// public API surface, only a reuse seam so `IbdWriter::finish` does not duplicate the
+/// 64KiB-chunk hash loop.
+pub(crate) use preflight::compute_digest;

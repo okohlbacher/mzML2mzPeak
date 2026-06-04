@@ -10,5 +10,7 @@
 //! modules are. See `07-01-PLAN.md` (Disposition note) for the rationale.
 
 pub mod error;
+pub mod ibd;
 
 pub use error::ReverseError;
+pub use ibd::{ArrayRef, IbdWriter};

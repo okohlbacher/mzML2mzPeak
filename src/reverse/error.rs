@@ -78,4 +78,19 @@ pub enum ReverseError {
         axis: &'static str,
         dtype: mzdata::spectrum::bindata::BinaryDataArrayType,
     },
+
+    /// A streamed write to the `.ibd` sidecar (header bytes or an array's raw little-endian
+    /// elements) failed. Uses `#[source]` rather than `#[from]` — consistent with the module's
+    /// io-not-`#[from]` rule (see the `OpenArchive`/`ArrayDecode` arms) — so the multiple
+    /// io-carrying arms never generate conflicting `From<io::Error>` impls. Phase 8 IBD-01/02.
+    #[error("failed to write .ibd: {0}")]
+    IbdWrite(#[source] std::io::Error),
+
+    /// Computing the streamed MD5 (`IMS:1000090`) checksum of the finished `.ibd` failed.
+    /// Composes [`crate::integrity::header::IntegrityError`] via `#[from]` so
+    /// [`crate::reverse::ibd::IbdWriter::finish`] can `?`-propagate the digest error. This is
+    /// the SOLE `#[from]` arm — `IntegrityError` is not `std::io::Error`, so it does not
+    /// conflict with the `#[source]` io arms above. Phase 8 IBD-03.
+    #[error("integrity digest of .ibd failed: {0}")]
+    Integrity(#[from] crate::integrity::header::IntegrityError),
 }
