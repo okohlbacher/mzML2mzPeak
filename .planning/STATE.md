@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-06-04T00:12:35.998Z"
-last_activity: 2026-06-04 -- Phase 06 execution started
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-06-04T00:21:21.997Z"
+last_activity: 2026-06-04
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 18
-  completed_plans: 15
-  percent: 83
+  completed_plans: 16
+  percent: 86
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-03)
 ## Current Position
 
 Phase: 06 (cli-ux-acceptance-gate) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 06
-Last activity: 2026-06-04 -- Phase 06 execution started
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-06-04
 
 Progress: [███████░░░] 67%
 
@@ -67,6 +67,7 @@ Progress: [███████░░░] 67%
 | Phase 05 P01 | 9 | 2 tasks | 4 files |
 | Phase 05 P02 | 11 | 2 tasks | 4 files |
 | Phase 05 P03 | 3 | 2 tasks | 1 files |
+| Phase 06 P01 | 6 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -103,6 +104,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 05]: count gate returns report (count.passed=false) not CountMismatch error — the report is the deliverable; ion-image grid row-allocated + bounds-checked every write (no sparse-grid OOB panic, T-05-04/05).
 - [Phase ?]: [Phase 05]: VER-01..VER-04 proven end-to-end by tests/verify_roundtrip.rs — extended fixture (F64-m/z profile + F32-m/z profile + centroid over sparse {(1,1),(3,1),(2,3)}) writes a real archive via the write_fixture seam (no .ibd) and verify_against_source asserts count/coords/profile L1 Δ=0 raw-facet bit-for-bit/centroid source-as-L1-ref/≥1 L2/ion-image M[row=y][col=x]/sparse no-panic.
 - [Phase ?]: [Phase 05]: peaks-facet centroid m/z widening (Float32->Float64) documented in-test as out-of-L1-scope; centroid pixel contributes zero L1 mismatch (Pitfall 2); raw_facet_bit_for_bit pins spectra_data as the authoritative L1 reference at source stored width.
+- [Phase ?]: [Phase 06]: verify_streaming (DAT-01) is the loop-inverted twin of verify_against_source — builds the OUTPUT coord index first (build_coord_index, ~1.4MB), then streams the source ONCE reading back only the single paired output spectrum per pixel; NEVER collects Vec<ImagingSpectrum> (T-6-mem bounded). Generic over IntoIterator<Item=Result<ImagingSpectrum,ReadError>> so ImagingReader drives the 34k path and an in-memory adapter drives the no-.ibd fixture equivalence test. compare_paired_pixel extracted so both verify entries share ONE comparison path verbatim — streaming==slice proven byte-equal at L1+L2.
+- [Phase ?]: [Phase 06]: ImzmlHeader.spectrum_count extracted from <spectrumList count> on the terminating line BEFORE the bounded-parse break (Some(34840) real file / Some(9) continuous fixture / None absent, lenient str::parse().ok() never panics, T-6-count); indicatif promoted to a DIRECT dep pinned =0.17.11 (NOT 0.17.10) preserving the single resolved copy (cargo tree -i indicatif = 1 path), binary-only intent.
 
 ### Pending Todos
 
@@ -125,6 +128,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-03T23:24:09.024Z
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-06-04T00:21:21.993Z
+Stopped at: Completed 06-01-PLAN.md
 Resume file: None

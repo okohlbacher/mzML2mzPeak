@@ -55,13 +55,13 @@ Requirements for initial release. Each maps to roadmap phases.
 ### CLI & UX
 
 - [ ] **CLI-01**: Command-line interface accepting input `.imzML` path and output `.mzpeak` path
-- [ ] **CLI-02**: Progress reporting suitable for ~35k-spectrum conversions
+- [x] **CLI-02**: Progress reporting suitable for ~35k-spectrum conversions
 - [ ] **CLI-03**: A validate / dry-run mode that checks input integrity and reports a conversion plan without writing output
 - [ ] **CLI-04**: Clear, actionable error messages on integrity failure, unsupported input, or coordinate-extraction failure
 
 ### Acceptance Dataset
 
-- [ ] **DAT-01**: Convert the full PXD001283 dataset (HR2MSI mouse urinary bladder S096, 34,840 spectra) end-to-end and pass all VER checks
+- [x] **DAT-01**: Convert the full PXD001283 dataset (HR2MSI mouse urinary bladder S096, 34,840 spectra) end-to-end and pass all VER checks
 
 ## v2 Requirements
 
@@ -125,10 +125,10 @@ Which phases cover which requirements. Populated during roadmap creation.
 | VER-03 | Phase 5 | Complete |
 | VER-04 | Phase 5 | Complete |
 | CLI-01 | Phase 6 | Pending |
-| CLI-02 | Phase 6 | Pending |
+| CLI-02 | Phase 6 | Complete |
 | CLI-03 | Phase 6 | Pending |
 | CLI-04 | Phase 6 | Pending |
-| DAT-01 | Phase 6 | Pending |
+| DAT-01 | Phase 6 | Complete |
 
 **Coverage:**
 
