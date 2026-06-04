@@ -26,6 +26,14 @@ path = "src/bin/preflight.rs"
 name = "imzml2mzpeak"
 path = "src/main.rs"
 
+# Phase-7 THROWAWAY read-spike (Plan 07-02): the reverse (mzPeak -> imzML) read-path GATE
+# harness over the real out/HR2MSI.mzpeak archive. NOT production code — superseded by Phase 8's
+# src/reverse/source.rs; committed only for reproducibility (durable evidence lives in
+# 07-FINDINGS.md). Declared explicitly to mirror the other bin blocks.
+[[bin]]
+name = "spike_reverse_read"
+path = "src/bin/spike_reverse_read.rs"
+
 [dependencies]
 # --- CORE compatibility crates: pinned EXACTLY (these fracture the arrow/mzdata
 # type graph if they drift). Versions mirror mzpeak_prototyping's own Cargo.toml. ---
