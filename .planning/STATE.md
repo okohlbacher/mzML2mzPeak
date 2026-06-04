@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.4
 milestone_name: — Reverse Converter
 status: executing
-stopped_at: Completed 09-02-PLAN.md
-last_updated: "2026-06-04T19:18:24.048Z"
-last_activity: 2026-06-04 -- Phase 10 planning complete
+stopped_at: Completed 10-01-PLAN.md
+last_updated: "2026-06-04T19:29:13.730Z"
+last_activity: 2026-06-04
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 9
-  completed_plans: 6
+  completed_plans: 7
   percent: 60
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-03)
 
 **Core value:** Reconstruct a valid imzML (`.imzML` + `.ibd`, UUID linkage) from any conformant imaging mzPeak archive without losing per-pixel coordinates or surviving m/z+intensity — `mzPeak → imzML → mzPeak` round-trips at L1 (surviving points bit-for-bit).
-**Current focus:** Phase 09 — imzml-xml-emitter
+**Current focus:** Phase 10 — streaming-reverse-orchestration-reverse-cli
 
 ## Current Position
 
-Phase: 10
-Plan: Not started
+Phase: 10 (streaming-reverse-orchestration-reverse-cli) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-06-04 -- Phase 10 planning complete
+Last activity: 2026-06-04
 Progress: [░░░░░░░░░░] 0/5 phases
 
 ## Performance Metrics
@@ -64,6 +64,7 @@ Progress: [░░░░░░░░░░] 0/5 phases
 | Phase 08 P01 | 25 min | 3 tasks | 5 files |
 | Phase 09 P01 | 5 min | 2 tasks | 3 files |
 | Phase 09 P02 | 8min | 2 tasks | 1 files |
+| Phase 10 P01 | 18 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -90,6 +91,9 @@ Recent decisions affecting current (v0.4) work:
 - [Phase ?]: Plan 09-01: ImzmlWriter streaming emitter emits spec-rich processed-mode .imzML; per-array dtype/array-type cvParams DIRECT for HR2MSI mixed f64/f32; scanSettings degrades to count=0 when imaging None; ReverseError::XmlEmit added
 - [Phase ?]: 09-02: drive ImzMLReader via read_into fallible inherent path (not Iterator::next which collapses errors to None)
 - [Phase ?]: 09-02: SC-4 array-shape proof asserts round-read element counts (data_len) — proves dtype-term width since reader sizes count x dtype.size_of()
+- [Phase ?]: Plan 10-01: ImzmlWriter split is additive (free emit_* fns over &mut impl Write; new()/finish() thin wrappers) so all Phase-9 oracle tests stay byte-identical.
+- [Phase ?]: Plan 10-01: read_pixel/decode_axis/ReversePixel promoted to src/reverse/source.rs (pub); spike imports the single lib impl (duplicate deleted).
+- [Phase ?]: Plan 10-01: reverse convert() uses Option C (body temp file; header with .ibd MD5 written after ibd.finish(), body std::io::copy'd, trailer appended) — bounded memory, no new crates; NotImaging pre-check before any output + cleanup-on-error.
 
 ### Reuse Anchors (from shipped v0.3)
 
@@ -126,6 +130,6 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-04T18:09:42.596Z
-Stopped at: Completed 09-02-PLAN.md
+Last session: 2026-06-04T19:29:13.726Z
+Stopped at: Completed 10-01-PLAN.md
 Resume file: None

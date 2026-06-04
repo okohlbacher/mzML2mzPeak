@@ -33,7 +33,7 @@ explicitly NOT a goal (v0.3 forward masks zero-intensity runs).
 ### CLI & orchestration (RCLI)
 
 - [ ] **RCLI-01**: Add a `reverse` subcommand to the existing CLI (imaging mzPeak in → `.imzML`/`.ibd` out) with actionable error messages and distinct non-zero exit codes (mirroring `classify_exit`)
-- [ ] **RCLI-02**: Stream spectra writing the `.ibd` incrementally under bounded memory (handle ~34,840 spectra without materializing the dataset)
+- [x] **RCLI-02**: Stream spectra writing the `.ibd` incrementally under bounded memory (handle ~34,840 spectra without materializing the dataset)
 
 ### Reverse verification (RVER)
 
@@ -72,7 +72,7 @@ explicitly NOT a goal (v0.3 forward masks zero-intensity runs).
 | IXML-02 | Phase 9 | Complete |
 | IXML-03 | Phase 9 | Complete |
 | RCLI-01 | Phase 10 | Pending |
-| RCLI-02 | Phase 10 | Pending |
+| RCLI-02 | Phase 10 | Complete |
 | RVER-01 | Phase 11 | Pending |
 | RVER-02 | Phase 11 | Pending |
 | RDAT-01 | Phase 11 | Pending |
