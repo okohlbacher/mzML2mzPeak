@@ -34,10 +34,11 @@
 
 use std::path::{Path, PathBuf};
 
+use imzml2mzpeak::read::ReadError;
 use imzml2mzpeak::read::record::{ImagingSpectrum, NumArray, Representation};
 use imzml2mzpeak::read::{RunProvenance, StorageMode};
 use imzml2mzpeak::schema::ConformanceLevel;
-use imzml2mzpeak::verify::verify_against_source;
+use imzml2mzpeak::verify::{verify_against_source, verify_streaming};
 use imzml2mzpeak::write::{ImagingWriter, WriteError, to_mzdata};
 
 use mzdata::curie;
@@ -591,4 +592,42 @@ fn sparse_grid_no_panic() {
     );
 
     let _ = std::fs::remove_file(&out);
+}
+
+/// THE CRUX (DAT-01) equivalence guard: the bounded-memory `verify_streaming` and the
+/// collect-all `verify_against_source` produce the SAME `VerificationReport` on the synthetic
+/// fixture, at BOTH `L1BitForBit` and `L2Transformed`.
+///
+/// The fixture has no `.ibd`, so a real [`ImagingReader`] cannot be opened (Pitfall 5). Instead
+/// we drive `verify_streaming` over a small in-test adapter that yields the SAME
+/// `Result<ImagingSpectrum, ReadError>` items the slice holds — so the equivalence is over
+/// IDENTICAL inputs and any divergence is attributable to the loop inversion alone, not to
+/// different data. `verify_streaming` is generic over `IntoIterator<Item = Result<…, ReadError>>`,
+/// which `ImagingReader` satisfies on the real 34k path.
+#[test]
+fn streaming_equals_slice_on_fixture() {
+    for level in [ConformanceLevel::L1BitForBit, ConformanceLevel::L2Transformed] {
+        let out = temp_out(match level {
+            ConformanceLevel::L1BitForBit => "stream_l1",
+            ConformanceLevel::L2Transformed => "stream_l2",
+        });
+        let fx = fixture();
+        write_fixture(&out, &fx).expect("fixture writes");
+
+        // Collect-all reference path.
+        let report_slice = verify_against_source(&fx, &out, level)
+            .expect("verify_against_source returns a report");
+
+        // Streaming path over an iterator yielding the SAME spectra (cloned), never collecting.
+        let stream = fx.iter().cloned().map(Ok::<ImagingSpectrum, ReadError>);
+        let report_streaming =
+            verify_streaming(stream, &out, level).expect("verify_streaming returns a report");
+
+        assert_eq!(
+            report_streaming, report_slice,
+            "verify_streaming must equal verify_against_source on the fixture at {level:?}"
+        );
+
+        let _ = std::fs::remove_file(&out);
+    }
 }
