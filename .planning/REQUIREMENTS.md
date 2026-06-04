@@ -37,12 +37,12 @@ explicitly NOT a goal (v0.3 forward masks zero-intensity runs).
 
 ### Reverse verification (RVER)
 
-- [ ] **RVER-01**: `mzPeak → imzML → mzPeak` round-trips at **L1** (surviving points bit-for-bit) by reversing, re-running the v0.3 forward `convert()`, and `verify_streaming` at `L1BitForBit`
-- [ ] **RVER-02**: Per-pixel coordinates (x/y/z) survive the reverse path exactly (integer-exact), verified end-to-end
+- [x] **RVER-01**: `mzPeak → imzML → mzPeak` round-trips at **L1** (surviving points bit-for-bit) by reversing, re-running the v0.3 forward `convert()`, and `verify_streaming` at `L1BitForBit`
+- [x] **RVER-02**: Per-pixel coordinates (x/y/z) survive the reverse path exactly (integer-exact), verified end-to-end
 
 ### Acceptance (RDAT)
 
-- [ ] **RDAT-01**: Reverse the real PXD001283-derived imaging mzPeak archive (34,840 spectra) end-to-end and pass the RVER-01 L1 roundtrip under bounded memory
+- [x] **RDAT-01**: Reverse the real PXD001283-derived imaging mzPeak archive (34,840 spectra) end-to-end and pass the RVER-01 L1 roundtrip under bounded memory
 
 ## Out of Scope (v0.4)
 
@@ -73,8 +73,8 @@ explicitly NOT a goal (v0.3 forward masks zero-intensity runs).
 | IXML-03 | Phase 9 | Complete |
 | RCLI-01 | Phase 10 | Complete |
 | RCLI-02 | Phase 10 | Complete |
-| RVER-01 | Phase 11 | Pending |
-| RVER-02 | Phase 11 | Pending |
-| RDAT-01 | Phase 11 | Pending |
+| RVER-01 | Phase 11 | Complete |
+| RVER-02 | Phase 11 | Complete |
+| RDAT-01 | Phase 11 | Complete |
 
 **Coverage:** 15/15 v0.4 requirements mapped · no orphans · no duplicates.
