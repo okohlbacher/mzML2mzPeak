@@ -110,6 +110,28 @@ pub fn compare_axis(
     }
 }
 
+/// Return the index of the first element that BREAKS a strictly-ascending order (i.e. the
+/// index `k` where `xs[k] <= xs[k-1]`), or `None` if `xs` is strictly ascending (a slice of
+/// length 0 or 1 is vacuously strictly ascending).
+///
+/// This is the **fail-closed precondition check** for [`merge_masked`] (CR-01). The
+/// two-pointer masking-aware merge is sound ONLY when the source m/z axis is strictly
+/// ascending; a descending step or a duplicate m/z can let the merge SILENTLY mis-classify
+/// a dropped non-zero point as lossless. The verifier calls this BEFORE the merge and turns
+/// a `Some(k)` into a hard verify failure — it does NOT sort (sorting would hide a genuine
+/// source/reader ordering anomaly and could mis-pair points on a fidelity gate).
+///
+/// A pair is "ascending" ONLY when `partial_cmp` yields `Some(Less)`: an `Equal`
+/// (duplicate m/z), a `Greater` (descending step), AND a `None` (incomparable, e.g. a `NaN`)
+/// are all reported as a break. This rejects BOTH a descending step AND an equal/duplicate
+/// m/z, and treats a `NaN` as fail-closed.
+pub fn first_non_ascending<T: PartialOrd>(xs: &[T]) -> Option<usize> {
+    use std::cmp::Ordering;
+    xs.windows(2)
+        .position(|w| w[0].partial_cmp(&w[1]) != Some(Ordering::Less))
+        .map(|i| i + 1)
+}
+
 /// A single side of a [`MergeOutcome`]: the first offending element on ONE axis, with the
 /// element index recorded against the SOURCE array (so the reporter can read the source
 /// value at that offset).
@@ -484,6 +506,25 @@ mod tests {
             |v: f32| v == 0.0,
         );
         assert_eq!(out, MergeOutcome::default(), "L2 surviving-point within tolerance passes");
+    }
+
+    #[test]
+    fn first_non_ascending_detects_descending_duplicate_and_accepts_strict() {
+        // Strictly ascending → None (also for length 0 and 1).
+        assert_eq!(first_non_ascending::<f64>(&[]), None);
+        assert_eq!(first_non_ascending(&[42.0]), None);
+        assert_eq!(first_non_ascending(&[1.0, 2.0, 3.0]), None);
+        // A descending step is reported at the offending index.
+        assert_eq!(first_non_ascending(&[1.0, 3.0, 2.0]), Some(2));
+        assert_eq!(first_non_ascending(&[5.0, 4.0]), Some(1));
+        // A DUPLICATE (equal neighbors) is non-strict → reported.
+        assert_eq!(first_non_ascending(&[1.0, 1.0]), Some(1));
+        assert_eq!(first_non_ascending(&[1.0, 2.0, 2.0, 3.0]), Some(2));
+        // f32 path behaves identically.
+        assert_eq!(first_non_ascending(&[1.0_f32, 2.0, 3.0]), None);
+        assert_eq!(first_non_ascending(&[3.0_f32, 1.0]), Some(1));
+        // A NaN makes the strict order undefined → reported (fail-closed).
+        assert_eq!(first_non_ascending(&[1.0, f64::NAN, 3.0]), Some(1));
     }
 
     #[test]

@@ -98,12 +98,12 @@ pub fn to_mzdata(s: &ImagingSpectrum) -> Result<MultiLayerSpectrum, WriteError> 
     //     spectra_data and (for Centroid/Unknown raw-array routing) spectra_peaks facets (DAT-01).
     //     This is metadata only; the raw LE bytes are untouched, so L1 bit-for-bit is preserved.
     let mut arrays = BinaryArrayMap::new();
-    arrays.add(num_to_dataarray(ArrayType::MZArray, Unit::MZ, &s.mz));
+    arrays.add(num_to_dataarray(ArrayType::MZArray, Unit::MZ, &s.mz)?);
     arrays.add(num_to_dataarray(
         ArrayType::IntensityArray,
         Unit::DetectorCounts,
         &s.intensity,
-    ));
+    )?);
 
     // (2) description: id + ms_level carried verbatim; signal_continuity from Representation
     //     (drives the writer's profile/centroid routing — never inferred from data shape).
@@ -223,25 +223,42 @@ fn intensity_as_f32(arr: &NumArray) -> Vec<f32> {
 /// dtype bit-for-bit. `F32 → Float32`, `F64 → Float64`. `update_buffer` asserts the dtype
 /// size matches the element size, so no widening/narrowing can occur (IN-04 / L1). NEVER
 /// calls `as_f64()` (lossy for F32).
-fn num_to_dataarray(name: ArrayType, unit: Unit, arr: &NumArray) -> DataArray {
+///
+/// WR-01: `update_buffer`'s dtype/size invariant is statically guaranteed at BOTH call sites
+/// (F32→Float32, F64→Float64), so the encode is unreachable-failure today. But because this
+/// runs in the per-spectrum write hot loop and depends on an UPSTREAM `update_buffer`
+/// contract we do not own (a future rev could add an alignment/capacity check), we surface a
+/// typed [`WriteError::Io`] rather than `expect`-panicking over real data — consistent with
+/// the module's "always surface a typed `WriteError`" discipline.
+fn num_to_dataarray(
+    name: ArrayType,
+    unit: Unit,
+    arr: &NumArray,
+) -> Result<DataArray, WriteError> {
     let mut da = match arr {
         NumArray::F32(v) => {
             let mut da = DataArray::wrap(&name, BinaryDataArrayType::Float32, Vec::new());
-            da.update_buffer(v.as_slice())
-                .expect("f32 slice into Float32 DataArray: dtype size matches");
+            da.update_buffer(v.as_slice()).map_err(|e| {
+                WriteError::Io(std::io::Error::other(format!(
+                    "encoding {name:?} (Float32) array failed: {e}"
+                )))
+            })?;
             da
         }
         NumArray::F64(v) => {
             let mut da = DataArray::wrap(&name, BinaryDataArrayType::Float64, Vec::new());
-            da.update_buffer(v.as_slice())
-                .expect("f64 slice into Float64 DataArray: dtype size matches");
+            da.update_buffer(v.as_slice()).map_err(|e| {
+                WriteError::Io(std::io::Error::other(format!(
+                    "encoding {name:?} (Float64) array failed: {e}"
+                )))
+            })?;
             da
         }
     };
     // Tag the canonical unit so the writer's column matching (which keys on array_type + dtype
     // + unit) routes the array into the POINT columns rather than auxiliary storage.
     da.unit = unit;
-    da
+    Ok(da)
 }
 
 #[cfg(test)]

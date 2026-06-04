@@ -224,6 +224,26 @@ pub enum VerifyError {
         #[source]
         source: std::io::Error,
     },
+
+    /// The SOURCE profile spectrum at `index` has a non-strictly-ascending m/z axis (a
+    /// descending step or a duplicate m/z at element `element`). The masking-aware
+    /// two-pointer merge ([`crate::verify::compare::merge_masked`]) is sound ONLY when the
+    /// source m/z is strictly ascending; feeding it a non-monotonic array could SILENTLY
+    /// mis-classify a dropped non-zero point as lossless (CR-01). Rather than risk a silent
+    /// false pass on a fidelity gate, the verifier FAILS CLOSED here — it does NOT sort
+    /// (which would mask a genuine source/reader ordering anomaly). The `coord` locates the
+    /// offending pixel for the operator.
+    #[error(
+        "source spectrum {index} (pixel x={}, y={}, z={:?}): m/z axis is not strictly \
+         ascending at element {element} — masking-aware verification cannot run safely \
+         (fail-closed; see CR-01)",
+        coord.0, coord.1, coord.2
+    )]
+    NonMonotonicSourceMz {
+        index: u64,
+        coord: (i64, i64, Option<i64>),
+        element: usize,
+    },
 }
 
 #[cfg(test)]

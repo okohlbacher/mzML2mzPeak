@@ -291,6 +291,18 @@ where
     let mut src_coords_tics: Vec<((i64, i64), f64)> = Vec::new();
 
     // --- Stream the SOURCE exactly ONCE; never collect it. Pair source position k -> out idx k.
+    //
+    // WR-03 (load-bearing contract): this i<->i pairing is sound ONLY because `convert`
+    // (src/write/convert.rs) emits output spectra in SOURCE ITERATION ORDER — the writer does
+    // not buffer, sort, or reorder. That emission order is a documented invariant on `convert`
+    // (see the WR-03 note there). The pairing is NOT blindly trusted: the coordinate-equality
+    // check below (`out_key != key`) fails the coordinates gate the moment the output index `k`
+    // does NOT carry the same `(x, y, z)` as source pixel `k`, so any future reorder that breaks
+    // the i<->i assumption surfaces as a coordinate failure rather than a silent mis-pairing
+    // (unless two reordered pixels happened to share a coordinate, which `build_index_coords`
+    // already rejects as a hard `DuplicateCoordinate`). The slice path (`verify_against_source`)
+    // pairs by coordinate key and is reorder-robust; this streaming path is bounded-memory and
+    // relies on the emission-order contract instead.
     for item in reader {
         let s = item?; // ReadError -> VerifyError::Read (#[from])
         let k = src_count; // source position == output index (writer wrote in source order)
@@ -515,7 +527,7 @@ fn compare_paired_pixel(
                 .ok_or(VerifyError::MissingArray { index: out_idx, axis: "intensity" })?;
 
             let outcome = compare_profile_masked(
-                s, mz_da, int_da, level, tol, out_idx,
+                s, mz_da, int_da, level, tol, out_idx, coord,
             )?;
 
             if let Some(m) = outcome.mz {
@@ -652,14 +664,30 @@ fn compare_profile_masked(
     level: ConformanceLevel,
     tol: &ToleranceContract,
     index: u64,
+    coord: CoordKey,
 ) -> Result<crate::verify::compare::MergeOutcome, VerifyError> {
-    use crate::verify::compare::merge_masked;
+    use crate::verify::compare::{first_non_ascending, merge_masked};
+
+    // FAIL-CLOSED precondition (CR-01): `merge_masked` is a two-pointer merge that is sound
+    // ONLY when the SOURCE m/z axis is strictly ascending. The read layer carries source m/z
+    // VERBATIM (no sort, no monotonicity check — `record.rs`/`stream.rs`), and imzML does not
+    // mandate ascending m/z (processed-mode pixels can be arbitrarily ordered). On a
+    // non-monotonic or duplicate-m/z source the merge could SILENTLY accept a dropped NON-ZERO
+    // point as lossless — the exact silent-data-loss failure the L1 gate exists to catch. We
+    // therefore reject a non-ascending source m/z as a hard verify error rather than feed the
+    // merge a precondition it cannot satisfy. We do NOT sort: sorting would mask a genuine
+    // source/reader ordering anomaly and could mis-pair points on a fidelity gate.
+    let non_ascending = match &s.mz {
+        NumArray::F64(v) => first_non_ascending(v),
+        NumArray::F32(v) => first_non_ascending(v),
+    };
+    if let Some(element) = non_ascending {
+        return Err(VerifyError::NonMonotonicSourceMz { index, coord, element });
+    }
 
     // Per-axis L1/L2 predicates, specialized to the stored width. L1 → exact `!=`; L2 → the
     // relative-error bound `|a-b|/|b| > rel_err` with a `b==0` exact-inequality guard (mirrors
-    // `first_mismatch_*`). m/z equality (point IDENTITY at the merge boundary) is ALWAYS exact:
-    // a surviving point is one whose stored m/z key matches bit-for-bit; the m/z *mismatch*
-    // predicate is the level-aware one (so an L2 m/z within tolerance is not flagged).
+    // `first_mismatch_*`).
     macro_rules! mismatch_pred {
         ($ty:ty, $rel:expr) => {{
             let rel = $rel as $ty;
@@ -676,10 +704,36 @@ fn compare_profile_masked(
         }};
     }
 
+    // m/z point IDENTITY at the merge boundary. WR-05: this MUST track the same level-aware
+    // tolerance as the m/z *mismatch* predicate, otherwise the boundary is inconsistent. Under
+    // L1 identity is exact (`==`, the bit-for-bit key). Under L2 two m/z that differ by less
+    // than `mz_rel_err` are the SAME surviving point (`mz_mismatch` would NOT flag them), so the
+    // identity tie must also accept them — exactly the NEGATION of the L2 mismatch predicate.
+    // Using exact `==` under L2 would push such a within-tolerance pair down the
+    // `smz < omz` / `out < src` branches and raise a SPURIOUS m/z failure / dropped-point check
+    // for points L2 is supposed to accept. (`a == b` already implies within-tolerance, so this
+    // is strictly more permissive than `==` and never narrows L1 behavior.)
+    macro_rules! eq_pred {
+        ($ty:ty, $rel:expr) => {{
+            let rel = $rel as $ty;
+            move |a: $ty, b: $ty| match level {
+                ConformanceLevel::L1BitForBit => a == b,
+                ConformanceLevel::L2Transformed => {
+                    if b == (0.0 as $ty) {
+                        a == b
+                    } else {
+                        ((a - b).abs() / b.abs()) <= rel
+                    }
+                }
+            }
+        }};
+    }
+
     macro_rules! run_merge {
         ($mz_ty:ty, $src_mz:expr, $int_ty:ty, $src_int:expr) => {{
             let out_mz = decode_at::<$mz_ty>(mz_da, index, "m/z")?;
             let out_int = decode_at::<$int_ty>(int_da, index, "intensity")?;
+            let mz_eq = eq_pred!($mz_ty, tol.mz_rel_err);
             let mz_mismatch = mismatch_pred!($mz_ty, tol.mz_rel_err);
             let int_mismatch = mismatch_pred!($int_ty, tol.intensity_rel_err);
             Ok(merge_masked(
@@ -687,8 +741,8 @@ fn compare_profile_masked(
                 $src_int,
                 &out_mz,
                 &out_int,
-                // m/z point identity at the merge boundary: ALWAYS exact (bit-for-bit key).
-                |a: $mz_ty, b: $mz_ty| a == b,
+                // m/z point identity at the merge boundary: level-aware (WR-05).
+                mz_eq,
                 mz_mismatch,
                 int_mismatch,
                 |v: $int_ty| v == (0.0 as $int_ty),
@@ -790,6 +844,133 @@ mod tests {
                 "a missing output archive surfaces as VerifyError::OpenOutput, got: {err:?}"
             ),
         }
+    }
+
+    /// Build a Float64 m/z + Float32 intensity output [`DataArray`] pair for driving
+    /// [`compare_profile_masked`] directly (no live archive needed).
+    fn out_arrays(
+        mz: &[f64],
+        int: &[f32],
+    ) -> (
+        mzdata::spectrum::bindata::DataArray,
+        mzdata::spectrum::bindata::DataArray,
+    ) {
+        use mzdata::spectrum::bindata::{ArrayType, BinaryDataArrayType, DataArray};
+        let mut mz_da =
+            DataArray::wrap(&ArrayType::MZArray, BinaryDataArrayType::Float64, Vec::new());
+        mz_da.update_buffer(mz).expect("f64 into Float64");
+        let mut int_da = DataArray::wrap(
+            &ArrayType::IntensityArray,
+            BinaryDataArrayType::Float32,
+            Vec::new(),
+        );
+        int_da.update_buffer(int).expect("f32 into Float32");
+        (mz_da, int_da)
+    }
+
+    fn profile_spectrum(mz: NumArray, intensity: NumArray) -> ImagingSpectrum {
+        ImagingSpectrum {
+            x: 1,
+            y: 1,
+            z: None,
+            mz,
+            intensity,
+            representation: Representation::Profile,
+            ms_level: 1,
+            native_id: "scan=1".to_string(),
+        }
+    }
+
+    /// CR-01 regression (the silent-data-loss path MUST be closed): a profile pixel whose
+    /// SOURCE m/z is DESCENDING, where a NON-ZERO source point is ABSENT from the output, MUST
+    /// be reported as a hard `VerifyError::NonMonotonicSourceMz` — it must NOT silently pass
+    /// through the masking-aware merge. (Before the fix, the two-pointer merge could
+    /// mis-classify the dropped non-zero point as lossless on a non-monotonic source.)
+    #[test]
+    fn cr01_descending_source_mz_with_lost_nonzero_point_fails_closed() {
+        // Source m/z DESCENDING (300 > 200 > 100); intensities all non-zero. The output omits
+        // the 200.0 point (a genuine NON-ZERO loss) — on a correctly-ascending merge this is an
+        // intensity failure, but on this NON-MONOTONIC source the merge could silently accept it.
+        let s = profile_spectrum(
+            NumArray::F64(vec![300.0, 200.0, 100.0]),
+            NumArray::F32(vec![30.0, 20.0, 10.0]),
+        );
+        // Output (even if it happened to be ascending) omits the non-zero 200.0 point.
+        let (mz_da, int_da) = out_arrays(&[100.0, 300.0], &[10.0, 30.0]);
+        let result = compare_profile_masked(
+            &s,
+            &mz_da,
+            &int_da,
+            ConformanceLevel::L1BitForBit,
+            &ToleranceContract::L1,
+            0,
+            (1, 1, None),
+        );
+        match result {
+            Err(VerifyError::NonMonotonicSourceMz { index, element, .. }) => {
+                assert_eq!(index, 0);
+                // First descending step is at element 1 (200.0 <= 300.0).
+                assert_eq!(element, 1);
+            }
+            other => panic!(
+                "non-ascending source m/z must fail CLOSED as NonMonotonicSourceMz, got: {other:?}"
+            ),
+        }
+    }
+
+    /// CR-01 regression: a DUPLICATE source m/z is likewise rejected fail-closed (the merge
+    /// cannot disambiguate two source points sharing an m/z key under masking).
+    #[test]
+    fn cr01_duplicate_source_mz_fails_closed() {
+        let s = profile_spectrum(
+            NumArray::F64(vec![100.0, 200.0, 200.0, 300.0]),
+            NumArray::F32(vec![10.0, 20.0, 21.0, 30.0]),
+        );
+        let (mz_da, int_da) = out_arrays(&[100.0, 200.0, 300.0], &[10.0, 20.0, 30.0]);
+        let result = compare_profile_masked(
+            &s,
+            &mz_da,
+            &int_da,
+            ConformanceLevel::L1BitForBit,
+            &ToleranceContract::L1,
+            0,
+            (1, 1, None),
+        );
+        match result {
+            Err(VerifyError::NonMonotonicSourceMz { element, .. }) => {
+                // The duplicate is at element 2 (200.0 is not strictly greater than 200.0).
+                assert_eq!(element, 2);
+            }
+            other => panic!("duplicate source m/z must fail CLOSED, got: {other:?}"),
+        }
+    }
+
+    /// CR-01 regression (the normal path still works): a strictly-ascending source profile
+    /// pixel with only zero-intensity points dropped passes the masking-aware merge cleanly —
+    /// the fail-closed guard does NOT regress the monotonic happy path.
+    #[test]
+    fn cr01_ascending_source_with_zero_drops_still_passes() {
+        // Ascending m/z; the 200.0 point has ZERO intensity and is legitimately dropped.
+        let s = profile_spectrum(
+            NumArray::F64(vec![100.0, 200.0, 300.0]),
+            NumArray::F32(vec![10.0, 0.0, 30.0]),
+        );
+        let (mz_da, int_da) = out_arrays(&[100.0, 300.0], &[10.0, 30.0]);
+        let outcome = compare_profile_masked(
+            &s,
+            &mz_da,
+            &int_da,
+            ConformanceLevel::L1BitForBit,
+            &ToleranceContract::L1,
+            0,
+            (1, 1, None),
+        )
+        .expect("a strictly-ascending source must run the merge, not error");
+        assert_eq!(
+            outcome,
+            crate::verify::compare::MergeOutcome::default(),
+            "ascending source with only zero-intensity drops is lossless"
+        );
     }
 
     /// The path-based entry on a non-existent SOURCE surfaces a `VerifyError::Read` (the source

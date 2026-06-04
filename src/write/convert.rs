@@ -73,6 +73,15 @@ pub fn convert(mut reader: ImagingReader, out_path: &Path) -> Result<(), WriteEr
     //     (IN-08 — no collect-all). Each read error propagates via `?` (WriteError::Read).
     //     Routing is automatic: the writer dispatches on signal_continuity (set verbatim in
     //     to_mzdata) — NO branch here.
+    //
+    //     LOAD-BEARING EMISSION-ORDER CONTRACT (WR-03): output spectra are written in EXACT
+    //     SOURCE ITERATION ORDER — the sampled-first spectrum first, then the reader's remaining
+    //     items in order. There is NO buffering, sorting, or reordering. The streaming verifier
+    //     (`verify_streaming` in src/verify/verify.rs) relies on this to pair source position `k`
+    //     to output index `k`; if a future refactor here reorders, buffers, or sorts output, the
+    //     verifier's i<->i coordinate-equality check will fail loudly (and any reorder that swaps
+    //     two distinct pixels is caught as a coordinate divergence). Do NOT reorder without
+    //     updating the verifier's pairing strategy.
     if let Some(first) = first {
         writer.write_spectrum(&first)?;
     }
