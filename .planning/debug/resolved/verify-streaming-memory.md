@@ -1,6 +1,6 @@
 ---
 slug: verify-streaming-memory
-status: partially_resolved
+status: resolved
 trigger: "verify_streaming unbounded memory growth + pathological slowness on the full 34,840-spectrum PXD001283 acceptance run, violating DAT-01 bounded-memory guarantee"
 created: 2026-06-03
 updated: 2026-06-04
@@ -57,8 +57,9 @@ DATA_END
 - timestamp 2026-06-04 (ARCHIVE LAYOUT): `out/HR2MSI.mzpeak` (ZIP) members:
   `spectra_metadata.parquet` = 34,840 rows, **1 row group**, 104 columns, **580 MB** (the whole archive);
   `spectra_data.parquet` = 67,916,471 points, **65 row groups**, 3 cols (point.spectrum_index/mz/intensity),
-  213 KB compressed footer but ~67.9M points. So Processed-mode arrays live in `spectra_data` (Profile|
-  Unknown routing), and the metadata facet is a single huge row group.
+  213 KB compressed footer but ~67.9M points (point.mz/point.intensity columns — SEE 2026-06-04
+  DECISIVE note: these columns are entirely NULL; the real arrays are in the metadata facet's
+  auxiliary_arrays). The metadata facet is a single huge row group.
 - timestamp 2026-06-04 (TIMING, instrumented verify_streaming): `load_all_spectrum_metadata` = ~4.8–5.0s
   (one-time); `build_coord_index`/`build_index_coords` = **~14 ms** (Option A fixed the metadata O(n²)
   completely); per-pixel loop processed **< 2,000 of 34,840** pixels in 7+ minutes both before AND after
@@ -75,6 +76,24 @@ DATA_END
   3-block LRU, the observed per-call cost implies the readback re-decodes a full row group far more often
   than once-per-row-group (effectively per spectrum), i.e. an upstream-reader O(n·rowgroup) cost for this
   archive's coarse data row groups.
+- timestamp 2026-06-04 (DECISIVE — DATA LOCATION, supersedes the row-group-decode mechanism note):
+  Direct pyarrow inspection of `out/HR2MSI.mzpeak` shows the `spectra_data.parquet` `point.mz` and
+  `point.intensity` columns are **100% NULL** (1,048,576/1,048,576 null in row group 0; `mz_delta_model`
+  is also null). The ACTUAL spectral arrays live in `spectra_metadata.parquet` →
+  `spectrum.auxiliary_arrays` (number_of_auxiliary_arrays = 2 per spectrum): aux[0] = m/z array
+  (MS:1000514, data_type MS:1000523 = f64, compression MS:1000576 = none), aux[1] = intensity array
+  (MS:1000515, data_type MS:1000521 = f32, none). Decoded bytes match `number_of_data_points` exactly
+  (spectrum 0: 9032 B / 8 = 1129 f64 m/z; 4516 B / 4 = 1129 f32 intensity; n_data_points = 1129). The
+  m/z values decode to a monotone ramp (404.0927, 404.0958, ...), i.e. real data.
+- timestamp 2026-06-04 (MECHANISM, corrected): `get_spectrum_arrays(i)` (reader.rs:461) takes the
+  single-row-group data fast path, which decodes the all-NULL data row group (cheap), then calls
+  `load_auxiliary_arrays_for_spectrum(index)` (reader.rs:1102 → load_auxiliary_arrays_for_from
+  reader.rs:1551). That builds a FRESH `spectrum_metadata()` Parquet reader with a row filter for ONE
+  index against the **single-row-group 580 MB metadata facet** EVERY call, and decodes the giant
+  `auxiliary_arrays` nested-binary column chunk to extract one spectrum's two blobs. ~2.85 s/call is
+  that per-spectrum re-decode of the single huge metadata row group — NOT a data-facet row-group decode.
+  The 16 GB `load_all_spectrum_metadata` spike is the all-at-once materialization of all 34,840 rows of
+  the same heavy nested `auxiliary_arrays`/`parameters` columns.
 
 ## Eliminated
 
@@ -146,7 +165,46 @@ per-spectrum readback. Candidate directions (require a planning decision, likely
 - **Tame the metadata RSS spike:** `load_all_spectrum_metadata` on the 104-column single-row-group 580 MB
   facet spikes to ~16 GB transiently; reading only the coordinate columns (IMS:1000050/51/52) would avoid it.
 
-### Files changed
+### Files changed (interim A/B)
 - `src/verify/verify.rs` — Option A (load_all_spectrum_metadata prime in both verify entry points),
   Option B (verify_streaming ascending-index pairing + new `build_index_coords` helper; `build_coord_index`
   retained for the slice path `verify_against_source`). Doc comments updated to record the rationale.
+
+---
+
+## FINAL RESOLUTION (2026-06-04) — status: RESOLVED
+
+The interim A/B work was necessary but not sufficient. Deeper inspection (direct pyarrow read of the
+produced archive) overturned the assumption that the data lived in `spectra_data.parquet`:
+
+**TRUE ROOT CAUSE — a Phase-4 WRITER bug.** Our writer left `spectra_data` `point.mz`/`point.intensity`
+100% NULL and stored every processed-mode spectrum's m/z+intensity in `spectra_metadata.parquet`
+`spectrum.auxiliary_arrays`. Cause: the writer registered a FIXED `add_spectrum_peak_type::<CentroidPeak>()`
+schema (m/z Float64@Unit::MZ, intensity Float32@DetectorCounts), but `to_mzdata` produced arrays at
+SOURCE dtype tagged `Unit::Unknown`, so `array_map_to_schema_arrays` matched no point column by name and
+spilled both arrays to `auxiliary_arrays`. The ~2.85 s/call readback was `load_auxiliary_arrays_for_spectrum`
+rebuilding a filtered reader over the single-row-group 580 MB metadata facet PER CALL to pull those blobs.
+
+**FIX (committed on branch `fix/verify-streaming-readback`):**
+1. `fix(write)` 9a716/64acf9 — derive the data-facet schema from the SOURCE spectra (mirror the reference
+   `sample_array_types_from_spectrum_source` → `array_map_to_schema_arrays`); register exactly the single
+   m/z + intensity point columns at the source dtype (f64 m/z, f32 intensity here). Tag Unit::MZ /
+   DetectorCounts in `to_mzdata` so names match. Removed the dual-width hack that caused a record-batch
+   length panic. m/z+intensity now land in `spectra_data` point columns; zero auxiliary arrays.
+2. `feat(verify)` 1b29d0b — **masking-aware L1 contract** (user decision: keep `mask_zero_intensity_runs`,
+   adapt L1). New two-pointer `merge_masked` in compare.rs: surviving output points must match source
+   bit-for-bit at source width; every dropped source point must be zero-intensity (guard test
+   `dropped_nonzero_point_is_l1_failure` proves genuine signal loss fails). `src/schema/tolerance.rs` L1
+   doc updated; conformance doc B11 added.
+3. `test(06-03)` 793a5f6 — committed `tests/acceptance.rs` (DAT-01 gate).
+
+**VERIFICATION (real PXD001283, 34,840 spectra):**
+- `cargo test --release --test acceptance -- --ignored` → `acceptance_pxd001283_full_roundtrip ... ok` in **7.11 s**.
+- CLI `convert --verify` on the real file: **exit 0 (L1 passed)**, **7.4 s real**, **peak memory 366 MB**
+  (max RSS 670 MB) — bounded. Data facet: 39 row groups, 40,559,444 point rows, point columns populated.
+- Before: 30+ min, 2.8 GB climbing, never finished. After: 7 s, 366 MB, L1 pass.
+- Full suite green (84 lib + integration).
+
+**Resolved sub-findings:** the per-spectrum readback is now cheap (reads cheap data-facet point columns,
+no metadata-facet aux pulls); the 16 GB metadata spike is gone (no `load_all_spectrum_metadata` aux
+materialization needed on the corrected layout); build_coord_index O(n²)→O(n) retained.
