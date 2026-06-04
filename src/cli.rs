@@ -16,7 +16,7 @@
 //!     code with the anyhow context already printed by `main` (CLI-04, threat T-6-exit).
 
 use std::io::IsTerminal;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use anyhow::{Context, anyhow};
@@ -49,11 +49,25 @@ const EXIT_GENERIC: u8 = 1; // anything else
     long_about = None
 )]
 pub struct ConvertCli {
-    /// Input imzML file (its sibling `.ibd` must be present and integrity-valid).
+    /// Input file. A `.imzML` / `.imzml` runs the forward path (imzML → mzPeak); a `.mzpeak`
+    /// (or any input with `--reverse`) runs the reverse path (mzPeak → imzML + .ibd).
     pub input: PathBuf,
 
-    /// Output mzPeak file. Required for a real conversion; omitted for `--dry-run`.
+    /// Output path. Forward: the `.mzpeak` archive (required for a real conversion; omitted for
+    /// `--dry-run`). Reverse: an output STEM from which `OUT.imzML` + `OUT.ibd` are derived
+    /// (falls back to `--output-stem` if both are given the stem flag wins).
     pub output: Option<PathBuf>,
+
+    /// Reverse output stem (mzPeak → imzML). Derives `STEM.imzML` + `STEM.ibd` sharing a stem;
+    /// if the stem already ends `.imzML` / `.imzml` that name is kept and `.ibd` swapped in for
+    /// the sidecar. Preferred over the positional output when both are supplied.
+    #[arg(short = 'o', long = "output-stem")]
+    pub output_stem: Option<PathBuf>,
+
+    /// Force the reverse path (mzPeak → imzML) regardless of the input extension — the explicit
+    /// override when the input extension cannot be inferred or is non-standard (RCLI-01).
+    #[arg(long)]
+    pub reverse: bool,
 
     /// Report the conversion plan (mode / count / grid / integrity) and exit WITHOUT writing.
     #[arg(long)]
@@ -69,6 +83,37 @@ pub struct ConvertCli {
 /// Drive the CLI: dry-run report (CLI-03) or convert + optional verify (CLI-01/02), returning
 /// the typed library errors wrapped with `anyhow` context so [`classify_exit`] can map them.
 pub fn run(cli: ConvertCli) -> anyhow::Result<()> {
+    // Direction policy (T-10-DISP): `--reverse` is the explicit override; otherwise infer from
+    // the input extension. `.imzML`/`.imzml` → forward (the UNCHANGED v0.3 path); `.mzpeak` →
+    // reverse. Anything else errors actionably and names `--reverse` as the escape hatch — no
+    // silent mis-direction.
+    let reverse = if cli.reverse {
+        true
+    } else {
+        match cli.input.extension().and_then(|e| e.to_str()) {
+            Some("imzML") | Some("imzml") => false,
+            Some("mzpeak") => true,
+            _ => {
+                return Err(anyhow!(
+                    "cannot infer direction from {:?}; pass --reverse for mzPeak→imzML, or use a \
+                     .imzML / .mzpeak input",
+                    cli.input
+                ));
+            }
+        }
+    };
+
+    if reverse {
+        run_reverse(&cli)
+    } else {
+        run_forward(cli)
+    }
+}
+
+/// Forward path (imzML → imaging mzPeak) — the SHIPPED v0.3 dispatch, unchanged. Extracted
+/// verbatim into a branch so the bare `imzml2mzpeak <in.imzML> <out.mzpeak>` invocation parses
+/// and behaves byte-identically (T-10-COMPAT).
+fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
     if cli.dry_run {
         return dry_run(&cli);
     }
@@ -162,6 +207,106 @@ pub fn run(cli: ConvertCli) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+/// Reverse path (imaging mzPeak → imzML + .ibd) — RCLI-01. Resolves the output STEM, derives
+/// the `.imzML`/`.ibd` pair, drives an indicatif progress bar sized to the archive spectrum
+/// count (binary-only — the library `convert` exposes no tick hook and must not gain an
+/// indicatif dep, so progress is start/finish-only, mirroring the forward off-TTY path), then
+/// calls the typed library pipeline. `--verify`/`--dry-run` are forward-only and rejected here.
+fn run_reverse(cli: &ConvertCli) -> anyhow::Result<()> {
+    // `--verify` / `--dry-run` are forward-only (T-10-FLAGS) — reject rather than silently run
+    // forward-only logic. Reverse roundtrip verification ships in Phase 11.
+    if cli.verify || cli.dry_run {
+        return Err(anyhow!(
+            "--verify / --dry-run are forward-only; reverse roundtrip verification ships in \
+             Phase 11"
+        ));
+    }
+
+    // Resolve the output stem: `--output-stem` wins, else the positional output, so both
+    // `imzml2mzpeak in.mzpeak -o out` and `imzml2mzpeak in.mzpeak out` work.
+    let stem = cli
+        .output_stem
+        .as_deref()
+        .or(cli.output.as_deref())
+        .ok_or_else(|| {
+            anyhow!(
+                "no output stem given — `imzml2mzpeak <input.mzpeak> -o <out>` (derives \
+                 out.imzML + out.ibd)"
+            )
+        })?;
+    let (imzml, ibd) = derive_reverse_paths(stem);
+
+    // Progress total: open a MzPeakReader purely to read len() (binary-only indicatif), then
+    // drop it before the library convert opens its own reader.
+    let total: Option<u64> = mzpeak_prototyping::MzPeakReader::new(&cli.input)
+        .ok()
+        .map(|r| r.len() as u64);
+
+    let tty = std::io::stderr().is_terminal();
+    let bar = if tty {
+        let pb = match total {
+            Some(n) => {
+                let pb = ProgressBar::new(n);
+                pb.set_style(
+                    ProgressStyle::with_template(
+                        "{spinner} reversing [{bar:40}] {pos}/{len} spectra ({eta})",
+                    )
+                    .unwrap_or_else(|_| ProgressStyle::default_bar()),
+                );
+                pb
+            }
+            None => {
+                let pb = ProgressBar::new_spinner();
+                pb.set_message("reversing (spectrum count unknown)");
+                pb
+            }
+        };
+        Some(pb)
+    } else {
+        match total {
+            Some(n) => log::info!("reversing {} ({} spectra)", cli.input.display(), n),
+            None => log::info!("reversing {} (spectrum count unknown)", cli.input.display()),
+        }
+        None
+    };
+
+    crate::reverse::convert::convert(&imzml, &ibd, &cli.input)
+        .context("reverse conversion failed")?;
+
+    if let Some(pb) = bar {
+        if let Some(n) = total {
+            pb.set_position(n);
+        }
+        pb.finish_with_message("reverse conversion complete");
+    } else {
+        match total {
+            Some(n) => log::info!(
+                "reversed {n} spectra → {} + {}",
+                imzml.display(),
+                ibd.display()
+            ),
+            None => log::info!(
+                "reverse conversion complete → {} + {}",
+                imzml.display(),
+                ibd.display()
+            ),
+        }
+    }
+
+    Ok(())
+}
+
+/// Derive the reverse `.imzML` + `.ibd` output pair from an output STEM (D-"-o stem", SC-4).
+/// If `out` already ends `.imzML`/`.imzml` that exact name is kept for the XML and `.ibd` is
+/// swapped in for the sidecar; otherwise both extensions are appended/replaced onto the stem.
+/// Both returned paths share a stem. `std::path` only — no shell, no `..` expansion (T-10-PATH).
+fn derive_reverse_paths(out: &Path) -> (PathBuf, PathBuf) {
+    match out.extension().and_then(|e| e.to_str()) {
+        Some("imzML") | Some("imzml") => (out.to_path_buf(), out.with_extension("ibd")),
+        _ => (out.with_extension("imzML"), out.with_extension("ibd")),
+    }
 }
 
 /// Dry-run (CLI-03): report storage mode, spectrum count, grid dims, and integrity status,
@@ -320,6 +465,48 @@ fn classify_integrity_error(ie: &IntegrityError) -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use clap::Parser;
+
+    // --- Task 1: dispatch / -o stem derivation / backward-compat parse -------------------
+
+    #[test]
+    fn bare_forward_invocation_still_parses() {
+        // A3 / T-10-COMPAT regression guard: the shipped `imzml2mzpeak <in.imzML> <out.mzpeak>`
+        // invocation must keep parsing with `reverse == false` so the v0.3 acceptance harness
+        // is untouched.
+        let cli = ConvertCli::try_parse_from(["imzml2mzpeak", "in.imzML", "out.mzpeak"])
+            .expect("bare forward invocation must still parse");
+        assert_eq!(cli.input, PathBuf::from("in.imzML"));
+        assert_eq!(cli.output, Some(PathBuf::from("out.mzpeak")));
+        assert!(!cli.reverse, "default direction must remain forward");
+    }
+
+    #[test]
+    fn derive_reverse_paths_no_extension_appends_both() {
+        let (imzml, ibd) = derive_reverse_paths(Path::new("out"));
+        assert_eq!(imzml, PathBuf::from("out.imzML"));
+        assert_eq!(ibd, PathBuf::from("out.ibd"));
+        // SC-4: shared stem.
+        assert_eq!(imzml.file_stem(), ibd.file_stem());
+    }
+
+    #[test]
+    fn derive_reverse_paths_imzml_extension_kept() {
+        let (imzml, ibd) = derive_reverse_paths(Path::new("out.imzML"));
+        assert_eq!(imzml, PathBuf::from("out.imzML"));
+        assert_eq!(ibd, PathBuf::from("out.ibd"));
+        assert_eq!(imzml.file_stem(), ibd.file_stem());
+    }
+
+    #[test]
+    fn derive_reverse_paths_lowercase_imzml_extension_kept() {
+        let (imzml, ibd) = derive_reverse_paths(Path::new("out.imzml"));
+        assert_eq!(imzml, PathBuf::from("out.imzml"));
+        assert_eq!(ibd, PathBuf::from("out.ibd"));
+        assert_eq!(imzml.file_stem(), ibd.file_stem());
+    }
+
+    // --- exit-code classification --------------------------------------------------------
 
     #[test]
     fn integrity_error_maps_to_code_two() {
