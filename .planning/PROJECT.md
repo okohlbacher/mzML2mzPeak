@@ -8,11 +8,22 @@ A command-line converter that reads imzML mass spectrometry **imaging** (MSI) fi
 
 Convert an arbitrary imzML imaging dataset into a valid imaging mzPeak file **without losing spatial or spectral information** — i.e. every pixel's coordinates and its m/z + intensity data survive the roundtrip.
 
+## Current State
+
+**v0.3 shipped (2026-06-04)** — the forward converter (imzML → imaging mzPeak) is complete and
+proven on the full real PXD001283 dataset (34,840 spectra): converts + masking-aware L1 roundtrip
+in ~7 s, 366 MB bounded. Tag `v0.3`; see `MILESTONES.md`.
+
+**Next milestone goal:** reverse conversion (imaging mzPeak → imzML) — previously out-of-scope for
+v0.3; to be scoped via `/gsd:new-milestone`.
+
 ## Requirements
 
 ### Validated
 
-(None yet — ship to validate)
+- **v0.3 (shipped 2026-06-04) — Forward converter.** All 30 v0.3 requirements
+  (ENV/IN/SPA/SCH/OUT/VER/CLI/DAT) delivered and proven on real data (full PXD001283, 34,840
+  spectra, masking-aware L1 roundtrip). See `MILESTONES.md` / `milestones/v0.3-REQUIREMENTS.md`.
 
 ### Active
 
