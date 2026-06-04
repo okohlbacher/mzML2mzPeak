@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.4
 milestone_name: — Reverse Converter
-status: executing
+status: verifying
 stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-06-04T19:35:03.743Z"
+last_updated: "2026-06-04T19:40:27.611Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 9
-  completed_plans: 8
-  percent: 60
+  completed_plans: 9
+  percent: 80
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-03)
 
 Phase: 10 (streaming-reverse-orchestration-reverse-cli) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-04
 Progress: [░░░░░░░░░░] 0/5 phases
 
@@ -66,6 +66,7 @@ Progress: [░░░░░░░░░░] 0/5 phases
 | Phase 09 P02 | 8min | 2 tasks | 1 files |
 | Phase 10 P01 | 18 min | 3 tasks | 5 files |
 | Phase 10 P02 | 12 min | 2 tasks tasks | 1 files files |
+| Phase 10 P03 | 10min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -97,6 +98,7 @@ Recent decisions affecting current (v0.4) work:
 - [Phase ?]: Plan 10-01: reverse convert() uses Option C (body temp file; header with .ibd MD5 written after ibd.finish(), body std::io::copy'd, trailer appended) — bounded memory, no new crates; NotImaging pre-check before any output + cleanup-on-error.
 - [Phase ?]: Plan 10-02: ConvertCli stays FLAT; direction inferred in run(), no Subcommand enum — RCLI-01 satisfied while keeping the v0.3 positional invocation byte-compatible.
 - [Phase ?]: Plan 10-02: classify_reverse_error introduces NO new exit code — maps ReverseError onto the existing 5-code contract (coordinate=4, unsupported=3, integrity=2 via delegation to classify_integrity_error, generic=1).
+- [Phase ?]: Plan 10-03: end-to-end reverse conformance proven via mzdata::ImzMLReader as oracle (re-read coords/array-shapes/uuid), a 5k-pixel bounded-memory-at-scale test, and a built-binary non-imaging fail-fast (exit 4 + no partial output); zero new crates. RCLI-01/RCLI-02 closed.
 
 ### Reuse Anchors (from shipped v0.3)
 
@@ -133,6 +135,6 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-04T19:34:30.665Z
+Last session: 2026-06-04T19:39:51.150Z
 Stopped at: Completed 10-01-PLAN.md
 Resume file: None

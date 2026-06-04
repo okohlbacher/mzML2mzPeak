@@ -30,7 +30,7 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 - [x] **Phase 7: Reverse Read-Spike & Dependency Audit** - Confirm `MzPeakReader` yields per-pixel coords + source-dtype arrays on a real archive; settle the checksum (SHA-1 vs MD5) zero-new-crates decision; hard-fail non-imaging input. (completed 2026-06-04)
 - [x] **Phase 8: `.ibd` Binary Writer (CRUX)** - Incremental UUID-header + raw-LE array writer that returns exact `(offset, element_count, encoded_bytes)` per array, with streamed checksum. (completed 2026-06-04)
 - [x] **Phase 9: `.imzML` XML Emitter** - Latin-1-safe processed-mode imzML that `mzdata` re-reads: per-spectrum scan coords, two external `<binaryDataArray>`, `<fileContent>` integrity terms, `<scanSettings>`. (completed 2026-06-04)
-- [ ] **Phase 10: Streaming Reverse Orchestration & `reverse` CLI** - Bounded-memory read-pixel→append-`.ibd`→emit-XML pipeline behind a `reverse` subcommand with distinct exit codes.
+- [x] **Phase 10: Streaming Reverse Orchestration & `reverse` CLI** - Bounded-memory read-pixel→append-`.ibd`→emit-XML pipeline behind a `reverse` subcommand with distinct exit codes. (completed 2026-06-04)
 - [ ] **Phase 11: Reverse Roundtrip Verification & PXD001283 Acceptance** - `mzPeak → imzML → mzPeak` L1 roundtrip reusing `src/verify`, with integer-exact coordinate survival, proven end-to-end on the real 34,840-spectrum archive.
 
 ## Phase Details
@@ -105,7 +105,7 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 
 - [x] 10-01-PLAN.md — Library pipeline: ImzmlWriter split-phase API + read_pixel promoted to src/reverse/source.rs + Option-C bounded-memory reverse convert() (RCLI-02)
 - [x] 10-02-PLAN.md — CLI: extension dispatch + --reverse + -o stem derivation + classify_reverse_error exit-code mapping (RCLI-01)
-- [ ] 10-03-PLAN.md — End-to-end oracle (mzdata re-read) + ~5k-pixel bounded-memory proof + non-imaging CLI fail-fast (RCLI-01/02)
+- [x] 10-03-PLAN.md — End-to-end oracle (mzdata re-read) + ~5k-pixel bounded-memory proof + non-imaging CLI fail-fast (RCLI-01/02)
 
 ### Phase 11: Reverse Roundtrip Verification & PXD001283 Acceptance
 
@@ -128,5 +128,5 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 | 7. Reverse Read-Spike & Dependency Audit | 3/3 | Complete    | 2026-06-04 |
 | 8. `.ibd` Binary Writer (CRUX) | 1/1 | Complete    | 2026-06-04 |
 | 9. `.imzML` XML Emitter | 2/2 | Complete    | 2026-06-04 |
-| 10. Streaming Reverse Orchestration & `reverse` CLI | 2/3 | In Progress|  |
+| 10. Streaming Reverse Orchestration & `reverse` CLI | 3/3 | Complete   | 2026-06-04 |
 | 11. Reverse Roundtrip Verification & PXD001283 Acceptance | 0/? | Not started | - |
