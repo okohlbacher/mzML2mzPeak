@@ -102,6 +102,17 @@ pub enum ReverseError {
     #[error(".ibd offset arithmetic overflow: {count} elements × {size} bytes exceeds u64")]
     IbdOverflow { count: u64, size: u64 },
 
+    /// The m/z and intensity arrays of spectrum `index` carry unequal element counts. In a
+    /// well-formed processed-mode spectrum the paired peak arrays MUST have equal lengths;
+    /// `defaultArrayLength` is derived from the m/z count, so a mismatch would silently mis-declare
+    /// the intensity array and corrupt the peak list on any consumer that trusts that attribute.
+    /// The emitter fails closed here rather than emitting a malformed `<spectrum>`. Phase 9 WR-01.
+    #[error(
+        "spectrum {index}: m/z array length {mz} != intensity array length {intensity} \
+         (paired peak arrays must be equal in processed mode)"
+    )]
+    ArrayLengthMismatch { index: u64, mz: u64, intensity: u64 },
+
     /// A prior [`crate::reverse::ibd::IbdWriter::append`] failed mid-array, poisoning the writer.
     /// Any subsequent `append`/`finish` fails fast with this arm rather than writing at a `cursor`
     /// that no longer matches the true (partially-written) file position. Phase 8 IBD-02.

@@ -306,6 +306,19 @@ impl ImzmlWriter {
         mz: ArrayEmit,
         intensity: ArrayEmit,
     ) -> Result<(), ReverseError> {
+        // Paired-array invariant (WR-01): in processed mode the m/z and intensity arrays are
+        // paired peak data and MUST have equal element counts. `defaultArrayLength` is declared
+        // from the m/z count alone, so an unequal intensity count would be silently mis-declared
+        // and corrupt the peak list on any consumer that trusts the attribute. Fail closed at the
+        // emit boundary BEFORE writing any bytes (no partial <spectrum> on disk).
+        if mz.1.count != intensity.1.count {
+            return Err(ReverseError::ArrayLengthMismatch {
+                index,
+                mz: mz.1.count,
+                intensity: intensity.1.count,
+            });
+        }
+
         // Resolve dtype terms BEFORE writing any bytes (reject non-{f32,f64} without a partial
         // <spectrum> on disk — Security V5).
         let (mz_dtype_acc, mz_dtype_name) = dtype_cv(mz.0, index, "m/z")?;
@@ -644,6 +657,42 @@ mod tests {
         assert!(!text.contains("IMS:1000042"), "no fabricated pixel-count x");
         assert!(!text.contains("IMS:1000046"), "no fabricated pixel-size x");
         assert!(!text.contains("IMS:1000044"), "no fabricated max-dimension x");
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// WR-01: an m/z↔intensity element-count mismatch is rejected with
+    /// [`ReverseError::ArrayLengthMismatch`] BEFORE any `<spectrum>` byte is written (fail-closed
+    /// paired-array invariant).
+    #[test]
+    fn count_mismatch_rejected() {
+        let dir = tempdir();
+        let path = dir.join("mismatch.imzML");
+        let mut w = ImzmlWriter::new(&path, Uuid::new_v4(), "deadbeef", 1, None).unwrap();
+        // m/z carries 3 elements, intensity carries 2 — a paired-array violation.
+        let mz_ref = ArrayRef { offset: 16, count: 3, encoded_len: 24 };
+        let int_ref = ArrayRef { offset: 40, count: 2, encoded_len: 8 };
+        let err = w
+            .write_spectrum(
+                0,
+                1,
+                2,
+                None,
+                (BinaryDataArrayType::Float64, mz_ref),
+                (BinaryDataArrayType::Float32, int_ref),
+            )
+            .unwrap_err();
+        match err {
+            ReverseError::ArrayLengthMismatch { index, mz, intensity } => {
+                assert_eq!(index, 0);
+                assert_eq!(mz, 3);
+                assert_eq!(intensity, 2);
+            }
+            other => panic!("expected ArrayLengthMismatch, got {other:?}"),
+        }
+        // No partial <spectrum> reached disk before the guard fired.
+        let text = read_text(&path);
+        assert!(!text.contains("<spectrum"), "no partial <spectrum> emitted on mismatch");
 
         fs::remove_dir_all(&dir).ok();
     }
