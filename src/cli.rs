@@ -248,10 +248,7 @@ pub fn classify_exit(e: &anyhow::Error) -> ExitCode {
         }
     }
     if let Some(ie) = e.downcast_ref::<IntegrityError>() {
-        if matches!(ie, IntegrityError::UnsupportedCompression { .. }) {
-            return ExitCode::from(EXIT_UNSUPPORTED);
-        }
-        return ExitCode::from(EXIT_INTEGRITY);
+        return classify_integrity_error(ie);
     }
 
     // 3) Coordinate-extraction failures (no scan / missing coordinate / duplicate) → code 4.
@@ -260,10 +257,7 @@ pub fn classify_exit(e: &anyhow::Error) -> ExitCode {
             return ExitCode::from(EXIT_COORDINATE);
         }
         if let ReadError::Integrity(ie) = re {
-            if matches!(ie, IntegrityError::UnsupportedCompression { .. }) {
-                return ExitCode::from(EXIT_UNSUPPORTED);
-            }
-            return ExitCode::from(EXIT_INTEGRITY);
+            return classify_integrity_error(ie);
         }
     }
     if let Some(ve) = e.downcast_ref::<VerifyError>() {
@@ -299,11 +293,25 @@ fn classify_read_error(re: &ReadError) -> ExitCode {
         ReadError::NoScan { .. } | ReadError::CoordMissing { .. } => {
             ExitCode::from(EXIT_COORDINATE)
         }
-        ReadError::Integrity(IntegrityError::UnsupportedCompression { .. }) => {
-            ExitCode::from(EXIT_UNSUPPORTED)
-        }
-        ReadError::Integrity(_) => ExitCode::from(EXIT_INTEGRITY),
+        ReadError::Integrity(ie) => classify_integrity_error(ie),
         _ => ExitCode::from(EXIT_GENERIC),
+    }
+}
+
+/// Classify an [`IntegrityError`]: an `UnsupportedCompression` is the unsupported-input class
+/// (3); a genuine integrity-VERIFICATION failure (UUID / checksum / missing `.ibd` / missing
+/// declaration) is the integrity class (2); a transport `Io` error (e.g. a missing input
+/// file) is NOT an integrity-verification failure and falls through to the generic class (1)
+/// so distinct failure classes keep distinct codes (CLI-04).
+fn classify_integrity_error(ie: &IntegrityError) -> ExitCode {
+    match ie {
+        IntegrityError::UnsupportedCompression { .. } => ExitCode::from(EXIT_UNSUPPORTED),
+        IntegrityError::Io(_) => ExitCode::from(EXIT_GENERIC),
+        IntegrityError::MissingIbd { .. }
+        | IntegrityError::MissingUuidDeclaration
+        | IntegrityError::MissingChecksumDeclaration
+        | IntegrityError::UuidMismatch { .. }
+        | IntegrityError::ChecksumMismatch { .. } => ExitCode::from(EXIT_INTEGRITY),
     }
 }
 
@@ -353,6 +361,18 @@ mod tests {
     #[test]
     fn generic_error_maps_to_code_one() {
         let e = anyhow!("some unrelated failure");
+        assert_eq!(
+            format!("{:?}", classify_exit(&e)),
+            format!("{:?}", ExitCode::from(EXIT_GENERIC))
+        );
+    }
+
+    #[test]
+    fn integrity_io_error_maps_to_generic_not_integrity() {
+        // A transport I/O failure inside preflight (e.g. a missing input file) is NOT an
+        // integrity-verification failure — it must take the generic code 1, distinct from 2.
+        let io = std::io::Error::new(std::io::ErrorKind::NotFound, "no such file");
+        let e = anyhow::Error::new(IntegrityError::Io(io));
         assert_eq!(
             format!("{:?}", classify_exit(&e)),
             format!("{:?}", ExitCode::from(EXIT_GENERIC))
