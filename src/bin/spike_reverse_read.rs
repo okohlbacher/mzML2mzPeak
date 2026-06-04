@@ -26,8 +26,10 @@
 //!   - count > 0 (RMZ-01),
 //!   - every sampled head pixel yields BOTH x and y by accession (RMZ-02),
 //!   - every sampled axis decodes to a `{F32, F64}` NumArray with len > 0 at its SOURCE dtype,
-//!     and across the sample NOT every axis is f64 (i.e. the f32 intensity width is observed —
-//!     the no-widening proof; RMZ-01 Pitfall 2),
+//!     and across the sample at least one f32 axis is observed ON A PROFILE PIXEL — i.e. an
+//!     f32 width decoded at its SOURCE dtype via `decode_axis`, the genuine no-widening proof
+//!     (WR-03: a Centroid/Unknown pixel's f32 is fabricated from the fixed-width peaks schema
+//!     and does NOT count; RMZ-01 Pitfall 2),
 //!   - the first pixel IS imaging (else ReverseError::NotImaging — RMZ-04 fail-closed),
 //!   - `metadata.imaging` was read without panic (present-or-None both pass — RMZ-03).
 //!
@@ -211,7 +213,12 @@ fn gate(archive_path: &str) -> anyhow::Result<bool> {
     let sample_n = HEAD_SAMPLE.min(count);
     let mut coords_ok = 0usize;
     let mut axes_ok = 0usize;
-    let mut saw_f32_axis = false; // the no-widening proof: an f32 axis must be observed
+    // WR-03: the no-widening proof. An f32 axis only PROVES no f32→f64 widening if it was
+    // decoded at its SOURCE dtype on the Profile/`decode_axis` path. A Centroid/Unknown pixel
+    // FABRICATES `NumArray::F32` from the fixed-width `spectra_peaks` schema regardless of any
+    // source dtype, so its f32 is not evidence of dtype preservation and must NOT satisfy this
+    // gate. We therefore only count f32 axes observed on `Representation::Profile` pixels.
+    let mut saw_f32_axis = false;
     let mut sample_failed = false;
 
     for i in 0..sample_n as u64 {
@@ -223,7 +230,12 @@ fn gate(archive_path: &str) -> anyhow::Result<bool> {
                     axes_ok += 1;
                 }
                 coords_ok += 1; // read_pixel only returns Ok when x AND y resolved
-                if matches!(p.mz, NumArray::F32(_)) || matches!(p.intensity, NumArray::F32(_)) {
+                // WR-03: only Profile pixels reach here via `decode_axis` (SOURCE-dtype
+                // decode); a Centroid/Unknown f32 is fabricated from the fixed-width peaks
+                // schema and is NOT a no-widening proof, so it is excluded here.
+                if p.representation == Representation::Profile
+                    && (matches!(p.mz, NumArray::F32(_)) || matches!(p.intensity, NumArray::F32(_)))
+                {
                     saw_f32_axis = true;
                 }
                 let z_part = p.z.map(|z| format!(" z={z}")).unwrap_or_default();
@@ -261,7 +273,7 @@ fn gate(archive_path: &str) -> anyhow::Result<bool> {
         && sample_n > 0
         && coords_ok == sample_n
         && axes_ok == sample_n
-        && saw_f32_axis; // no-widening proof: intensity stays f32, not all-f64
+        && saw_f32_axis; // no-widening proof: a Profile-path f32 axis decoded at SOURCE dtype
 
     Ok(pass)
 }
