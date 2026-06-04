@@ -83,15 +83,60 @@ pub fn convert(imzml_path: &Path, ibd_path: &Path, archive: &Path) -> Result<(),
     // Derive the body temp path (std only — no `tempfile` crate; mirrors the ibd.rs test pattern).
     let body_tmp = body_temp_path(imzml_path);
 
-    // The whole streaming + finalize sequence runs inside a closure so a single cleanup arm can
-    // best-effort remove ALL partial outputs (.ibd, .imzML, temp body) on ANY error (Pitfall 4).
+    // RAII cleanup (WR-01): tie partial-output removal to scope exit, not just the explicit error
+    // branch. If `run_pipeline` returns Err OR *panics* (an upstream `mzdata` bug, a `debug_assert!`
+    // in the XML emitter firing, etc.) the guard's Drop best-effort removes ALL partial outputs
+    // (.ibd, .imzML, temp body) while unwinding — no orphaned `imzml2mzpeak_body_*` temp accumulates
+    // in the OS temp dir across panicking runs (Pitfall 4 / threat T-10-PART). On success the guard
+    // is disarmed so the committed outputs survive (the temp body is removed inside run_pipeline,
+    // and the guard's later remove of an already-gone temp is a harmless no-op).
+    let guard = PartialOutputGuard::new(imzml_path, ibd_path, &body_tmp);
     let result = run_pipeline(&mut reader, count, uuid, imzml_path, ibd_path, &body_tmp, imaging);
-    if result.is_err() {
-        std::fs::remove_file(ibd_path).ok();
-        std::fs::remove_file(imzml_path).ok();
-        std::fs::remove_file(&body_tmp).ok();
+    if result.is_ok() {
+        // Committed: keep the .imzML/.ibd, do NOT let the guard delete them on drop.
+        guard.disarm();
     }
+    // On Err, the guard drops here armed → removes the partial .ibd/.imzML/temp body.
     result
+}
+
+/// RAII partial-output cleanup for [`convert`] (WR-01). Holds the three output paths and, while
+/// armed, best-effort removes them on `Drop` — so partial `.ibd`/`.imzML`/temp-body artifacts are
+/// cleaned up on BOTH an error return AND a panic unwind (the explicit error branch alone misses
+/// panics). [`disarm`](Self::disarm) is called on the success path to commit the outputs.
+struct PartialOutputGuard {
+    imzml: PathBuf,
+    ibd: PathBuf,
+    body_tmp: PathBuf,
+    armed: bool,
+}
+
+impl PartialOutputGuard {
+    fn new(imzml: &Path, ibd: &Path, body_tmp: &Path) -> Self {
+        Self {
+            imzml: imzml.to_path_buf(),
+            ibd: ibd.to_path_buf(),
+            body_tmp: body_tmp.to_path_buf(),
+            armed: true,
+        }
+    }
+
+    /// Disarm on the success path so the committed `.imzML`/`.ibd` are NOT removed on drop.
+    fn disarm(mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for PartialOutputGuard {
+    fn drop(&mut self) {
+        if self.armed {
+            // Best-effort — a failed remove (already gone / read-only dir) is not worth panicking
+            // over while we may already be unwinding from another panic.
+            std::fs::remove_file(&self.ibd).ok();
+            std::fs::remove_file(&self.imzml).ok();
+            std::fs::remove_file(&self.body_tmp).ok();
+        }
+    }
 }
 
 /// The bounded-memory streaming + Option-C finalize body. Split out so [`convert`] can wrap it in
@@ -432,6 +477,56 @@ mod tests {
         );
         assert!(!imzml.exists(), "no .imzML left after a non-imaging failure");
         assert!(!ibd.exists(), "no .ibd left after a non-imaging failure");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// WR-01: the RAII `PartialOutputGuard` removes a partial `.imzML`/`.ibd`/temp body on an
+    /// unwinding panic, not just on the explicit error branch. Simulates a mid-pipeline panic by
+    /// creating the three artifacts, dropping the (still-armed) guard inside `catch_unwind`, and
+    /// asserting all three are gone afterward.
+    #[test]
+    fn partial_output_guard_cleans_up_on_panic() {
+        let dir = tempdir();
+        let imzml = dir.join("partial.imzML");
+        let ibd = dir.join("partial.ibd");
+        let body_tmp = dir.join("partial.imzML.body");
+        std::fs::write(&imzml, b"partial xml").unwrap();
+        std::fs::write(&ibd, b"partial ibd").unwrap();
+        std::fs::write(&body_tmp, b"partial body").unwrap();
+
+        let (i2, b2, t2) = (imzml.clone(), ibd.clone(), body_tmp.clone());
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            // Guard is created and never disarmed → simulates the panic path of `convert`.
+            let _guard = PartialOutputGuard::new(&i2, &b2, &t2);
+            panic!("simulated mid-pipeline panic");
+        }));
+        assert!(result.is_err(), "the closure must have panicked");
+
+        assert!(!imzml.exists(), "armed guard removed the partial .imzML on panic-unwind");
+        assert!(!ibd.exists(), "armed guard removed the partial .ibd on panic-unwind");
+        assert!(!body_tmp.exists(), "armed guard removed the temp body on panic-unwind");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// WR-01: a disarmed guard (the success path) keeps the committed outputs on drop.
+    #[test]
+    fn partial_output_guard_disarm_keeps_outputs() {
+        let dir = tempdir();
+        let imzml = dir.join("kept.imzML");
+        let ibd = dir.join("kept.ibd");
+        let body_tmp = dir.join("kept.imzML.body");
+        std::fs::write(&imzml, b"committed xml").unwrap();
+        std::fs::write(&ibd, b"committed ibd").unwrap();
+
+        {
+            let guard = PartialOutputGuard::new(&imzml, &ibd, &body_tmp);
+            guard.disarm();
+        } // drop here — disarmed, so it must NOT remove the outputs.
+
+        assert!(imzml.exists(), "disarmed guard keeps the committed .imzML");
+        assert!(ibd.exists(), "disarmed guard keeps the committed .ibd");
 
         std::fs::remove_dir_all(&dir).ok();
     }
