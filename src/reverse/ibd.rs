@@ -276,4 +276,95 @@ mod tests {
 
         fs::remove_dir_all(&dir).ok();
     }
+
+    /// Compute the lowercase-hex MD5 of an explicit byte slice, reusing the RustCrypto `md-5`
+    /// already in the tree (no new crate). Test-only independent oracle for the checksum.
+    fn md5_hex(bytes: &[u8]) -> String {
+        use md5::Digest;
+        let mut h = md5::Md5::new();
+        h.update(bytes);
+        let out = h.finalize();
+        let mut s = String::with_capacity(out.len() * 2);
+        for b in out {
+            s.push_str(&format!("{b:02x}"));
+        }
+        s
+    }
+
+    /// IBD-03: finish() hashes the WHOLE file (header included). The returned hex equals an
+    /// independent MD5 over byte 0..EOF; a header-EXCLUDED digest is shown to differ.
+    #[test]
+    fn checksum_covers_whole_file() {
+        let dir = tempdir();
+        let path = dir.join("checksum.ibd");
+        let uuid = Uuid::new_v4();
+        let mut w = IbdWriter::new(&path, uuid).unwrap();
+        w.append(&NumArray::F64(vec![100.0, 200.0])).unwrap();
+        w.append(&NumArray::F32(vec![1.0, 2.0, 3.0])).unwrap();
+        let returned = w.finish().unwrap();
+
+        let bytes = fs::read(&path).unwrap();
+        let whole = md5_hex(&bytes);
+        assert_eq!(returned, whole, "finish() hex == MD5 of whole file (header included)");
+
+        // Guard against Pitfall 3: hashing only the array region MUST differ.
+        let array_region_only = md5_hex(&bytes[16..]);
+        assert_ne!(
+            returned, array_region_only,
+            "header-excluded digest must differ — proves the header is covered"
+        );
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// IBD-03: the minted UUID round-trips per the mzdata reader's check_ibd_file contract —
+    /// Uuid::from_bytes(file[0..16]) == writer.uuid().
+    #[test]
+    fn uuid_header_roundtrips() {
+        let dir = tempdir();
+        let path = dir.join("uuid.ibd");
+        let uuid = Uuid::new_v4();
+        let w = IbdWriter::new(&path, uuid).unwrap();
+        let writer_uuid = w.uuid();
+        let _ = w.finish().unwrap();
+
+        let bytes = fs::read(&path).unwrap();
+        let header: [u8; 16] = bytes[0..16].try_into().unwrap();
+        assert_eq!(Uuid::from_bytes(header), writer_uuid, "header round-trips to writer.uuid()");
+        assert_eq!(writer_uuid, uuid, "writer.uuid() is the minted value");
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Pitfall 7: a zero-length array returns (cursor, 0, 0), writes zero bytes, and leaves the
+    /// cursor unchanged — the next append starts at the same offset. The offset is still ≥ 16
+    /// (flagged for Phase 9: an empty array still carries its non-zero IMS:1000102 offset).
+    #[test]
+    fn empty_array_append() {
+        let dir = tempdir();
+        let path = dir.join("empty.ibd");
+        let mut w = IbdWriter::new(&path, Uuid::new_v4()).unwrap();
+
+        // First a real array so the empty one sits at a non-zero (>16) offset.
+        let r0 = w.append(&NumArray::F64(vec![1.0, 2.0])).unwrap();
+        assert_eq!(r0, ArrayRef { offset: 16, count: 2, encoded_len: 16 });
+
+        let empty = w.append(&NumArray::F32(vec![])).unwrap();
+        assert_eq!(
+            empty,
+            ArrayRef { offset: 32, count: 0, encoded_len: 0 },
+            "empty array: (cursor, 0, 0), offset still >= 16"
+        );
+
+        // The following append starts at the SAME cursor — empty array wrote nothing.
+        let r2 = w.append(&NumArray::F32(vec![9.0])).unwrap();
+        assert_eq!(r2.offset, 32, "cursor unchanged after empty append");
+
+        let _ = w.finish().unwrap();
+        let bytes = fs::read(&path).unwrap();
+        // 16 header + 16 (f64 x2) + 0 (empty) + 4 (f32 x1) = 36
+        assert_eq!(bytes.len(), 36, "empty array contributed zero bytes");
+
+        fs::remove_dir_all(&dir).ok();
+    }
 }
