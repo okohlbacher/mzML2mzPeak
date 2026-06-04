@@ -12,10 +12,10 @@ files_reviewed_list:
   - src/bin/spike_reverse_read.rs
 findings:
   critical: 0
-  warning: 3
+  warning: 0
   info: 4
-  total: 7
-status: issues_found
+  total: 4
+status: clean
 ---
 
 # Phase 10: Code Review Report
@@ -187,3 +187,64 @@ errors instead of truncating an unrelated file; retry with a new name on `Alread
 _Reviewed: 2026-06-04_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+
+## Re-review (iteration 2)
+
+**Re-reviewed:** 2026-06-04 (focused verification of WR-01/WR-02/WR-03 fixes; commits d0232d9, 2b456a1, 0e6ec4b)
+**Method:** Adversarial re-read of `src/reverse/convert.rs` + `src/cli.rs`, cross-checked against the
+full `ReverseError` variant set in `src/reverse/error.rs`; full `cargo test --lib` run (132 passed,
+including the 8 new fix tests).
+
+### WR-01 — RESOLVED
+
+RAII `PartialOutputGuard` (convert.rs:107-140) ties partial-output removal to scope exit. `convert`
+arms the guard before `run_pipeline` (line 93) and calls `disarm()` ONLY on `result.is_ok()` (lines
+95-98). Verified both directions:
+- **Success disarms, committed outputs survive:** `disarm(mut self)` consumes the guard by value and
+  sets `armed=false`; the moved-out original binding never drops again, and the disarmed copy's `Drop`
+  is a no-op. `run_pipeline` removes the temp body itself (line 193); the disarmed guard never touches
+  the `.imzML`/`.ibd`. Proven by `partial_output_guard_disarm_keeps_outputs`.
+- **Panic/Err removes:** on Err the still-armed guard drops at convert.rs:99 and removes all three; on a
+  panic the local guard drops while unwinding past line 94. `Drop` is best-effort (`.ok()`), correct for
+  the unwind path. Proven by `partial_output_guard_cleans_up_on_panic` (catch_unwind + AssertUnwindSafe).
+
+No regression: the orphaned-temp-on-panic leak that motivated WR-01 is closed.
+
+### WR-02 — RESOLVED (primary self-overwrite vector closed; see note)
+
+`reject_output_collision` + `same_file_path` (cli.rs:319-359) run in `run_reverse` (lines 245-246)
+AFTER `derive_reverse_paths` and BEFORE `convert` opens any `File::create`. Verified:
+- **Catches self-overwrite:** `same_file_path` canonicalizes both paths (full, then parent-dir +
+  filename for not-yet-created outputs, then lexical), so `./in.imzML` vs `in.imzML` and symlinks
+  collide. Proven by `reject_output_collision_errors_on_self_overwrite` (`.`-segment alias rejected).
+- **No false positive on distinct outputs:** distinct file names under the same canonical parent compare
+  unequal → Ok. Proven by `reject_output_collision_allows_distinct_outputs`.
+
+The data-loss-of-source vector (a derived output truncating the input archive mid-read) is closed.
+NOTE (carried as residual, not a re-opened Warning): the fix guards input-vs-output collision only; it
+does NOT add a clobber confirmation for an existing *unrelated* output file (the secondary silent-clobber
+angle of the original WR-02). That residual is Info-tier (`--force` ergonomics), not a data-loss-of-source
+risk, and does not block `clean`.
+
+### WR-03 — RESOLVED
+
+`classify_reverse_error` (cli.rs:536-557) now maps all six structural-defect variants
+(`UnsupportedDtype`, `ArrayLengthMismatch`, `MissingArray`, `MissingDataFacet`, `MissingMetadata`,
+`ArrayDecode`) uniformly to `EXIT_UNSUPPORTED` (3); I/O/internal (`IbdWrite`, `XmlEmit`, `IbdOverflow`,
+`IbdPoisoned`, `OpenArchive`) to `EXIT_GENERIC` (1); coordinate (`NotImaging`/`CoordMissing`/`NoScan`) to
+4; `Integrity` delegates to `classify_integrity_error` (2). Verified against `src/reverse/error.rs`: the
+match is **exhaustive with no wildcard arm** — all 15 variants are enumerated, so the compiler guarantees
+no variant silently falls through to a default code. The prior 1-vs-3 split (`MissingMetadata`/`ArrayDecode`
+diverging from `MissingArray`/`MissingDataFacet`) is gone; the "malformed archive" class is internally
+consistent. Pinned by `reverse_missing_metadata_*`, `reverse_array_decode_*`, `reverse_missing_array_*`,
+`reverse_open_archive_*` (all → expected codes).
+
+### Verdict
+
+All three Warnings resolved. Info items IN-01..IN-04 deferred (acceptable per scope). Status → `clean`.
+
+---
+
+_Re-reviewed: 2026-06-04 (iteration 2)_
+_Reviewer: Claude (gsd-code-reviewer)_
+_Depth: standard (focused re-verification)_
