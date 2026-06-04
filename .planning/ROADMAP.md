@@ -131,4 +131,4 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 | 8. `.ibd` Binary Writer (CRUX) | 1/1 | Complete    | 2026-06-04 |
 | 9. `.imzML` XML Emitter | 2/2 | Complete    | 2026-06-04 |
 | 10. Streaming Reverse Orchestration & `reverse` CLI | 3/3 | Complete    | 2026-06-04 |
-| 11. Reverse Roundtrip Verification & PXD001283 Acceptance | 1/1 | Complete   | 2026-06-04 |
+| 11. Reverse Roundtrip Verification & PXD001283 Acceptance | 1/1 | Complete    | 2026-06-04 |
