@@ -120,8 +120,17 @@ fn read_pixel(reader: &mut MzPeakReader, index: u64) -> Result<ReversePixel, Rev
                 decode_axis(int_da, index, "intensity")?,
             )
         }
-        // Centroid AND Unknown → spectra_peaks facet (Pattern E). The peaks facet stores m/z
-        // as f64 and intensity as f32 (upstream schema), so build the matching NumArray.
+        // Centroid AND Unknown → spectra_peaks facet (Pattern E). This is NOT a silent
+        // coercion: the upstream `spectra_peaks` schema is FIXED-WIDTH BY DESIGN. The only
+        // surface the reader exposes for it is `get_spectrum_peaks_for`, which materializes
+        // each point into an mzpeaks `CentroidPeak` whose `mz()` is `f64` and `intensity()`
+        // is `f32` at the TYPE level (mzpeaks 1.0.9) — there is NO narrower/wider source
+        // dtype to recover, unlike the Profile `spectra_data` facet that `decode_axis`
+        // branches on. The matching `NumArray::F64`/`NumArray::F32` below therefore RECORD
+        // the schema's actual fixed width; they do not widen/narrow an f32/f64 source array.
+        // WR-01/WR-02: `count_and_dtype` asserts this on the centroid fixture pixel, so the
+        // fixed-width property is proven, not implied. (If a dtype-preserving centroid facet
+        // ever appears upstream, route it through `decode_axis` exactly like the Profile arm.)
         Representation::Centroid | Representation::Unknown => {
             let peaks = reader
                 .get_spectrum_peaks_for(index)
