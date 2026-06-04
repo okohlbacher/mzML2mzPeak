@@ -85,7 +85,17 @@ fn provenance() -> RunProvenance {
 /// `finish_parquet → add_index_metadata("imaging", &block) → finish` sequence. Returns once the
 /// archive is fully finalized on disk.
 fn write_fixture(out: &Path, geom: Option<&ImagingRunMetadata>) -> Result<(), WriteError> {
-    let mut writer = ImagingWriter::new(out)?;
+    use mzdata::prelude::SpectrumLike;
+
+    // Reconstruct all fixture spectra up front, then derive the data-facet schema from their
+    // array maps (mirrors the reference's sample_array_types_from_spectrum_source — the schema is
+    // the UNION of the source-dtype columns actually present, so each width is registered once).
+    let specs: Vec<_> = fixture()
+        .iter()
+        .map(to_mzdata)
+        .collect::<Result<Vec<_>, _>>()?;
+    let sample_maps: Vec<&_> = specs.iter().filter_map(|s| s.raw_arrays()).collect();
+    let mut writer = ImagingWriter::new(out, &sample_maps)?;
 
     // Wire run metadata once (assembles + stores the metadata.imaging block on the writer).
     let source = FileMetadataConfig::default();
@@ -93,9 +103,8 @@ fn write_fixture(out: &Path, geom: Option<&ImagingRunMetadata>) -> Result<(), Wr
     writer.write_run_metadata(&source, &prov, geom)?;
 
     // Streaming write loop (one spectrum at a time; routing is automatic by signal_continuity).
-    for s in fixture() {
-        let mz_spec = to_mzdata(&s)?;
-        writer.write_spectrum(&mz_spec)?;
+    for mz_spec in &specs {
+        writer.write_spectrum(mz_spec)?;
     }
 
     // Ensure the chromatograms_* facet exists (empty — no TIC), so the reference reader can

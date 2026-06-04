@@ -9,11 +9,21 @@
 //!      `add_spectrum_scan_field(CustomBuilderFromParameter::from_spec(..))`, with ZERO edits
 //!      to any core `mzpeak_prototyping` struct (CONTEXT Area 1, OUT-02). `from_spec` only
 //!      accepts `Int64` for these; all three specs already declare `DataType::Int64`.
-//!   1b. **Data-column registration (DAT-01).** At `new`, the spectra_data POINT columns
-//!      (m/z + intensity, BOTH Float64 and Float32 variants, at the canonical PSI-MS units) are
-//!      registered via `add_spectrum_field` so profile/processed per-spectrum m/z + intensity
-//!      populate `point.mz` / `point.intensity` at the SOURCE width instead of spilling to
-//!      `spectrum.auxiliary_arrays`. See [`spectra_data_point_fields`] for the mechanism.
+//!   1b. **Data-column registration (DAT-01).** At `new`, the spectra_data POINT columns are
+//!      DERIVED FROM SAMPLE SPECTRA — exactly as the reference converter does
+//!      (`examples/convert.rs:414` → `sample_array_types_from_spectrum_source` →
+//!      `array_map_to_schema_arrays`, writer.rs:130). We feed the reconstructed first
+//!      spectrum's (`to_mzdata`) `raw_arrays()` map through the reference's public
+//!      `peak_series::array_map_to_schema_arrays` and register each derived `FieldRef` via
+//!      `add_spectrum_field`. This produces exactly ONE m/z column and ONE intensity column at
+//!      the SOURCE dtype the data actually uses (f64 m/z + f32 intensity for the real PXD001283
+//!      file), so per-spectrum m/z + intensity populate `point.mz` / `point.intensity` at the
+//!      source width instead of spilling to `spectrum.auxiliary_arrays`, and NOTHING is widened.
+//!      Registering a speculative second width that no spectrum produces is structurally invalid
+//!      for the point model (an always-unvisited sibling column collides with the writer's
+//!      zero-intensity-run masking on `build(_, true)`, panicking
+//!      `array_buffer.rs:356` with mismatched record-batch column lengths) — so we register only
+//!      widths present in the sampled spectra. See [`data_facet_fields_from_samples`].
 //!   2. **Metadata mapping (OUT-03).** `write_run_metadata` copies source PSI-MS + IMS
 //!      metadata, records `imzml2mzpeak` conversion provenance, and maps [`RunProvenance`]
 //!      into `file_description` by IMS accession (SPA-04). It ALSO assembles + stores the
@@ -31,6 +41,8 @@ use std::fs::File;
 use std::path::Path;
 
 use mzpeak_prototyping::archive::ZipArchiveWriter;
+use mzpeak_prototyping::buffer_descriptors::BufferOverrideTable;
+use mzpeak_prototyping::peak_series::array_map_to_schema_arrays;
 use mzpeak_prototyping::writer::{
     AbstractMzPeakWriter, CustomBuilderFromParameter, MzPeakWriterType,
 };
@@ -41,7 +53,7 @@ use mzdata::spectrum::bindata::{ArrayType, BinaryArrayMap, BinaryDataArrayType, 
 use mzdata::curie;
 use mzdata::meta::{DataProcessing, ProcessingMethod, Software, custom_software_name};
 use mzdata::params::Param;
-use mzdata::prelude::{MSDataFileMetadata, ParamDescribed};
+use mzdata::prelude::{ByteArrayView, MSDataFileMetadata, ParamDescribed};
 use mzdata::spectrum::MultiLayerSpectrum;
 
 use crate::read::{RunProvenance, StorageMode};
@@ -137,7 +149,16 @@ impl ImagingWriter {
     /// interpreted or joined (V12). Coordinate columns are registered SOLELY through
     /// `add_spectrum_scan_field(CustomBuilderFromParameter::from_spec(..))`; no core struct is
     /// edited. No encryption is configured (V6).
-    pub fn new(out_path: &Path) -> Result<Self, WriteError> {
+    ///
+    /// `sample_arrays` is a slice of reconstructed-spectrum array maps (`MultiLayerSpectrum`'s
+    /// `raw_arrays()`) used to DERIVE the spectra_data POINT-column schema, mirroring the
+    /// reference converter's `sample_array_types_from_spectrum_source` (examples/convert.rs:414).
+    /// Each map's `(array_type, dtype, unit)` tuple determines one POINT column at the SOURCE
+    /// dtype; passing the first reconstructed spectrum is sufficient for a dtype-homogeneous
+    /// imzML file (the real-world case). Passing several maps registers the UNION of widths
+    /// actually present (used by the mixed-dtype verification fixture). An EMPTY slice registers
+    /// no data columns — the writer falls back to its default index-only POINT schema.
+    pub fn new(out_path: &Path, sample_arrays: &[&BinaryArrayMap]) -> Result<Self, WriteError> {
         let handle = File::create(out_path)?;
 
         // Register the coordinate columns ONCE on the builder. Each `from_spec` builds a
@@ -153,27 +174,18 @@ impl ImagingWriter {
             ));
         }
 
-        // Register the spectra_data POINT columns so profile/processed m/z + intensity land in
-        // `point.mz` / `point.intensity` instead of falling through to `spectrum.auxiliary_arrays`
-        // (DAT-01). The previous `add_spectrum_peak_type::<CentroidPeak>()` registered a FIXED
-        // Float64-m/z (Unit::MZ) + Float32-intensity (Unit::DetectorCounts) schema; at write time
-        // the reference matches an incoming array to a schema column by FIELD NAME, which encodes
-        // (array_type, dtype, unit). Our reconstructed arrays (`to_mzdata`) carry the SOURCE dtype
-        // (F32 *or* F64) at `Unit::Unknown`, so NONE matched the fixed Float64/MZ-unit column and
-        // every value serialized NULL in the POINT columns while the real data spilled to aux.
-        //
-        // Fix: register BOTH the Float64 and Float32 variants of m/z and intensity at
-        // `Unit::Unknown` — exactly the (array_type, dtype, unit) tuples `to_mzdata` emits. The
-        // writer's `mark_primary_arrays` collapses the first-registered variant of each axis to
-        // the bare `mz` / `intensity` primary column and keeps the other as a dtype-suffixed
-        // sibling, so whichever width a given spectrum carries finds a matching column. THE CRUX:
-        // an F32 array stays in the f32 column and an F64 array in the f64 column — never widened.
-        // (Real imzML is dtype-homogeneous per file, so only one width is populated and the other
-        // column stays all-NULL, which Parquet stores near-free; a mixed-width file — e.g. the
-        // verification fixture — populates both.) The centroid `spectra_peaks` facet needs NO
-        // registration here: its writer is created on demand with the canonical CentroidPeak
-        // schema by the reference writer itself (writer.rs `get_or_create_peak_writer`).
-        for field in spectra_data_point_fields() {
+        // Register the spectra_data POINT columns DERIVED FROM the sample array maps so
+        // profile/processed m/z + intensity land in `point.mz` / `point.intensity` at their
+        // SOURCE width instead of spilling to `spectrum.auxiliary_arrays` (DAT-01). This mirrors
+        // the reference (examples/convert.rs:414 → sample_array_types_from_spectrum_source →
+        // peak_series::array_map_to_schema_arrays, writer.rs:130): the schema is derived from the
+        // arrays the data ACTUALLY carries, producing exactly one m/z column and one intensity
+        // column per width present. We pass each derived field through `add_spectrum_field`. We
+        // deliberately do NOT hand-register a speculative second width: a permanently-unvisited
+        // sibling POINT column collides with the writer's zero-intensity-run masking under
+        // `build(_, true)` and panics array_buffer.rs:356 ("all columns in a record batch must
+        // have the same length"). See [`data_facet_fields_from_samples`] for the field union.
+        for field in data_facet_fields_from_samples(sample_arrays) {
             builder = builder.add_spectrum_field(field);
         }
 
@@ -306,49 +318,66 @@ impl ImagingWriter {
     }
 }
 
-/// The spectra_data POINT columns to register on the writer builder: BOTH the Float64 and
-/// Float32 variants of m/z and intensity, at `Unit::Unknown` (the unit `to_mzdata`'s
-/// reconstructed arrays carry). Registering both widths means whichever dtype a given spectrum
-/// holds finds a matching POINT column, so its values land in `point.mz` / `point.intensity`
-/// rather than `auxiliary_arrays` — at the SOURCE width (THE CRUX: no f32→f64 widening).
+/// Derive the spectra_data POINT-column schema from `sample_arrays`, mirroring the reference
+/// converter's array-type sampling (examples/convert.rs:414 → `sample_array_types_from_…` →
+/// `peak_series::array_map_to_schema_arrays`, writer.rs:130).
 ///
-/// The first-registered variant of each axis becomes the writer's bare `mz` / `intensity`
-/// primary column; the sibling keeps a dtype-suffixed name. Ordered (m/z Float64, m/z Float32,
-/// intensity Float64, intensity Float32) so the Float64 variants are the primaries, matching
-/// the reference's canonical layout.
-fn spectra_data_point_fields() -> Vec<arrow::datatypes::FieldRef> {
-    use mzdata::params::Unit;
-    use mzpeak_prototyping::BufferName;
-    // The `spectrum_index` field MUST be included: once any field is registered the writer
-    // skips its default-field path (which would otherwise add the index column), so omitting it
-    // leaves the POINT struct with no `spectrum_index` and panics at write time in
-    // `PointBuffers::add_arrays` ("Unexpected field spectrum_index").
-    //
-    // Each axis is registered at BOTH widths with the SAME canonical unit `to_mzdata` tags onto
-    // its arrays (m/z → Unit::MZ, intensity → Unit::DetectorCounts), so the write-time
-    // `BufferName::from_data_array` matches a column by (array_type, dtype, unit). The units
-    // also match the reference's canonical schema, keeping the layout mergeable-by-design.
-    let mut fields = vec![BufferContext::Spectrum.index_field()];
-    for (array_type, dtype, unit) in [
-        (ArrayType::MZArray, BinaryDataArrayType::Float64, Unit::MZ),
-        (ArrayType::MZArray, BinaryDataArrayType::Float32, Unit::MZ),
-        (
-            ArrayType::IntensityArray,
-            BinaryDataArrayType::Float64,
-            Unit::DetectorCounts,
-        ),
-        (
-            ArrayType::IntensityArray,
-            BinaryDataArrayType::Float32,
-            Unit::DetectorCounts,
-        ),
-    ] {
-        fields.push(
-            BufferName::new(BufferContext::Spectrum, array_type, dtype)
-                .with_unit(unit)
-                .to_field(),
-        );
+/// For each sample `BinaryArrayMap` we run the reference's public
+/// [`array_map_to_schema_arrays`] (the exact non-chunked path the reference's private
+/// `ArrayTypesSampler` uses) with a default [`BufferOverrideTable`] and the map's primary-axis
+/// length. That yields the `spectrum_index` field plus one `FieldRef` per array AT ITS SOURCE
+/// dtype — `BufferName::from_data_array` keys the column name on `(array_type, dtype, unit)`, so
+/// an f64 m/z array produces an f64 m/z column and an f32 one an f32 column (THE CRUX: no
+/// widening). We accumulate the UNION of derived fields by name (de-duplicated), so:
+///   * a dtype-homogeneous file (passing one sample — the real-world case) registers exactly one
+///     m/z column + one intensity column at the file's actual widths; and
+///   * a mixed-width fixture (passing several samples) registers each width once.
+///
+/// We do NOT add a speculative width absent from every sample: a permanently-unvisited sibling
+/// POINT column collides with the writer's zero-intensity-run masking under `build(_, true)` and
+/// panics `array_buffer.rs:356`. `spectrum_index` is included (it is the first field
+/// `array_map_to_schema_arrays` emits): once any field is registered the writer skips its
+/// default-field path, so omitting `spectrum_index` would panic `PointBuffers::add_arrays`
+/// ("Unexpected field spectrum_index").
+///
+/// An empty `sample_arrays` returns an empty `Vec` — the builder then keeps its default
+/// index-only POINT schema.
+fn data_facet_fields_from_samples(
+    sample_arrays: &[&BinaryArrayMap],
+) -> Vec<arrow::datatypes::FieldRef> {
+    let overrides = BufferOverrideTable::default();
+    let mut fields: Vec<arrow::datatypes::FieldRef> = Vec::new();
+
+    for map in sample_arrays {
+        // Primary-axis length: the number of points along the context's default sorted array
+        // (m/z for spectra). `array_map_to_schema_arrays` uses it to size the index column and to
+        // detect ragged auxiliary arrays; here every array is the same length, so this is just
+        // the point count. A 0 length still derives the correct FIELD types (only the array data
+        // would differ), which is all we need for schema registration.
+        let primary_len = map
+            .get(&BufferContext::Spectrum.default_sorted_array())
+            .and_then(|a| a.data_len().ok())
+            .unwrap_or_default();
+
+        // The reference's exact non-chunked schema-derivation path. source_index/source_time are
+        // schema-irrelevant placeholders (0 / None). Errors are non-fatal for sampling: skip a
+        // map we cannot decode rather than abort (the writer falls back to its default schema).
+        if let Ok((derived, _arrays)) = array_map_to_schema_arrays(
+            BufferContext::Spectrum,
+            map,
+            primary_len,
+            0,
+            None,
+            &overrides,
+        ) {
+            for f in derived.iter() {
+                if !fields.iter().any(|g| g.name() == f.name()) {
+                    fields.push(f.clone());
+                }
+            }
+        }
     }
+
     fields
 }
 
@@ -496,7 +525,7 @@ mod tests {
     fn new_builds_writer_at_temp_path() {
         let mut out = std::env::temp_dir();
         out.push(format!("imzml2mzpeak_writer_new_{}.mzpeak", std::process::id()));
-        let w = ImagingWriter::new(&out).expect("ImagingWriter::new builds with column registration");
+        let w = ImagingWriter::new(&out, &[]).expect("ImagingWriter::new builds with column registration");
         // The imaging block is not yet assembled (that is write_run_metadata's job, Task 2).
         assert!(w.imaging_block.is_none(), "imaging block unset until metadata is wired");
         // WR-02: imaging_metadata() returns a typed error (not a panic) before metadata wiring.
@@ -519,7 +548,7 @@ mod tests {
 
         let mut out = std::env::temp_dir();
         out.push(format!("imzml2mzpeak_writer_meta_{}.mzpeak", std::process::id()));
-        let mut w = ImagingWriter::new(&out).expect("build writer");
+        let mut w = ImagingWriter::new(&out, &[]).expect("build writer");
 
         let prov = RunProvenance {
             uuid: Some("4f8c2e1a-0000-4000-8000-000000000abc".to_string()),
@@ -578,7 +607,7 @@ mod tests {
 
         let mut out = std::env::temp_dir();
         out.push(format!("imzml2mzpeak_writer_min_{}.mzpeak", std::process::id()));
-        let mut w = ImagingWriter::new(&out).expect("build writer");
+        let mut w = ImagingWriter::new(&out, &[]).expect("build writer");
 
         let prov = RunProvenance {
             uuid: None,
@@ -610,7 +639,7 @@ mod tests {
 
         let mut out = std::env::temp_dir();
         out.push(format!("imzml2mzpeak_writer_chrom_{}.mzpeak", std::process::id()));
-        let mut w = ImagingWriter::new(&out).expect("build writer");
+        let mut w = ImagingWriter::new(&out, &[]).expect("build writer");
 
         let prov = RunProvenance {
             uuid: None,

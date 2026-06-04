@@ -22,6 +22,8 @@
 
 use std::path::Path;
 
+use mzdata::prelude::SpectrumLike;
+
 use crate::read::ImagingReader;
 use crate::write::{ImagingWriter, WriteError, to_mzdata};
 
@@ -35,9 +37,28 @@ use crate::write::{ImagingWriter, WriteError, to_mzdata};
 ///
 /// The output path is used VERBATIM by [`ImagingWriter::new`] (`File::create`); its contents
 /// are never interpreted (V12).
-pub fn convert(reader: ImagingReader, out_path: &Path) -> Result<(), WriteError> {
-    // (1) Open the writer (one-time coordinate-column registration on the builder).
-    let mut writer = ImagingWriter::new(out_path)?;
+pub fn convert(mut reader: ImagingReader, out_path: &Path) -> Result<(), WriteError> {
+    // (1) SAMPLE the data-facet dtype from the FIRST spectrum, then build the writer with a
+    //     POINT-column schema derived from that sample — mirroring the reference converter's
+    //     `sample_array_types_from_spectrum_source` (examples/convert.rs:414). A real imzML file
+    //     is dtype-homogeneous (uniformly f64 m/z + f32 intensity for PXD001283), so the first
+    //     spectrum's widths ARE the file's schema; deriving the schema from the actual data (vs.
+    //     hand-registering both widths) yields exactly one correctly-typed m/z + intensity POINT
+    //     column and never panics on the record-batch-length invariant (DAT-01). The first
+    //     reconstructed spectrum is retained and written FIRST below, so no spectrum is dropped
+    //     and the reader is consumed exactly once (bounded memory — only ONE spectrum is held).
+    let first = match reader.next() {
+        Some(item) => Some(to_mzdata(&item?)?),
+        None => None,
+    };
+    let sample_maps: Vec<&_> = first
+        .as_ref()
+        .and_then(|s| s.raw_arrays())
+        .into_iter()
+        .collect();
+    let mut writer = ImagingWriter::new(out_path, &sample_maps)?;
+    // `sample_maps` borrows `first`; drop the borrow before `first` is written below.
+    drop(sample_maps);
 
     // (2) Wire run metadata ONCE before the loop. Provenance is cloned out of the reader so
     //     the source-metadata borrow ends before the loop consumes the reader by value;
@@ -48,9 +69,13 @@ pub fn convert(reader: ImagingReader, out_path: &Path) -> Result<(), WriteError>
     let provenance = reader.provenance().clone();
     writer.write_run_metadata(reader.source_metadata(), &provenance, None)?;
 
-    // (3) Streaming read→write loop: ONE spectrum at a time (IN-08 — no collect-all). Each
-    //     read error propagates via `?` (WriteError::Read). Routing is automatic: the writer
-    //     dispatches on signal_continuity (set verbatim in to_mzdata) — NO branch here.
+    // (3) Write the sampled-first spectrum (if any), then stream the REST one at a time
+    //     (IN-08 — no collect-all). Each read error propagates via `?` (WriteError::Read).
+    //     Routing is automatic: the writer dispatches on signal_continuity (set verbatim in
+    //     to_mzdata) — NO branch here.
+    if let Some(first) = first {
+        writer.write_spectrum(&first)?;
+    }
     for item in reader {
         let s = item?;
         // to_mzdata is fallible (WR-01 axis-length, CR-02 non-finite m/z, WR-03 coordinate
@@ -95,7 +120,7 @@ mod tests {
         // A path under a non-existent directory cannot be created (ENOENT → io::Error).
         let bad = Path::new("/nonexistent-dir-xyz-imzml2mzpeak/out.mzpeak");
         // `ImagingWriter` is not `Debug`, so match on the Result rather than `expect_err`.
-        match ImagingWriter::new(bad) {
+        match ImagingWriter::new(bad, &[]) {
             Ok(_) => panic!("creating under a missing dir must fail"),
             Err(err) => assert!(
                 matches!(err, WriteError::Io(_)),

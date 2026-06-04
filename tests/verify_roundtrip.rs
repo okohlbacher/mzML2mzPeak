@@ -110,7 +110,19 @@ fn provenance() -> RunProvenance {
 /// `write_roundtrip.rs::write_fixture` (:83-114) to take the fixture slice. Returns once the
 /// archive is fully finalized on disk. No `.ibd` is involved (Pitfall 5).
 fn write_fixture(out: &Path, spectra: &[ImagingSpectrum]) -> Result<(), WriteError> {
-    let mut writer = ImagingWriter::new(out)?;
+    use mzdata::spectrum::SpectrumLike;
+
+    // Reconstruct all spectra up front, then derive the data-facet schema from their array maps
+    // (mirrors the reference's sample_array_types_from_spectrum_source). The verification fixture
+    // is mixed-dtype (an F64-m/z and an F32-m/z profile pixel), so sampling ALL of them registers
+    // BOTH the f64 `mz_f64_mz` column and the primary f32 `mz` column — each width once, at its
+    // source dtype (no widening). A real (dtype-homogeneous) file registers a single m/z column.
+    let specs: Vec<_> = spectra
+        .iter()
+        .map(to_mzdata)
+        .collect::<Result<Vec<_>, _>>()?;
+    let sample_maps: Vec<&_> = specs.iter().filter_map(|s| s.raw_arrays()).collect();
+    let mut writer = ImagingWriter::new(out, &sample_maps)?;
 
     // Wire run metadata once (assembles + stores the metadata.imaging block on the writer).
     let source = FileMetadataConfig::default();
@@ -118,9 +130,8 @@ fn write_fixture(out: &Path, spectra: &[ImagingSpectrum]) -> Result<(), WriteErr
     writer.write_run_metadata(&source, &prov, None)?;
 
     // Streaming write loop (one spectrum at a time; routing is automatic by signal_continuity).
-    for s in spectra {
-        let mz_spec = to_mzdata(s)?;
-        writer.write_spectrum(&mz_spec)?;
+    for mz_spec in &specs {
+        writer.write_spectrum(mz_spec)?;
     }
 
     // Empty chromatograms_* facet so the reference reader can open (it eagerly loads chromatogram
@@ -431,6 +442,166 @@ fn point_columns_populated_not_auxiliary() {
     assert_eq!(total_points, 7, "profile pixels contribute 3 + 4 = 7 POINT rows");
     assert!(saw_f64_mz, "the F64-m/z profile pixel populated the `mz_f64` POINT column (no widening)");
     assert!(saw_f32_mz, "the F32-m/z profile pixel populated the primary `mz` POINT column (THE CRUX)");
+
+    let _ = std::fs::remove_file(&data_path);
+    let _ = std::fs::remove_file(&out);
+}
+
+/// REGRESSION (the real-data panic, DAT-01): a dtype-HOMOGENEOUS file with the exact dtype
+/// profile of PXD001283 — uniformly Float64 m/z + Float32 intensity profile spectra — AND
+/// zero-intensity runs (which trigger the writer's `mask_zero_intensity_runs` drop path) must
+/// convert WITHOUT panicking and land in a SINGLE correctly-typed pair of POINT columns.
+///
+/// The previous fix hand-registered BOTH the f64 and f32 widths of m/z AND intensity. For a
+/// uniform f64-m/z + f32-intensity file that left the f32-`mz` and f64-`intensity` POINT columns
+/// permanently unvisited; combined with the zero-run masking (`build(_, true)`) it produced
+/// mismatched record-batch column lengths and panicked `array_buffer.rs:356`
+/// ("all columns in a record batch must have the same length"). The earlier synthetic fixtures
+/// could NOT catch it because none had zero-intensity runs (so the masking path never fired) and
+/// they were mixed-dtype (so both width columns were genuinely visited). This fixture reproduces
+/// BOTH conditions: uniform f64-m/z + f32-intensity AND embedded zero-intensity points. The
+/// sampled-schema fix registers exactly one m/z (f64) + one intensity (f32) column, so there is
+/// no unvisited sibling and the masking path is consistent.
+///
+/// Asserts: (1) `write_fixture` does not panic — THE crux of this regression; (2) the surviving
+/// data-facet points decode at the SOURCE width with NO widening (every read-back m/z equals an
+/// exact f64 source value; every read-back intensity equals an exact f32 source value) — note
+/// `mask_zero_intensity_runs = true` deliberately drops zero-intensity RUNS, so the read-back is a
+/// subset, not the full array (that masking is the reference writer's documented behavior, not
+/// this fix's concern); (3) the POINT columns are populated as a SINGLE f64 `mz_f64_mz` column
+/// (NOT split across two speculative widths) plus the single f32 `intensity` column.
+#[test]
+fn uniform_f64_mz_f32_intensity_with_zero_runs_no_panic() {
+    use arrow::array::{Array, AsArray};
+    use mzdata::spectrum::bindata::{ArrayType, ByteArrayView};
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+
+    // Two profile pixels, both Float64 m/z + Float32 intensity (the real-data profile), each with
+    // a run of zero intensities so the writer's zero-run masking actually fires.
+    let fx = vec![
+        ImagingSpectrum {
+            x: 1,
+            y: 1,
+            z: None,
+            mz: NumArray::F64(vec![100.0, 200.0, 300.0, 400.0, 500.0]),
+            intensity: NumArray::F32(vec![0.0, 0.0, 42.0, 0.0, 7.5]),
+            representation: Representation::Profile,
+            ms_level: 1,
+            native_id: "spectrum=1".to_string(),
+        },
+        ImagingSpectrum {
+            x: 2,
+            y: 1,
+            z: None,
+            mz: NumArray::F64(vec![110.0, 220.0, 330.0]),
+            intensity: NumArray::F32(vec![5.0, 0.0, 0.0]),
+            representation: Representation::Profile,
+            ms_level: 1,
+            native_id: "spectrum=2".to_string(),
+        },
+    ];
+
+    let out = temp_out("uniformf64zeroruns");
+    // (1) The load-bearing assertion: this must NOT panic (it did on real data before the fix).
+    write_fixture(&out, &fx).expect("uniform f64-m/z + f32-intensity (with zero runs) converts");
+
+    // (2) The surviving data-facet points decode at the SOURCE width with NO widening. Because
+    //     mask_zero_intensity_runs drops zero-intensity runs, the read-back is a SUBSET of the
+    //     source — so we assert each surviving value is an EXACT member of the source array at the
+    //     source width (f64 m/z, f32 intensity), proving no f32-widening crept in.
+    let mut reader = MzPeakReader::new(&out).expect("reader opens");
+    for s in &fx {
+        let mut out_idx = None;
+        for i in 0..reader.len() as u64 {
+            let descr = reader.get_spectrum_metadata(i).expect("meta").expect("present");
+            let scan = descr.acquisition.first_scan().expect("scan");
+            let x = scan.get_param_by_curie(&curie!(IMS:1000050)).and_then(|p| p.value.to_i64().ok());
+            let y = scan.get_param_by_curie(&curie!(IMS:1000051)).and_then(|p| p.value.to_i64().ok());
+            if x == Some(s.x) && y == Some(s.y) {
+                out_idx = Some(i);
+                break;
+            }
+        }
+        let out_idx = out_idx.expect("pixel resolves to an output index");
+        let arrays = reader
+            .get_spectrum_arrays(out_idx)
+            .expect("read data facet")
+            .expect("profile pixel has data-facet arrays");
+        let NumArray::F64(src_mz) = &s.mz else { unreachable!() };
+        let NumArray::F32(src_int) = &s.intensity else { unreachable!() };
+        let got_mz = arrays.get(&ArrayType::MZArray).expect("m/z").to_f64().expect("f64 m/z");
+        let got_int = arrays.get(&ArrayType::IntensityArray).expect("int").to_f32().expect("f32 int");
+        assert!(!got_mz.is_empty(), "surviving m/z points present at ({},{})", s.x, s.y);
+        assert_eq!(got_mz.len(), got_int.len(), "m/z and intensity stay paired after masking");
+        for &m in got_mz.iter() {
+            assert!(
+                src_mz.iter().any(|&v| v == m),
+                "read-back m/z {m} is an exact f64 source value (no widening) at ({},{})",
+                s.x, s.y
+            );
+        }
+        for &v in got_int.iter() {
+            assert!(
+                src_int.iter().any(|&w| w == v),
+                "read-back intensity {v} is an exact f32 source value (no widening) at ({},{})",
+                s.x, s.y
+            );
+        }
+    }
+
+    // (3) The POINT columns: a SINGLE f64 m/z column (`mz_f64_mz`) and a SINGLE f32 intensity
+    //     column (`intensity`) — confirming the schema was NOT split into two speculative widths.
+    let file = std::fs::File::open(&out).expect("open archive");
+    let mut zip = zip::ZipArchive::new(file).expect("open zip");
+    let data_path = out.with_extension("uf64.spectra_data.parquet");
+    {
+        let mut f = zip.by_name("spectra_data.parquet").expect("spectra_data present");
+        let mut tmp = std::fs::File::create(&data_path).expect("create temp parquet");
+        std::io::copy(&mut f, &mut tmp).expect("copy parquet");
+    }
+    let tmp = std::fs::File::open(&data_path).expect("reopen temp parquet");
+    let pq = ParquetRecordBatchReaderBuilder::try_new(tmp).expect("builder").build().expect("reader");
+    let mut saw_any = false;
+    for batch in pq {
+        let batch = batch.expect("batch");
+        let point = batch.column_by_name("point").expect("point struct").as_struct();
+        // For a uniform f64-m/z file the writer collapses the single (and only) m/z axis to the
+        // bare primary `mz` column, at Float64 — and there is NO second dtype-suffixed m/z sibling
+        // (the broken fix's speculative f32 `mz_f32` / f64-suffixed columns). Assert exactly ONE
+        // m/z column, of Float64 type, and that it is non-null for every surviving point.
+        let mz_cols: Vec<_> = point
+            .fields()
+            .iter()
+            .filter(|f| {
+                let n = f.name();
+                n == "mz" || n.starts_with("mz_")
+            })
+            .collect();
+        assert_eq!(
+            mz_cols.len(),
+            1,
+            "exactly ONE m/z POINT column for a uniform f64-m/z file (DAT-01 regression), got {:?}",
+            mz_cols.iter().map(|f| f.name()).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            mz_cols[0].data_type(),
+            &arrow::datatypes::DataType::Float64,
+            "the single m/z POINT column is Float64 — source width preserved, no widening/narrowing"
+        );
+        let mz = point
+            .column_by_name(mz_cols[0].name())
+            .unwrap()
+            .as_primitive::<arrow::datatypes::Float64Type>();
+        let _intensity = point
+            .column_by_name("intensity")
+            .expect("single f32 intensity POINT column present")
+            .as_primitive::<arrow::datatypes::Float32Type>();
+        for i in 0..point.len() {
+            assert!(mz.is_valid(i), "row {i}: m/z must be non-null in the single f64 POINT column");
+            saw_any = true;
+        }
+    }
+    assert!(saw_any, "the profile pixels contributed POINT rows");
 
     let _ = std::fs::remove_file(&data_path);
     let _ = std::fs::remove_file(&out);
