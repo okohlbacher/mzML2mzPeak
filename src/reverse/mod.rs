@@ -11,11 +11,13 @@
 //!   those triples into the `IMS:1000102/103/104` external-data cvParams the vendored
 //!   `mzdata::ImzMLReader` re-reads.
 
+pub mod convert;
 pub mod error;
 pub mod ibd;
 pub mod imzml_writer;
 pub mod source;
 
+pub use convert::convert;
 pub use error::ReverseError;
 pub use ibd::{ArrayRef, IbdWriter};
 pub use imzml_writer::ImzmlWriter;
