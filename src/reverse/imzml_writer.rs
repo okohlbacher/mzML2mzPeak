@@ -284,10 +284,15 @@ impl ImzmlWriter {
             self.cv_param("IMS", "IMS:1000044", "max dimension x", &md.x.to_string())?;
             self.cv_param("IMS", "IMS:1000045", "max dimension y", &md.y.to_string())?;
         }
-        // pixel_size_um → IMS:1000046 (x) / IMS:1000047 (y)
+        // pixel_size_um → IMS:1000046 (x) / IMS:1000047 (y). A non-finite value (NaN/±inf) is
+        // OMITTED rather than emitted as an invalid numeric cvParam token (WR-03).
         if let Some(ps) = meta.pixel_size_um {
-            self.cv_param("IMS", "IMS:1000046", "pixel size x", &format_f64(ps.x))?;
-            self.cv_param("IMS", "IMS:1000047", "pixel size y", &format_f64(ps.y))?;
+            if let Some(x) = format_f64(ps.x) {
+                self.cv_param("IMS", "IMS:1000046", "pixel size x", &x)?;
+            }
+            if let Some(y) = format_f64(ps.y) {
+                self.cv_param("IMS", "IMS:1000047", "pixel size y", &y)?;
+            }
         }
         self.write_raw("</scanSettings></scanSettingsList>\n")?;
         Ok(())
@@ -429,11 +434,18 @@ impl ImzmlWriter {
     }
 }
 
-/// Format an `f64` geometry value WITHOUT widening artifacts: integral values print without a
-/// trailing `.0` noise issue is irrelevant here (these are run-level scalars, not L1 array data),
-/// so `Display` is sufficient and deterministic.
-fn format_f64(v: f64) -> String {
-    v.to_string()
+/// Format a FINITE `f64` geometry value WITHOUT widening artifacts: integral values print without
+/// a trailing `.0` noise issue that is irrelevant here (these are run-level scalars, not L1 array
+/// data), so `Display` is sufficient and deterministic.
+///
+/// WR-03 — non-finite guard. `f64::to_string()` renders `NaN`/`±inf` as the bare tokens
+/// `"NaN"`/`"inf"`/`"-inf"`, which are NOT valid numeric values for an `IMS:1000046/1000047`
+/// cvParam. A corrupt or hand-edited archive could carry a non-finite pixel size; rather than
+/// emit a malformed numeric token, return `None` so the caller OMITS the term (graceful degrade,
+/// consistent with the absent-metadata "never fabricate / omit absent" discipline — threat
+/// T-09-FAB).
+fn format_f64(v: f64) -> Option<String> {
+    v.is_finite().then(|| v.to_string())
 }
 
 #[cfg(test)]
@@ -708,6 +720,43 @@ mod tests {
         // No partial <spectrum> reached disk before the guard fired.
         let text = read_text(&path);
         assert!(!text.contains("<spectrum"), "no partial <spectrum> emitted on mismatch");
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// WR-03: a non-finite (NaN/inf) pixel-size value is OMITTED rather than emitted as an invalid
+    /// numeric cvParam token — no `value="NaN"`/`value="inf"` reaches the document.
+    #[test]
+    fn nonfinite_pixel_size_omitted() {
+        // format_f64 contract: finite → Some(text), non-finite → None.
+        assert_eq!(format_f64(50.0), Some("50".to_string()));
+        assert_eq!(format_f64(f64::NAN), None);
+        assert_eq!(format_f64(f64::INFINITY), None);
+        assert_eq!(format_f64(f64::NEG_INFINITY), None);
+
+        let dir = tempdir();
+        let path = dir.join("nonfinite.imzML");
+        let meta = ImagingMetadata {
+            is_imaging: true,
+            pixel_count: None,
+            // x is NaN (must be omitted), y is finite (must be emitted).
+            pixel_size_um: Some(AxisPair { x: f64::NAN, y: 25.0 }),
+            max_dimension_um: None,
+            scan_pattern: None,
+            scan_type: None,
+            line_scan_direction: None,
+            linescan_sequence: None,
+            coordinate_base: 1,
+        };
+        let w = ImzmlWriter::new(&path, Uuid::new_v4(), "deadbeef", 0, Some(&meta)).unwrap();
+        w.finish().unwrap();
+
+        let text = read_text(&path);
+        assert!(!text.contains("NaN"), "non-finite pixel size must not emit a bare NaN token");
+        assert!(!text.contains("IMS:1000046"), "NaN pixel-size x term omitted");
+        // The finite y value is still emitted normally.
+        assert!(text.contains("IMS:1000047"), "finite pixel-size y term still emitted");
+        assert!(text.contains("value=\"25\""), "finite pixel-size y value emitted");
 
         fs::remove_dir_all(&dir).ok();
     }
