@@ -519,33 +519,40 @@ fn classify_integrity_error(ie: &IntegrityError) -> ExitCode {
 }
 
 /// Classify a reverse [`crate::reverse::ReverseError`] into the SAME 5-code contract the forward
-/// path uses (RCLI-01, T-10-EXIT) — no new exit code is introduced. Mirrors the forward classes:
+/// path uses (RCLI-01, T-10-EXIT) — no new exit code is introduced. Mirrors the forward classes,
+/// applying ONE coherent rule (WR-03) so the "malformed archive" class is internally consistent:
 ///   - coordinate failures (`NotImaging` / `CoordMissing` / `NoScan`) → code 4, mirroring
 ///     `ReadError::CoordMissing` / `ReadError::NoScan`;
-///   - malformed / unsupported input shape (`UnsupportedDtype` / `ArrayLengthMismatch` /
-///     `MissingArray` / `MissingDataFacet`) → code 3, mirroring `ReadError::UnsupportedDtype`;
+///   - ANY structural defect in an otherwise-imaging archive — a malformed-but-present input the
+///     converter cannot consume (`UnsupportedDtype` / `ArrayLengthMismatch` / `MissingArray` /
+///     `MissingDataFacet` / `MissingMetadata` / `ArrayDecode`) → code 3 (unsupported). These are
+///     grouped together so a missing-metadata defect and a missing-array defect on the same
+///     archive yield the SAME exit code, not 1 vs 3 (the previous inconsistency);
 ///   - `Integrity` delegates to [`classify_integrity_error`] (same UUID/checksum class, no
 ///     duplicate logic — proves the .ibd-digest path shares the forward integrity codes);
-///   - every remaining transport/structural arm (`IbdWrite`, `XmlEmit`, `IbdOverflow`,
-///     `IbdPoisoned`, `OpenArchive`, `MissingMetadata`, `ArrayDecode`) → the generic code 1.
+///   - genuine I/O / transport / internal failures, NOT a property of the input's shape
+///     (`IbdWrite`, `XmlEmit`, `IbdOverflow`, `IbdPoisoned`, `OpenArchive`) → the generic code 1,
+///     mirroring `IntegrityError::Io` on the forward path.
 fn classify_reverse_error(re: &crate::reverse::ReverseError) -> ExitCode {
     use crate::reverse::ReverseError as R;
     match re {
         R::NotImaging | R::CoordMissing { .. } | R::NoScan { .. } => {
             ExitCode::from(EXIT_COORDINATE)
         }
+        // Structural defect in a malformed-but-present input → unsupported (3), uniformly.
         R::UnsupportedDtype { .. }
         | R::ArrayLengthMismatch { .. }
         | R::MissingArray { .. }
-        | R::MissingDataFacet { .. } => ExitCode::from(EXIT_UNSUPPORTED),
+        | R::MissingDataFacet { .. }
+        | R::MissingMetadata { .. }
+        | R::ArrayDecode { .. } => ExitCode::from(EXIT_UNSUPPORTED),
         R::Integrity(ie) => classify_integrity_error(ie),
+        // Genuine I/O / transport / internal failures → generic (1).
         R::IbdWrite(_)
         | R::XmlEmit(_)
         | R::IbdOverflow { .. }
         | R::IbdPoisoned
-        | R::OpenArchive(_)
-        | R::MissingMetadata { .. }
-        | R::ArrayDecode { .. } => ExitCode::from(EXIT_GENERIC),
+        | R::OpenArchive(_) => ExitCode::from(EXIT_GENERIC),
     }
 }
 
@@ -747,6 +754,55 @@ mod tests {
     fn reverse_ibd_write_maps_to_generic_code_one() {
         let io = std::io::Error::new(std::io::ErrorKind::WriteZero, "disk full");
         let e = anyhow::Error::new(crate::reverse::ReverseError::IbdWrite(io));
+        assert_eq!(
+            format!("{:?}", classify_exit(&e)),
+            format!("{:?}", ExitCode::from(EXIT_GENERIC))
+        );
+    }
+
+    // WR-03: structural defects in a malformed-but-present archive map UNIFORMLY to code 3
+    // (unsupported), so MissingMetadata and ArrayDecode no longer diverge from MissingArray /
+    // MissingDataFacet (the previous 1-vs-3 inconsistency).
+
+    #[test]
+    fn reverse_missing_metadata_maps_to_unsupported_code_three() {
+        let e = anyhow::Error::new(crate::reverse::ReverseError::MissingMetadata { index: 5 });
+        assert_eq!(
+            format!("{:?}", classify_exit(&e)),
+            format!("{:?}", ExitCode::from(EXIT_UNSUPPORTED))
+        );
+    }
+
+    #[test]
+    fn reverse_array_decode_maps_to_unsupported_code_three() {
+        let io = std::io::Error::new(std::io::ErrorKind::InvalidData, "bad facet bytes");
+        let e = anyhow::Error::new(crate::reverse::ReverseError::ArrayDecode {
+            index: 5,
+            axis: "m/z",
+            source: io,
+        });
+        assert_eq!(
+            format!("{:?}", classify_exit(&e)),
+            format!("{:?}", ExitCode::from(EXIT_UNSUPPORTED))
+        );
+    }
+
+    #[test]
+    fn reverse_missing_array_maps_to_unsupported_code_three() {
+        let e = anyhow::Error::new(crate::reverse::ReverseError::MissingArray {
+            index: 5,
+            axis: "intensity",
+        });
+        assert_eq!(
+            format!("{:?}", classify_exit(&e)),
+            format!("{:?}", ExitCode::from(EXIT_UNSUPPORTED))
+        );
+    }
+
+    #[test]
+    fn reverse_open_archive_maps_to_generic_code_one() {
+        let io = std::io::Error::new(std::io::ErrorKind::NotFound, "no such archive");
+        let e = anyhow::Error::new(crate::reverse::ReverseError::OpenArchive(io));
         assert_eq!(
             format!("{:?}", classify_exit(&e)),
             format!("{:?}", ExitCode::from(EXIT_GENERIC))
