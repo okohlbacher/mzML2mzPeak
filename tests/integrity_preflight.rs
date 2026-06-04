@@ -38,6 +38,13 @@ fn header_parse_continuous_fixture() {
         EXPECTED_SHA1,
         "declared SHA-1 hex (lowercased)"
     );
+    // CLI-02: the bounded parse surfaces the <spectrumList count> total. The continuous
+    // fixture declares count="9" on its terminating <spectrumList> line.
+    assert_eq!(
+        h.spectrum_count,
+        Some(9),
+        "continuous fixture declares <spectrumList count=\"9\">"
+    );
 }
 
 #[test]

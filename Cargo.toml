@@ -83,6 +83,12 @@ thiserror = "=2.0.18"
 clap = { version = "=4.5.38", features = ["derive"] }
 log = "=0.4.27"
 env_logger = "=0.11.8"
+# --- Progress bar (CLI-02): promoted to a DIRECT dependency at the version Cargo.lock
+# ALREADY resolves transitively via mzpeak_prototyping, so pinning `=0.17.11` preserves the
+# SINGLE resolved copy (verify with `cargo tree -i indicatif`). NOT 0.17.10 (CLAUDE.md's
+# table value is stale — the lockfile is at 0.17.11). Binary-only: indicatif is used in the
+# CLI (Phase 06-02), never in a library module (mirrors the anyhow binary-only boundary). ---
+indicatif = "=0.17.11"
 
 # --- VENDORED PATCH (plan 00-01): the published mzdata 0.63.3 imzML reader fails to
 # compile with the `imzml` feature (E0046 — missing required `ChromatogramSource::

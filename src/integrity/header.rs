@@ -56,6 +56,11 @@ pub struct ImzmlHeader {
     /// Declared `.ibd` file name (`IMS:1000070`) when present; `None` otherwise (the
     /// continuous fixture does not declare one — preflight then falls back to the sibling).
     pub ibd_file_name: Option<String>,
+    /// Total spectrum (pixel) count from the `<spectrumList count="N">` attribute (the
+    /// terminating line of the bounded parse). `Some(N)` when present and parseable —
+    /// `Some(34840)` for the real PXD001283 file — `None` when the attribute is absent or
+    /// unparseable (CLI-02 progress total; degrade gracefully, never panic — T-6-mem/T-6-count).
+    pub spectrum_count: Option<usize>,
 }
 
 /// A parsed header plus the number of bytes consumed reaching `<spectrumList`.
@@ -123,6 +128,7 @@ pub fn parse_imzml_header_counted(path: &Path) -> Result<HeaderParseReport, Inte
     let mut uuid: Option<String> = None;
     let mut checksum: Option<(ChecksumType, String)> = None;
     let mut ibd_file_name: Option<String> = None;
+    let mut spectrum_count: Option<usize> = None;
     let mut bytes_consumed: u64 = 0;
 
     let mut buf: Vec<u8> = Vec::new();
@@ -139,9 +145,14 @@ pub fn parse_imzml_header_counted(path: &Path) -> Result<HeaderParseReport, Inte
         let line = String::from_utf8_lossy(&buf);
 
         // STOP at the start of the spectrum list. The header params always precede it; the
-        // whole (potentially 56MB) spectrum body must never be read here. Count the bytes
-        // of this terminating line as consumed, then break.
+        // whole (potentially 56MB) spectrum body must never be read here. The terminating
+        // line carries the mandatory `count="N"` attribute (mzML <spectrumList>); extract it
+        // BEFORE breaking so the CLI-02 progress total is obtained WITHOUT reading any
+        // spectrum (Pitfall 4 — the stop-token line carries the count). Lenient parse: an
+        // absent/unparseable count degrades to None and never panics (T-6-count). Count the
+        // bytes of this terminating line as consumed, then break.
         if line.contains("<spectrumList") {
+            spectrum_count = parse_count_attr(&line).and_then(|s| s.parse::<usize>().ok());
             break;
         }
 
@@ -174,6 +185,7 @@ pub fn parse_imzml_header_counted(path: &Path) -> Result<HeaderParseReport, Inte
             checksum_type,
             checksum_hex,
             ibd_file_name,
+            spectrum_count,
         },
         bytes_consumed,
     })
@@ -196,6 +208,17 @@ fn checksum_type_of(line: &str) -> Option<ChecksumType> {
 /// `value="` and the next `"`). Mirrors `parse_value_attr` in spike_coords.rs.
 fn parse_value_attr(line: &str) -> Option<String> {
     let key = "value=\"";
+    let start = line.find(key)? + key.len();
+    let rest = &line[start..];
+    let end = rest.find('"')?;
+    Some(rest[..end].to_string())
+}
+
+/// Extract the `count="..."` attribute from the `<spectrumList ...>` line (the string between
+/// the first `count="` and the next `"`). Same find/slice shape as [`parse_value_attr`], keyed
+/// on `count="` instead of `value="`. Returns `None` when the attribute is absent.
+fn parse_count_attr(line: &str) -> Option<String> {
+    let key = "count=\"";
     let start = line.find(key)? + key.len();
     let rest = &line[start..];
     let end = rest.find('"')?;
@@ -256,6 +279,44 @@ mod tests {
             Some("abc123")
         );
         assert_eq!(parse_value_attr("<cvParam name=\"x\"/>"), None);
+    }
+
+    #[test]
+    fn parse_count_attr_extracts() {
+        assert_eq!(
+            parse_count_attr(r#"<spectrumList count="34840" defaultDataProcessingRef="X">"#)
+                .as_deref(),
+            Some("34840")
+        );
+        // Absent count attribute -> None (degrade gracefully; never panic).
+        assert_eq!(parse_count_attr(r#"<spectrumList defaultDataProcessingRef="X">"#), None);
+    }
+
+    /// The real PXD001283 file declares `<spectrumList count="34840">`; the bounded header
+    /// parse must surface `spectrum_count == Some(34840)` WITHOUT reading any spectrum (the
+    /// parse still stops at `<spectrumList`, so `bytes_consumed` stays far below the ~56MB
+    /// file size). Gated on the (large, un-committed) data file's presence so CI without the
+    /// dataset still passes.
+    #[test]
+    fn spectrum_count_real_file_is_34840() {
+        let path = Path::new("data/HR2MSImouseurinarybladderS096.imzML");
+        if !path.exists() {
+            eprintln!("skipping: {} not present", path.display());
+            return;
+        }
+        let full_len = std::fs::metadata(path).unwrap().len();
+        let report = parse_imzml_header_counted(path).expect("real header parses");
+        assert_eq!(
+            report.header.spectrum_count,
+            Some(34840),
+            "real PXD001283 file declares <spectrumList count=\"34840\">"
+        );
+        assert!(
+            report.bytes_consumed < full_len,
+            "bounded: consumed {} of {} bytes — must stop at <spectrumList",
+            report.bytes_consumed,
+            full_len
+        );
     }
 
     #[test]

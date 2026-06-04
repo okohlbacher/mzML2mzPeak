@@ -1104,6 +1104,7 @@ dependencies = [
  "clap",
  "encoding_rs",
  "env_logger",
+ "indicatif",
  "log",
  "md-5",
  "mzdata",
