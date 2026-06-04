@@ -223,10 +223,14 @@ impl ImzmlWriter {
         )?;
         self.write_raw("</fileDescription>\n")?;
 
-        // softwareList — this converter.
+        // softwareList — this converter. The version tracks the crate (env!) rather than a magic
+        // literal that silently lies when the crate bumps (IN-03). The value is static (from
+        // CARGO_PKG_VERSION) but routed through the escape path for consistency with the single
+        // value-write entry point.
+        self.write_raw("<softwareList count=\"1\"><software id=\"sw_imzml2mzpeak\" version=\"")?;
+        self.write_escaped(env!("CARGO_PKG_VERSION"))?;
         self.write_raw(
-            "<softwareList count=\"1\">\
-             <software id=\"sw_imzml2mzpeak\" version=\"0.4\">\
+            "\">\
              <cvParam cvRef=\"MS\" accession=\"MS:1000799\" name=\"custom unreleased software tool\" value=\"imzml2mzpeak\"/>\
              </software></softwareList>\n",
         )?;

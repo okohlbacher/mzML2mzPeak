@@ -1,11 +1,13 @@
-//! Typed error contract for the reverse (mzPeak → imzML) read path.
+//! Typed error contract for the reverse (mzPeak → imzML) conversion path.
 //!
-//! [`ReverseError`] is the one genuinely-new code artifact of Phase 7 (per RESEARCH): a
-//! `thiserror` clone of [`crate::verify::VerifyError`]'s coordinate/metadata/dtype arms plus
-//! the new [`ReverseError::NotImaging`] arm — the RMZ-04 deliverable. It exists in the library
-//! (not the throwaway read spike) so integration tests can import it; bin targets are not
-//! importable. The streaming read LOGIC stays in the Phase-7 spike and is promoted into
-//! `src/reverse/source.rs` in Phase 8 — that promotion reuses this enum, it does not rewrite it.
+//! [`ReverseError`] is the shared `thiserror` failure type for the whole reverse converter: the
+//! read-side coordinate/metadata/dtype arms (clones of [`crate::verify::VerifyError`]) plus the
+//! [`ReverseError::NotImaging`] RMZ-04 guard, the Phase-8 `.ibd` write arms
+//! ([`Self::IbdWrite`]/[`Self::IbdOverflow`]/[`Self::IbdPoisoned`]/[`Self::Integrity`]), and the
+//! Phase-9 `.imzML` emit arms ([`Self::XmlEmit`]/[`Self::ArrayLengthMismatch`]). It lives in the
+//! library (not a throwaway bin spike) so integration tests can import it; bin targets are not
+//! importable. The shipped read/write logic lives in [`crate::reverse::ibd`] and
+//! [`crate::reverse::imzml_writer`], which reuse this enum.
 //!
 //! Conventions mirror [`crate::verify::VerifyError`] (see `src/verify/report.rs`):
 //!   - `#[source]` (NOT a second `#[from]`) wraps every [`std::io::Error`] field, so the

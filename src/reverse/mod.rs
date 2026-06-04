@@ -1,13 +1,15 @@
-//! Reverse converter (mzPeak → imzML) — typed-error contract only, for now.
+//! Reverse converter (mzPeak → imzML) — the imaging-mzPeak-to-imzML write half.
 //!
-//! In Phase 7 this module holds ONLY the typed-error contract ([`ReverseError`]) for the
-//! reverse read-capability spike. The streaming read LOGIC lives in the throwaway Phase-7
-//! spike (`src/bin/spike_reverse_read.rs`); Phase 8 promotes that logic into a future
-//! `src/reverse/source.rs` here, reusing this enum verbatim.
+//! This module hosts the shipped reverse-conversion surface:
 //!
-//! It is seeded in the library (rather than left inline in the spike) so that the Phase-7
-//! integration tests can `import` [`ReverseError`] — bin targets are not importable, library
-//! modules are. See `07-01-PLAN.md` (Disposition note) for the rationale.
+//! - [`ReverseError`] ([`error`]) — the typed `thiserror` failure contract shared by every
+//!   reverse read/write call (seeded in Phase 7 so integration tests can import it; bin targets
+//!   are not importable, library modules are).
+//! - [`IbdWriter`] / [`ArrayRef`] ([`ibd`], Phase 8) — the streaming `.ibd` binary-sidecar writer
+//!   and the `(offset, count, encoded_len)` triple each appended array returns.
+//! - [`ImzmlWriter`] ([`imzml_writer`], Phase 9) — the streaming `.imzML` XML emitter that turns
+//!   those triples into the `IMS:1000102/103/104` external-data cvParams the vendored
+//!   `mzdata::ImzMLReader` re-reads.
 
 pub mod error;
 pub mod ibd;
