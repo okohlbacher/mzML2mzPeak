@@ -206,6 +206,26 @@ fn count_and_dtype() {
     // Non-empty arrays.
     assert!(!p0.mz.is_empty() && !p0.intensity.is_empty(), "arrays are non-empty");
 
+    // WR-02: also read+assert the CENTROID pixel (index 1) — the path that goes through the
+    // fixed-width `spectra_peaks` facet (WR-01). The fixture declares this pixel's m/z as
+    // Float64 and its intensity as Float32 (see fixtures/reverse/mod.rs::imaging_archive), and
+    // the upstream peaks schema is fixed at f64 m/z + f32 intensity. Asserting both proves the
+    // centroid path returns the expected widths rather than leaving the claim implied: this is
+    // the test that would surface WR-01 as a failure if the centroid path ever drifted.
+    let p1 = read_pixel(&mut reader, 1).expect("read pixel 1 (centroid)");
+    assert_eq!(p1.representation, Representation::Centroid, "pixel 1 is the centroid pixel");
+    assert!(
+        matches!(p1.mz, NumArray::F64(_)),
+        "centroid m/z reads back as NumArray::F64 (fixed-width peaks schema), got {:?}",
+        p1.mz.source_dtype()
+    );
+    assert!(
+        matches!(p1.intensity, NumArray::F32(_)),
+        "centroid intensity reads back as NumArray::F32 (fixed-width peaks schema), got {:?}",
+        p1.intensity.source_dtype()
+    );
+    assert!(!p1.mz.is_empty() && !p1.intensity.is_empty(), "centroid arrays are non-empty");
+
     std::fs::remove_file(&path).ok();
 }
 
