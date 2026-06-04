@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Imaging-Schema Layer** - Lock the imaging mzPeak extension (scan-facet coordinate columns, run-level params, provenance, tolerance contract) per spec v0.3 (completed 2026-06-03)
 - [x] **Phase 4: mzPeak Write Layer** - Streaming writer that emits a valid imaging mzPeak archive via the public extension seam (completed 2026-06-03)
 - [x] **Phase 5: Verification / Roundtrip Layer** - Reload-and-compare harness proving count, coordinate, and numerical fidelity plus an ion-image reconstruction (completed 2026-06-03)
-- [ ] **Phase 6: CLI/UX Layer + PXD001283 Acceptance Gate** - Full CLI (convert, dry-run, progress, errors) assembled end-to-end and run on the full 34,840-spectrum dataset
+- [x] **Phase 6: CLI/UX Layer + PXD001283 Acceptance Gate** - Full CLI (convert, dry-run, progress, errors) assembled end-to-end and run on the full 34,840-spectrum dataset (completed 2026-06-04)
 
 ## Phase Details
 
@@ -151,7 +151,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
   - [x] 06-01-PLAN.md — `verify_streaming` bounded-memory verify core (loop inversion reusing build_coord_index) + `<spectrumList count>` header extract + indicatif `=0.17.11` direct dep + streaming==slice equivalence test (DAT-01, CLI-02)
   - [x] 06-02-PLAN.md — clap-derive `convert <in> <out>` CLI (`--dry-run`/`--verify`) + progress bar with non-TTY log fallback + distinct per-class exit codes + spawned-process CLI tests (CLI-01, CLI-02, CLI-03, CLI-04)
-  - [ ] 06-03-PLAN.md — `#[ignore]` PXD001283 full-dataset acceptance test: convert 34,840 spectra + verify_streaming asserting VER-01..04 at L1 under bounded memory (DAT-01)
+  - [x] 06-03-PLAN.md — `#[ignore]` PXD001283 full-dataset acceptance test: convert 34,840 spectra + verify_streaming asserting VER-01..04 at L1 under bounded memory (DAT-01)
 
 ## Progress
 
@@ -166,4 +166,4 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4 → 5 → 6
 | 3. Imaging-Schema Layer | 3/3 | Complete    | 2026-06-03 |
 | 4. mzPeak Write Layer | 3/3 | Complete   | 2026-06-03 |
 | 5. Verification / Roundtrip Layer | 3/3 | Complete   | 2026-06-03 |
-| 6. CLI/UX Layer + PXD001283 Acceptance Gate | 2/3 | In Progress|  |
+| 6. CLI/UX Layer + PXD001283 Acceptance Gate | 3/3 | Complete   | 2026-06-04 |
