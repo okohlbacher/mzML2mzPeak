@@ -74,12 +74,89 @@ fn dtype_cv(
 /// (NOT bytes) and is passed straight through (the reader multiplies by `dtype.size_of()`).
 type ArrayEmit = (BinaryDataArrayType, crate::reverse::ArrayRef);
 
+// =================================================================================================
+// Free emit helpers over `&mut impl Write` (Plan 10-01 Task 1, option (b)).
+//
+// The header / per-spectrum body / trailer phases of [`ImzmlWriter`] are emitted EXCLUSIVELY
+// through these free functions so all three share ONE escape-discipline implementation and the
+// byte layout cannot drift between the eager-header lifecycle (`new`/`finish`) and the split-phase
+// lifecycle (`new_body`/`write_header_to`/`write_trailer_to`) used by the Option-C orchestrator.
+// The original `&mut self` methods (`write_raw`/`write_escaped`/`cv_param`/`cv_param_flag`/...)
+// delegate to these, so no bytes change — only WHERE they are written.
+// =================================================================================================
+
+/// Write a STATIC string verbatim (no escaping). Use ONLY for fixed XML scaffolding the emitter
+/// controls — never for caller-supplied values.
+fn emit_raw(sink: &mut impl Write, s: &str) -> Result<(), ReverseError> {
+    sink.write_all(s.as_bytes()).map_err(ReverseError::XmlEmit)
+}
+
+/// Write a DYNAMIC value, entity-escaping `& < > " '` first (threat T-09-INJ). EVERY
+/// caller-supplied text/attribute value MUST go through this helper — a value containing a raw
+/// metacharacter is escaped, never written raw.
+fn emit_escaped(sink: &mut impl Write, value: &str) -> Result<(), ReverseError> {
+    let escaped = escape(value);
+    sink.write_all(escaped.as_bytes())
+        .map_err(ReverseError::XmlEmit)
+}
+
+/// Emit one presence-only `<cvParam>` (no value attribute): `cvRef`/`accession`/`name` only.
+fn emit_cv_param_flag(
+    sink: &mut impl Write,
+    cv_ref: &str,
+    accession: &str,
+    name: &str,
+) -> Result<(), ReverseError> {
+    emit_raw(sink, "<cvParam cvRef=\"")?;
+    emit_escaped(sink, cv_ref)?;
+    emit_raw(sink, "\" accession=\"")?;
+    emit_escaped(sink, accession)?;
+    emit_raw(sink, "\" name=\"")?;
+    emit_escaped(sink, name)?;
+    emit_raw(sink, "\" value=\"\"/>")?;
+    Ok(())
+}
+
+/// Emit one valued `<cvParam>`: `cvRef`/`accession`/`name`/`value`. The `value` is routed through
+/// the escape path (threat T-09-INJ).
+fn emit_cv_param(
+    sink: &mut impl Write,
+    cv_ref: &str,
+    accession: &str,
+    name: &str,
+    value: &str,
+) -> Result<(), ReverseError> {
+    emit_raw(sink, "<cvParam cvRef=\"")?;
+    emit_escaped(sink, cv_ref)?;
+    emit_raw(sink, "\" accession=\"")?;
+    emit_escaped(sink, accession)?;
+    emit_raw(sink, "\" name=\"")?;
+    emit_escaped(sink, name)?;
+    emit_raw(sink, "\" value=\"")?;
+    emit_escaped(sink, value)?;
+    emit_raw(sink, "\"/>")?;
+    Ok(())
+}
+
 /// Streamed writer for one `.imzML` document.
 ///
 /// Holds a [`BufWriter`] sink (never buffers all 34,840 spectra). [`Self::new`] eagerly writes
 /// the complete spec-rich header through `<spectrumList count="N">`; each [`Self::write_spectrum`]
 /// streams exactly one `<spectrum>`; [`Self::finish`] writes the closing tags and flushes. Mirrors
 /// the [`IbdWriter`] lifecycle.
+///
+/// ## Split-phase lifecycle (Plan 10-01 — Option C)
+///
+/// In addition to the eager-header `new`/`write_spectrum`/`finish` lifecycle, the three document
+/// phases are independently callable so the Phase-10 orchestrator can emit the BODY (spectra) to a
+/// temp sink BEFORE it knows the `.ibd` MD5, then write the HEADER (which carries that MD5) to the
+/// real `.imzML` and concatenate. The split-phase methods emit byte-identical output to the eager
+/// lifecycle (they share the same free emit helpers):
+///   - [`Self::new_body`] — construct over a caller sink WITHOUT writing the header.
+///   - [`Self::write_spectrum`] — unchanged; one `<spectrum>` to the held sink.
+///   - [`Self::flush_body`] — flush the held sink (no trailer).
+///   - [`Self::write_header_to`] — write the full header to an arbitrary sink (associated fn).
+///   - [`Self::write_trailer_to`] — write the closing tags to an arbitrary sink (associated fn).
 ///
 /// [`IbdWriter`]: crate::reverse::ibd::IbdWriter
 pub struct ImzmlWriter {
@@ -109,49 +186,46 @@ impl ImzmlWriter {
     ) -> Result<Self, ReverseError> {
         let sink = BufWriter::new(File::create(path.as_ref()).map_err(ReverseError::XmlEmit)?);
         let mut w = Self { sink };
-        w.write_header(uuid, ibd_md5_hex, count, imaging)?;
+        Self::write_header_to(&mut w.sink, uuid, ibd_md5_hex, count, imaging)?;
         Ok(w)
     }
 
-    /// Write a STATIC string verbatim (no escaping). Use ONLY for fixed XML scaffolding the
-    /// emitter controls — never for caller-supplied values.
+    /// Construct over a caller-supplied `sink` WITHOUT writing the header (Plan 10-01 — Option C).
+    /// The body sink is the orchestrator's temp file; spectra are streamed into it via
+    /// [`Self::write_spectrum`] BEFORE the `.ibd` MD5 is known, then the real `.imzML` header is
+    /// written separately via [`Self::write_header_to`] and the body concatenated.
+    pub fn new_body(sink: BufWriter<File>) -> Self {
+        Self { sink }
+    }
+
+    /// Flush the held sink WITHOUT writing the trailer (Plan 10-01 — Option C). Used after the
+    /// body-emit loop so the temp body file is fully on disk before it is copied into the real
+    /// `.imzML`. The trailer is written separately to the real sink via [`Self::write_trailer_to`].
+    pub fn flush_body(&mut self) -> Result<(), ReverseError> {
+        self.sink.flush().map_err(ReverseError::XmlEmit)
+    }
+
+    /// Write a STATIC string verbatim (no escaping). Delegates to [`emit_raw`].
     fn write_raw(&mut self, s: &str) -> Result<(), ReverseError> {
-        self.sink
-            .write_all(s.as_bytes())
-            .map_err(ReverseError::XmlEmit)
+        emit_raw(&mut self.sink, s)
     }
 
-    /// Write a DYNAMIC value, entity-escaping `& < > " '` first (threat T-09-INJ). EVERY
-    /// caller-supplied text/attribute value MUST go through this helper — a value containing a raw
-    /// metacharacter is escaped, never written raw.
+    /// Write a DYNAMIC value, entity-escaping `& < > " '` first. Delegates to [`emit_escaped`].
     fn write_escaped(&mut self, value: &str) -> Result<(), ReverseError> {
-        let escaped = escape(value);
-        self.sink
-            .write_all(escaped.as_bytes())
-            .map_err(ReverseError::XmlEmit)
+        emit_escaped(&mut self.sink, value)
     }
 
-    /// Emit one presence-only `<cvParam>` (no value attribute): `cvRef`/`accession`/`name` only.
-    /// `accession` and `name` are emitted through the escape path (defensive — they are static
-    /// here, but the helper is the single value-write entry point).
+    /// Emit one presence-only `<cvParam>`. Delegates to [`emit_cv_param_flag`].
     fn cv_param_flag(
         &mut self,
         cv_ref: &str,
         accession: &str,
         name: &str,
     ) -> Result<(), ReverseError> {
-        self.write_raw("<cvParam cvRef=\"")?;
-        self.write_escaped(cv_ref)?;
-        self.write_raw("\" accession=\"")?;
-        self.write_escaped(accession)?;
-        self.write_raw("\" name=\"")?;
-        self.write_escaped(name)?;
-        self.write_raw("\" value=\"\"/>")?;
-        Ok(())
+        emit_cv_param_flag(&mut self.sink, cv_ref, accession, name)
     }
 
-    /// Emit one valued `<cvParam>`: `cvRef`/`accession`/`name`/`value`. The `value` is routed
-    /// through the escape path (threat T-09-INJ).
+    /// Emit one valued `<cvParam>`. Delegates to [`emit_cv_param`].
     fn cv_param(
         &mut self,
         cv_ref: &str,
@@ -159,77 +233,81 @@ impl ImzmlWriter {
         name: &str,
         value: &str,
     ) -> Result<(), ReverseError> {
-        self.write_raw("<cvParam cvRef=\"")?;
-        self.write_escaped(cv_ref)?;
-        self.write_raw("\" accession=\"")?;
-        self.write_escaped(accession)?;
-        self.write_raw("\" name=\"")?;
-        self.write_escaped(name)?;
-        self.write_raw("\" value=\"")?;
-        self.write_escaped(value)?;
-        self.write_raw("\"/>")?;
-        Ok(())
+        emit_cv_param(&mut self.sink, cv_ref, accession, name, value)
     }
 
-    /// Write the complete spec-rich header: prolog → `<mzML>` → `<cvList>` (with `<cv id="IMS">`)
-    /// → `<fileDescription>`/`<fileContent>` (UUID/MD5/processed) → scaffolding lists →
-    /// `<scanSettingsList>` (from `imaging` or empty) → `<run>` → `<spectrumList count="N">`.
-    fn write_header(
-        &mut self,
+    /// Write the complete spec-rich header to an ARBITRARY sink: prolog → `<mzML>` → `<cvList>`
+    /// (with `<cv id="IMS">`) → `<fileDescription>`/`<fileContent>` (UUID/MD5/processed) →
+    /// scaffolding lists → `<scanSettingsList>` (from `imaging` or empty) → `<run>` →
+    /// `<spectrumList count="N">`.
+    ///
+    /// This is an ASSOCIATED function over `&mut impl Write` (Plan 10-01 — Option C) so the
+    /// orchestrator can write the header — which carries `IMS:1000090` (the `.ibd` MD5, only known
+    /// AFTER the body) — to the real `.imzML` sink AFTER the spectra body has been streamed to a
+    /// temp file. The bytes are byte-identical to the eager-header lifecycle (both route through the
+    /// same free emit helpers); [`Self::new`] is now a thin wrapper that calls this.
+    pub fn write_header_to(
+        sink: &mut impl Write,
         uuid: Uuid,
         ibd_md5_hex: &str,
         count: u64,
         imaging: Option<&ImagingMetadata>,
     ) -> Result<(), ReverseError> {
-        self.write_raw(PROLOG)?;
-        self.write_raw(
+        emit_raw(sink, PROLOG)?;
+        emit_raw(
+            sink,
             "\n<mzML xmlns=\"http://psi.hupo.org/ms/mzml\" version=\"1.1.0\">\n",
         )?;
 
         // cvList — MUST contain <cv id="IMS"> so the reader recognizes IMS accessions
         // (reader.rs is_imzml + ControlledVocabulary::IMS).
-        self.write_raw("<cvList count=\"2\">")?;
-        self.write_raw(
+        emit_raw(sink, "<cvList count=\"2\">")?;
+        emit_raw(
+            sink,
             "<cv id=\"MS\" fullName=\"PSI-MS controlled vocabulary\" \
              URI=\"https://raw.githubusercontent.com/HUPO-PSI/psi-ms-CV/master/psi-ms.obo\"/>",
         )?;
-        self.write_raw(
+        emit_raw(
+            sink,
             "<cv id=\"IMS\" fullName=\"Mass Spectrometry Imaging controlled vocabulary\" \
              URI=\"https://raw.githubusercontent.com/imzML/imzML/master/imagingMS.obo\"/>",
         )?;
-        self.write_raw("</cvList>\n")?;
+        emit_raw(sink, "</cvList>\n")?;
 
         // fileDescription / fileContent — the three HARD-required imzML terms.
-        self.write_raw("<fileDescription>")?;
-        self.write_raw("<fileContent>")?;
+        emit_raw(sink, "<fileDescription>")?;
+        emit_raw(sink, "<fileContent>")?;
         // IMS:1000080 — universally unique identifier (dashed text; reader trims {} then parses).
-        self.cv_param(
+        emit_cv_param(
+            sink,
             "IMS",
             "IMS:1000080",
             "universally unique identifier",
             &uuid.to_string(),
         )?;
         // IMS:1000090 — ibd MD5 (lowercase hex, verbatim from IbdWriter::finish).
-        self.cv_param("IMS", "IMS:1000090", "ibd MD5", ibd_md5_hex)?;
+        emit_cv_param(sink, "IMS", "IMS:1000090", "ibd MD5", ibd_md5_hex)?;
         // IMS:1000031 — processed mode (presence-only).
-        self.cv_param_flag("IMS", "IMS:1000031", "processed")?;
-        self.write_raw("</fileContent>")?;
+        emit_cv_param_flag(sink, "IMS", "IMS:1000031", "processed")?;
+        emit_raw(sink, "</fileContent>")?;
         // OUR output lineage only (NOT the upstream's — deferred per CONTEXT).
-        self.write_raw(
+        emit_raw(
+            sink,
             "<sourceFileList count=\"1\">\
              <sourceFile id=\"sf_reverse\" name=\"imzml2mzpeak\" location=\"file://\">\
              <cvParam cvRef=\"MS\" accession=\"MS:1000824\" name=\"no nativeID format\" value=\"\"/>\
              </sourceFile></sourceFileList>",
         )?;
-        self.write_raw("</fileDescription>\n")?;
+        emit_raw(sink, "</fileDescription>\n")?;
 
         // softwareList — this converter. The version tracks the crate (env!) rather than a magic
         // literal that silently lies when the crate bumps (IN-03). The value is static (from
         // CARGO_PKG_VERSION) but routed through the escape path for consistency with the single
         // value-write entry point.
-        self.write_raw("<softwareList count=\"1\"><software id=\"sw_imzml2mzpeak\" version=\"")?;
-        self.write_escaped(env!("CARGO_PKG_VERSION"))?;
-        self.write_raw(
+        emit_raw(sink, "<softwareList count=\"1\"><software id=\"sw_imzml2mzpeak\" version=\"")?;
+        emit_escaped(sink, env!("CARGO_PKG_VERSION"))?;
+        emit_raw(
+            sink,
             "\">\
              <cvParam cvRef=\"MS\" accession=\"MS:1000799\" name=\"custom unreleased software tool\" value=\"imzml2mzpeak\"/>\
              </software></softwareList>\n",
@@ -237,17 +315,19 @@ impl ImzmlWriter {
 
         // scanSettingsList — geometry from metadata.imaging WHERE PRESENT; empty when absent
         // (never fabricated — threat T-09-FAB).
-        self.write_scan_settings(imaging)?;
+        Self::write_scan_settings_to(sink, imaging)?;
 
         // instrumentConfigurationList — a minimal IC1 referenced by <run>.
-        self.write_raw(
+        emit_raw(
+            sink,
             "<instrumentConfigurationList count=\"1\">\
              <instrumentConfiguration id=\"IC1\"/>\
              </instrumentConfigurationList>\n",
         )?;
 
         // dataProcessingList — a reverse-conversion entry referenced by <spectrumList>.
-        self.write_raw(
+        emit_raw(
+            sink,
             "<dataProcessingList count=\"1\">\
              <dataProcessing id=\"dp_reverse\">\
              <processingMethod order=\"0\" softwareRef=\"sw_imzml2mzpeak\">\
@@ -256,49 +336,51 @@ impl ImzmlWriter {
         )?;
 
         // run + spectrumList — every ref= names an id declared above (Pitfall 4).
-        self.write_raw(
+        emit_raw(
+            sink,
             "<run id=\"run_reverse\" defaultInstrumentConfigurationRef=\"IC1\">\n",
         )?;
-        self.write_raw("<spectrumList count=\"")?;
-        self.write_escaped(&count.to_string())?;
-        self.write_raw("\" defaultDataProcessingRef=\"dp_reverse\">\n")?;
+        emit_raw(sink, "<spectrumList count=\"")?;
+        emit_escaped(sink, &count.to_string())?;
+        emit_raw(sink, "\" defaultDataProcessingRef=\"dp_reverse\">\n")?;
         Ok(())
     }
 
-    /// Emit `<scanSettingsList>`. When `imaging` is `Some`, emit a `<scanSettings>` carrying ONLY
-    /// the present (`Some`) geometry fields under their documented accessions. When `None`, emit an
-    /// empty `<scanSettingsList count="0"/>` and fabricate nothing (threat T-09-FAB).
-    fn write_scan_settings(
-        &mut self,
+    /// Emit `<scanSettingsList>` to an arbitrary sink. When `imaging` is `Some`, emit a
+    /// `<scanSettings>` carrying ONLY the present (`Some`) geometry fields under their documented
+    /// accessions. When `None`, emit an empty `<scanSettingsList count="0"/>` and fabricate nothing
+    /// (threat T-09-FAB).
+    fn write_scan_settings_to(
+        sink: &mut impl Write,
         imaging: Option<&ImagingMetadata>,
     ) -> Result<(), ReverseError> {
         let Some(meta) = imaging else {
-            self.write_raw("<scanSettingsList count=\"0\"/>\n")?;
+            emit_raw(sink, "<scanSettingsList count=\"0\"/>\n")?;
             return Ok(());
         };
-        self.write_raw("<scanSettingsList count=\"1\">")?;
-        self.write_raw("<scanSettings id=\"ss_reverse\">")?;
+        emit_raw(sink, "<scanSettingsList count=\"1\">")?;
+        emit_raw(sink, "<scanSettings id=\"ss_reverse\">")?;
         // pixel_count → IMS:1000042 (x) / IMS:1000043 (y)
         if let Some(pc) = meta.pixel_count {
-            self.cv_param("IMS", "IMS:1000042", "max count of pixels x", &pc.x.to_string())?;
-            self.cv_param("IMS", "IMS:1000043", "max count of pixels y", &pc.y.to_string())?;
+            emit_cv_param(sink, "IMS", "IMS:1000042", "max count of pixels x", &pc.x.to_string())?;
+            emit_cv_param(sink, "IMS", "IMS:1000043", "max count of pixels y", &pc.y.to_string())?;
         }
         // max_dimension_um → IMS:1000044 (x) / IMS:1000045 (y)
         if let Some(md) = meta.max_dimension_um {
-            self.cv_param("IMS", "IMS:1000044", "max dimension x", &md.x.to_string())?;
-            self.cv_param("IMS", "IMS:1000045", "max dimension y", &md.y.to_string())?;
+            emit_cv_param(sink, "IMS", "IMS:1000044", "max dimension x", &md.x.to_string())?;
+            emit_cv_param(sink, "IMS", "IMS:1000045", "max dimension y", &md.y.to_string())?;
         }
         // pixel_size_um → IMS:1000046 (x) / IMS:1000047 (y). A non-finite value (NaN/±inf) is
         // OMITTED rather than emitted as an invalid numeric cvParam token (WR-03).
         if let Some(ps) = meta.pixel_size_um {
             if let Some(x) = format_f64(ps.x) {
-                self.cv_param("IMS", "IMS:1000046", "pixel size x", &x)?;
+                emit_cv_param(sink, "IMS", "IMS:1000046", "pixel size x", &x)?;
             }
             if let Some(y) = format_f64(ps.y) {
-                self.cv_param("IMS", "IMS:1000047", "pixel size y", &y)?;
+                emit_cv_param(sink, "IMS", "IMS:1000047", "pixel size y", &y)?;
             }
         }
-        self.write_raw("</scanSettings></scanSettingsList>\n")?;
+        emit_raw(sink, "</scanSettings></scanSettingsList>\n")?;
         Ok(())
     }
 
@@ -431,10 +513,19 @@ impl ImzmlWriter {
     }
 
     /// Write the closing tags (`</spectrumList></run></mzML>`) and flush. Consumes the writer.
+    /// Thin wrapper over [`Self::write_trailer_to`] (byte-identical) plus a final flush.
     pub fn finish(mut self) -> Result<(), ReverseError> {
-        self.write_raw("</spectrumList>\n</run>\n</mzML>\n")?;
+        Self::write_trailer_to(&mut self.sink)?;
         self.sink.flush().map_err(ReverseError::XmlEmit)?;
         Ok(())
+    }
+
+    /// Write exactly the closing tags `</spectrumList>\n</run>\n</mzML>\n` to an ARBITRARY sink
+    /// (Plan 10-01 — Option C). The Option-C orchestrator calls this on the real `.imzML` sink
+    /// AFTER the header and the concatenated body. Byte-identical to the [`Self::finish`] trailer.
+    /// Does NOT flush — the caller owns the final flush of its own sink.
+    pub fn write_trailer_to(sink: &mut impl Write) -> Result<(), ReverseError> {
+        emit_raw(sink, "</spectrumList>\n</run>\n</mzML>\n")
     }
 }
 
