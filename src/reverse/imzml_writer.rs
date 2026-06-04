@@ -395,6 +395,7 @@ impl ImzmlWriter {
         x: i64,
         y: i64,
         z: Option<i64>,
+        ms_level: u8,
         representation: Representation,
         mz: ArrayEmit,
         intensity: ArrayEmit,
@@ -426,15 +427,26 @@ impl ImzmlWriter {
         self.write_raw("\">")?;
 
         // Spectrum-level CV terms required for the output to be RE-CONVERTIBLE (the round-trip's
-        // point): without `MS:1000511 ms level` a re-reading consumer sees ms_level 0 and cannot
-        // infer the spectrum type (the mzpeak forward writer panics: "Couldn't infer spectrum type
-        // from MS level"). Emit the MS1-spectrum type term explicitly plus ms level = 1. Reverse
-        // output is always MS1 imaging data (the milestone scope), so a fixed MS1 declaration is
-        // correct; this is a presence/level CV pair, not a value coercion (WR-01 fix).
-        self.write_raw(
-            "<cvParam cvRef=\"MS\" accession=\"MS:1000579\" name=\"MS1 spectrum\" value=\"\"/>",
-        )?;
-        self.cv_param("MS", "MS:1000511", "ms level", "1")?;
+        // point): without `MS:1000511 ms level` a re-reading consumer cannot infer the spectrum
+        // type (the mzpeak forward writer panics: "Couldn't infer spectrum type from MS level").
+        // The REAL source `ms_level` is threaded through and re-declared VERBATIM — NOT hardcoded
+        // to 1 — so a non-MS1 source round-trips its true level instead of being silently
+        // mis-declared (WR-01). The paired spectrum-type term is chosen FROM the level: only
+        // `ms_level == 1` may assert `MS:1000579 MS1 spectrum`; `ms_level >= 2` asserts
+        // `MS:1000580 MSn spectrum`. For `ms_level == 0` (a legal carried value — record.rs:119-121)
+        // NEITHER type term is emitted (asserting a false MS1 would be a fidelity bug); only the
+        // honest `ms level = 0` value goes out. This is a presence/level CV pair, not a value
+        // coercion.
+        match ms_level {
+            0 => {} // no faithful spectrum-type term to assert at level 0
+            1 => self.write_raw(
+                "<cvParam cvRef=\"MS\" accession=\"MS:1000579\" name=\"MS1 spectrum\" value=\"\"/>",
+            )?,
+            _ => self.write_raw(
+                "<cvParam cvRef=\"MS\" accession=\"MS:1000580\" name=\"MSn spectrum\" value=\"\"/>",
+            )?,
+        }
+        self.cv_param("MS", "MS:1000511", "ms level", &ms_level.to_string())?;
 
         // Spectrum-representation CV term (WR-01) — REQUIRED for the round-trip to preserve
         // profile-vs-centroid continuity. Without it a re-reading consumer (mzdata) sees
@@ -737,6 +749,7 @@ mod tests {
             1,
             2,
             None,
+            1,
             Representation::Profile,
             (BinaryDataArrayType::Float64, mz_ref),
             (BinaryDataArrayType::Float32, int_ref),
@@ -830,6 +843,7 @@ mod tests {
                 1,
                 2,
                 None,
+                1,
                 Representation::Profile,
                 (BinaryDataArrayType::Float64, mz_ref),
                 (BinaryDataArrayType::Float32, int_ref),
@@ -926,10 +940,12 @@ mod tests {
     use mzdata::spectrum::MultiLayerSpectrum;
     use mzdata::spectrum::bindata::{ArrayType, ByteArrayView};
 
-    /// One emitted fixture pixel: the 1-based coords and the source arrays it was built from.
+    /// One emitted fixture pixel: the 1-based coords, the source MS level, and the source arrays
+    /// it was built from.
     struct FixturePixel {
         x: i64,
         y: i64,
+        ms_level: u8,
         mz: NumArray,
         intensity: NumArray,
     }
@@ -952,13 +968,14 @@ mod tests {
         let mut ibd = IbdWriter::new(&ibd_path, uuid).unwrap();
 
         // Append both arrays per pixel, capturing each (dtype, ArrayRef) pair for the emitter.
-        let mut emit_args: Vec<(i64, i64, ArrayEmit, ArrayEmit)> = Vec::with_capacity(pixels.len());
+        let mut emit_args: Vec<(i64, i64, u8, ArrayEmit, ArrayEmit)> =
+            Vec::with_capacity(pixels.len());
         for px in pixels {
             let mz_dtype = dtype_of(&px.mz);
             let int_dtype = dtype_of(&px.intensity);
             let mz_ref = ibd.append(&px.mz).unwrap();
             let int_ref = ibd.append(&px.intensity).unwrap();
-            emit_args.push((px.x, px.y, (mz_dtype, mz_ref), (int_dtype, int_ref)));
+            emit_args.push((px.x, px.y, px.ms_level, (mz_dtype, mz_ref), (int_dtype, int_ref)));
         }
         // finish() hashes the WHOLE .ibd (header included) — the SAME md5 the emitter must declare.
         let md5_hex = ibd.finish().unwrap();
@@ -971,8 +988,8 @@ mod tests {
             imaging,
         )
         .unwrap();
-        for (i, (x, y, mz, int)) in emit_args.into_iter().enumerate() {
-            xml.write_spectrum(i as u64, x, y, None, Representation::Profile, mz, int)
+        for (i, (x, y, ms_level, mz, int)) in emit_args.into_iter().enumerate() {
+            xml.write_spectrum(i as u64, x, y, None, ms_level, Representation::Profile, mz, int)
                 .unwrap();
         }
         xml.finish().unwrap();
@@ -1003,12 +1020,14 @@ mod tests {
             FixturePixel {
                 x: 1,
                 y: 1,
+                ms_level: 1,
                 mz: NumArray::F64(vec![100.0, 200.0, 300.0]),
                 intensity: NumArray::F32(vec![10.0, 20.0, 30.0]),
             },
             FixturePixel {
                 x: 2,
                 y: 1,
+                ms_level: 1,
                 mz: NumArray::F64(vec![150.0, 250.0]),
                 intensity: NumArray::F32(vec![5.0, 6.0]),
             },
@@ -1108,6 +1127,97 @@ mod tests {
         fs::remove_dir_all(&dir).ok();
     }
 
+    /// WR-01: the REAL source `ms_level` is threaded through and re-declared VERBATIM, NOT hardcoded
+    /// to 1. A fixture pixel built with `ms_level = 2` round-reads through the `mzdata::ImzMLReader`
+    /// oracle with `ms_level() == 2`, and the paired spectrum-type term is the MSn term
+    /// (`MS:1000580`), never a false `MS:1000579 MS1 spectrum`.
+    #[test]
+    fn ms_level_threaded_through_roundreads() {
+        let dir = tempdir();
+        // One pixel at MS level 2 (a non-default level the old hardcode would have silently
+        // mis-declared as 1). Distinct from two_pixel_fixture (which is all level 1).
+        let pixels = vec![FixturePixel {
+            x: 4,
+            y: 9,
+            ms_level: 2,
+            mz: NumArray::F64(vec![111.0, 222.0]),
+            intensity: NumArray::F32(vec![1.0, 2.0]),
+        }];
+        let (xml_path, ibd_path) = emit_fixture(&dir, &pixels, None);
+
+        // (a) Byte-level: the honest level is emitted and NO false MS1 type term is present.
+        let text = read_text(&xml_path);
+        assert!(
+            text.contains("accession=\"MS:1000511\" name=\"ms level\" value=\"2\""),
+            "the real ms level (2) is emitted verbatim, not hardcoded to 1"
+        );
+        assert!(
+            text.contains("accession=\"MS:1000580\" name=\"MSn spectrum\""),
+            "ms_level >= 2 emits the MSn spectrum-type term"
+        );
+        assert!(
+            !text.contains("MS:1000579"),
+            "an MSn spectrum must NOT assert the MS1-spectrum term"
+        );
+
+        // (b) Oracle: mzdata reads the level back as 2.
+        let mut reader = ImzMLReader::<File, File>::new(
+            File::open(&xml_path).unwrap(),
+            File::open(&ibd_path).unwrap(),
+        );
+        let mut spec = MultiLayerSpectrum::default();
+        reader
+            .read_into(&mut spec)
+            .expect("MS-level-2 spectrum re-reads Ok via mzdata");
+        assert_eq!(
+            spec.ms_level(),
+            2,
+            "round-read ms_level equals the emitted source level (no hardcode-to-1 loss)"
+        );
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// WR-01 (level-0 boundary): the legal `ms_level = 0` carried value (record.rs:119-121) is
+    /// emitted as an honest `ms level = 0` and emits NEITHER spectrum-type term — asserting a false
+    /// `MS:1000579 MS1 spectrum` at level 0 would be an outright mis-declaration.
+    #[test]
+    fn ms_level_zero_emits_no_false_type_term() {
+        let dir = tempdir();
+        let path = dir.join("level0.imzML");
+        let mut w = ImzmlWriter::new(&path, Uuid::new_v4(), "deadbeef", 1, None).unwrap();
+        let mz_ref = ArrayRef { offset: 16, count: 2, encoded_len: 16 };
+        let int_ref = ArrayRef { offset: 32, count: 2, encoded_len: 8 };
+        w.write_spectrum(
+            0,
+            1,
+            1,
+            None,
+            0,
+            Representation::Profile,
+            (BinaryDataArrayType::Float64, mz_ref),
+            (BinaryDataArrayType::Float32, int_ref),
+        )
+        .unwrap();
+        w.finish().unwrap();
+
+        let text = read_text(&path);
+        assert!(
+            text.contains("accession=\"MS:1000511\" name=\"ms level\" value=\"0\""),
+            "level 0 is carried verbatim, not normalized to 1"
+        );
+        assert!(
+            !text.contains("MS:1000579"),
+            "level 0 must NOT assert a false MS1-spectrum type term"
+        );
+        assert!(
+            !text.contains("MS:1000580"),
+            "level 0 emits no MSn-spectrum type term either"
+        );
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
     /// WR-02: a spectrum whose m/z AND intensity arrays are BOTH zero-length emits+re-reads through
     /// the `mzdata::ImzMLReader` oracle without the reader rejecting it as "missing external data".
     /// This covers the boundary the offset≥16 invariant (enforced in `ibd.rs`, asserted at the emit
@@ -1123,12 +1233,14 @@ mod tests {
             FixturePixel {
                 x: 1,
                 y: 1,
+                ms_level: 1,
                 mz: NumArray::F64(vec![100.0, 200.0]),
                 intensity: NumArray::F32(vec![10.0, 20.0]),
             },
             FixturePixel {
                 x: 2,
                 y: 1,
+                ms_level: 1,
                 mz: NumArray::F64(vec![]),
                 intensity: NumArray::F32(vec![]),
             },

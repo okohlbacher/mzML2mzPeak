@@ -39,6 +39,11 @@ pub struct ReversePixel {
     pub y: i64,
     /// Optional 1-based imaging z coordinate (IMS:1000052), `None` when absent.
     pub z: Option<i64>,
+    /// MS level (`MS:1000511`), carried VERBATIM from the source spectrum — INCLUDING the
+    /// legal value `0` (record.rs:119-121: "0 is a legal carried value and must NOT be
+    /// rejected or normalized"). The reverse emitter re-declares this real level rather than
+    /// hardcoding `1`, so a non-MS1 source round-trips its true MS level (WR-01).
+    pub ms_level: u8,
     /// Profile vs Centroid/Unknown — drives which facet the arrays came from.
     pub representation: Representation,
     /// m/z axis at its SOURCE dtype (no widening).
@@ -94,6 +99,9 @@ pub fn read_pixel(reader: &mut MzPeakReader, index: u64) -> Result<ReversePixel,
     };
 
     let representation: Representation = descr.signal_continuity.into();
+    // MS level carried VERBATIM (record.rs:119-121) — including the legal `0`; the emitter
+    // re-declares it instead of asserting a fixed MS1 (WR-01).
+    let ms_level = descr.ms_level;
 
     let (mz, intensity) = match representation {
         // Profile → spectra_data facet (raw arrays at SOURCE width — the L1 reference).
@@ -130,7 +138,7 @@ pub fn read_pixel(reader: &mut MzPeakReader, index: u64) -> Result<ReversePixel,
         }
     };
 
-    Ok(ReversePixel { x, y, z, representation, mz, intensity })
+    Ok(ReversePixel { x, y, z, ms_level, representation, mz, intensity })
 }
 
 /// Decode one `DataArray` at its SOURCE dtype into a [`NumArray`], rejecting any dtype outside
@@ -327,6 +335,7 @@ mod tests {
         assert_eq!(p0.x, 3, "x recovered by IMS:1000050");
         assert_eq!(p0.y, 7, "y recovered by IMS:1000051");
         assert_eq!(p0.z, None, "z absent => None");
+        assert_eq!(p0.ms_level, 1, "ms_level carried verbatim from the source spectrum (WR-01)");
         assert_eq!(p0.representation, Representation::Profile);
         assert!(matches!(p0.mz, NumArray::F64(_)), "m/z stays F64 (no widening)");
         assert!(

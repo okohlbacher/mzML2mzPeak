@@ -28,7 +28,9 @@ use mzpeak_prototyping::MzPeakReader;
 mod reverse_fixtures;
 
 /// Field-copy a [`ReversePixel`] into an [`ImagingSpectrum`]. `verify_streaming` reads ONLY
-/// `{x, y, z, mz, intensity, representation}`, so `ms_level`/`native_id` are placeholders.
+/// `{x, y, z, mz, intensity, representation}`; `native_id` remains a placeholder. `ms_level` now
+/// flows VERBATIM from the reverse-read pixel (WR-01) rather than being hardcoded — the source
+/// side is no longer forced to 1, so the real level is carried through faithfully.
 fn to_imaging(px: ReversePixel) -> ImagingSpectrum {
     ImagingSpectrum {
         x: px.x,
@@ -37,7 +39,7 @@ fn to_imaging(px: ReversePixel) -> ImagingSpectrum {
         mz: px.mz,
         intensity: px.intensity,
         representation: px.representation,
-        ms_level: 1,             // PLACEHOLDER — verify never reads it
+        ms_level: px.ms_level,    // carried verbatim from the reverse-read pixel (WR-01)
         native_id: String::new(), // PLACEHOLDER — verify never reads it
     }
 }

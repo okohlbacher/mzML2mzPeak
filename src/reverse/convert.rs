@@ -169,6 +169,7 @@ fn run_pipeline(
             px.x,
             px.y,
             px.z,
+            px.ms_level,
             px.representation,
             (px.mz.source_dtype(), mz_ref),
             (px.intensity.source_dtype(), int_ref),
