@@ -157,6 +157,62 @@ pub fn imaging_archive() -> PathBuf {
     out
 }
 
+/// Build a PARAMETERIZED N-pixel imaging fixture for the bounded-memory proof (RCLI-02) and
+/// return its path.
+///
+/// Generalizes [`imaging_archive`] to `n` distinct-coordinate `Profile` pixels laid out on a
+/// roughly-square grid (`x = (i % grid_w) + 1`, `y = (i / grid_w) + 1`, both 1-based so a sampled
+/// coord round-read is meaningful). Each pixel carries a DELIBERATELY SMALL `Float64` m/z +
+/// `Float32` intensity array (2-3 elements) — the test proves the loop STREAMS at scale, not that
+/// it handles large arrays — and a unique `native_id`. Reuses the production [`to_mzdata`] path,
+/// the `ImagingRunMetadata` geometry block (grid sized to fit `n`), [`temp_out`], and
+/// [`write_seam`] verbatim. The 2-pixel [`imaging_archive`] is left intact; this is additive.
+///
+/// No `tempfile` crate (the module hand-rolls temp paths via [`temp_out`]). Caller removes the
+/// returned file.
+pub fn imaging_archive_n(n: u32) -> PathBuf {
+    // Roughly-square grid that fits all n pixels (ceil(sqrt(n))).
+    let grid_w: u32 = (n as f64).sqrt().ceil() as u32;
+    let grid_w = grid_w.max(1);
+    let grid_h: u32 = n.div_ceil(grid_w).max(1);
+
+    let pixels: Vec<ImagingSpectrum> = (0..n)
+        .map(|i| {
+            let x = (i % grid_w) + 1; // 1-based
+            let y = (i / grid_w) + 1; // 1-based
+            // Small per-pixel arrays — distinct values so nothing collapses, but tiny (2-3 elems).
+            let base = (i % 1000) as f64;
+            ImagingSpectrum {
+                x: x as i64,
+                y: y as i64,
+                z: None,
+                mz: NumArray::F64(vec![100.0 + base, 200.5 + base, 350.25 + base]),
+                intensity: NumArray::F32(vec![10.0, 42.0, 7.5]),
+                representation: Representation::Profile,
+                ms_level: 1,
+                native_id: format!("spectrum={}", i + 1),
+            }
+        })
+        .collect();
+
+    let specs: Vec<MultiLayerSpectrum> = pixels
+        .iter()
+        .map(to_mzdata)
+        .collect::<Result<_, _>>()
+        .expect("reconstruct N-pixel imaging fixture spectra");
+
+    let geom = ImagingRunMetadata {
+        grid_x: Some(grid_w as i64),
+        grid_y: Some(grid_h as i64),
+        scan_pattern: Some("IMS:1000413".to_string()),
+        ..Default::default()
+    };
+
+    let out = temp_out("imaging_n");
+    write_seam(&out, &specs, Some(&geom)).expect("N-pixel imaging fixture writes a valid archive");
+    out
+}
+
 /// Build the NEGATIVE non-imaging fixture (RMZ-04) and return its path.
 ///
 /// Produces a conformant `.mzpeak` whose two spectra carry valid `Float64` m/z + `Float32`
