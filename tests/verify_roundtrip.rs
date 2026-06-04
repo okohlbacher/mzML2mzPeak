@@ -858,6 +858,125 @@ fn sparse_grid_no_panic() {
     let _ = std::fs::remove_file(&out);
 }
 
+/// MASKING-AWARE L1 (the adapted contract, the happy path): a PROFILE pixel whose source
+/// carries zero-intensity runs round-trips and VERIFIES under L1 even though the writer's
+/// `mask_zero_intensity_runs` drops interior zeros (so the output point arrays are a SUBSET of
+/// the source). The merge accepts the subset because every dropped point had intensity == 0 and
+/// every surviving point matches bit-for-bit at the source width. This is the case that FALSELY
+/// FAILED under the previous strict element-wise compare.
+#[test]
+fn profile_with_zero_runs_passes_l1_under_masking() {
+    let out = temp_out("zeroruns_l1");
+    // Two profile pixels, uniform F64 m/z + F32 intensity (the PXD001283 shape), each with
+    // interior zero-intensity runs that the writer drops. Surviving points are all non-zero.
+    let fx = vec![
+        ImagingSpectrum {
+            x: 1,
+            y: 1,
+            z: None,
+            mz: NumArray::F64(vec![100.0, 200.0, 300.0, 400.0, 500.0]),
+            intensity: NumArray::F32(vec![0.0, 0.0, 42.0, 0.0, 7.5]),
+            representation: Representation::Profile,
+            ms_level: 1,
+            native_id: "spectrum=1".to_string(),
+        },
+        ImagingSpectrum {
+            x: 2,
+            y: 1,
+            z: None,
+            mz: NumArray::F64(vec![110.0, 220.0, 330.0]),
+            intensity: NumArray::F32(vec![5.0, 0.0, 0.0]),
+            representation: Representation::Profile,
+            ms_level: 1,
+            native_id: "spectrum=2".to_string(),
+        },
+    ];
+    write_fixture(&out, &fx).expect("zero-run fixture writes");
+
+    let report = verify_against_source(&fx, &out, ConformanceLevel::L1BitForBit)
+        .expect("verify returns a report");
+
+    assert!(
+        report.mz.passed,
+        "m/z of surviving points is bit-for-bit; dropped zeros are not m/z failures: {:?}, mismatches={:?}",
+        report.mz, report.mismatches
+    );
+    assert!(
+        report.intensity.passed,
+        "every dropped source point had intensity == 0, so no signal loss (adapted L1): {:?}, mismatches={:?}",
+        report.intensity, report.mismatches
+    );
+    assert!(
+        report.passed(),
+        "an honest round-trip with zero-intensity-run masking PASSES the adapted L1 contract: {report:?}"
+    );
+
+    let _ = std::fs::remove_file(&out);
+}
+
+/// MASKING-AWARE L1 (the GUARD — proves the contract catches genuine signal loss, not just
+/// rubber-stamping any subset): write an archive whose output drops zero-intensity points, then
+/// VERIFY it against a source where those SAME m/z positions carry NON-ZERO intensity. The
+/// output is then missing NON-ZERO source points — real data loss — which MUST be reported as an
+/// L1 intensity FAILURE.
+///
+/// Construction: the honest archive is written from `written` (zeros at indices 1,3 → dropped).
+/// The verifier is then driven against `claimed`, identical EXCEPT those dropped positions now
+/// hold non-zero intensities. Counts and coordinates still match (same pixel, same m/z grid), so
+/// the failure must surface specifically on the intensity axis — proving the merge's zero-drop
+/// invariant is enforced, not assumed.
+#[test]
+fn dropped_nonzero_point_is_l1_failure() {
+    let out = temp_out("nonzero_loss_guard");
+
+    // What we WROTE: zeros at m/z 200 and 400 → the writer drops them from the output.
+    let written = vec![ImagingSpectrum {
+        x: 1,
+        y: 1,
+        z: None,
+        mz: NumArray::F64(vec![100.0, 200.0, 300.0, 400.0, 500.0]),
+        intensity: NumArray::F32(vec![10.0, 0.0, 42.0, 0.0, 7.5]),
+        representation: Representation::Profile,
+        ms_level: 1,
+        native_id: "spectrum=1".to_string(),
+    }];
+    write_fixture(&out, &written).expect("guard fixture writes");
+
+    // What we CLAIM the source was: identical m/z, but m/z 200 and 400 carry NON-ZERO signal.
+    // The output (subset) is therefore missing two NON-ZERO source points → genuine loss.
+    let claimed = vec![ImagingSpectrum {
+        x: 1,
+        y: 1,
+        z: None,
+        mz: NumArray::F64(vec![100.0, 200.0, 300.0, 400.0, 500.0]),
+        intensity: NumArray::F32(vec![10.0, 88.0, 42.0, 17.0, 7.5]),
+        representation: Representation::Profile,
+        ms_level: 1,
+        native_id: "spectrum=1".to_string(),
+    }];
+
+    let report = verify_against_source(&claimed, &out, ConformanceLevel::L1BitForBit)
+        .expect("verify returns a report (signal loss is a soft FAIL, not an error)");
+
+    assert!(report.count.passed, "counts still match (1 == 1)");
+    assert!(report.coordinates.passed, "coordinate still pairs (same pixel)");
+    assert!(
+        !report.intensity.passed,
+        "a dropped NON-ZERO source point is real data loss → L1 intensity FAILURE: {:?}",
+        report.intensity
+    );
+    assert!(
+        report.intensity.mismatch_count >= 1,
+        "the signal loss surfaces as at least one intensity mismatch"
+    );
+    assert!(
+        !report.passed(),
+        "the overall report MUST NOT pass when a non-zero point was dropped (genuine loss)"
+    );
+
+    let _ = std::fs::remove_file(&out);
+}
+
 /// THE CRUX (DAT-01) equivalence guard: the bounded-memory `verify_streaming` and the
 /// collect-all `verify_against_source` produce the SAME `VerificationReport` on the synthetic
 /// fixture, at BOTH `L1BitForBit` and `L2Transformed`.

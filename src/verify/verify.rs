@@ -491,6 +491,17 @@ fn compare_paired_pixel(
         // `spectra_data`; that was masked by auxiliary-array fallback before DAT-01 and is wrong.)
         Representation::Profile => {
             // Profile -> spectra_data facet; the L1 reference, compared at SOURCE width.
+            //
+            // MASKING-AWARE L1 (the adapted contract): the writer keeps
+            // `mask_zero_intensity_runs = true` (src/write/writer.rs), so the output point
+            // arrays are a zero-suppressed SUBSET of the source, NOT an element-for-element
+            // copy. A strict equal-length element-wise compare would FALSELY FAIL on real
+            // profile data. Instead we run a two-pointer MERGE over source vs output points in
+            // ascending m/z order (`merge_masked`): surviving points are checked bit-for-bit at
+            // the SOURCE width (no f32→f64 widening), and every DROPPED source point must have
+            // had intensity == 0 (the writer only ever drops zero-intensity points — see the
+            // `merge_masked` doc + vendored `filter.rs:623`). A dropped NON-ZERO point is real
+            // signal loss → an L1 intensity FAILURE.
             let arrays = reader
                 .get_spectrum_arrays(out_idx)
                 .map_err(VerifyError::OpenOutput)?
@@ -503,29 +514,26 @@ fn compare_paired_pixel(
                 .get(&ArrayType::IntensityArray)
                 .ok_or(VerifyError::MissingArray { index: out_idx, axis: "intensity" })?;
 
-            // Compare m/z at the SOURCE stored width (never widen for L1, Pitfall/record.rs).
-            let mz_first = compare_profile_axis(
-                &s.mz, mz_da, tol.mz_rel_err, level, out_idx, "m/z",
+            let outcome = compare_profile_masked(
+                s, mz_da, int_da, level, tol, out_idx,
             )?;
-            if let Some(elem) = mz_first {
+
+            if let Some(m) = outcome.mz {
                 *mz_mismatch_pixels += 1;
                 report.record_mismatch(mismatch_for(
-                    &s.mz, mz_da, coord, out_idx, MismatchAxis::Mz, elem,
+                    &s.mz, mz_da, coord, out_idx, MismatchAxis::Mz, m.src_element,
                 ));
             }
-
-            // Compare intensity at the SOURCE stored width.
-            let int_first = compare_profile_axis(
-                &s.intensity, int_da, tol.intensity_rel_err, level, out_idx, "intensity",
-            )?;
-            if let Some(elem) = int_first {
+            if let Some(m) = outcome.intensity {
                 *int_mismatch_pixels += 1;
                 report.record_mismatch(mismatch_for(
-                    &s.intensity, int_da, coord, out_idx, MismatchAxis::Intensity, elem,
+                    &s.intensity, int_da, coord, out_idx, MismatchAxis::Intensity, m.src_element,
                 ));
             }
 
-            // Output TIC for the ion image: sum the data-facet intensity at f64.
+            // Output TIC for the ion image: sum the data-facet intensity at f64. The masking
+            // only removes zero-intensity points, so the TIC of the surviving subset equals the
+            // source TIC — the VER-04 ion-image check stays valid against the source TIC.
             let out_int_f64 = int_da
                 .to_f64()
                 .map_err(|e| VerifyError::ArrayDecode {
@@ -627,37 +635,126 @@ fn compare_paired_pixel(
     }
 }
 
-/// Compare a profile-pixel axis (source [`NumArray`] vs an output [`DataArray`]) at the SOURCE
-/// stored width via [`first_mismatch_f64`] / [`first_mismatch_f32`], returning the first
-/// differing element index (or `None`). The output array is decoded at the SOURCE variant's
-/// width (the read-back preserves source dtype — RESEARCH Crux), so no widening occurs for L1.
-fn compare_profile_axis(
-    source: &NumArray,
-    out_da: &mzdata::spectrum::bindata::DataArray,
-    rel_err: f64,
+/// Run the MASKING-AWARE per-pixel merge for a PROFILE pixel: decode the output `spectra_data`
+/// m/z + intensity arrays at the SOURCE stored width (the read-back preserves source dtype —
+/// RESEARCH Crux; never widen for L1) and validate the adapted L1 contract directly via
+/// [`merge_masked`] — surviving points bit-for-bit at source width, dropped points must be
+/// zero-intensity. Returns the per-axis [`MergeOutcome`].
+///
+/// Because m/z and intensity can have INDEPENDENT source widths (e.g. F64 m/z + F32 intensity —
+/// the PXD001283 profile), this dispatches on BOTH axes' source variants and instantiates the
+/// generic [`merge_masked`] at the matching element types so the comparison happens at the
+/// stored width on each axis with NO widening (the load-bearing no-widen rule, T-05-03 / WR-04).
+fn compare_profile_masked(
+    s: &ImagingSpectrum,
+    mz_da: &mzdata::spectrum::bindata::DataArray,
+    int_da: &mzdata::spectrum::bindata::DataArray,
     level: ConformanceLevel,
+    tol: &ToleranceContract,
     index: u64,
-    axis: &'static str,
-) -> Result<Option<usize>, VerifyError> {
-    match source {
-        NumArray::F64(src_v) => {
-            let out_v = out_da
-                .to_f64()
-                .map_err(|e| VerifyError::ArrayDecode { index, axis, source: e.into() })?;
-            Ok(first_mismatch_f64(src_v, out_v.as_ref(), rel_err, level))
+) -> Result<crate::verify::compare::MergeOutcome, VerifyError> {
+    use crate::verify::compare::merge_masked;
+
+    // Per-axis L1/L2 predicates, specialized to the stored width. L1 → exact `!=`; L2 → the
+    // relative-error bound `|a-b|/|b| > rel_err` with a `b==0` exact-inequality guard (mirrors
+    // `first_mismatch_*`). m/z equality (point IDENTITY at the merge boundary) is ALWAYS exact:
+    // a surviving point is one whose stored m/z key matches bit-for-bit; the m/z *mismatch*
+    // predicate is the level-aware one (so an L2 m/z within tolerance is not flagged).
+    macro_rules! mismatch_pred {
+        ($ty:ty, $rel:expr) => {{
+            let rel = $rel as $ty;
+            move |a: $ty, b: $ty| match level {
+                ConformanceLevel::L1BitForBit => a != b,
+                ConformanceLevel::L2Transformed => {
+                    if b == (0.0 as $ty) {
+                        a != b
+                    } else {
+                        ((a - b).abs() / b.abs()) > rel
+                    }
+                }
+            }
+        }};
+    }
+
+    macro_rules! run_merge {
+        ($mz_ty:ty, $src_mz:expr, $int_ty:ty, $src_int:expr) => {{
+            let out_mz = decode_at::<$mz_ty>(mz_da, index, "m/z")?;
+            let out_int = decode_at::<$int_ty>(int_da, index, "intensity")?;
+            let mz_mismatch = mismatch_pred!($mz_ty, tol.mz_rel_err);
+            let int_mismatch = mismatch_pred!($int_ty, tol.intensity_rel_err);
+            Ok(merge_masked(
+                $src_mz,
+                $src_int,
+                &out_mz,
+                &out_int,
+                // m/z point identity at the merge boundary: ALWAYS exact (bit-for-bit key).
+                |a: $mz_ty, b: $mz_ty| a == b,
+                mz_mismatch,
+                int_mismatch,
+                |v: $int_ty| v == (0.0 as $int_ty),
+            ))
+        }};
+    }
+
+    match (&s.mz, &s.intensity) {
+        (NumArray::F64(src_mz), NumArray::F64(src_int)) => {
+            run_merge!(f64, src_mz, f64, src_int)
         }
-        NumArray::F32(src_v) => {
-            let out_v = out_da
-                .to_f32()
-                .map_err(|e| VerifyError::ArrayDecode { index, axis, source: e.into() })?;
-            Ok(first_mismatch_f32(src_v, out_v.as_ref(), rel_err as f32, level))
+        (NumArray::F64(src_mz), NumArray::F32(src_int)) => {
+            run_merge!(f64, src_mz, f32, src_int)
+        }
+        (NumArray::F32(src_mz), NumArray::F64(src_int)) => {
+            run_merge!(f32, src_mz, f64, src_int)
+        }
+        (NumArray::F32(src_mz), NumArray::F32(src_int)) => {
+            run_merge!(f32, src_mz, f32, src_int)
         }
     }
 }
 
+/// Decode an output [`DataArray`] at the requested element width (`f32` or `f64`) WITHOUT
+/// widening — the read-back preserves the source dtype, so the caller selects the matching
+/// width. Returns an owned `Vec` so the merge can borrow uniformly across the dtype dispatch.
+trait DecodeAt: Sized {
+    fn decode(
+        da: &mzdata::spectrum::bindata::DataArray,
+        index: u64,
+        axis: &'static str,
+    ) -> Result<Vec<Self>, VerifyError>;
+}
+impl DecodeAt for f64 {
+    fn decode(
+        da: &mzdata::spectrum::bindata::DataArray,
+        index: u64,
+        axis: &'static str,
+    ) -> Result<Vec<f64>, VerifyError> {
+        da.to_f64()
+            .map(|c| c.into_owned())
+            .map_err(|e| VerifyError::ArrayDecode { index, axis, source: e.into() })
+    }
+}
+impl DecodeAt for f32 {
+    fn decode(
+        da: &mzdata::spectrum::bindata::DataArray,
+        index: u64,
+        axis: &'static str,
+    ) -> Result<Vec<f32>, VerifyError> {
+        da.to_f32()
+            .map(|c| c.into_owned())
+            .map_err(|e| VerifyError::ArrayDecode { index, axis, source: e.into() })
+    }
+}
+fn decode_at<T: DecodeAt>(
+    da: &mzdata::spectrum::bindata::DataArray,
+    index: u64,
+    axis: &'static str,
+) -> Result<Vec<T>, VerifyError> {
+    T::decode(da, index, axis)
+}
+
 /// Build a [`Mismatch`] record for a profile-pixel axis, reading the differing element from the
 /// source [`NumArray`] and the output [`DataArray`] (both widened to f64 for the REPORT only —
-/// the authoritative comparison already ran at the stored width in [`compare_profile_axis`]).
+/// the authoritative comparison already ran at the stored width in [`compare_profile_masked`]).
 fn mismatch_for(
     source: &NumArray,
     out_da: &mzdata::spectrum::bindata::DataArray,

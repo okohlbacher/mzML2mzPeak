@@ -8,10 +8,21 @@
 /// Conformance level for decoded-array fidelity (spec v0.3 §8).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConformanceLevel {
-    /// L1 — numerically lossless, bit-for-bit (the v1 DEFAULT). With no opaque transform
-    /// applied, every decoded output value MUST equal the source value exactly (Δ = 0) at
-    /// the stored float precision, with no dtype widen/narrow — matching the Phase-2
-    /// dtype-preserving `NumArray` enum. Array length and ordering MUST be identical.
+    /// L1 — numerically lossless MODULO documented zero-intensity-run masking (the v1
+    /// DEFAULT). The mzPeak reference writer keeps `mask_zero_intensity_runs = true`, a
+    /// deliberate compression that DROPS interior zero-intensity points from profile spectra
+    /// (it always keeps every non-zero point and the run-boundary zeros; see the writer's
+    /// `_skip_zero_runs_gen` kernel). The output point arrays are therefore a zero-suppressed
+    /// SUBSET of the source, NOT an element-for-element copy. The adapted L1 contract is:
+    ///
+    /// 1. every SURVIVING output point equals its source point BIT-FOR-BIT at the stored
+    ///    float precision, with NO dtype widen/narrow (matching the Phase-2 dtype-preserving
+    ///    `NumArray` enum) — on BOTH the m/z and intensity axes; AND
+    /// 2. every SOURCE point ABSENT from the output had intensity == 0 (no NON-ZERO signal
+    ///    was ever dropped). A dropped non-zero point is genuine data loss and an L1 failure.
+    ///
+    /// The verifier enforces this via a two-pointer merge over source vs output points in m/z
+    /// order (`crate::verify::compare::merge_masked`), not a strict equal-length compare.
     L1BitForBit,
     /// L2 — opt-in transformed/compressed (Numpress/delta/null-marking). Per-axis relative
     /// error bounds apply and the transform CURIE + tolerance MUST be recorded. L2 MUST NOT

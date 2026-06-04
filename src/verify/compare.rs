@@ -110,6 +110,138 @@ pub fn compare_axis(
     }
 }
 
+/// A single side of a [`MergeOutcome`]: the first offending element on ONE axis, with the
+/// element index recorded against the SOURCE array (so the reporter can read the source
+/// value at that offset).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AxisMismatch {
+    /// The SOURCE element index at which the axis first failed.
+    pub src_element: usize,
+}
+
+/// The result of a masking-aware merge of one paired profile pixel (THE CRUX of the adapted
+/// L1 contract). Each axis is reported independently (m/z vs intensity), preserving the
+/// per-axis reporting CONTEXT Area 4 requires.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct MergeOutcome {
+    /// The first m/z-axis mismatch on a SURVIVING point (a surviving output m/z that did not
+    /// equal its source m/z under the active level), if any.
+    pub mz: Option<AxisMismatch>,
+    /// The first intensity-axis failure, if any. This covers BOTH (a) a surviving point whose
+    /// output intensity differed from source, AND (b) a SOURCE point with NON-ZERO intensity
+    /// that is ABSENT from the output (genuine signal loss). Both are attributed to the
+    /// intensity axis because intensity is the value that was either wrong or wrongly dropped.
+    pub intensity: Option<AxisMismatch>,
+}
+
+/// Masking-aware merge of one paired profile pixel's points, validating the adapted L1
+/// (and L2) contract directly without replicating the writer's run-masking algorithm.
+///
+/// CONTRACT ("L1 lossless modulo documented zero-intensity-run masking"): the output points
+/// are a SUBSET of the source points, and
+///   1. every OUTPUT point matches its corresponding SOURCE point under `level` on BOTH axes
+///      (for L1: bit-for-bit at the SOURCE stored width — no f32→f64 widening — because the
+///      caller passes already-source-width slices and the predicate is exact `!=`); AND
+///   2. every SOURCE point ABSENT from the output had intensity == 0 (the writer only ever
+///      drops zero-intensity points — verified below), so a dropped NON-ZERO point is real
+///      data loss and an L1 FAILURE.
+///
+/// WHY THIS IS SOUND (writer masking, vendored at
+/// `mzpeak_prototyping@d1aaaf8/src/filter.rs:623` `_skip_zero_runs_gen`, invoked from
+/// `array_buffer.rs:282-307` `add_arrays` via `drop_where_column_is_zero_run_arrays`
+/// `filter.rs:679`, gated by `mask_zero_intensity_runs = true` set at
+/// `src/write/writer.rs`): the kernel ALWAYS keeps every non-zero-intensity point and every
+/// zero that sits at a run BOUNDARY (a zero adjacent to a non-zero), and DROPS only INTERIOR
+/// zeros (a zero with a zero neighbor on the run-interior side). It therefore NEVER drops a
+/// point whose intensity is non-zero. The merge does not need to know which zeros are kept vs
+/// dropped — it only relies on the invariant "dropped ⇒ intensity was 0", which the kernel
+/// guarantees. (It also drops the matching m/z at those indices, keeping m/z+intensity paired.)
+///
+/// ALGORITHM (two-pointer merge over ascending m/z; both arrays are m/z-ascending):
+///   - `src[i].mz == out[j].mz` (matching key under L1's exact `!=` / L2's bound): a SURVIVING
+///     point — check intensity under `level`; advance both.
+///   - `src[i].mz < out[j].mz`: a source point DROPPED from the output — assert its intensity
+///     was 0 (OK, advance `i`); a non-zero dropped intensity is an L1 FAILURE on the intensity
+///     axis. (We advance `i` only.)
+///   - `out[j].mz < src[i].mz`: the output holds a point NOT present in the source (output ⊄
+///     source) — impossible under a faithful masking writer; reported as an m/z failure.
+///   - Output points left over after the source is exhausted are likewise output-not-in-source
+///     m/z failures; source points left over are treated as dropped (must be zero-intensity).
+///
+/// The m/z comparison uses `mz_pred` (the per-axis m/z predicate: exact `!=` under L1, the
+/// relative-error bound under L2) ONLY to decide point IDENTITY at the boundary tie, and to
+/// flag a surviving-point m/z mismatch. `int_pred` is the per-axis intensity predicate. Both
+/// are supplied by the caller already specialized to the source stored width (the load-bearing
+/// no-widen rule lives at the call site, as in [`compare_axis`]).
+///
+/// `MZ`/`INT` are the SOURCE/OUTPUT stored element types (`f32` or `f64`); the caller passes
+/// matching-width slices (the read-back preserves source dtype — RESEARCH Crux). The first
+/// offending element index is recorded against the SOURCE array on each axis.
+#[allow(clippy::too_many_arguments)]
+pub fn merge_masked<MZ, INT>(
+    src_mz: &[MZ],
+    src_int: &[INT],
+    out_mz: &[MZ],
+    out_int: &[INT],
+    mz_eq: impl Fn(MZ, MZ) -> bool,
+    mz_mismatch: impl Fn(MZ, MZ) -> bool,
+    int_mismatch: impl Fn(INT, INT) -> bool,
+    int_is_zero: impl Fn(INT) -> bool,
+) -> MergeOutcome
+where
+    MZ: Copy + PartialOrd,
+    INT: Copy,
+{
+    let mut outcome = MergeOutcome::default();
+    let mut i = 0usize; // source pointer
+    let mut j = 0usize; // output pointer
+
+    while i < src_mz.len() && j < out_mz.len() {
+        let smz = src_mz[i];
+        let omz = out_mz[j];
+        if mz_eq(smz, omz) {
+            // SURVIVING point: m/z keys match. Check both axes under the active predicates.
+            if outcome.mz.is_none() && mz_mismatch(smz, omz) {
+                outcome.mz = Some(AxisMismatch { src_element: i });
+            }
+            if outcome.intensity.is_none() && int_mismatch(src_int[i], out_int[j]) {
+                outcome.intensity = Some(AxisMismatch { src_element: i });
+            }
+            i += 1;
+            j += 1;
+        } else if smz < omz {
+            // Source point DROPPED from the output. It MUST have had zero intensity (the writer
+            // only drops zero-intensity points). A non-zero dropped point is genuine signal loss.
+            if outcome.intensity.is_none() && !int_is_zero(src_int[i]) {
+                outcome.intensity = Some(AxisMismatch { src_element: i });
+            }
+            i += 1;
+        } else {
+            // out < src: the output has an m/z absent from the source (output ⊄ source) —
+            // impossible under faithful masking; an m/z failure attributed at source position i.
+            if outcome.mz.is_none() {
+                outcome.mz = Some(AxisMismatch { src_element: i });
+            }
+            j += 1;
+        }
+    }
+
+    // Source tail: remaining source points were dropped — each must be zero-intensity.
+    while i < src_mz.len() {
+        if outcome.intensity.is_none() && !int_is_zero(src_int[i]) {
+            outcome.intensity = Some(AxisMismatch { src_element: i });
+        }
+        i += 1;
+    }
+    // Output tail: any remaining output point is not in the source (output ⊄ source) → m/z fail.
+    if j < out_mz.len() && outcome.mz.is_none() {
+        // Attribute at the (exhausted) source length boundary so the reporter has an index.
+        outcome.mz = Some(AxisMismatch { src_element: src_mz.len().saturating_sub(1) });
+    }
+
+    outcome
+}
+
 /// The L1 bit-for-bit contract (imported, never re-encoded). Exposed so call sites read the
 /// tolerance numbers from [`ToleranceContract`] rather than hand-rolling constants
 /// (T-05-02).
@@ -212,6 +344,146 @@ mod tests {
         let src = NumArray::F32(vec![1.0, 2.0]);
         let out = NumArray::F64(vec![1.0, 2.0]);
         assert!(compare_axis(&src, &out, 0.0, ConformanceLevel::L1BitForBit).is_some());
+    }
+
+    // --- merge_masked: the masking-aware L1 contract (subset + zero-drop invariant). ---------
+
+    /// Build the four L1 predicates for an f64-m/z + f32-intensity merge (the PXD001283 shape).
+    fn l1_f64mz_f32int(
+        src_mz: &[f64],
+        src_int: &[f32],
+        out_mz: &[f64],
+        out_int: &[f32],
+    ) -> MergeOutcome {
+        merge_masked(
+            src_mz,
+            src_int,
+            out_mz,
+            out_int,
+            |a: f64, b: f64| a == b,        // m/z identity (exact)
+            |a: f64, b: f64| a != b,        // m/z mismatch (L1 exact)
+            |a: f32, b: f32| a != b,        // intensity mismatch (L1 exact)
+            |v: f32| v == 0.0,              // intensity-is-zero
+        )
+    }
+
+    #[test]
+    fn merge_identical_arrays_no_mismatch() {
+        let out = l1_f64mz_f32int(
+            &[100.0, 200.0, 300.0],
+            &[1.0, 2.0, 3.0],
+            &[100.0, 200.0, 300.0],
+            &[1.0, 2.0, 3.0],
+        );
+        assert_eq!(out, MergeOutcome::default());
+    }
+
+    #[test]
+    fn merge_dropped_zero_points_pass() {
+        // Source has interior zeros at indices 1 and 3; the output is the surviving subset
+        // {100,300,500} with non-zero intensities. The merge must accept this as lossless.
+        let out = l1_f64mz_f32int(
+            &[100.0, 200.0, 300.0, 400.0, 500.0],
+            &[10.0, 0.0, 42.0, 0.0, 7.0],
+            &[100.0, 300.0, 500.0],
+            &[10.0, 42.0, 7.0],
+        );
+        assert_eq!(out, MergeOutcome::default(), "dropped zero-intensity points are lossless");
+    }
+
+    #[test]
+    fn merge_dropped_nonzero_point_is_intensity_failure() {
+        // A NON-ZERO source point (index 2, intensity 42) is MISSING from the output → real
+        // signal loss. The merge MUST flag an intensity-axis failure at that source element.
+        let out = l1_f64mz_f32int(
+            &[100.0, 200.0, 300.0],
+            &[10.0, 0.0, 42.0],
+            &[100.0, 200.0], // 300.0/42.0 dropped despite being non-zero!
+            &[10.0, 0.0],
+        );
+        assert_eq!(
+            out.intensity,
+            Some(AxisMismatch { src_element: 2 }),
+            "a dropped NON-ZERO point is an L1 intensity failure (genuine data loss)"
+        );
+        assert_eq!(out.mz, None, "m/z of surviving points was fine");
+    }
+
+    #[test]
+    fn merge_surviving_intensity_mismatch_flagged() {
+        // A surviving point's output intensity differs from source → intensity mismatch.
+        let out = l1_f64mz_f32int(
+            &[100.0, 200.0],
+            &[10.0, 20.0],
+            &[100.0, 200.0],
+            &[10.0, 99.0], // index 1 intensity corrupted
+        );
+        assert_eq!(out.intensity, Some(AxisMismatch { src_element: 1 }));
+        assert_eq!(out.mz, None);
+    }
+
+    #[test]
+    fn merge_surviving_mz_mismatch_flagged() {
+        // An output m/z that is "between" source keys: 250 is not in the source, and a source
+        // point (200, non-zero) is skipped. 250 < 300 so out<src triggers an m/z failure.
+        let out = l1_f64mz_f32int(
+            &[100.0, 200.0, 300.0],
+            &[10.0, 20.0, 30.0],
+            &[100.0, 250.0, 300.0],
+            &[10.0, 20.0, 30.0],
+        );
+        // 200.0 (non-zero) is dropped → intensity failure; 250.0 not in source → m/z failure.
+        assert!(out.mz.is_some(), "an output m/z absent from the source is an m/z failure");
+        assert_eq!(out.intensity, Some(AxisMismatch { src_element: 1 }));
+    }
+
+    #[test]
+    fn merge_output_longer_than_source_is_mz_failure() {
+        // Output has a trailing point not in the source (output ⊄ source).
+        let out = l1_f64mz_f32int(
+            &[100.0, 200.0],
+            &[10.0, 20.0],
+            &[100.0, 200.0, 300.0],
+            &[10.0, 20.0, 30.0],
+        );
+        assert!(out.mz.is_some(), "output-not-in-source is an m/z failure");
+    }
+
+    #[test]
+    fn merge_f32_mz_path() {
+        // The F32-m/z width path also merges correctly (surviving subset, zero drops).
+        let out = merge_masked(
+            &[100.0_f32, 200.0, 300.0],
+            &[5.0_f32, 0.0, 7.0],
+            &[100.0_f32, 300.0],
+            &[5.0_f32, 7.0],
+            |a: f32, b: f32| a == b,
+            |a: f32, b: f32| a != b,
+            |a: f32, b: f32| a != b,
+            |v: f32| v == 0.0,
+        );
+        assert_eq!(out, MergeOutcome::default());
+    }
+
+    #[test]
+    fn merge_l2_intensity_within_tolerance_passes() {
+        // Under an L2-style intensity predicate, a surviving point within the relative bound is
+        // accepted; the merge structure is identical, only the predicate relaxes.
+        let rel = ToleranceContract::L2.intensity_rel_err as f32;
+        let int_pred = move |a: f32, b: f32| {
+            if b == 0.0 { a != b } else { ((a - b).abs() / b.abs()) > rel }
+        };
+        let out = merge_masked(
+            &[100.0_f64, 200.0],
+            &[100.0_f32, 200.0],
+            &[100.0_f64, 200.0],
+            &[100.0_f32, 200.05], // ~2.5e-4 relative, within 1e-3
+            |a: f64, b: f64| a == b,
+            |a: f64, b: f64| a != b,
+            int_pred,
+            |v: f32| v == 0.0,
+        );
+        assert_eq!(out, MergeOutcome::default(), "L2 surviving-point within tolerance passes");
     }
 
     #[test]
