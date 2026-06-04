@@ -121,6 +121,14 @@ pub fn verify_against_source(
         return Ok(report);
     }
 
+    // Populate the reader's spectrum-metadata cache ONCE (DAT-01 / verify-streaming-memory fix).
+    // `get_spectrum_metadata(i)` only READS this cache; with it unset it rebuilds a fresh filtered
+    // Parquet reader and rescans the metadata facet PER call — O(n) each, O(n²) over the
+    // `build_coord_index` loop. One up-front load collapses that to O(n).
+    reader
+        .load_all_spectrum_metadata()
+        .map_err(VerifyError::OpenOutput)?;
+
     // --- STEP 2 (VER-02): build the OUTPUT coordinate -> index map. ------------------------
     let coord_to_index = build_coord_index(&mut reader, out_count)?;
 
@@ -199,22 +207,35 @@ pub fn verify_against_source(
 /// a STREAMED source without ever collecting all source spectra into a `Vec`.
 ///
 /// This is the loop-inverted twin of [`verify_against_source`]. Where the slice path indexes a
-/// materialized `&[ImagingSpectrum]`, this path builds the compact OUTPUT coord index FIRST
-/// (`build_coord_index`, already streaming, ~1.4 MB for 34,840 pixels) and then streams the
-/// SOURCE exactly ONCE — reading back only the single paired output spectrum per source pixel.
-/// At any instant only one live source spectrum, one live output spectrum, the output coord
-/// index, a per-coordinate collision set, and the two scalar-per-pixel TIC vecs are retained; the
-/// source is NEVER pushed into a `Vec` (T-6-mem — bounded regardless of dataset size).
+/// materialized `&[ImagingSpectrum]`, this path streams the SOURCE exactly ONCE and reads the
+/// OUTPUT back in STRICT ASCENDING INDEX ORDER (Option B / DAT-01): source position `k` pairs to
+/// output index `k`. The pairing is sound because the writer emits spectra in source iteration
+/// order (`src/write/convert.rs`) and `--verify` re-opens the SAME source in the SAME order, so
+/// source pixel `k` ⇔ output index `k`. Reading the output sequentially (ascending `out_idx`)
+/// keeps the reference reader's bounded row-group LRU (max 3 blocks) WARM: each output data
+/// row group is decoded exactly once across the whole pass. The earlier coordinate-keyed pairing
+/// (`coord_to_index.get(&key)`) produced a source-coordinate-ordered — i.e. effectively RANDOM —
+/// sequence of `out_idx`, which thrashed the 3-block LRU into re-decoding a whole ~1M-point row
+/// group PER pixel (O(n·rowgroup) ≈ quadratic): 34,840 full row-group decodes that pegged a core
+/// for >10 min without finishing on PXD001283. Pairing by ascending index removes that thrash.
 ///
-/// Generic over `IntoIterator<Item = Result<ImagingSpectrum, ReadError>>`: the real 34k path
-/// passes an [`ImagingReader`] (which streams the `.imzML`/`.ibd` once); fixture tests with no
-/// `.ibd` pass an in-memory adapter yielding the same items. Each per-pixel comparison delegates
-/// to the SAME [`compare_paired_pixel`] helper the slice path uses, so the two produce identical
-/// reports on identical inputs (proven by the `streaming_equals_slice_on_fixture` test).
+/// Spatial fidelity is still enforced by ACCESSION, not assumed from the i↔i pairing: the output
+/// coordinate at index `k` (read by `IMS:1000050/51/52`) MUST equal the source pixel's `(x,y,z)`,
+/// or the coordinate check fails. Output-side duplicate coordinates (spec §4.2 — one scan per
+/// pixel) are still a hard [`VerifyError::DuplicateCoordinate`] surfaced from `build_index_coords`;
+/// source-side duplicates (WR-03) still fail the coordinate check; a count mismatch still
+/// short-circuits to a non-passing report.
+///
+/// At any instant only one live source spectrum, one live output spectrum, the compact
+/// index→coordinate vector, a per-coordinate collision set, and the two scalar-per-pixel TIC vecs
+/// are retained; the source is NEVER pushed into a `Vec` (T-6-mem — bounded regardless of dataset
+/// size). The per-pixel comparison delegates to the SAME [`compare_paired_pixel`] helper the slice
+/// path uses, so the two produce identical reports on identical inputs (the
+/// `streaming_equals_slice_on_fixture` test: the fixture's source order equals its output order,
+/// so i↔i pairing yields the same `out_idx` per pixel as the slice path's coordinate pairing).
 ///
 /// A source read error surfaces as [`VerifyError::Read`]; the output is opened read-only and never
-/// interpreted (Security V12). On a count mismatch the report (count gate failed) is returned —
-/// the report is the deliverable, not a panic.
+/// interpreted (Security V12).
 pub fn verify_streaming<I>(
     reader: I,
     output_path: &Path,
@@ -231,9 +252,18 @@ where
     let mut out = MzPeakReader::new(output_path).map_err(VerifyError::OpenOutput)?;
     let out_count = out.len();
 
-    // --- STEP 2 (VER-02): build the OUTPUT coord -> index map FIRST (streaming, compact). -----
-    // Built before the source stream so each source pixel pairs by a single HashMap lookup.
-    let coord_to_index = build_coord_index(&mut out, out_count)?;
+    // Populate the reader's spectrum-metadata cache ONCE before reading any coordinates
+    // (DAT-01 / verify-streaming-memory). Without it, `get_spectrum_metadata(i)` rebuilds a fresh
+    // filtered Parquet reader and rescans the (single-row-group, ~580 MB) metadata facet per call
+    // — O(n) each, O(n^2) over the index→coordinate build. One up-front load makes every
+    // subsequent metadata read an O(1) cache hit.
+    out.load_all_spectrum_metadata()
+        .map_err(VerifyError::OpenOutput)?;
+
+    // --- STEP 2 (VER-02): read the OUTPUT index -> coordinate vector (by accession). ----------
+    // Detects output-side duplicate coordinates (hard error) and lets us verify, per pixel, that
+    // the output coordinate at index `k` matches the source pixel paired to it.
+    let out_coords = build_index_coords(&mut out, out_count)?;
 
     // Pre-marked report skeleton (identical shape to verify_against_source so the reports are
     // byte-equal). Accumulators are scalar / compact — never a Vec<ImagingSpectrum>.
@@ -257,21 +287,32 @@ where
     let mut out_coords_tics: Vec<((i64, i64), f64)> = Vec::new();
     let mut src_coords_tics: Vec<((i64, i64), f64)> = Vec::new();
 
-    // --- Stream the SOURCE exactly ONCE; never collect it. ----------------------------------
+    // --- Stream the SOURCE exactly ONCE; never collect it. Pair source position k -> out idx k.
     for item in reader {
         let s = item?; // ReadError -> VerifyError::Read (#[from])
+        let k = src_count; // source position == output index (writer wrote in source order)
         src_count += 1;
         let key: CoordKey = (s.x, s.y, s.z);
 
-        // Source-side collision detection (the "one scan per pixel" invariant on the SOURCE
-        // side too; WR-03) + pairing — identical to the slice path's STEP 2b.
+        // Source-side collision detection (the "one scan per pixel" invariant on the SOURCE side
+        // too; WR-03).
         if seen_src.insert(key, ()).is_some() {
             coordinates_ok = false; // source-side duplicate coordinate
         }
-        match coord_to_index.get(&key) {
-            Some(&out_idx) => {
-                paired_count += 1;
-                // SAME representation branch the slice path uses; reads back ONLY this pixel.
+
+        // Pair to output index k IFF such an index exists (it always does while k < out_count;
+        // an over-long source vs the output is an unpaired pixel and a count mismatch below).
+        match out_coords.get(k) {
+            Some(&out_key) => {
+                // Coordinate equality BY ACCESSION: the output coordinate at index k must equal
+                // the source pixel's (x, y, z). A divergence is an unpaired/mis-paired pixel.
+                if out_key != key {
+                    coordinates_ok = false;
+                } else {
+                    paired_count += 1;
+                }
+                // Read back ONLY this pixel, in ascending out_idx order (keeps the LRU warm).
+                let out_idx = k as u64;
                 let out_tic = compare_paired_pixel(
                     &mut out,
                     &s,
@@ -282,9 +323,9 @@ where
                     &mut mz_mismatch_pixels,
                     &mut int_mismatch_pixels,
                 )?;
-                out_coords_tics.push(((s.x, s.y), out_tic));
+                out_coords_tics.push(((out_key.0, out_key.1), out_tic));
             }
-            None => coordinates_ok = false, // unpaired source pixel
+            None => coordinates_ok = false, // source pixel with no output index (count mismatch)
         }
         // Source TIC for the ion image (scalar; mirrors the slice path's src_coords_tics).
         src_coords_tics.push(((s.x, s.y), tic_of(&s.intensity)));
@@ -327,6 +368,11 @@ where
 /// IMS coordinate params (`IMS:1000050/51/52`) by accession (VER-02; RESEARCH Pattern 3).
 /// A repeated `(x, y, z)` key is a hard [`VerifyError::DuplicateCoordinate`] (spec §4.2 — one
 /// scan per pixel). Missing metadata / scan / x-or-y coordinate surface as typed errors.
+///
+/// The caller MUST have primed the reader's spectrum-metadata cache (e.g. via
+/// `MzPeakReader::load_all_spectrum_metadata`) before this loop: `get_spectrum_metadata` only
+/// reads that cache, and with it unset each call rescans the metadata facet, making this loop
+/// O(n²) (DAT-01 / verify-streaming-memory).
 fn build_coord_index(
     reader: &mut MzPeakReader,
     out_count: usize,
@@ -358,6 +404,53 @@ fn build_coord_index(
         }
     }
     Ok(map)
+}
+
+/// Read the OUTPUT `index -> coordinate (x, y, z)` vector by reading each spectrum's scan-event
+/// IMS coordinate params (`IMS:1000050/51/52`) by accession (VER-02; RESEARCH Pattern 3), in
+/// ascending index order. A repeated `(x, y, z)` is a hard [`VerifyError::DuplicateCoordinate`]
+/// (spec §4.2 — one scan per pixel); a missing scan / x-or-y coordinate surfaces as a typed error.
+/// This is the index-ordered sibling of [`build_coord_index`] used by the bounded streaming path
+/// ([`verify_streaming`]): pairing there is by ascending index, so the verifier needs the inverse
+/// `index -> coordinate` lookup to confirm each paired output coordinate matches its source pixel.
+///
+/// The caller MUST have primed the reader's spectrum-metadata cache (e.g. via
+/// `MzPeakReader::load_all_spectrum_metadata`) before this loop: `get_spectrum_metadata` only
+/// reads that cache, and with it unset each call rescans the metadata facet, making this loop
+/// O(n²) (DAT-01 / verify-streaming-memory).
+fn build_index_coords(
+    reader: &mut MzPeakReader,
+    out_count: usize,
+) -> Result<Vec<CoordKey>, VerifyError> {
+    let mut coords: Vec<CoordKey> = Vec::with_capacity(out_count);
+    let mut seen: HashMap<CoordKey, ()> = HashMap::with_capacity(out_count);
+    for i in 0..out_count as u64 {
+        let descr = reader
+            .get_spectrum_metadata(i)
+            .map_err(VerifyError::OpenOutput)?
+            .ok_or(VerifyError::MissingMetadata { index: i })?;
+        let scan = descr
+            .acquisition
+            .first_scan()
+            .ok_or(VerifyError::NoScan { index: i })?;
+        let x = scan
+            .get_param_by_curie(&curie!(IMS:1000050))
+            .and_then(|p| p.value.to_i64().ok());
+        let y = scan
+            .get_param_by_curie(&curie!(IMS:1000051))
+            .and_then(|p| p.value.to_i64().ok());
+        let z = scan
+            .get_param_by_curie(&curie!(IMS:1000052))
+            .and_then(|p| p.value.to_i64().ok());
+        let (Some(x), Some(y)) = (x, y) else {
+            return Err(VerifyError::CoordMissing { index: i });
+        };
+        if seen.insert((x, y, z), ()).is_some() {
+            return Err(VerifyError::DuplicateCoordinate { x, y, z });
+        }
+        coords.push((x, y, z));
+    }
+    Ok(coords)
 }
 
 /// Compare ONE paired pixel: branch on the SOURCE representation, read back ONLY that pixel's
