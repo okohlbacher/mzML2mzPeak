@@ -379,6 +379,21 @@ impl ImzmlWriter {
         array_type_name: &str,
         arr: &crate::reverse::ArrayRef,
     ) -> Result<(), ReverseError> {
+        // WR-02 — cross-module invariant guard. The vendored reader treats a <binaryDataArray>
+        // as "external data missing" and FAILS the read when BOTH IMS:1000102 (offset) and
+        // IMS:1000103 (count) are zero (09-RESEARCH.md). A zero-length array legitimately emits
+        // count=0, so re-read correctness rests entirely on the offset being non-zero — an
+        // invariant enforced in `ibd.rs` (every ArrayRef.offset is >= 16, even for an empty array,
+        // because the 16-byte UUID header precedes the first array). That invariant lives in a
+        // different module; assert it HERE so a future IbdWriter refactor that produced an offset-0
+        // array would fail loudly at emit time rather than silently producing an .imzML the reader
+        // rejects. debug_assert (not a typed error): this is an internal producer-side invariant on
+        // values we computed, not caller-supplied data (CLAUDE.md — no panic on caller input).
+        debug_assert!(
+            arr.offset != 0 || arr.count != 0,
+            "binaryDataArray would emit offset=0 AND count=0 -> reader rejects as missing \
+             external data; ibd.rs guarantees offset >= 16"
+        );
         self.write_raw("<binaryDataArray encodedLength=\"0\">")?;
         // dtype (MS:1000521 f32 / MS:1000523 f64) — drives the reader's read_exact width.
         self.cv_param("MS", dtype_acc, dtype_name, "")?;
@@ -911,6 +926,59 @@ mod tests {
                 int_da.data_len().unwrap(),
                 elem_count(&expected.intensity),
                 "round-read intensity element count equals emitted (proves f32 dtype term width)"
+            );
+        }
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// WR-02: a spectrum whose m/z AND intensity arrays are BOTH zero-length emits+re-reads through
+    /// the `mzdata::ImzMLReader` oracle without the reader rejecting it as "missing external data".
+    /// This covers the boundary the offset≥16 invariant (enforced in `ibd.rs`, asserted at the emit
+    /// site) protects: an empty array carries count=0 but a NON-zero offset, so the reader does not
+    /// treat both-zero as absent. A real (non-empty) pixel precedes the empty one so the empty
+    /// array sits at a >16 offset, exactly as the production accumulation would place it.
+    #[test]
+    fn zero_length_array_roundreads() {
+        let dir = tempdir();
+        // First pixel: real arrays so the empty pixel's arrays land at offsets > 16.
+        // Second pixel: BOTH arrays empty (equal length 0 — satisfies the WR-01 paired invariant).
+        let pixels = vec![
+            FixturePixel {
+                x: 1,
+                y: 1,
+                mz: NumArray::F64(vec![100.0, 200.0]),
+                intensity: NumArray::F32(vec![10.0, 20.0]),
+            },
+            FixturePixel {
+                x: 2,
+                y: 1,
+                mz: NumArray::F64(vec![]),
+                intensity: NumArray::F32(vec![]),
+            },
+        ];
+        let (xml_path, ibd_path) = emit_fixture(&dir, &pixels, None);
+
+        let mut reader = ImzMLReader::<File, File>::new(
+            File::open(&xml_path).unwrap(),
+            File::open(&ibd_path).unwrap(),
+        );
+        assert!(
+            reader.imzml_metadata.uuid.is_some(),
+            "zero-length-array fixture still parses required metadata"
+        );
+
+        for expected in &pixels {
+            let mut spec = MultiLayerSpectrum::default();
+            reader
+                .read_into(&mut spec)
+                .expect("zero-length-array spectrum must read back Ok (offset!=0 keeps it present)");
+            let arrays = spec.raw_arrays().expect("spectrum carries external arrays");
+            let mz_da = arrays.get(&ArrayType::MZArray).expect("m/z array present");
+            assert_eq!(
+                mz_da.data_len().unwrap(),
+                elem_count(&expected.mz),
+                "round-read m/z element count equals emitted (incl. the zero-length boundary)"
             );
         }
 
