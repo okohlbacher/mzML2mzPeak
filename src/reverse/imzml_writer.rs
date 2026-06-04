@@ -669,4 +669,254 @@ mod tests {
 
         fs::remove_dir_all(&dir).ok();
     }
+
+    // ----------------------------------------------------------------------------------------
+    // Plan 09-02 — mzdata::ImzMLReader conformance proof (SC-1 + SC-4).
+    //
+    // The vendored reader IS the conformance oracle: it hard-parses the three required
+    // <fileContent> IMS terms (uuid populated only when all parsed — reader.rs:176-201) and
+    // sizes each external-data read as `count × dtype.size_of()` (reader.rs:993). Re-opening the
+    // emitted .imzML+.ibd pair and asserting the metadata + round-read coords/array shapes is the
+    // decisive proof the emitted byte layout is correct (IXML-01/02/03 against the oracle).
+    // ----------------------------------------------------------------------------------------
+
+    use crate::reverse::ibd::IbdWriter;
+    use crate::read::record::NumArray;
+    use mzdata::io::imzml::ImzMLReader;
+    use mzdata::prelude::{ParamDescribed, ParamValue, SpectrumLike};
+    use mzdata::spectrum::MultiLayerSpectrum;
+    use mzdata::spectrum::bindata::{ArrayType, ByteArrayView};
+
+    /// One emitted fixture pixel: the 1-based coords and the source arrays it was built from.
+    struct FixturePixel {
+        x: i64,
+        y: i64,
+        mz: NumArray,
+        intensity: NumArray,
+    }
+
+    /// Build a real `.ibd` (via [`IbdWriter`]) + the matching `.imzML` (via [`ImzmlWriter`]) under
+    /// `dir`, using ONE minted UUID for both so the reader's UUID linkage is consistent. Returns
+    /// `(xml_path, ibd_path)` ready to feed `ImzMLReader::new`. Mirrors the Phase 10 orchestration
+    /// the reader will see in production: mint once → IbdWriter::append per array → finish() for the
+    /// MD5 → ImzmlWriter::new(uuid, md5, count, imaging) → write_spectrum per pixel → finish().
+    fn emit_fixture(
+        dir: &std::path::Path,
+        pixels: &[FixturePixel],
+        imaging: Option<&ImagingMetadata>,
+    ) -> (PathBuf, PathBuf) {
+        let xml_path = dir.join("fixture.imzML");
+        let ibd_path = dir.join("fixture.ibd");
+
+        // ONE minted UUID reaches both writers (CONTEXT linkage decision).
+        let uuid = Uuid::new_v4();
+        let mut ibd = IbdWriter::new(&ibd_path, uuid).unwrap();
+
+        // Append both arrays per pixel, capturing each (dtype, ArrayRef) pair for the emitter.
+        let mut emit_args: Vec<(i64, i64, ArrayEmit, ArrayEmit)> = Vec::with_capacity(pixels.len());
+        for px in pixels {
+            let mz_dtype = dtype_of(&px.mz);
+            let int_dtype = dtype_of(&px.intensity);
+            let mz_ref = ibd.append(&px.mz).unwrap();
+            let int_ref = ibd.append(&px.intensity).unwrap();
+            emit_args.push((px.x, px.y, (mz_dtype, mz_ref), (int_dtype, int_ref)));
+        }
+        // finish() hashes the WHOLE .ibd (header included) — the SAME md5 the emitter must declare.
+        let md5_hex = ibd.finish().unwrap();
+
+        let mut xml = ImzmlWriter::new(
+            &xml_path,
+            uuid,
+            &md5_hex,
+            pixels.len() as u64,
+            imaging,
+        )
+        .unwrap();
+        for (i, (x, y, mz, int)) in emit_args.into_iter().enumerate() {
+            xml.write_spectrum(i as u64, x, y, None, mz, int).unwrap();
+        }
+        xml.finish().unwrap();
+
+        (xml_path, ibd_path)
+    }
+
+    /// Source dtype of a [`NumArray`] as the [`BinaryDataArrayType`] the emitter consumes.
+    fn dtype_of(a: &NumArray) -> BinaryDataArrayType {
+        match a {
+            NumArray::F32(_) => BinaryDataArrayType::Float32,
+            NumArray::F64(_) => BinaryDataArrayType::Float64,
+        }
+    }
+
+    /// Element count of a [`NumArray`].
+    fn elem_count(a: &NumArray) -> usize {
+        match a {
+            NumArray::F32(v) => v.len(),
+            NumArray::F64(v) => v.len(),
+        }
+    }
+
+    /// The two-pixel, mixed-dtype fixture used by SC-1 + SC-4: f64 m/z + f32 intensity per pixel,
+    /// 1-based coords (1,1) and (2,1), distinct element counts so a shape mismatch is detectable.
+    fn two_pixel_fixture() -> Vec<FixturePixel> {
+        vec![
+            FixturePixel {
+                x: 1,
+                y: 1,
+                mz: NumArray::F64(vec![100.0, 200.0, 300.0]),
+                intensity: NumArray::F32(vec![10.0, 20.0, 30.0]),
+            },
+            FixturePixel {
+                x: 2,
+                y: 1,
+                mz: NumArray::F64(vec![150.0, 250.0]),
+                intensity: NumArray::F32(vec![5.0, 6.0]),
+            },
+        ]
+    }
+
+    /// SC-1: an emitted fixture .imzML+.ibd pair re-opens via `mzdata::ImzMLReader::new` with the
+    /// required metadata parsed (`imzml_metadata.uuid.is_some()` — proves the three required
+    /// <fileContent> IMS terms parsed) AND the first spectrum reads back Ok. The fixture is built
+    /// with a REAL `IbdWriter` so the UUID/MD5/offset linkage matches what the emitter declares.
+    #[test]
+    fn roundtrip_reads() {
+        let dir = tempdir();
+        let pixels = two_pixel_fixture();
+        let (xml_path, ibd_path) = emit_fixture(&dir, &pixels, None);
+
+        let xml_file = File::open(&xml_path).unwrap();
+        let ibd_file = File::open(&ibd_path).unwrap();
+        let mut reader = ImzMLReader::<File, File>::new(xml_file, ibd_file);
+
+        // SC-1: the three required <fileContent> terms parsed → uuid populated. A missing term
+        // leaves this None (reader.rs:176-201) and fails the test loudly.
+        assert!(
+            reader.imzml_metadata.uuid.is_some(),
+            "required imzML metadata (uuid) must be populated — proves 3 <fileContent> terms parsed"
+        );
+
+        // First spectrum iterates Ok (the reader sized + read the .ibd arrays without error).
+        let mut spec = MultiLayerSpectrum::default();
+        let sz = reader
+            .read_into(&mut spec)
+            .expect("first spectrum must read back Ok via mzdata");
+        assert!(sz > 0, "first spectrum read returned a non-empty record");
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// SC-4: round-read the 1-based IMS:1000050/51 coords AND per-array element counts through
+    /// `mzdata::ImzMLReader`, asserting each equals what was emitted. The coord read-back uses the
+    /// SAME `get_param_by_curie(&curie!(IMS:1000050)).value.to_i64()` path as the Phase 7 read half.
+    /// Because the reader sizes reads as `count × dtype.size_of()`, a correct round-read element
+    /// count also proves the per-array dtype term is right (guards Pitfall 3 off-by-2× width).
+    #[test]
+    fn coords_and_arrays_roundread() {
+        let dir = tempdir();
+        let pixels = two_pixel_fixture();
+        let (xml_path, ibd_path) = emit_fixture(&dir, &pixels, None);
+
+        let xml_file = File::open(&xml_path).unwrap();
+        let ibd_file = File::open(&ibd_path).unwrap();
+        let mut reader = ImzMLReader::<File, File>::new(xml_file, ibd_file);
+
+        for expected in &pixels {
+            let mut spec = MultiLayerSpectrum::default();
+            reader
+                .read_into(&mut spec)
+                .expect("each emitted spectrum must read back Ok");
+
+            // --- Coords (SC-4): the canonical Phase 7 read-back path. ---
+            let scan = spec
+                .acquisition()
+                .first_scan()
+                .expect("spectrum carries a scan");
+            let x = scan
+                .get_param_by_curie(&mzdata::curie!(IMS:1000050))
+                .expect("IMS:1000050 present")
+                .value
+                .to_i64()
+                .expect("x coord parses as i64");
+            let y = scan
+                .get_param_by_curie(&mzdata::curie!(IMS:1000051))
+                .expect("IMS:1000051 present")
+                .value
+                .to_i64()
+                .expect("y coord parses as i64");
+            assert_eq!(x, expected.x, "round-read x equals emitted (1-based)");
+            assert_eq!(y, expected.y, "round-read y equals emitted (1-based)");
+
+            // --- Array shapes (SC-4): element counts equal emitted → dtype width is correct. ---
+            let arrays = spec.raw_arrays().expect("spectrum carries external arrays");
+            let mz_da = arrays.get(&ArrayType::MZArray).expect("m/z array present");
+            let int_da = arrays
+                .get(&ArrayType::IntensityArray)
+                .expect("intensity array present");
+            assert_eq!(
+                mz_da.data_len().unwrap(),
+                elem_count(&expected.mz),
+                "round-read m/z element count equals emitted (proves f64 dtype term width)"
+            );
+            assert_eq!(
+                int_da.data_len().unwrap(),
+                elem_count(&expected.intensity),
+                "round-read intensity element count equals emitted (proves f32 dtype term width)"
+            );
+        }
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Both the absent-metadata (PXD001283 graceful-degradation shape) AND the spec-rich
+    /// scanSettings fixtures re-read via `mzdata::ImzMLReader` without error: a `<scanSettingsList
+    /// count="0"/>` does not break re-read (no fabricated geometry — threat T-09-FAB), and a
+    /// populated `<scanSettings>` (pixel_size_um) does not break it either.
+    #[test]
+    fn filecontent_and_scansettings() {
+        // (a) imaging = None — graceful degradation.
+        {
+            let dir = tempdir();
+            let pixels = two_pixel_fixture();
+            let (xml_path, ibd_path) = emit_fixture(&dir, &pixels, None);
+
+            let mut reader = ImzMLReader::<File, File>::new(
+                File::open(&xml_path).unwrap(),
+                File::open(&ibd_path).unwrap(),
+            );
+            assert!(
+                reader.imzml_metadata.uuid.is_some(),
+                "absent-imaging fixture still parses required metadata"
+            );
+            let mut spec = MultiLayerSpectrum::default();
+            reader
+                .read_into(&mut spec)
+                .expect("absent-imaging fixture re-reads without error");
+
+            fs::remove_dir_all(&dir).ok();
+        }
+
+        // (b) imaging = Some(pixel_size_um) — spec-rich scanSettings does not break re-read.
+        {
+            let dir = tempdir();
+            let pixels = two_pixel_fixture();
+            let meta = meta_with_pixel_size();
+            let (xml_path, ibd_path) = emit_fixture(&dir, &pixels, Some(&meta));
+
+            let mut reader = ImzMLReader::<File, File>::new(
+                File::open(&xml_path).unwrap(),
+                File::open(&ibd_path).unwrap(),
+            );
+            assert!(
+                reader.imzml_metadata.uuid.is_some(),
+                "spec-rich-scanSettings fixture still parses required metadata"
+            );
+            let mut spec = MultiLayerSpectrum::default();
+            reader
+                .read_into(&mut spec)
+                .expect("spec-rich-scanSettings fixture re-reads without error");
+
+            fs::remove_dir_all(&dir).ok();
+        }
+    }
 }
