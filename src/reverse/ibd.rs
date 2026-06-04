@@ -63,13 +63,26 @@ pub struct ArrayRef {
 /// Holds a [`BufWriter`] sink (never buffers the whole `.ibd` in memory — RCLI-02 carry-forward
 /// for 34,840 spectra), the output `path` (re-opened by [`Self::finish`] to hash), an explicit
 /// `u64` `cursor` (the logical write position — NEVER `BufWriter::stream_position`, which lags
-/// the buffered position), and the caller-minted `uuid` (written into the header and exposed via
-/// [`Self::uuid`] for Phase 9 linkage).
+/// the buffered position), the caller-minted `uuid` (written into the header and exposed via
+/// [`Self::uuid`] for Phase 9 linkage), and a `poisoned` flag.
+///
+/// # Post-failure contract (IBD-02)
+///
+/// The writer is **single-use after a write failure**. If [`Self::append`] returns an error
+/// (e.g. disk-full mid-array, or `u64` offset overflow), the writer is *poisoned*: the cursor is
+/// NOT advanced and the on-disk file may hold a partial, orphaned array. The caller MUST NOT
+/// reuse the writer — every later [`Self::append`] / [`Self::finish`] then fails fast with
+/// [`ReverseError::IbdPoisoned`] instead of writing at a `cursor` that no longer matches the true
+/// file position (which would silently corrupt the `.ibd`). The orchestrator (Phase 10) is
+/// expected to discard the writer and delete the partial `.ibd` on any error from these methods.
 pub struct IbdWriter {
     sink: BufWriter<File>,
     path: PathBuf,
     cursor: u64,
     uuid: Uuid,
+    /// Set the instant any write fails. Once true, `append`/`finish` short-circuit with
+    /// [`ReverseError::IbdPoisoned`] rather than operating on a known-inconsistent file/cursor.
+    poisoned: bool,
 }
 
 impl IbdWriter {
@@ -89,45 +102,56 @@ impl IbdWriter {
             path,
             cursor: 16, // every array offset is measured from after the header
             uuid,
+            poisoned: false,
         })
     }
 
     /// Append one array's raw little-endian bytes (at its source width — never widened) and
-    /// return its `(offset, count, encoded_len)` triple. Advances the cursor by `encoded_len`.
+    /// return its `(offset, count, encoded_len)` triple. Advances the cursor by `encoded_len`
+    /// **only after the full array is written**, so a failed append leaves the cursor unchanged.
+    ///
+    /// On any write failure the writer is poisoned (see the [`IbdWriter`] post-failure contract):
+    /// the partial bytes may remain on disk, the cursor is NOT advanced, and every later call
+    /// fails fast with [`ReverseError::IbdPoisoned`]. The caller must discard the writer and
+    /// delete the partial `.ibd`.
     pub fn append(&mut self, arr: &NumArray) -> Result<ArrayRef, ReverseError> {
+        if self.poisoned {
+            return Err(ReverseError::IbdPoisoned);
+        }
         let offset = self.cursor; // IMS:1000102 — captured BEFORE writing (≥ 16 even when empty)
         let count = arr.len() as u64; // IMS:1000103 — ELEMENT count, NOT bytes
         let dtype_size: u64 = match arr {
             NumArray::F32(_) => 4,
             NumArray::F64(_) => 8,
         };
-        // Write at native width — NEVER as_f64() (it widens and breaks dtype/byte width).
-        match arr {
-            NumArray::F32(v) => {
-                for &x in v {
-                    self.sink
-                        .write_all(&x.to_le_bytes())
-                        .map_err(ReverseError::IbdWrite)?;
-                }
-            }
-            NumArray::F64(v) => {
-                for &x in v {
-                    self.sink
-                        .write_all(&x.to_le_bytes())
-                        .map_err(ReverseError::IbdWrite)?;
-                }
-            }
-        }
         // u64 arithmetic (threat T-08-OF): realistic data is far below u64::MAX; use checked_mul
         // for the count×size product and checked_add for the cursor advance to make overflow
-        // impossible-by-construction rather than relying on the data range.
+        // a typed error rather than a panic. Compute the NEXT cursor BEFORE writing any bytes so
+        // an overflow rejects the append without leaving a partial array on disk.
         let encoded_len = count
             .checked_mul(dtype_size)
             .ok_or(ReverseError::IbdOverflow { count, size: dtype_size })?;
-        self.cursor = self
+        let next_cursor = self
             .cursor
             .checked_add(encoded_len)
             .ok_or(ReverseError::IbdOverflow { count, size: dtype_size })?;
+        // Write at native width — NEVER as_f64() (it widens and breaks dtype/byte width). On the
+        // first failing element, poison the writer and return WITHOUT advancing the cursor, so a
+        // partially-written array can never desync `cursor` from the true file position.
+        let write_result = match arr {
+            NumArray::F32(v) => v
+                .iter()
+                .try_for_each(|&x| self.sink.write_all(&x.to_le_bytes())),
+            NumArray::F64(v) => v
+                .iter()
+                .try_for_each(|&x| self.sink.write_all(&x.to_le_bytes())),
+        };
+        if let Err(e) = write_result {
+            self.poisoned = true;
+            return Err(ReverseError::IbdWrite(e));
+        }
+        // Full array written — only now is it safe to advance the cursor.
+        self.cursor = next_cursor;
         Ok(ArrayRef {
             offset,
             count,
@@ -142,7 +166,13 @@ impl IbdWriter {
 
     /// Flush the sink, then stream the MD5 (`IMS:1000090`) of the WHOLE finished file (header
     /// included) via the shipped [`crate::integrity::compute_digest`]. Returns lowercase hex.
+    ///
+    /// Fails fast with [`ReverseError::IbdPoisoned`] if a prior [`Self::append`] failed mid-array:
+    /// the on-disk file is partial/inconsistent, so its digest would be meaningless.
     pub fn finish(mut self) -> Result<String, ReverseError> {
+        if self.poisoned {
+            return Err(ReverseError::IbdPoisoned);
+        }
         // Pitfall 4: flush the BufWriter BEFORE re-reading, or the digest hashes a truncated
         // file (and the on-disk .ibd would be short).
         self.sink.flush().map_err(ReverseError::IbdWrite)?;
