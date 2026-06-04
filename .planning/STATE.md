@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: milestone
-status: verifying
+status: executing
 stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-06-03T23:24:17.211Z"
-last_activity: 2026-06-03
+last_updated: "2026-06-04T00:12:35.998Z"
+last_activity: 2026-06-04 -- Phase 06 execution started
 progress:
   total_phases: 7
   completed_phases: 6
-  total_plans: 15
+  total_plans: 18
   completed_plans: 15
-  percent: 86
+  percent: 83
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-03)
 
 **Core value:** Convert an arbitrary imzML imaging dataset into a valid imaging mzPeak file without losing spatial or spectral information — every pixel's coordinates and its m/z + intensity data survive the roundtrip.
-**Current focus:** Phase 05 — verification-roundtrip-layer
+**Current focus:** Phase 06 — cli-ux-acceptance-gate
 
 ## Current Position
 
-Phase: 05 (verification-roundtrip-layer) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
-Last activity: 2026-06-03
+Phase: 06 (cli-ux-acceptance-gate) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 06
+Last activity: 2026-06-04 -- Phase 06 execution started
 
 Progress: [███████░░░] 67%
 
