@@ -238,6 +238,13 @@ fn run_reverse(cli: &ConvertCli) -> anyhow::Result<()> {
         })?;
     let (imzml, ibd) = derive_reverse_paths(stem);
 
+    // WR-02: refuse to write a derived output ONTO the input archive. `convert` opens the outputs
+    // with `File::create` (truncating), so a derived `.imzML`/`.ibd` resolving to the same file as
+    // the input would destroy the source mid-read. Compare by canonical path so `./in.mzpeak` vs
+    // `in.mzpeak` (and symlinks) are caught, with a lexical fallback when a path is not yet on disk.
+    reject_output_collision(&cli.input, &imzml, "imzML")?;
+    reject_output_collision(&cli.input, &ibd, "ibd")?;
+
     // Progress total: open a MzPeakReader purely to read len() (binary-only indicatif), then
     // drop it before the library convert opens its own reader.
     let total: Option<u64> = mzpeak_prototyping::MzPeakReader::new(&cli.input)
@@ -307,6 +314,48 @@ fn derive_reverse_paths(out: &Path) -> (PathBuf, PathBuf) {
         Some("imzML") | Some("imzml") => (out.to_path_buf(), out.with_extension("ibd")),
         _ => (out.with_extension("imzML"), out.with_extension("ibd")),
     }
+}
+
+/// WR-02 self-overwrite guard: error if a derived reverse `output` resolves to the same file as the
+/// `input` archive. Compares canonical paths (catches `./in.mzpeak` vs `in.mzpeak`, `..` segments,
+/// and symlinks); when a path cannot be canonicalized (the output usually does not exist yet) it
+/// falls back to canonicalizing the parent directory + appending the file name, and finally to a
+/// plain lexical equality. `which` names the offending output (`imzML` / `ibd`) in the message.
+fn reject_output_collision(input: &Path, output: &Path, which: &str) -> anyhow::Result<()> {
+    if same_file_path(input, output) {
+        return Err(anyhow!(
+            "refusing to write the reverse {which} output onto the input archive {:?} — choose a \
+             different output stem (-o) so the source is not overwritten",
+            input
+        ));
+    }
+    Ok(())
+}
+
+/// Best-effort "do these two paths refer to the same file?" without requiring both to exist. Tries
+/// full `canonicalize`; for a not-yet-created path it canonicalizes the parent dir and re-appends
+/// the file name; otherwise compares the raw paths lexically. Never errors — a guard helper.
+fn same_file_path(a: &Path, b: &Path) -> bool {
+    fn resolve(p: &Path) -> PathBuf {
+        if let Ok(c) = p.canonicalize() {
+            return c;
+        }
+        match (p.parent(), p.file_name()) {
+            (Some(parent), Some(name)) => {
+                let parent = if parent.as_os_str().is_empty() {
+                    Path::new(".")
+                } else {
+                    parent
+                };
+                match parent.canonicalize() {
+                    Ok(cp) => cp.join(name),
+                    Err(_) => p.to_path_buf(),
+                }
+            }
+            _ => p.to_path_buf(),
+        }
+    }
+    resolve(a) == resolve(b)
 }
 
 /// Dry-run (CLI-03): report storage mode, spectrum count, grid dims, and integrity status,
@@ -542,6 +591,40 @@ mod tests {
         assert_eq!(imzml, PathBuf::from("out.imzml"));
         assert_eq!(ibd, PathBuf::from("out.ibd"));
         assert_eq!(imzml.file_stem(), ibd.file_stem());
+    }
+
+    // --- WR-02: reverse output-collision guard -------------------------------------------
+
+    #[test]
+    fn reject_output_collision_errors_on_self_overwrite() {
+        // A derived output that resolves to the same file as the input must be rejected.
+        let dir = std::env::temp_dir().join(format!(
+            "imzml2mzpeak_collision_test_{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let input = dir.join("in.imzML");
+        std::fs::write(&input, b"x").unwrap();
+
+        // Same logical path expressed differently (via a `.` segment) must still collide.
+        let aliased = dir.join(".").join("in.imzML");
+        let err = reject_output_collision(&input, &aliased, "imzML")
+            .expect_err("self-overwrite must be rejected");
+        assert!(
+            err.to_string().contains("refusing to write"),
+            "actionable self-overwrite message, got: {err}"
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn reject_output_collision_allows_distinct_outputs() {
+        // Distinct derived outputs (the normal case) pass the guard.
+        let input = Path::new("some_input.mzpeak");
+        let (imzml, ibd) = derive_reverse_paths(Path::new("some_output"));
+        assert!(reject_output_collision(input, &imzml, "imzML").is_ok());
+        assert!(reject_output_collision(input, &ibd, "ibd").is_ok());
     }
 
     // --- exit-code classification --------------------------------------------------------
