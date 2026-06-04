@@ -101,7 +101,11 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
   3. Errors produce actionable messages and distinct non-zero exit codes, mirroring the existing `classify_exit` mapping (e.g. non-imaging input, read failure, I/O failure each get their own code).
   4. The output directory layout and naming are consistent (`.imzML` and `.ibd` share a stem, UUID matches between them). Opening + closing adversarial review recorded.
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+- [ ] 10-01-PLAN.md — Library pipeline: ImzmlWriter split-phase API + read_pixel promoted to src/reverse/source.rs + Option-C bounded-memory reverse convert() (RCLI-02)
+- [ ] 10-02-PLAN.md — CLI: extension dispatch + --reverse + -o stem derivation + classify_reverse_error exit-code mapping (RCLI-01)
+- [ ] 10-03-PLAN.md — End-to-end oracle (mzdata re-read) + ~5k-pixel bounded-memory proof + non-imaging CLI fail-fast (RCLI-01/02)
 
 ### Phase 11: Reverse Roundtrip Verification & PXD001283 Acceptance
 
@@ -124,5 +128,5 @@ with an adversarial CODEX/CLI review (reflected in success criteria where load-b
 | 7. Reverse Read-Spike & Dependency Audit | 3/3 | Complete    | 2026-06-04 |
 | 8. `.ibd` Binary Writer (CRUX) | 1/1 | Complete    | 2026-06-04 |
 | 9. `.imzML` XML Emitter | 2/2 | Complete    | 2026-06-04 |
-| 10. Streaming Reverse Orchestration & `reverse` CLI | 0/? | Not started | - |
+| 10. Streaming Reverse Orchestration & `reverse` CLI | 0/3 | Planned | - |
 | 11. Reverse Roundtrip Verification & PXD001283 Acceptance | 0/? | Not started | - |
