@@ -228,3 +228,51 @@ fn small_fixture_l1_roundtrip() {
     std::fs::remove_dir_all(&dir).ok();
     std::fs::remove_file(&orig).ok();
 }
+
+/// RDAT-01 (SC-4): the repeatable real-dataset acceptance gate on the 34,840-spectrum,
+/// PXD001283-derived `out/HR2MSI.mzpeak`. `#[ignore]`-gated (432 MB, not in CI / fresh checkouts)
+/// and skips GRACEFULLY (early return, not a failure) when the archive is absent so a fresh
+/// checkout + the default suite stay green.
+///
+/// Run command (the documented acceptance invocation):
+///   `cargo test --release --test reverse_roundtrip -- --ignored`
+///
+/// Bounded memory is a LOCKED RDAT-01 requirement: the verify SOURCE streams via [`MzPeakSource`]
+/// (NEVER a collected Vec); both roundtrip legs stream (reverse holds one ReversePixel live,
+/// forward streams one spectrum); `load_all_spectrum_metadata()` is primed exactly once on the
+/// source (Pitfall 1). A soft, non-asserting peak-RSS observation is printed.
+#[test]
+#[ignore = "RDAT-01 acceptance: 34,840 spectra / 432 MB; run with --release --ignored"]
+fn pxd001283_reverse_acceptance() {
+    let orig = Path::new("out/HR2MSI.mzpeak");
+    if !orig.exists() {
+        eprintln!("[skip] RDAT-01: out/HR2MSI.mzpeak absent — skipping (not a failure)");
+        return; // graceful skip (NOT an assertion) — keeps fresh checkouts / CI green (Pitfall 6)
+    }
+
+    let dir = tempdir("pxd");
+    let rt = roundtrip(orig, &dir); // both legs stream
+
+    // Verify SOURCE: the STREAMING adapter over the ORIGINAL archive (bounded memory) — NEVER a Vec.
+    let source = MzPeakSource::open(orig).expect("open original mzPeak source");
+    let report = verify_streaming(source, &rt, ConformanceLevel::L1BitForBit)
+        .expect("verification runs without a typed error");
+
+    assert_eq!(report.count.source_count, 34_840, "RDAT-01: full dataset");
+    assert!(
+        report.passed(),
+        "RDAT-01 / RVER-01 L1 must pass on all 34,840: {report:?}"
+    );
+    assert!(
+        report.coordinates.passed,
+        "RVER-02 coords integer-exact at scale"
+    );
+
+    // Soft, non-asserting peak-RSS observation (bounded-memory evidence).
+    if let Some(kb) = peak_rss_kb() {
+        eprintln!("[rdat01] peak RSS ~{:.1} MB", kb as f64 / 1024.0);
+    }
+
+    // Cleanup the temp work dir; keep the (gitignored) input archive.
+    std::fs::remove_dir_all(&dir).ok();
+}
