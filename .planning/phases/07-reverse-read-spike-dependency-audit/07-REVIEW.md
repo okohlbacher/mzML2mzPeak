@@ -13,18 +13,22 @@ files_reviewed_list:
   - tests/reverse_read_spike.rs
 findings:
   critical: 0
-  warning: 3
+  warning: 0
   info: 4
-  total: 7
-status: findings
+  total: 4
+status: clean
 ---
 
 # Phase 7: Code Review Report
 
 **Reviewed:** 2026-06-04
 **Depth:** standard
-**Files Reviewed:** 7
-**Status:** issues_found
+**Status:** clean (re-review iteration 2 — all 3 Warnings resolved; 4 Info intentionally deferred)
+
+> **Iteration 1** found 0 Critical / 3 Warning / 4 Info. The 3 Warnings were fixed in
+> commits `6675577` (WR-01), `422a1a8` (WR-02), `fb8eef5` (WR-03) and re-verified in
+> iteration 2 (see "## Re-review (iteration 2)" at the end). The original iteration-1
+> finding bodies are retained below for traceability.
 
 ## Summary
 
@@ -51,6 +55,8 @@ the gate's PASS is sound for THIS file), and the coercion is a fidelity gap on a
 exercised end-to-end yet. But it must be addressed before Phase 8 promotes the read shape.
 
 ## Warnings
+
+> **All three Warnings below are RESOLVED as of iteration 2.** Bodies retained for context.
 
 ### WR-01: Centroid/Unknown read path coerces source dtype via mzpeaks peak accessors
 
@@ -161,6 +167,58 @@ runtime check that does not exist.
 
 ---
 
-_Reviewed: 2026-06-04_
+## Re-review (iteration 2)
+
+**Re-reviewed:** 2026-06-04
+**Scope:** Focused verification of the WR-01 / WR-02 / WR-03 fixes (commits `6675577`,
+`422a1a8`, `fb8eef5`). Not a fresh full review.
+
+### WR-01 — RESOLVED
+
+The original finding's prescribed remedy offered two paths: route centroid through a
+dtype-preserving facet, OR — if `get_spectrum_peaks_for` is the only surface and it
+hardcodes f64/f32 — document that the upstream `spectra_peaks` schema is itself fixed-width
+AND add an assertion that proves it. The investigation confirmed the latter: mzpeaks 1.0.9
+`CentroidPeak` exposes `mz(): f64` / `intensity(): f32` at the TYPE level via the only
+available read surface, so no narrower source dtype is recoverable. The applied fix matches
+the prescription exactly:
+- `tests/reverse_read_spike.rs:123-133` and `src/bin/spike_reverse_read.rs:129-137` now carry
+  an inline doc comment stating the `spectra_peaks` schema is fixed-width by design and that
+  the `NumArray` widths RECORD the schema rather than widen/narrow a source array.
+- The fixed-width property is backed by the WR-02 assertion (not merely asserted in prose).
+The centroid branch is correctly distinguished from the Profile `decode_axis` path, and the
+doc explicitly states that if a dtype-preserving centroid facet ever appears upstream it
+should route through `decode_axis`. Verdict: **resolved.**
+
+### WR-02 — RESOLVED
+
+`count_and_dtype` now reads the centroid pixel at index 1
+(`tests/reverse_read_spike.rs:215`) and asserts: `Representation::Centroid` (line 216),
+`NumArray::F64(_)` m/z (line 218), `NumArray::F32(_)` intensity (line 223), and non-empty
+arrays (line 227). Cross-checked against the fixture
+(`tests/fixtures/reverse/mod.rs:130-139`): pixel 1 is declared Centroid with `F64` m/z +
+`F32` intensity, so the assertions bind to the fixture's actual declared dtypes. The
+previously-untested coercing path is now covered; the test would fail if the centroid path
+ever drifted. Verdict: **resolved.**
+
+### WR-03 — RESOLVED
+
+`gate()` now sets `saw_f32_axis` only when `p.representation == Representation::Profile`
+(`src/bin/spike_reverse_read.rs:236-240`). A fabricated centroid `NumArray::F32` can no
+longer satisfy the no-widening gate, eliminating the false-positive. The scoping is
+documented at the flag declaration (lines 216-220) and at the gate predicate (line 276), and
+the module-level GATE contract (lines 28-34) states the Profile-only proof explicitly. The
+fix matches the prescribed remedy (count f32 only on the `decode_axis`/Profile path).
+Verdict: **resolved.**
+
+### Outcome
+
+All 3 Warnings resolved. The 4 Info findings were intentionally deferred as
+throwaway-spike-acceptable and do not block. Frontmatter `status` set to `clean`;
+`findings.warning` set to `0`. No source files were modified during this review.
+
+---
+
+_Reviewed: 2026-06-04 (iteration 1); re-reviewed 2026-06-04 (iteration 2)_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
