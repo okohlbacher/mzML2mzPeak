@@ -443,16 +443,16 @@ return Ok(());   // → ExitCode::SUCCESS
 
 **Note:** All other claims are `[VERIFIED]` against this repo's source or the vendored writer at exact file:line, or `[CITED]` to docs.rs/indicatif/0.17.11.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Exact Phase-3 entry for source-side grid dimensions in dry-run.**
    - What we know: a scanSettings geometry parser exists and produced grid 260×134 for the real file (STATE Phase-03); the verify side reads grid via `grid_dims_from_metadata(metadata.imaging)`.
    - What's unclear: the exact public function the dry-run should call on the SOURCE (pre-write) to get `(width, height)`.
-   - Recommendation: planner inspects `src/schema/` for the geometry parser's public entry; if none is conveniently public, surface grid dims as "unknown" in the dry-run plan (CLI-03 lists "grid dimensions where available" — Phase-3 SPA-03 is "where available").
+   - **RESOLVED:** dry-run calls `parse_scan_settings` for source grid dims; when it yields nothing, the dry-run plan surfaces grid dims as "unknown" (CLI-03 is "grid dimensions where available"; Phase-3 SPA-03 is "where available"). Implemented in plan 06-02 Task 1.
 
 2. **Whether to optimize the double .ibd digest.**
    - What we know: `--verify` opens the source twice; each open re-digests the .ibd.
-   - Recommendation: ship the simple double-open for v1; add an `open_preverified` only if acceptance timing is a problem.
+   - **RESOLVED:** ship the simple double-open for v1 (no `open_preverified`); revisit only if acceptance timing is a problem. Reflected in plan 06-03 (acceptance run accepts the double digest).
 
 ## Environment Availability
 
