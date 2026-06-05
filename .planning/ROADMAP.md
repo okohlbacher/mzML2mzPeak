@@ -75,6 +75,10 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
   2. Absolute offsets `IMS:1000053/54` carried in `ImagingMetadata` and re-emitted; `pixel_count.z` carried through.
   3. Existing reverse roundtrip + mzdata-oracle tests stay green. Opening + closing adversarial review recorded.
 
+**Plans:** 1 plan
+
+- [ ] 14-01-PLAN.md — µm UO:0000017 unit on IMS:1000044-47 + offsets IMS:1000053/54 (emit-when-present, µm) + add optional `absolute_offset_um` to ImagingMetadata/imaging.json/spec-doc + carry pixel_count.z; all proven against the mzdata::ImzMLReader oracle (FID-01, FID-02, FID-03).
+
 ### Phase 15: TIFF optical-image import
 
 **Goal**: Import one or more optical TIFFs on forward conversion, store each as a separate ZIP member, and record per-image metadata + a full-extent affine into the MS pixel grid in `index.json`.
@@ -93,7 +97,7 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
 |-------|-----------|----------------|--------|-----------|
 | 12. Imaging schema & spec prerequisites | v0.5 | 2/2 | Complete    | 2026-06-05 |
 | 13. Index enrichment | v0.5 | 1/1 | Complete    | 2026-06-05 |
-| 14. Reverse-emit fidelity | v0.5 | 0/? | Not started | - |
+| 14. Reverse-emit fidelity | v0.5 | 0/1 | Planned     | - |
 | 15. TIFF optical-image import | v0.5 | 0/? | Not started | - |
 
 <details>
