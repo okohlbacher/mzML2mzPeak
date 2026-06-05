@@ -131,7 +131,7 @@ fn roundtrip(orig_mzpeak: &Path, work_dir: &Path) -> PathBuf {
     // Leg 2: .imzML/.ibd -> mzPeak. open() runs the integrity preflight FIRST; the reverse output
     // satisfies it by construction. Fresh reader (one-shot, Pitfall 2).
     let reader = ImagingReader::open(&tmp_imzml).expect("open reverse output (preflight passes)");
-    forward_convert(reader, &rt_mzpeak).expect("forward convert (Leg 2)");
+    forward_convert(reader, &rt_mzpeak, &[]).expect("forward convert (Leg 2)");
 
     rt_mzpeak
 }
