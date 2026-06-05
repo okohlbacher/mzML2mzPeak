@@ -23,6 +23,7 @@
 pub mod spectrum;
 pub mod writer;
 pub mod convert;
+pub mod image;
 
 pub use spectrum::to_mzdata;
 pub use writer::{ImagingWriter, WriteError};

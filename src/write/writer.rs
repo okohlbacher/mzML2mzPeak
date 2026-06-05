@@ -126,6 +126,20 @@ pub enum WriteError {
     /// block (WR-02). Returned instead of panicking so callers handle the unwired case.
     #[error("imaging metadata block not wired — call write_run_metadata before imaging_metadata")]
     MetadataNotWired,
+
+    /// A `--image` TIFF could not be read for its dimensions (IMG-04). Surfaced as a typed,
+    /// actionable failure (not a panic) when `tiff::Decoder::new`/`dimensions()` rejects a
+    /// malformed / non-TIFF / unreadable file. Carries the offending path and the underlying
+    /// decoder error string. (Constructed in [`crate::write::image::read_tiff_dimensions`].)
+    #[error("failed to read TIFF dimensions for {path}: {detail}")]
+    ImageDecode { path: String, detail: String },
+
+    /// A `--image` was supplied but the MS pixel grid count (`Nx`×`Ny`) could not be
+    /// determined, so a full-extent affine cannot be built (IMG-04). Raised by Plan 03's
+    /// `convert()` import loop when `pixel_count` is unknown (e.g. an empty/coordinate-less
+    /// run). Defined here because `writer.rs` is this plan's `files_modified` seam.
+    #[error("cannot build image affine: MS pixel_count is unknown for {out_path}")]
+    ImageAffineUnknownPixelCount { out_path: String },
 }
 
 /// Wraps the reference `mzpeak_prototyping` writer for imaging output.
