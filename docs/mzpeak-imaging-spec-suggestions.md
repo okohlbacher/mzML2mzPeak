@@ -197,6 +197,21 @@
 > **and after** any `images/image_NNNN.tiff` members have been added, and only then is `index.json`
 > emitted. `pixel_count_source` records whether `pixel_count` was `"declared"` (from imzML
 > `IMS:1000042/43`) or `"observed_max"` (derived); `mz_range` is OMITTED when there are no MS1 spectra.
+>
+> **NOTE — implementation status (imzml2mzpeak forward converter, v0.5 / Phase 13).** The
+> `is_imaging` flag, `pixel_count {x, y[, z]}` together with `pixel_count_source`, and `mz_range
+> {min, max}` are now **POPULATED AT RUNTIME** by the forward `imzML → imaging mzPeak` converter.
+> They are computed by a single **bounded-memory streaming accumulator** (O(1) — scalar coordinate
+> maxima plus two `Option<f64>` m/z bounds; no per-spectrum buffering) that observes every spectrum
+> — **including the first spectrum sampled early for schema inference** — during the one-pass write,
+> then folds its results into the `metadata.imaging` block **just before `mzpeak_index.json` is
+> written last**. `pixel_count_source` is `"declared"` when the imzML declared grid counts
+> (`IMS:1000042/43`), otherwise `"observed_max"` from the maximum observed 1-based coordinate
+> (never fabricated beyond observed); `mz_range` is the min/max over MS1 (`ms_level == 1`) spectra
+> only and is omitted (with a log line) when there are no MS1 spectra. The non-finite (NaN/±∞)
+> m/z values are skipped so they cannot poison the bound. This keeps spec ⟷ implementation
+> consistent — the schema already carries these fields (Phase 12); Phase 13 wires their runtime
+> population.
 
 ### Edit 9 — `### Shared-Axis Grid Layout` under `## Signal Data Layouts`
 **Location:** "Signal Data Layouts".

@@ -25,6 +25,7 @@ use std::path::Path;
 use mzdata::prelude::SpectrumLike;
 
 use crate::read::ImagingReader;
+use crate::write::writer::IndexAccumulator;
 use crate::write::{ImagingWriter, WriteError, to_mzdata};
 
 /// Convert an imaging spectrum stream into an imaging mzPeak archive at `out_path`.
@@ -47,8 +48,20 @@ pub fn convert(mut reader: ImagingReader, out_path: &Path) -> Result<(), WriteEr
     //     column and never panics on the record-batch-length invariant (DAT-01). The first
     //     reconstructed spectrum is retained and written FIRST below, so no spectrum is dropped
     //     and the reader is consumed exactly once (bounded memory — only ONE spectrum is held).
+    // One bounded accumulator for the whole pass (IDX-01): scalar coord-max + MS1 m/z bounds,
+    // O(1) memory — no per-spectrum buffering (threat T-13-02). Folded into the cloned imaging
+    // block just before the index is written, at the terminal seam below.
+    let mut acc = IndexAccumulator::new();
+
+    // The sampled-first spectrum is OBSERVED on the raw ImagingSpectrum BEFORE to_mzdata consumes
+    // it (CODEX review-#2 / IDX-02): the first pixel's coordinates + MS1 m/z must count toward the
+    // index totals (no off-by-one drop). Bind the unwrapped record, observe it, THEN convert it.
     let first = match reader.next() {
-        Some(item) => Some(to_mzdata(&item?)?),
+        Some(item) => {
+            let rec = item?;
+            acc.observe(rec.x, rec.y, rec.z, rec.ms_level, &rec.mz);
+            Some(to_mzdata(&rec)?)
+        }
         None => None,
     };
     let sample_maps: Vec<&_> = first
@@ -87,6 +100,9 @@ pub fn convert(mut reader: ImagingReader, out_path: &Path) -> Result<(), WriteEr
     }
     for item in reader {
         let s = item?;
+        // Observe the raw ImagingSpectrum BEFORE to_mzdata (IDX-02/03) — coords + MS1 m/z bounds
+        // for the index totals — then convert + write. One spectrum live at a time (no buffering).
+        acc.observe(s.x, s.y, s.z, s.ms_level, &s.mz);
         // to_mzdata is fallible (WR-01 axis-length, CR-02 non-finite m/z, WR-03 coordinate
         // validation); a data-dependent defect surfaces as a typed WriteError, never a panic.
         let mz_spec = to_mzdata(&s)?;
@@ -105,7 +121,18 @@ pub fn convert(mut reader: ImagingReader, out_path: &Path) -> Result<(), WriteEr
     //     open ZipArchiveWriter so the imaging block can be inserted before the index is
     //     written. finish_parquet(self) CONSUMES the writer, so the imaging block is cloned
     //     out FIRST (per Plan 02 handoff note; ImagingMetadata: Clone).
-    let block = writer.imaging_metadata()?.clone();
+    let mut block = writer.imaging_metadata()?.clone();
+    // Fold the bounded accumulator into the cloned block AFTER the full pass and BEFORE the index
+    // is written (IDX-01 index-last seam): observed_max pixel_count when geometry did not declare
+    // grid counts, and MS1 m/z bounds. mz_range is left None when no MS1 spectra were seen.
+    acc.fold_into(&mut block);
+    if block.mz_range.is_none() {
+        // IDX-03: no MS1 (ms_level==1) spectra were observed, so mz_range is OMITTED (not a bogus
+        // empty range). Log the omission via the existing `log` facade (not `tracing`).
+        log::info!(
+            "imaging index: no MS1 (ms_level==1) spectra observed — mz_range omitted from metadata.imaging"
+        );
+    }
     let mut zip = writer.finish_parquet()?;
     zip.add_index_metadata("imaging", &block)
         .map_err(WriteError::Json)?;
