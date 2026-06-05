@@ -120,3 +120,16 @@ indicatif = "=0.17.11"
 # 0.63.x backport ships (see deferred-items.md upstream issue draft). ---
 [patch.crates-io]
 mzdata = { path = "vendor/mzdata" }
+
+# --- VENDORED PATCH (plan 15-03): the upstream mzpeak_prototyping FileEntry enums
+# `EntityType`/`DataKind` derive `Serialize` but deserialize via `DeserializeFromStr`;
+# the derived `Serialize` emits the `Other(String)` tuple variant as a JSON object
+# (`{"other": "..."}`) that cannot be read back, so any archive containing an `Other`
+# member (e.g. our `images/image_NNNN.tiff`) wrote an `index.json` whose `FileEntry`
+# failed to deserialize — and the reader's `.ok()` silently dropped the ENTIRE
+# FileIndex (losing all `metadata.imaging`). This redirects the git dep to a minimal
+# vendored fork that serializes those enums via `Display` (symmetric with `FromStr`).
+# Same vendoring discipline as the mzdata fork above. Drop once fixed upstream
+# (see deferred-items.md upstream issue draft). ---
+[patch."https://github.com/HUPO-PSI/mzPeak"]
+mzpeak_prototyping = { path = "vendor/mzpeak_prototyping" }

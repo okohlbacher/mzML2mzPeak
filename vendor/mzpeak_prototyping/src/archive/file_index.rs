@@ -1,0 +1,238 @@
+use std::{collections::HashMap, fmt, ops::Deref, str::FromStr};
+
+use serde::{Deserialize, Serialize};
+use serde_with::{DeserializeFromStr, SerializeDisplay};
+
+// VENDORED PATCH (imzml2mzpeak v0.5): `DataKind`/`EntityType` previously derived
+// `Serialize` while deserializing via `DeserializeFromStr`. The derived `Serialize`
+// emits the `Other(String)` tuple variant as a JSON object (`{"other": "..."}`),
+// which `DeserializeFromStr` (a plain string) cannot read back — so any archive
+// containing an `Other` file member wrote an `index.json` whose `FileEntry` failed
+// to deserialize, and the reader's `.ok()` silently dropped the ENTIRE FileIndex
+// (losing all `metadata`, including `metadata.imaging`). Fix: serialize via
+// `Display` (`SerializeDisplay`) so the wire form is a plain string symmetric with
+// `FromStr`. Unit variants are unchanged (they already serialized to their string).
+// Upstream issue to be filed; drop this fork when fixed upstream.
+
+/// The facet of the thing being described in this file
+#[derive(Debug, SerializeDisplay, DeserializeFromStr, Clone, PartialEq, Eq)]
+pub enum DataKind {
+    // Wire form is driven by Display/FromStr (SerializeDisplay/DeserializeFromStr);
+    // the former #[serde(rename=...)] attrs were inert under those derives and removed.
+    DataArray,
+    Peaks,
+    Metadata,
+    Proprietary,
+    Other(String),
+}
+
+impl fmt::Display for DataKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::DataArray => "data arrays",
+            Self::Peaks => "peaks",
+            Self::Metadata => "metadata",
+            Self::Proprietary => "proprietary",
+            Self::Other(s) => s.as_str(),
+        })
+    }
+}
+
+impl FromStr for DataKind {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_lowercase().trim() {
+            "data arrays" => Self::DataArray,
+            "peaks" => Self::Peaks,
+            "metadata" => Self::Metadata,
+            "proprietary" => Self::Proprietary,
+            "other" => Self::Other("other".into()),
+            _ => Self::Other(s.to_string()),
+        })
+    }
+}
+
+/// The things being described in one facet or another by this file
+#[derive(Debug, SerializeDisplay, DeserializeFromStr, Clone, PartialEq, Eq)]
+pub enum EntityType {
+    // Wire form driven by Display/FromStr; former #[serde(...)] attrs were inert and removed.
+    // ("mass spectrum" is still accepted on read via FromStr's alias arm.)
+    Spectrum,
+    Chromatogram,
+    WavelengthSpectrum,
+    Other(String),
+}
+
+impl fmt::Display for EntityType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Spectrum => "spectrum",
+            Self::Chromatogram => "chromatogram",
+            Self::WavelengthSpectrum => "wavelength spectrum",
+            Self::Other(s) => s.as_str(),
+        })
+    }
+}
+
+impl FromStr for EntityType {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_lowercase().trim() {
+            "spectrum" => Self::Spectrum,
+            "mass spectrum" => Self::Spectrum,
+            "wavelength spectrum" => Self::WavelengthSpectrum,
+            "chromatogram" => Self::Chromatogram,
+            "other" => Self::Other("other".into()),
+            _ => {
+                log::warn!("Found entity type {s}, treating as 'other'");
+                Self::Other(s.to_string())
+            }
+        })
+    }
+}
+
+/// A single file in the mzPeak archive of a certain type
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct FileEntry {
+    /// The name of the file, relative to the root of the archive
+    pub name: String,
+    /// The entity this file describes
+    pub entity_type: EntityType,
+    /// The data this file describes
+    pub data_kind: DataKind,
+}
+
+impl FileEntry {
+    pub fn archive_type(&self) -> super::MzPeakArchiveType {
+        match (&self.entity_type, &self.data_kind) {
+            (EntityType::Spectrum, DataKind::DataArray) => {
+                super::MzPeakArchiveType::SpectrumDataArrays
+            }
+            (EntityType::Spectrum, DataKind::Metadata) => {
+                super::MzPeakArchiveType::SpectrumMetadata
+            }
+            (EntityType::Spectrum, DataKind::Peaks) => {
+                super::MzPeakArchiveType::SpectrumPeakDataArrays
+            }
+            (EntityType::Chromatogram, DataKind::DataArray) => {
+                super::MzPeakArchiveType::ChromatogramDataArrays
+            }
+            (EntityType::Chromatogram, DataKind::Metadata) => {
+                super::MzPeakArchiveType::ChromatogramMetadata
+            }
+            (EntityType::WavelengthSpectrum, DataKind::DataArray) => {
+                super::MzPeakArchiveType::WavelengthSpectrumDataArrays
+            }
+            (EntityType::WavelengthSpectrum, DataKind::Metadata) => {
+                super::MzPeakArchiveType::WavelengthSpectrumMetadata
+            }
+            (EntityType::Other(_), _) => super::MzPeakArchiveType::Other,
+            (_, _) => {
+                if matches!(self.data_kind, DataKind::Proprietary) {
+                    log::debug!("Could not map {self:?} to an archive type");
+                }
+                else {
+                    log::warn!("Could not map {self:?} to an archive type");
+                }
+                super::MzPeakArchiveType::Other
+            }
+        }
+    }
+
+    pub fn new(name: String, entity_type: EntityType, data_kind: DataKind) -> Self {
+        Self {
+            name,
+            entity_type,
+            data_kind,
+        }
+    }
+}
+
+impl From<super::MzPeakArchiveType> for FileEntry {
+    fn from(value: super::MzPeakArchiveType) -> Self {
+        match value {
+            super::MzPeakArchiveType::SpectrumMetadata => FileEntry::new(
+                value.tag_file_suffix().into(),
+                EntityType::Spectrum,
+                DataKind::Metadata,
+            ),
+            super::MzPeakArchiveType::SpectrumDataArrays => FileEntry::new(
+                value.tag_file_suffix().into(),
+                EntityType::Spectrum,
+                DataKind::DataArray,
+            ),
+            super::MzPeakArchiveType::SpectrumPeakDataArrays => FileEntry::new(
+                value.tag_file_suffix().into(),
+                EntityType::Spectrum,
+                DataKind::Peaks,
+            ),
+            super::MzPeakArchiveType::ChromatogramMetadata => FileEntry::new(
+                value.tag_file_suffix().into(),
+                EntityType::Chromatogram,
+                DataKind::Metadata,
+            ),
+            super::MzPeakArchiveType::ChromatogramDataArrays => FileEntry::new(
+                value.tag_file_suffix().into(),
+                EntityType::Chromatogram,
+                DataKind::DataArray,
+            ),
+            super::MzPeakArchiveType::WavelengthSpectrumDataArrays => FileEntry::new(
+                value.tag_file_suffix().into(),
+                EntityType::WavelengthSpectrum,
+                DataKind::DataArray,
+            ),
+            super::MzPeakArchiveType::WavelengthSpectrumMetadata => FileEntry::new(
+                value.tag_file_suffix().into(),
+                EntityType::WavelengthSpectrum,
+                DataKind::Metadata,
+            ),
+            super::MzPeakArchiveType::Other => FileEntry::new(
+                "".into(),
+                "other".parse().unwrap(),
+                DataKind::Other("other".into()),
+            ),
+            super::MzPeakArchiveType::Proprietary => FileEntry::new(
+                "".into(),
+                EntityType::Other("".into()),
+                DataKind::Proprietary,
+            ),
+        }
+    }
+}
+
+/// A collection of [`FileEntry`] and associated JSON-compatible metadata
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct FileIndex {
+    pub files: Vec<FileEntry>,
+    pub metadata: HashMap<String, serde_json::Value>,
+}
+
+impl From<Vec<FileEntry>> for FileIndex {
+    fn from(value: Vec<FileEntry>) -> Self {
+        Self::new(value, Default::default())
+    }
+}
+
+impl FileIndex {
+    pub const fn index_file_name() -> &'static str {
+        "mzpeak_index.json"
+    }
+
+    pub fn new(files: Vec<FileEntry>, metadata: HashMap<String, serde_json::Value>) -> Self {
+        Self { files, metadata }
+    }
+
+    pub fn push(&mut self, entry: FileEntry) {
+        self.files.push(entry);
+    }
+}
+
+impl Deref for FileIndex {
+    type Target = [FileEntry];
+
+    fn deref(&self) -> &Self::Target {
+        &self.files
+    }
+}

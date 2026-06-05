@@ -1,0 +1,61 @@
+on: [push, pull_request]
+
+env:
+  RUST_BACKTRACE: full
+  RUST_LOG: debug
+  CARGO_PROFILE_TEST_BUILD_OVERRIDE_DEBUG: true
+
+name: Test
+jobs:
+
+  test-rust:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    name: Rust Test Suite
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install miniserve for HTTP tests
+        run: |
+          cargo install miniserve
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: -- --nocapture --show-output
+  test-python:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    name: Python Test Suite
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v6.1.0
+        with:
+            python-version: '3.12'
+            cache: 'pip'
+      - name: install library
+        shell: bash
+        run: |
+          pip install -v python/
+          pip install coverage pytest pytest-cov pytest-xdist scipy pynumpress -U
+      - name: run tests
+        shell: bash
+        run: |
+          py.test -l -s -v python/test/ \
+            --cov=mzpeak --cov-report term \
+            --log-level=DEBUG
