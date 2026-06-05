@@ -157,13 +157,38 @@
 > ```json
 > { "metadata": { "imaging": {
 >     "is_imaging": true,
->     "pixel_count": {"x": 260, "y": 134},
+>     "pixel_count": {"x": 260, "y": 134, "z": 1},
+>     "pixel_count_source": "observed_max",
+>     "mz_range": {"min": 100.07, "max": 999.93},
 >     "pixel_size_um": {"x": 10.0, "y": 10.0},
 >     "scan_pattern": "IMS:1000413", "scan_type": "IMS:1000480",
 >     "line_scan_direction": "IMS:1000491", "linescan_sequence": "IMS:1000401",
->     "coordinate_base": 1
+>     "coordinate_base": 1,
+>     "images": [
+>       {
+>         "archive_path": "images/image_0000.tiff",
+>         "source_name": "optical.tiff",
+>         "media_type": "image/tiff",
+>         "width": 2600, "height": 1340,
+>         "sha256": "…", "size_bytes": 12345678,
+>         "affine": {
+>           "type": "affine",
+>           "matrix": [0.0996, 0, 1, 0, 0.0993, 1],
+>           "maps": "image_px -> ms_px",
+>           "registration_quality": "assumed_full_extent"
+>         }
+>       }
+>     ]
 > } } }
 > ```
+>
+> **NOTE — `index.json` (`mzpeak_index.json`) is written LAST.** The imaging block's aggregates depend
+> on the full data pass: `pixel_count` with `pixel_count_source: "observed_max"` is derived from the
+> maximum coordinate observed across all spectra, and `mz_range` is the min/max over all MS1
+> (`ms_level == 1`) spectra. The block is therefore finalised **after** the complete spectrum pass
+> **and after** any `images/image_NNNN.tiff` members have been added, and only then is `index.json`
+> emitted. `pixel_count_source` records whether `pixel_count` was `"declared"` (from imzML
+> `IMS:1000042/43`) or `"observed_max"` (derived); `mz_range` is OMITTED when there are no MS1 spectra.
 
 ### Edit 9 — `### Shared-Axis Grid Layout` under `## Signal Data Layouts`
 **Location:** "Signal Data Layouts".
@@ -254,24 +279,72 @@
 ```
 
 ### `schema/imaging.json`
+
+> **NOTE.** This snippet mirrors the in-repo [`schema/imaging.json`](../schema/imaging.json)
+> field-for-field. With the F1 self-corrections applied: `pixel_count` is now **OPTIONAL** (real-world
+> imzML frequently omits grid counts), so the `required` set is `["is_imaging", "coordinate_base"]`
+> (it no longer requires `pixel_count`); `max_dimension_um` x/y are **integer** (matching
+> `AxisPair<i64>` in `src/schema/metadata.rs`); and the new `pixel_count.z`, `pixel_count_source`,
+> `mz_range`, and `images` fields are present. The schema stays `additionalProperties: false` at the
+> top level and on the new nested objects.
+
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "imaging",
-  "description": "Optional denormalised discovery block for mzpeak_index.json.metadata.imaging. Authoritative data is the pixel/scan columns + scan_settings.",
+  "description": "Optional denormalised discovery block for mzpeak_index.json.metadata.imaging. Authoritative data is the pixel/scan columns + scan_settings. MAY be incomplete at write time; only is_imaging and coordinate_base are guaranteed.",
   "type": "object",
+  "required": ["is_imaging", "coordinate_base"],
   "properties": {
     "is_imaging":     {"type": "boolean"},
-    "pixel_count":    {"type": "object", "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}, "z": {"type": "integer"}}, "required": ["x", "y"]},
+    "pixel_count":    {"type": "object", "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}, "z": {"type": "integer", "description": "OPTIONAL grid depth (z-stack); absent for 2D imaging."}}, "required": ["x", "y"]},
+    "pixel_count_source": {"type": "string", "enum": ["declared", "observed_max"], "description": "Provenance of pixel_count: declared (imzML IMS:1000042/43) or observed_max (derived from max observed coordinate)."},
+    "mz_range": {
+      "type": "object",
+      "description": "OPTIONAL MS1-only observed m/z bounds across the run.",
+      "required": ["min", "max"],
+      "properties": {"min": {"type": "number"}, "max": {"type": "number"}},
+      "additionalProperties": false
+    },
+    "images": {
+      "type": "array",
+      "description": "OPTIONAL per-image descriptive metadata for optical images stored as ZIP members.",
+      "items": {
+        "type": "object",
+        "required": ["archive_path", "source_name", "media_type", "width", "height", "sha256", "size_bytes", "affine"],
+        "properties": {
+          "archive_path": {"type": "string", "description": "Path of the image within the mzPeak ZIP, e.g. images/image_0000.tiff."},
+          "source_name":  {"type": "string", "description": "Original filename of the imported image."},
+          "media_type":   {"type": "string", "default": "image/tiff"},
+          "width":        {"type": "integer"},
+          "height":       {"type": "integer"},
+          "sha256":       {"type": "string", "description": "SHA-256 hex digest of the stored image bytes."},
+          "size_bytes":   {"type": "integer"},
+          "affine": {
+            "type": "object",
+            "description": "Full-extent display-hint affine mapping 0-based image pixels to 1-based MS pixels.",
+            "required": ["type", "matrix", "maps", "registration_quality"],
+            "properties": {
+              "type":   {"const": "affine"},
+              "matrix": {"type": "array", "items": {"type": "number"}, "minItems": 6, "maxItems": 6, "description": "[a,b,c,d,e,f] with (x_ms,y_ms)=(a*col+b*row+c, d*col+e*row+f)."},
+              "maps":   {"const": "image_px -> ms_px"},
+              "registration_quality": {"const": "assumed_full_extent"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
     "pixel_size_um":  {"type": "object", "properties": {"x": {"type": "number"}, "y": {"type": "number"}}},
-    "max_dimension_um": {"type": "object", "properties": {"x": {"type": "number"}, "y": {"type": "number"}}},
+    "max_dimension_um": {"type": "object", "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}}},
     "scan_pattern":        {"type": "string", "description": "CURIE, child of IMS:1000041"},
     "scan_type":           {"type": "string", "description": "CURIE, child of IMS:1000048"},
     "line_scan_direction": {"type": "string", "description": "CURIE, child of IMS:1000049"},
     "linescan_sequence":   {"type": "string", "description": "CURIE, child of IMS:1000040"},
-    "coordinate_base":     {"type": "integer", "enum": [1]}
+    "coordinate_base":     {"type": "integer", "const": 1}
   },
-  "required": ["is_imaging", "pixel_count"]
+  "additionalProperties": false
 }
 ```
 
@@ -288,8 +361,8 @@
 | 4 | `pixel` facet + `pixel_index` FK + scan key | Spectrum Metadata facets | — (Parquet schema in doc) | base |
 | 5 | coordinate/key typing | Typing Parameter Values | — | base |
 | 6 | imaging coordinates / orientation / conformance | new §Imaging | — | ext. |
-| 7 | `image` entity + registration | Entity Type + new file §; converter behaviour | `image.json` | base |
-| 8 | `metadata.imaging` block | Index File | `imaging.json` | ext. |
+| 7 | optical images as separate TIFF ZIP members (`images/image_NNNN.tiff`, `FileIndex` `Other`, descriptive metadata + affine in `metadata.imaging.images[]`); full `image.parquet` blob + CV registration demoted to **F8 future option** | Entity Type + new file §; converter behaviour | `image.json` (governs F8 future option) | base |
+| 8 | `metadata.imaging` block — adds `pixel_count.z`, `pixel_count_source`, `mz_range`, `images[]`; `pixel_count` optional; `max_dimension_um` integer; index written last | Index File | `imaging.json` | ext. |
 | 9 | shared-axis grid layout | Signal Data Layouts | — | base |
 | 10 | imaging provenance | file_description usage | — | ext. |
 
