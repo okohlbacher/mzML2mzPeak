@@ -28,7 +28,7 @@ use crate::integrity::preflight::preflight_with;
 use crate::read::{ImagingReader, ReadError};
 use crate::schema::{ConformanceLevel, parse_scan_settings};
 use crate::verify::{VerifyError, verify_streaming};
-use crate::write::convert;
+use crate::write::convert_with;
 
 /// Distinct non-zero exit codes per failure class (CLI-04 / T-6-exit). `0` is success.
 const EXIT_INTEGRITY: u8 = 2; // UUID/checksum/.ibd integrity gate failed
@@ -100,6 +100,31 @@ pub struct ConvertCli {
     /// accept that risk; it works around the gate, it does not repair the data.
     #[arg(long = "allow-checksum-mismatch")]
     pub allow_checksum_mismatch: bool,
+
+    /// Disable Numpress-linear m/z encoding (the size-reducing default) and store m/z with
+    /// lossless Delta chunking instead. Numpress is lossy on m/z (bounded fixed-point error;
+    /// intensity is always lossless), so pass this for an EXACT, bit-for-bit round-trip. Files are
+    /// a bit larger but bit-exact. (Imaging mzPeak always stays lossless regardless of this flag.)
+    #[arg(long = "no-numpress")]
+    pub no_numpress: bool,
+
+    /// ZSTD compression level (1–22). Higher = smaller output, slower. Default 19.
+    #[arg(long = "zstd-level", value_name = "N", default_value_t = 19)]
+    pub zstd_level: i32,
+}
+
+impl ConvertCli {
+    /// Build the writer [`EncodingOptions`] from the size flags: Numpress-linear m/z by default
+    /// (`--no-numpress` → lossless Delta), at `--zstd-level` (default 19) with tuned row groups.
+    fn encoding_options(&self) -> crate::write::EncodingOptions {
+        let mut o = if self.no_numpress {
+            crate::write::EncodingOptions::lossless()
+        } else {
+            crate::write::EncodingOptions::compact()
+        };
+        o.zstd_level = Some(self.zstd_level);
+        o
+    }
 }
 
 /// Initialize the global logger. When `log_file` is `Some`, all `log` records are written to
@@ -175,7 +200,7 @@ fn run_forward_mzml(cli: ConvertCli) -> anyhow::Result<()> {
     })?;
 
     log::info!("converting {} (plain mzML)", cli.input.display());
-    let report = crate::write::convert_mzml(&cli.input, out)
+    let report = crate::write::convert_mzml(&cli.input, out, &cli.encoding_options())
         .with_context(|| format!("plain-mzML conversion failed for {}", cli.input.display()))?;
     log::info!(
         "converted {} spectra + {} chromatograms → {}",
@@ -267,9 +292,28 @@ fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
 
     // Open the reader (runs preflight internally) and stream the conversion. `convert`
     // consumes the reader by value and owns the per-spectrum loop.
+    // Imaging mzPeak hand-registers flat POINT columns (to carry the IMS coordinate columns and
+    // avoid the writer's zero-mask schema panic), which is INCOMPATIBLE with chunked m/z encoding
+    // (numpress/delta need LargeList columns). So m/z chunking is not applied to imaging — it keeps
+    // lossless flat columns plus the lossless zstd/row-group tuning, preserving the L1 guarantee.
+    let enc = {
+        let mut e = cli.encoding_options();
+        if e.mz_chunking.is_some() {
+            if !cli.no_numpress {
+                log::info!(
+                    "m/z chunking (numpress) is not applied to imaging mzPeak — keeping lossless \
+                     columns + zstd-{} / row-group tuning (imaging stays L1 bit-for-bit)",
+                    cli.zstd_level
+                );
+            }
+            e.mz_chunking = None;
+            e.lossy_mz = false;
+        }
+        e
+    };
     let reader = ImagingReader::open_with(&cli.input, cli.allow_checksum_mismatch)
         .with_context(|| format!("failed to open imzML reader for {}", cli.input.display()))?;
-    convert(reader, out, &cli.images).context("conversion failed")?;
+    convert_with(reader, out, &cli.images, &enc).context("conversion failed")?;
 
     if let Some(pb) = bar {
         if let Some(n) = total {
@@ -293,7 +337,15 @@ fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
                     cli.input.display()
                 )
             })?;
-        let report = verify_streaming(reader2, out, ConformanceLevel::L1BitForBit)
+        // Numpress (lossy m/z) cannot satisfy bit-for-bit; verify at L2 tolerance instead. The
+        // lossless path (`--no-numpress`) keeps the strict L1 contract.
+        let level = if enc.lossy_mz {
+            log::info!("verifying at L2 (tolerance) — Numpress m/z encoding is lossy; use --no-numpress for L1 bit-for-bit");
+            ConformanceLevel::L2Transformed
+        } else {
+            ConformanceLevel::L1BitForBit
+        };
+        let report = verify_streaming(reader2, out, level)
             .context("verification failed to run")?;
         if !report.passed() {
             // A verify-REPORT failure is a distinct exit class (5). Carry a typed marker so

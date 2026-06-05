@@ -89,7 +89,11 @@ fn readable_path(input: &Path) -> Result<(PathBuf, Option<TranscodedXml>), MzmlC
 /// to `output`. Streams spectra then chromatograms through the reference writer and returns the
 /// counts. m/z arrays of ion-mobility spectra (timsTOF) are sorted before writing, mirroring the
 /// reference converter, so the writer always sees ascending m/z.
-pub fn convert_mzml(input: &Path, output: &Path) -> Result<MzmlConvertReport, MzmlConvertError> {
+pub fn convert_mzml(
+    input: &Path,
+    output: &Path,
+    opts: &crate::write::EncodingOptions,
+) -> Result<MzmlConvertReport, MzmlConvertError> {
     // `_xml_guard` keeps the transcoded temp file (if any) alive for the reader's lifetime.
     let (read_path, _xml_guard) = readable_path(input)?;
     let mut reader = MZReaderType::<File, CentroidPeak, DeconvolutedPeak>::open_path(&read_path)
@@ -106,6 +110,17 @@ pub fn convert_mzml(input: &Path, output: &Path) -> Result<MzmlConvertReport, Mz
     // Populate the data-column schema from whatever arrays the source actually carries
     // (examples/convert.rs:412-418): spectrum arrays + a sample of chromatogram arrays.
     let mut builder = MzPeakWriterType::<File>::builder();
+    // Output-size encoding knobs (chunked m/z, zstd level, row groups). Compression is always set
+    // (legacy → writer-default zstd, unchanged); chunking/row-group only when requested.
+    if let Some(chunk) = opts.mz_chunking.clone() {
+        builder = builder
+            .chunked_encoding(Some(chunk.clone()))
+            .chromatogram_chunked_encoding(Some(chunk));
+    }
+    builder = builder.compression(opts.compression());
+    if let Some(rg) = opts.row_group_size {
+        builder = builder.row_group_size(Some(rg));
+    }
     builder = builder
         .sample_array_types_from_spectrum_source(&mut reader)
         .sample_array_types_from_chromatograms(reader.iter_chromatograms().take(10));

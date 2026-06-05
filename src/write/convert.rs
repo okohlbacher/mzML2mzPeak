@@ -49,9 +49,24 @@ use crate::write::{ImagingWriter, WriteError, to_mzdata};
 /// `metadata.imaging.images[]` (IMG-02/03/04). An empty slice reproduces the no-image output
 /// byte-for-byte (`block.images` stays `None`, omitted from the index).
 pub fn convert(
+    reader: ImagingReader,
+    out_path: &Path,
+    image_paths: &[PathBuf],
+) -> Result<(), WriteError> {
+    // Library/back-compat entry point: legacy lossless encoding (no chunking, default zstd) so the
+    // L1 bit-for-bit guarantee and existing tests are unchanged. The CLI uses `convert_with`.
+    convert_with(reader, out_path, image_paths, &crate::write::EncodingOptions::legacy())
+}
+
+/// Like [`convert`] but applies output-size [`EncodingOptions`](crate::write::EncodingOptions)
+/// (chunked m/z encoding, ZSTD level, row-group size) to the writer. Numpress chunking is lossy
+/// on m/z — under it the produced archive no longer round-trips L1 bit-for-bit (use the lossless
+/// option set for that).
+pub fn convert_with(
     mut reader: ImagingReader,
     out_path: &Path,
     image_paths: &[PathBuf],
+    opts: &crate::write::EncodingOptions,
 ) -> Result<(), WriteError> {
     // (0) PRE-FLIGHT image validation (WR-01): fail BEFORE any output file is created, so a
     //     bad/missing/non-TIFF/separator-named image passed anywhere in the --image list never
@@ -112,7 +127,7 @@ pub fn convert(
         .and_then(|s| s.raw_arrays())
         .into_iter()
         .collect();
-    let mut writer = ImagingWriter::new(out_path, &sample_maps)?;
+    let mut writer = ImagingWriter::new_with_encoding(out_path, &sample_maps, opts)?;
     // `sample_maps` borrows `first`; drop the borrow before `first` is written below.
     drop(sample_maps);
 

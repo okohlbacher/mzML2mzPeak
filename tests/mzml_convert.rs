@@ -31,7 +31,7 @@ fn tiny_pwiz_mzml_converts_and_reads_back() {
 
     let out = tmp_out("tiny");
     let _ = std::fs::remove_file(&out);
-    let report = convert_mzml(input, &out).expect("convert_mzml must succeed");
+    let report = convert_mzml(input, &out, &imzml2mzpeak::write::EncodingOptions::default()).expect("convert_mzml must succeed");
     assert_eq!(report.spectra, 4);
     assert_eq!(report.chromatograms, 2);
 
@@ -57,7 +57,7 @@ fn produced_archive_is_always_openable() {
     }
     let out = tmp_out("openable");
     let _ = std::fs::remove_file(&out);
-    convert_mzml(input, &out).expect("convert");
+    convert_mzml(input, &out, &imzml2mzpeak::write::EncodingOptions::default()).expect("convert");
     assert!(
         MzPeakReader::new(&out).is_ok(),
         "every produced archive must be openable by the reference reader"

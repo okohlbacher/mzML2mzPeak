@@ -174,13 +174,40 @@ impl ImagingWriter {
     /// actually present (used by the mixed-dtype verification fixture). An EMPTY slice registers
     /// no data columns — the writer falls back to its default index-only POINT schema.
     pub fn new(out_path: &Path, sample_arrays: &[&BinaryArrayMap]) -> Result<Self, WriteError> {
+        // Back-compat: legacy encoding (no chunking, writer-default zstd) — keeps the library's
+        // `convert()` and the L1 bit-for-bit tests byte-behaviour-identical.
+        Self::new_with_encoding(out_path, sample_arrays, &crate::write::EncodingOptions::legacy())
+    }
+
+    /// Like [`ImagingWriter::new`] but applies output-size [`EncodingOptions`] (chunked m/z
+    /// encoding, ZSTD level, Parquet row-group size) to the underlying writer. Numpress chunking
+    /// is lossy on m/z; callers that require L1 bit-for-bit must pass a lossless option set.
+    pub fn new_with_encoding(
+        out_path: &Path,
+        sample_arrays: &[&BinaryArrayMap],
+        opts: &crate::write::EncodingOptions,
+    ) -> Result<Self, WriteError> {
         let handle = File::create(out_path)?;
+
+        let mut builder = MzPeakWriterType::<File>::builder();
+
+        // Output-size knobs. Chunked encoding applies to both the spectrum m/z axis and the
+        // (empty) chromatogram time axis. Compression is always set (legacy maps to the writer's
+        // default zstd, so behaviour is unchanged). Row-group size is only overridden when set.
+        if let Some(chunk) = opts.mz_chunking.clone() {
+            builder = builder
+                .chunked_encoding(Some(chunk.clone()))
+                .chromatogram_chunked_encoding(Some(chunk));
+        }
+        builder = builder.compression(opts.compression());
+        if let Some(rg) = opts.row_group_size {
+            builder = builder.row_group_size(Some(rg));
+        }
 
         // Register the coordinate columns ONCE on the builder. Each `from_spec` builds a
         // scan-facet column that, at write time, pulls its value from the spectrum's scan
         // event by accession (RESEARCH.md Pitfall 1). All three specs are Int64 (from_spec
         // panics on any other dtype — visitor.rs:238); `imaging_scan_fields()` guarantees it.
-        let mut builder = MzPeakWriterType::<File>::builder();
         for spec in crate::schema::imaging_scan_fields() {
             builder = builder.add_spectrum_scan_field(CustomBuilderFromParameter::from_spec(
                 spec.curie,
