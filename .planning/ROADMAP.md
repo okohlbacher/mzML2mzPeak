@@ -27,7 +27,7 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
 
 - [x] **Phase 12: Imaging schema & spec prerequisites** - Extend `schema/imaging.json` + `metadata.rs` (+ tests) for `mz_range`, optional `pixel_count(+z)`, `pixel_count_source`, `images[]`; rewrite spec-doc Edit 7 (TIFF-separate-file design) + Edit 8. Unblocks U1/U2. (completed 2026-06-05)
 - [x] **Phase 13: Index enrichment (index-last, flag, pixel counts, m/z bounds)** - Stream coordinate-max + MS1 m/z min/max accumulators; write `metadata.imaging` with `is_imaging`, `pixel_count(+source)`, `mz_range` last. (completed 2026-06-05)
-- [ ] **Phase 14: Reverse-emit fidelity (units / offsets / z)** - µm `UO:0000017` units on `IMS:1000044/45/46/47`; round-trip absolute offsets `IMS:1000053/54`; carry `pixel_count.z`.
+- [x] **Phase 14: Reverse-emit fidelity (units / offsets / z)** - µm `UO:0000017` units on `IMS:1000044/45/46/47`; round-trip absolute offsets `IMS:1000053/54`; carry `pixel_count.z`. (completed 2026-06-05)
 - [ ] **Phase 15: TIFF optical-image import** - Forward `--image` CLI (repeatable, TIFF-only); store as `images/image_NNNN.tiff` ZIP members indexed `Other`; per-image metadata + sha256/size + full-extent affine in `metadata.imaging.images[]`.
 
 ## Phase Details
@@ -75,7 +75,7 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
   2. Absolute offsets `IMS:1000053/54` carried in `ImagingMetadata` and re-emitted; `pixel_count.z` carried through.
   3. Existing reverse roundtrip + mzdata-oracle tests stay green. Opening + closing adversarial review recorded.
 
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 - [x] 14-01-PLAN.md — µm UO:0000017 unit on IMS:1000044-47 + offsets IMS:1000053/54 (emit-when-present, µm) + add optional `absolute_offset_um` to ImagingMetadata/imaging.json/spec-doc + carry pixel_count.z; all proven against the mzdata::ImzMLReader oracle (FID-01, FID-02, FID-03).
 
@@ -97,7 +97,7 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
 |-------|-----------|----------------|--------|-----------|
 | 12. Imaging schema & spec prerequisites | v0.5 | 2/2 | Complete    | 2026-06-05 |
 | 13. Index enrichment | v0.5 | 1/1 | Complete    | 2026-06-05 |
-| 14. Reverse-emit fidelity | v0.5 | 1/1 | Complete   | 2026-06-05 |
+| 14. Reverse-emit fidelity | v0.5 | 1/1 | Complete    | 2026-06-05 |
 | 15. TIFF optical-image import | v0.5 | 0/? | Not started | - |
 
 <details>
