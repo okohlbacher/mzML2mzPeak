@@ -53,6 +53,35 @@ pub fn convert(
     out_path: &Path,
     image_paths: &[PathBuf],
 ) -> Result<(), WriteError> {
+    // (0) PRE-FLIGHT image validation (WR-01): fail BEFORE any output file is created, so a
+    //     bad/missing/non-TIFF/separator-named image passed anywhere in the --image list never
+    //     strands a truncated/corrupt `.mzpeak` on disk. `ImagingWriter::new` below is the first
+    //     `File::create`; everything here runs before it, with the ZIP untouched. For each image
+    //     we (a) reject any path-separator in the derived source_name (T-15-06 / V5) and (b) read
+    //     the TIFF dimensions (IFD-only, bounded memory) to prove the file exists + is a readable
+    //     TIFF. The per-image import loop below repeats the cheap IFD read at the terminal seam.
+    for path in image_paths {
+        // The derived source_name is descriptive-only, but it is attacker-influenced — reject any
+        // residual path separator here too, so the failure surfaces before output exists (matches
+        // the import-loop check below, kept in sync).
+        let source_name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or_else(|| WriteError::ImageDecode {
+                path: path.display().to_string(),
+                detail: "image path has no UTF-8 file name component".to_string(),
+            })?;
+        if source_name.contains('/') || source_name.contains('\\') {
+            return Err(WriteError::ImageDecode {
+                path: path.display().to_string(),
+                detail: format!("derived source_name {source_name:?} contains a path separator"),
+            });
+        }
+        // Prove the file is a readable TIFF (IFD-only, no pixel decode) before any output is
+        // written. A bad path fails fast with the typed WriteError::ImageDecode here.
+        let _ = read_tiff_dimensions(path)?;
+    }
+
     // (1) SAMPLE the data-facet dtype from the FIRST spectrum, then build the writer with a
     //     POINT-column schema derived from that sample — mirroring the reference converter's
     //     `sample_array_types_from_spectrum_source` (examples/convert.rs:414). A real imzML file

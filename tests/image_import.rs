@@ -160,6 +160,51 @@ fn two_images_and_duplicate_basenames_get_distinct_ordinals() {
     let _ = std::fs::remove_file(&out);
 }
 
+/// WR-01: a bad `--image` (non-existent / non-TIFF) fails fast BEFORE any output is created, so
+/// no truncated/corrupt `.mzpeak` is left on disk. Pre-flight validation runs at the very top of
+/// `convert()` (before the first `File::create`), so the output path must NOT exist afterwards.
+#[test]
+fn bad_image_fails_fast_and_leaves_no_output() {
+    use imzml2mzpeak::write::WriteError;
+
+    // (a) A non-existent image path → error, no output file.
+    let out = temp_out("badmissing");
+    let _ = std::fs::remove_file(&out);
+    let reader = open_fixture();
+    let missing = PathBuf::from("tests/fixtures/imaging/does_not_exist_xyz.tiff");
+    let res = convert(reader, &out, &[PathBuf::from(TIFF_FIXTURE), missing]);
+    match res {
+        Err(WriteError::ImageDecode { .. }) => {}
+        other => panic!("expected WriteError::ImageDecode for a missing image, got {other:?}"),
+    }
+    assert!(
+        !out.exists(),
+        "no output .mzpeak must be left on disk when a --image fails pre-flight; found {}",
+        out.display()
+    );
+
+    // (b) An existing-but-non-TIFF image path → error, no output file.
+    let out2 = temp_out("badnontiff");
+    let _ = std::fs::remove_file(&out2);
+    let not_tiff = std::env::temp_dir().join(format!(
+        "imzml2mzpeak_image_import_nontiff_{}.bin",
+        std::process::id()
+    ));
+    std::fs::write(&not_tiff, b"this is definitely not a TIFF file").unwrap();
+    let reader2 = open_fixture();
+    let res2 = convert(reader2, &out2, &[not_tiff.clone()]);
+    let _ = std::fs::remove_file(&not_tiff);
+    match res2 {
+        Err(WriteError::ImageDecode { .. }) => {}
+        other => panic!("expected WriteError::ImageDecode for a non-TIFF image, got {other:?}"),
+    }
+    assert!(
+        !out2.exists(),
+        "no output .mzpeak must be left on disk when a non-TIFF --image fails pre-flight; found {}",
+        out2.display()
+    );
+}
+
 /// Back-compat: no `--image` ⇒ the archive opens AND `metadata.imaging` has NO `images` key
 /// (the no-image output is unchanged; the key is omitted, not emitted as null/empty).
 #[test]
