@@ -346,6 +346,29 @@ fn no_ms1_omits_mz_range() {
 /// the spectrum `convert()` samples early for schema inference. If that sampled-first spectrum
 /// were dropped from the accumulator, the read-back `mz_range.min` would jump to the next pixel's
 /// first value (102.1). Asserting `min == 101.1` therefore proves the sampled-first is observed.
+/// Campaign ISSUE-1 regression: forward-convert an imzML whose spectra declare `MS:1000511 value="0"`
+/// (ms_level 0) with NO explicit spectrum-type cvParam — the canonical ms-imaging.org Example-1
+/// *continuous* pair. Before the fix the vendored mzpeak writer `panic!`d ("Couldn't infer spectrum
+/// type from MS level"); now it defaults ms_level 0 → MS1 (MS:1000579). The existing
+/// `convert_real_path_observes_sampled_first_spectrum` uses the *processed* fixture (which carries an
+/// explicit level), so it did NOT cover this path.
+#[test]
+fn convert_ms_level_zero_imzml_does_not_panic() {
+    let continuous = Path::new("tests/fixtures/imaging/Example_Continuous.imzML");
+    assert!(
+        continuous.exists(),
+        "committed continuous (ms_level-0) fixture must be present at {}",
+        continuous.display()
+    );
+    let out = temp_out("convert_ms_level_zero");
+    let _ = std::fs::remove_file(&out);
+    let reader = ImagingReader::open(continuous).expect("open committed continuous fixture");
+    convert(reader, &out, &[]).expect("forward convert of an ms_level-0 imzML must NOT panic");
+    let mut r = MzPeakReader::new(&out).expect("reader opens the convert() output");
+    assert!(r.len() > 0, "converted archive has spectra");
+    let _ = std::fs::remove_file(&out);
+}
+
 #[test]
 fn convert_real_path_observes_sampled_first_spectrum() {
     let processed = Path::new("tests/fixtures/imaging/Example_Processed.imzML");

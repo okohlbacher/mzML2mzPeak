@@ -325,8 +325,18 @@ fn run_reverse(cli: &ConvertCli) -> anyhow::Result<()> {
 /// Both returned paths share a stem. `std::path` only — no shell, no `..` expansion (T-10-PATH).
 fn derive_reverse_paths(out: &Path) -> (PathBuf, PathBuf) {
     match out.extension().and_then(|e| e.to_str()) {
+        // The stem is already a `.imzML`/`.imzml` path → keep it, swap the sidecar to `.ibd`.
         Some("imzML") | Some("imzml") => (out.to_path_buf(), out.with_extension("ibd")),
-        _ => (out.with_extension("imzML"), out.with_extension("ibd")),
+        // Otherwise treat the WHOLE path as the stem and APPEND extensions, so a stem that
+        // contains a dot (e.g. `run.rev`) becomes `run.rev.imzML` rather than having its last
+        // segment replaced by `with_extension` (campaign ISSUE-4).
+        _ => {
+            let mut imzml = out.as_os_str().to_owned();
+            imzml.push(".imzML");
+            let mut ibd = out.as_os_str().to_owned();
+            ibd.push(".ibd");
+            (PathBuf::from(imzml), PathBuf::from(ibd))
+        }
     }
 }
 
@@ -647,6 +657,27 @@ mod tests {
         assert_eq!(imzml, PathBuf::from("out.imzML"));
         assert_eq!(ibd, PathBuf::from("out.ibd"));
         // SC-4: shared stem.
+        assert_eq!(imzml.file_stem(), ibd.file_stem());
+    }
+
+    #[test]
+    fn derive_reverse_paths_dotted_stem_is_preserved() {
+        // Campaign ISSUE-4: a stem containing a dot (not .imzML) must be APPENDED to, not have
+        // its last segment replaced. `run.rev` → `run.rev.imzML` + `run.rev.ibd` (NOT `run.imzML`).
+        let (imzml, ibd) = derive_reverse_paths(Path::new("out/run.rev"));
+        assert_eq!(imzml, PathBuf::from("out/run.rev.imzML"));
+        assert_eq!(ibd, PathBuf::from("out/run.rev.ibd"));
+    }
+
+    #[test]
+    fn derive_reverse_paths_mzpeak_stem_is_appended_not_swapped() {
+        // CODEX adversarial-review coverage gap: `-o out.mzpeak` is treated as a STEM, so the
+        // `.mzpeak` segment is preserved and `.imzML`/`.ibd` are APPENDED — yielding
+        // `out.mzpeak.imzML` + `out.mzpeak.ibd` (NOT `out.imzML`). Documents the intended
+        // contract: only a trailing `.imzML`/`.imzml` is treated as an explicit XML extension.
+        let (imzml, ibd) = derive_reverse_paths(Path::new("out.mzpeak"));
+        assert_eq!(imzml, PathBuf::from("out.mzpeak.imzML"));
+        assert_eq!(ibd, PathBuf::from("out.mzpeak.ibd"));
         assert_eq!(imzml.file_stem(), ibd.file_stem());
     }
 

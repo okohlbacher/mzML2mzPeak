@@ -123,20 +123,25 @@ fn resolve_ibd_path(imzml_path: &Path, declared_name: Option<&str>) -> Result<Pa
         }
     }
 
-    // Sibling-stem fallback: <stem>.ibd then <stem>.IBD.
+    // Sibling-stem fallback: <stem>.ibd then <stem>.IBD. APPEND the extension to the full
+    // file stem rather than `set_extension`, which would *replace* a dotted stem's last
+    // segment (e.g. a reverse output "a.rev.imzML" → stem "a.rev" → "a.ibd" instead of the
+    // correct "a.rev.ibd"). This mirrors the reverse-side `derive_reverse_paths` fix and keeps
+    // sidecar resolution consistent with how the reverse emitter actually names the `.ibd`.
     let stem = imzml_path.file_stem().unwrap_or_default();
-    for ext in ["ibd", "IBD"] {
-        let mut p = parent.join(stem);
-        p.set_extension(ext);
+    for ext in [".ibd", ".IBD"] {
+        let mut name = stem.to_os_string();
+        name.push(ext);
+        let p = parent.join(&name);
         if p.exists() {
             return Ok(p);
         }
     }
 
     // Nothing found — report the canonical lowercase sibling as the expected path.
-    let mut expected = parent.join(stem);
-    expected.set_extension("ibd");
-    Err(IntegrityError::MissingIbd { path: expected })
+    let mut name = stem.to_os_string();
+    name.push(".ibd");
+    Err(IntegrityError::MissingIbd { path: parent.join(name) })
 }
 
 /// Compute the whole-file digest of `path` with the declared algorithm, streaming in
@@ -225,5 +230,29 @@ mod tests {
     #[test]
     fn uuid_hex_to_bytes_rejects_wrong_length() {
         assert!(uuid_hex_to_bytes("abcd").is_none());
+    }
+
+    /// Campaign ISSUE-5 regression: the sibling-`.ibd` fallback must APPEND `.ibd` to the full
+    /// file stem, not `set_extension` (which would replace a dotted stem's last segment). For a
+    /// reverse output named `a.rev.imzML` the expected sidecar is `a.rev.ibd`, NOT `a.ibd`.
+    /// We assert via the reported "missing" path (no `.ibd` present in the temp dir), which is
+    /// derived by the exact same code path as a successful resolve.
+    #[test]
+    fn resolve_ibd_path_preserves_dotted_stem() {
+        let dir = std::env::temp_dir().join(format!("i2mp_i5_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let imzml = dir.join("a.rev.imzML");
+        let err = resolve_ibd_path(&imzml, None).unwrap_err();
+        match err {
+            IntegrityError::MissingIbd { path } => {
+                assert_eq!(
+                    path.file_name().unwrap().to_string_lossy(),
+                    "a.rev.ibd",
+                    "dotted stem must yield a.rev.ibd, not a.ibd"
+                );
+            }
+            other => panic!("expected MissingIbd, got {other:?}"),
+        }
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
