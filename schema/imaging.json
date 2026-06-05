@@ -12,7 +12,68 @@
       "required": ["x", "y"],
       "properties": {
         "x": { "type": "integer" },
-        "y": { "type": "integer" }
+        "y": { "type": "integer" },
+        "z": { "type": "integer", "description": "OPTIONAL grid depth (z-stack); absent for 2D imaging." }
+      }
+    },
+    "pixel_count_source": {
+      "type": "string",
+      "enum": ["declared", "observed_max"],
+      "description": "OPTIONAL — provenance of pixel_count: \"declared\" (from imzML IMS:1000042/43) or \"observed_max\" (derived from max observed coordinates)."
+    },
+    "mz_range": {
+      "type": "object",
+      "description": "OPTIONAL MS1-only observed m/z bounds across the run.",
+      "required": ["min", "max"],
+      "properties": {
+        "min": { "type": "number" },
+        "max": { "type": "number" }
+      },
+      "additionalProperties": false
+    },
+    "images": {
+      "type": "array",
+      "description": "OPTIONAL per-image descriptive metadata for optical images stored as ZIP members.",
+      "items": {
+        "type": "object",
+        "required": [
+          "archive_path",
+          "source_name",
+          "media_type",
+          "width",
+          "height",
+          "sha256",
+          "size_bytes",
+          "affine"
+        ],
+        "properties": {
+          "archive_path": { "type": "string", "description": "Path of the image within the mzPeak ZIP, e.g. images/image_0000.tiff." },
+          "source_name": { "type": "string", "description": "Original filename of the imported image." },
+          "media_type": { "type": "string", "default": "image/tiff", "description": "IANA media type of the stored image." },
+          "width": { "type": "integer", "description": "Image width in pixels." },
+          "height": { "type": "integer", "description": "Image height in pixels." },
+          "sha256": { "type": "string", "description": "SHA-256 hex digest of the stored image bytes." },
+          "size_bytes": { "type": "integer", "description": "Size of the stored image in bytes." },
+          "affine": {
+            "type": "object",
+            "description": "Full-extent display-hint affine mapping 0-based image pixels to 1-based MS pixels.",
+            "required": ["type", "matrix", "maps", "registration_quality"],
+            "properties": {
+              "type": { "const": "affine" },
+              "matrix": {
+                "type": "array",
+                "items": { "type": "number" },
+                "minItems": 6,
+                "maxItems": 6,
+                "description": "[a,b,c,d,e,f] with (x_ms,y_ms)=(a*col+b*row+c, d*col+e*row+f)."
+              },
+              "maps": { "const": "image_px -> ms_px" },
+              "registration_quality": { "const": "assumed_full_extent" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
       }
     },
     "pixel_size_um": {
