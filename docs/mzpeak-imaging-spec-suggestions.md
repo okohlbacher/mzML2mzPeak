@@ -3,6 +3,7 @@
 **Target:** `doc/index.md` and `schema/` in [HUPO-PSI/mzPeak](https://github.com/HUPO-PSI/mzPeak) (against commit `d1aaaf84`).
 **Basis:** the answered *Open Questions: Imaging Support in mzPeak* (J. Klein / O. Kohlbacher / A. Römpp, 2026-06-03). See companion analysis `knowledge/project/Spec integration proposal (imaging).md`.
 **Status:** suggestion for discussion — written in the spec's own style (`_MUST_`/`_SHOULD_`/`_MAY_`, facet-bullet and JSON-example conventions).
+**Version:** **V2 (2026-06-05)** — integrates the mzPeakIV viewer cross-review (`mzPeak-imaging-additions.md`, items ADD-01–05): adds an image **`role`/`derived_subtype`** so optical vs. derived-MS overview images are distinguishable, **concretises** the shared-axis grid layout into a reader-detectable contract, spells out **multi-spectra-per-pixel aggregation**, and adds non-normative **reader guidance** (Part D) plus a viewer cross-reference (Part E). Changes since V1 (the 10 edits) are tagged **[V2]**.
 
 **Conventions used below.** Each edit gives a **location** (existing `doc/index.md` heading), an **action** (insert / replace / amend), and **proposed text**. New `schema/*.json` files are given in full in Part B. Accessions marked *(confirm)* need a CV cross-check; items marked **🔣 new CV term** do not yet exist and must be minted (CV-governance gate).
 
@@ -41,11 +42,15 @@
 **Location:** "File-Level Metadata", and the metadata list under "Spectrum Metadata - spectra_metadata.parquet".
 **Action:** add a bullet to the metadata list and a paragraph.
 
+> **[V2-codex] Required CV declaration.** The file-level metadata _MUST_ include:
+>   - [`cv_list`](../schema/cv_list.json) — required for every archive that uses controlled vocabularies, including existing `MS`/`UO` terms.
+>
 > The file-level metadata _MAY_ additionally include:
->   - [`cv_list`](../schema/cv_list.json) — required (Edit 2).
 >   - [`scan_settings_list`](../schema/scan_settings.json) — run-level acquisition settings.
 >
 > **`scan_settings_list`.** Mirrors mzML `scanSettingsList`. Each `scan_settings` carries an `id`, a `parameters` list of CV params, and an optional `targets` list. This is the home for **run-constant imaging geometry**: grid size (`IMS:1000042` "max count of pixel x", `IMS:1000043` "max count of pixel y"), pixel size (`IMS:1000046/47`), max physical dimensions (`IMS:1000044/45`, unit µm `UO:0000017`), absolute position offsets (`IMS:1000053/54`), and the acquisition-geometry **child** terms written directly (e.g. `IMS:1000413` "flyback", `IMS:1000480` "horizontal line scan", `IMS:1000491` "linescan left right", `IMS:1000401` "top down"). A `spectrum`/`scan` _MAY_ reference its settings via `scan_settings_ref`; otherwise the run default applies. Governed by [`schema/scan_settings.json`](../schema/scan_settings.json).
+>
+> **[V2-codex] Placement of `scan_settings_ref`.** Because the current `scan` facet has no primary key of its own and the run-level geometry normally applies to every scan, `scan_settings_ref` _SHOULD_ be added to the `scan` group when settings vary within a run and _MAY_ be added to `spectrum` only when the reference is spectrum-level metadata. Readers _MUST_ treat an absent `scan_settings_ref` as a reference to the first/default `scan_settings_list` entry.
 >
 > **NOTE:** this element already exists in the mzML schema and is read/written by mzdata when present; its prior absence from mzPeak was an oversight. Geometry _MUST NOT_ be scattered into `run.parameters`.
 
@@ -80,13 +85,14 @@
 
 > # Imaging — Coordinates and Ion Images
 >
-> An mzPeak archive is an **imaging** archive when it carries a `pixel` facet (or promoted `IMS:1000050/51` coordinate columns) and declares `metadata.imaging.is_imaging = true` (see [imaging index block](#imaging-index-block)). An imaging archive _MUST_ remain a valid base mzPeak archive — all imaging additions are additive.
+> An mzPeak archive is an **imaging** archive when it carries a `pixel` facet (or promoted `IMS:1000050/51` coordinate columns). When the optional discovery block is present it _MUST_ declare `metadata.imaging.is_imaging = true` (see [imaging index block](#imaging-index-block)). **[V2-codex]** The discovery block is therefore confirmatory, not the sole source of truth; its absence _MUST NOT_ invalidate an otherwise-readable coordinate-bearing imaging archive. An imaging archive _MUST_ remain a valid base mzPeak archive — all imaging additions are additive.
 >
 > **Coordinate base.** Positions are **1-based integers**, preserved verbatim from the source (imzML); `metadata.imaging.coordinate_base` _MUST_ be `1`. Readers needing 0-based subtract 1. (Note the deliberate offset from the 0-based `spectrum.index`.)
 >
-> **Display orientation (normative).** Because positions are *absolute* per-pixel coordinates (not acquisition order), display is fully determined by the coordinates. Render an ion image as a matrix `M[row][col]` with `col = position_x`, `row = position_y`, and pixel `(1, 1)` at the **top-left** (x increases rightward, y increases downward). Scan pattern/type/direction terms ([scan_settings](#scan-settings)) are acquisition-order **provenance only** and _MUST NOT_ alter display. Two archives with identical coordinates but different scan directions render identically.
+> **Display orientation (normative).** Because positions are *absolute* per-pixel coordinates (not acquisition order), display is fully determined by the coordinates. Render an ion image with pixel coordinate `(1, 1)` at the **top-left** (x increases rightward, y increases downward). **[V2-codex]** If the implementation stores the display matrix in 0-based arrays, place a pixel at `M[position_y - 1][position_x - 1]`; if it stores a 1-based logical matrix, this is equivalently `M[row][col]` with `row = position_y`, `col = position_x`. Scan pattern/type/direction terms ([scan_settings](#scan-settings)) are acquisition-order **provenance only** and _MUST NOT_ alter display. Two archives with identical coordinates but different scan directions render identically.
 >
 > **Ion-image reconstruction.** For an m/z window and aggregation `f`, read each spectrum's signal (from `spectra_data`/`spectra_peaks`), restrict to the window via the page index, aggregate with `f`, and place the result at grid `(position_x, position_y)` of its pixel; unfilled cells are background. Sparse/irregular acquisitions are supported — absent pixels simply have no row.
+> **[V2] Multiple spectra per pixel.** When more than one spectrum maps to a pixel (via `spectrum.pixel_index`; e.g. ion-mobility frames or replicates), the per-pixel value aggregates `f` over **all** spectra mapping to that pixel: the per-spectrum window result is first reduced over each spectrum, then combined across the pixel's spectra. The default overview (TIC) combines by **sum**; base-peak combines by **max**. Readers _MUST_ group by `pixel_index` before placing a value on the grid; they _MUST NOT_ assume a 1:1 spectrum↔pixel mapping.
 >
 > **Storage mode.** The source imzML storage mode (`IMS:1000030` continuous / `IMS:1000031` processed) governs source binary addressing only and _MUST_ be recorded in provenance ([file_description.contents](#imaging-provenance)). It is independent of spectrum representation (`MS:1000127`/`MS:1000128`), which governs the mzPeak destination (`spectra_peaks` vs `spectra_data`) as for any spectrum. Continuous-mode archives _SHOULD_ store the shared m/z axis once via the [shared-axis grid layout](#shared-axis-grid-layout); until that is available, per-spectrum re-materialisation is the fallback and the writer _SHOULD_ report the resulting size cost.
 >
@@ -116,6 +122,8 @@
 > not a hard error — optical images are auxiliary and are not part of the spectral L1 contract), and an
 > `affine` object.
 >
+> **[V2] Image `role`.** Each `images[]` entry _SHOULD_ carry a `role` — `optical` (assumed when absent, for back-compat with v0.5 files), `overview`, `histology`, `derived-MS-image`, `fluorescence`, … — and, for `derived-MS-image`, an optional `derived_subtype` (`tic`, `base_peak`, …) and `modality`. This lets a reader tell an optical/histology overlay (drives the overlay display, ADD-01) apart from a pre-computed MS overview it can use as an instant-TIC fast path (ADD-02). A pre-computed TIC/base-peak overview _MAY_ be written as an additional `images/image_NNNN.tiff` member with `role: derived-MS-image`; it is always also derivable from the spectra, so its absence is not an error.
+>
 > **`affine` (full-extent display hint, NOT true registration).** The `affine` maps the image's pixel
 > grid onto the MS pixel grid as an *unregistered* display hint:
 > `{ "type": "affine", "matrix": [a, b, c, d, e, f], "maps": "image_px -> ms_px",
@@ -142,7 +150,7 @@
 >
 > > Add entity type `image`. An imaging archive _MAY_ contain an `images.parquet` ([data kind](#data-kind) `metadata`+blob) holding **one or more** images — optical/microscopy overviews, derived MS overview images (e.g. TIC-per-pixel), or other modalities. Each image's binary payload is stored as a Parquet `LargeBinary` blob column (`image/tiff` is the default media type; other modalities are permitted). Governed by [`schema/image.json`](../schema/image.json) (which governs this **F8 future option**, not the v0.5 design above).
 > >
-> > Per-image fields: `id`, `role` (**🔣 new CV term**, e.g. optical / overview / histology / derived-MS-image / fluorescence), `modality`, `media_type` (default `"image/tiff"`), `width`, `height`, `data` (blob), optional `source_uri` + `checksum` (provenance for an image pulled in from an external reference such as imzML `IMS:1006008` "optical image location"), and a `registration` object.
+> > Per-image fields: `id`, `role` (**🔣 new CV term**, e.g. optical / overview / histology / derived-MS-image / fluorescence), **[V2-codex]** `derived_subtype` (for `derived-MS-image`, e.g. `tic` / `base_peak`), `modality`, `media_type` (default `"image/tiff"`), `width`, `height`, `data` (blob), optional `source_uri` + `checksum` (provenance for an image pulled in from an external reference such as imzML `IMS:1006008` "optical image location"), and a `registration` object.
 > >
 > > **`registration`** describes the mapping of **image pixel coordinates → MS pixel coordinates**: `{ "type": "affine", "matrix": [a, b, c, d, e, f], "maps": "image_px -> ms_px" }`, where `(x_ms, y_ms) = (a·col + b·row + c, d·col + e·row + f)`. Full multi-image / deformable registration is a known open problem and is **deferred**; this F8 option defines the affine slot and the `image_px -> ms_px` direction with CV-governed registration terms. **🔣** the registration-transform and image-role/modality terms require new CV accessions.
 > >
@@ -195,7 +203,13 @@
 **Action:** insert (base feature; flagged as the continuous-mode solution).
 
 > ### Shared-Axis Grid Layout
-> For acquisitions where many spectra share one identical axis with **no per-spectrum transform** (e.g. imzML `continuous` mode, where every pixel shares one m/z axis), the shared axis _MAY_ be stored **once** as a named array and referenced by each spectrum, with only the parallel intensity array stored per spectrum. This avoids re-materialising an identical axis per pixel. (Resolves the open grid-encoding action item; the imaging section sets the SHOULD for continuous mode.)
+> For acquisitions where many spectra share one identical axis with **no per-spectrum transform** (e.g. imzML `continuous` mode, where every pixel shares one m/z axis), the shared axis _MAY_ be stored **once** and referenced by every spectrum, with only the parallel intensity array stored per spectrum. This avoids re-materialising an identical axis per pixel and resolves the open grid-encoding action item; the imaging section sets the SHOULD for continuous mode.
+>
+> **[V2] Concrete, reader-detectable contract.** A reader _MUST_ be able to detect and resolve the shared axis without heuristics:
+> - The shared axis is stored as a single named array with its own `array_index` entry. **[V2-codex]** The current `schema/array_index.json` does not define `buffer_name`; until JK accepts an `array_index` schema extension, identify the shared axis using existing fields: `array_name: "shared_mz_axis"` (or another minted CV-governed name), `path` pointing to the physical column that stores the axis, `array_type` set to the axis type (for m/z, `MS:1000514`), and `transform` carrying a new CURIE that marks the entry as the shared grid axis (**🔣 new CV term**, e.g. "shared axis array"). It _MAY_ live in `spectra_data.parquet` as a dedicated column or in a companion `spectra_data_shared_axis.parquet`; the `array_index.path` plus the file's `mzpeak_index.json` entry records which file owns the physical column.
+> - In this layout the per-spectrum `spectra_data` rows store **intensity only** (no per-row `mz` / axis column). A reader detects the layout when the `array_index` declares `array_name: "shared_mz_axis"` or the shared-axis transform CURIE (equivalently: the per-spectrum signal buffer has an intensity column but no parallel axis column).
+> - Each spectrum's intensities are positionally parallel to the shared axis (identical length and order); `null`-marking / zero-run encoding applies to the intensities as usual. The axis applies to all spectra of the run by default, or per-group when keyed to a `scan_settings` `id` for files that mix axes.
+> - Writers _MUST_ still record the original storage mode (`IMS:1000030`/`IMS:1000031`). The exact buffer placement (in-file buffer vs companion file) is to be finalised with the maintainer; both are reader-detectable via the `array_index`.
 
 ### Edit 10 — Imaging provenance in `file_description`
 **Location:** existing `file_description` usage.
@@ -255,7 +269,8 @@
   "type": "object",
   "properties": {
     "id":         {"type": "string"},
-    "role":       {"type": "string", "description": "CURIE for image role (NEW CV term): optical | overview | histology | derived MS image | fluorescence | ..."},
+    "role":       {"type": "string", "description": "[V2-codex] Image role token/CURIE. Before CV terms are minted, use the stable tokens optical | overview | histology | derived-MS-image | fluorescence; after minting, use the corresponding CURIEs."},
+    "derived_subtype": {"type": ["string", "null"], "description": "[V2-codex] For role=derived-MS-image, stable token/CURIE such as tic or base_peak."},
     "modality":   {"type": ["string", "null"]},
     "media_type": {"type": "string", "default": "image/tiff"},
     "width":      {"type": ["integer", "null"]},
@@ -316,6 +331,9 @@
           "archive_path": {"type": "string", "description": "Path of the image within the mzPeak ZIP, e.g. images/image_0000.tiff."},
           "source_name":  {"type": "string", "description": "Original filename of the imported image."},
           "media_type":   {"type": "string", "default": "image/tiff"},
+          "role":            {"type": "string", "description": "[V2] image role: optical (assumed if absent) | overview | histology | derived-MS-image | fluorescence | …"},
+          "derived_subtype": {"type": ["string", "null"], "description": "[V2] for role=derived-MS-image: tic | base_peak | …"},
+          "modality":        {"type": ["string", "null"], "description": "[V2] acquisition modality of the image, if known."},
           "width":        {"type": "integer"},
           "height":       {"type": "integer"},
           "sha256":       {"type": "string", "description": "SHA-256 hex digest of the stored image bytes."},
@@ -379,4 +397,53 @@
 ### Open items before merge
 - Confirm canonical IMS CV URI (AR) and mint the new CV terms (role/modality/registration).
 - Confirm the `pixel` facet vs denormalised-onto-`scan` default with JK (cardinality, packed-table placement).
-- Decide whether `images.parquet` is a separate file or images ride in the metadata footer + a blob column.
+- Decide whether `images.parquet` is a separate file or images ride in the metadata footer + a blob column. *(V2: resolved for v0.5 — optical images are separate `images/image_NNNN.tiff` ZIP members; the `image.parquet` blob is the deferred F8 option.)*
+
+### [V2] Open items added by the viewer cross-review
+- Finalise the **shared-axis** buffer placement (in-file `spectra_data` buffer vs companion `spectra_data_shared_axis.parquet`) and mint the "shared axis array" CV term (Edit 9).
+- Confirm the **image `role`/`derived_subtype`** vocabulary (controlled list vs free CURIE) and whether `role` should become _REQUIRED_ once writers emit it (Edit 7 [V2]).
+- Confirm the **multi-spectra-per-pixel** default aggregation (TIC=sum, base-peak=max) and whether the chosen aggregation should be recorded in `metadata.imaging` (Edit 6 [V2]).
+
+---
+
+## Part D — Reader guidance (non-normative) [V2]
+
+Implementation guidance distilled from the mzPeakIV viewer cross-review. These are **fallback chains** a conformant reader can follow; authoritative sources win, discovery/fast-path copies are used only when they agree.
+
+### D.1 Pixel-coordinate source chain (highest priority first)
+1. **`pixel` facet** via `spectrum.pixel_index` → `pixel.IMS_1000050/51_position_x/y` (the V2 normative path; required when >1 spectrum per pixel).
+2. Promoted `scan.IMS_1000050/51` columns (v0.5 one-spectrum-per-pixel shortcut).
+3. `scan.parameters` cvParam fallback.
+4. `id`-string parse fallback.
+
+### D.2 Grid-geometry source chain
+1. **`scan_settings_list[*].parameters`** — *authoritative* (`IMS:1000042/43/46/47`, `IMS:1000044/45`, `IMS:1000053/54`, scan pattern/type/direction).
+2. `metadata.imaging` fast-path discovery block (pixel counts/sizes, scan-geometry CURIEs). **[V2-codex]** Readers may use it for initial sizing before opening Parquet metadata, but once `scan_settings_list` is read it _MUST_ be validated against the authoritative values.
+3. `run.parameters` — legacy/deprecated location; read only for forward-compat with pre-spec files.
+
+### D.3 Image discovery & display
+- **[V2-codex] v0.5 path:** read `metadata.imaging.images[]` and resolve each `archive_path` to an `Other` file entry/ZIP member such as `images/image_0000.tiff`. `entity_type: "image"` is the deferred F8 `images.parquet` path only.
+- Load each `images/image_NNNN.tiff` ZIP member; verify `sha256` (mismatch ⇒ WARNING, not fatal).
+- Route by `role`: `optical`/`histology`/`overview` → registration overlay using `affine` (`image_px → ms_px`); `derived-MS-image` + `derived_subtype: tic` → instant-TIC fast path (skip the `spectra_metadata` TIC scan).
+- If `affine.registration_quality == "assumed_full_extent"`, treat the overlay as coarse.
+
+### D.4 Shared-axis detection
+- If the `array_index` declares `array_name: "shared_mz_axis"` or the shared-axis transform CURIE (or the per-spectrum signal buffer has intensity but no parallel axis column) → read the axis once, pair with each spectrum's intensity array, and apply the m/z window over shared-axis indices.
+- Otherwise use the per-row `point`/`chunked` layout as today.
+
+### D.5 Precedence rule
+The `pixel`/`scan` columns and `scan_settings_list` are **authoritative**; `metadata.imaging` is a denormalised fast path that _MUST_ agree when present and whose absence _MUST NOT_ make an otherwise-readable archive invalid.
+
+---
+
+## Part E — Viewer (mzPeakIV) cross-reference [V2]
+
+How the viewer backlog additions (`mzPeak-imaging-additions.md`, ADD-01–05) map to spec features, and what V2 changed to unblock them.
+
+| Viewer item | Spec edit | V2 change that unblocks it |
+|---|---|---|
+| ADD-01 optical/overview image display | Edit 7 | `images[]` `role` so optical/histology images are routed to the overlay (D.3) |
+| ADD-02 pre-computed TIC fast-path | Edit 7 | `role: derived-MS-image` + `derived_subtype: tic`; reader fast path (D.3) |
+| ADD-03 `pixel` facet coordinate source | Edit 4 | coordinate-source chain step 0 + multi-spectra aggregation (Edit 6 [V2], D.1) |
+| ADD-04 `scan_settings_list` geometry source | Edit 3 / Edit 8 | geometry-source chain: `scan_settings` authoritative, `metadata.imaging` fast path (D.2) |
+| ADD-05 shared-axis grid layout reader | Edit 9 | concrete `shared_mz_axis` array + detection contract (D.4) |
