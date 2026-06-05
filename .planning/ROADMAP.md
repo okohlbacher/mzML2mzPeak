@@ -62,7 +62,7 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
 
 **Plans:** 1 plan
 
-- [ ] 13-01-PLAN.md — Bounded IndexAccumulator (coord-max + MS1 m/z min/max, incl. the early schema-sampled first spectrum) folded into the cloned `metadata.imaging` block before the index is written last: is_imaging, pixel_count{x,y[,z]}+source (declared|observed_max), mz_range over MS1 (omit+log when none). (IDX-01, IDX-02, IDX-03)
+- [x] 13-01-PLAN.md — Bounded IndexAccumulator (coord-max + MS1 m/z min/max, incl. the early schema-sampled first spectrum) folded into the cloned `metadata.imaging` block before the index is written last: is_imaging, pixel_count{x,y[,z]}+source (declared|observed_max), mz_range over MS1 (omit+log when none). (IDX-01, IDX-02, IDX-03)
 
 ### Phase 14: Reverse-emit fidelity (units / offsets / z)
 
@@ -92,7 +92,7 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 12. Imaging schema & spec prerequisites | v0.5 | 2/2 | Complete    | 2026-06-05 |
-| 13. Index enrichment | v0.5 | 0/1 | Planned | - |
+| 13. Index enrichment | v0.5 | 1/1 | Complete   | 2026-06-05 |
 | 14. Reverse-emit fidelity | v0.5 | 0/? | Not started | - |
 | 15. TIFF optical-image import | v0.5 | 0/? | Not started | - |
 

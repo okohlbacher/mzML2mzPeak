@@ -30,16 +30,16 @@ small reverse-emit fidelity pass (units/offsets/z). **Reverse image export is OU
 
 ### Index enrichment (IDX) — Phase 13
 
-- [ ] **IDX-01**: `index.json` is finalized LAST — after the full spectrum pass AND after any image
+- [x] **IDX-01**: `index.json` is finalized LAST — after the full spectrum pass AND after any image
   members are added — via the existing `finish_parquet() → add_index_metadata("imaging",…) → finish()`
   seam, extended with streaming accumulators (no full-dataset buffering).
 
-- [ ] **IDX-02**: `metadata.imaging.is_imaging` + per-dimension `pixel_count {x,y[,z]}`. Use declared
+- [x] **IDX-02**: `metadata.imaging.is_imaging` + per-dimension `pixel_count {x,y[,z]}`. Use declared
   grid counts when the imzML provides them (`pixel_count_source:"declared"`); otherwise derive from the
   max observed coordinate during the pass (`pixel_count_source:"observed_max"`). The accumulator counts
   the early schema-sampled first spectrum. Never fabricate beyond observed.
 
-- [ ] **IDX-03**: `metadata.imaging.mz_range {min,max}` computed over MS1 spectra only (`ms_level == 1`);
+- [x] **IDX-03**: `metadata.imaging.mz_range {min,max}` computed over MS1 spectra only (`ms_level == 1`);
   omitted (with a log line) when there are no MS1 spectra.
 
 ### Reverse-emit fidelity (FID) — Phase 14
@@ -82,9 +82,9 @@ small reverse-emit fidelity pass (units/offsets/z). **Reverse image export is OU
 |--------|-------|--------|
 | SCH-01 | 12 | Complete |
 | SPEC-01 | 12 | Complete |
-| IDX-01 | 13 | Pending |
-| IDX-02 | 13 | Pending |
-| IDX-03 | 13 | Pending |
+| IDX-01 | 13 | Complete |
+| IDX-02 | 13 | Complete |
+| IDX-03 | 13 | Complete |
 | FID-01 | 14 | Pending |
 | FID-02 | 14 | Pending |
 | FID-03 | 14 | Pending |

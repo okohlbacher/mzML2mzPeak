@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.5
 milestone_name: — Index enrichment & optical-image import
-status: executing
+status: verifying
 stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-06-05T15:09:07.580Z"
-last_activity: 2026-06-05 -- Phase 13 planning complete
+last_updated: "2026-06-05T15:18:56.009Z"
+last_activity: 2026-06-05
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 3
-  completed_plans: 2
-  percent: 25
+  completed_plans: 3
+  percent: 50
 ---
 
 # Project State
@@ -23,14 +23,14 @@ See: .planning/PROJECT.md (updated 2026-06-03)
 **Core value:** Both-direction imzML↔imaging-mzPeak converter (v0.3 forward + v0.4 reverse shipped).
 v0.5 enriches the forward `index.json` (imaging flag, derived pixel counts, MS1 m/z bounds, written
 last) and imports optical TIFF images with a full-extent affine into the MS pixel grid.
-**Current focus:** Phase 12 — imaging-schema-spec-prerequisites
+**Current focus:** Phase 13 — index-enrichment-index-last-flag-pixel-counts-m-z-bounds
 
 ## Current Position
 
-Phase: 13
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-06-05 -- Phase 13 planning complete
+Phase: 13 (index-enrichment-index-last-flag-pixel-counts-m-z-bounds) — EXECUTING
+Plan: 1 of 1
+Status: Phase complete — ready for verification
+Last activity: 2026-06-05
 
 ## v0.5 Locked Decisions (CODEX-reviewed)
 
@@ -87,6 +87,7 @@ Last activity: 2026-06-05 -- Phase 13 planning complete
 | Phase 11 P01 | 17 min | 3 tasks | 4 files |
 | Phase 12 P01 | 10 | 2 tasks | 4 files |
 | Phase 12 P02 | 2 | 2 tasks | 1 files |
+| Phase 13 P01 | 25m | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -122,6 +123,7 @@ Recent decisions affecting current (v0.4) work:
 - [Phase ?]: 12-01: ImageAffine pins type/maps/registration_quality via serde defaults + ImageAffine::new(matrix)
 - [Phase ?]: 12-01: PixelCountSource wire strings exactly declared / observed_max (snake_case)
 - [Phase ?]: Spec-doc Edit 7 rewritten to TIFF-separate-ZIP-member design; images.parquet-blob + CV-registration design demoted to F8 future option (Phase 12-02)
+- [Phase ?]: Phase 13: bounded scalar IndexAccumulator populates metadata.imaging is_imaging/pixel_count(+source)/mz_range at runtime, folded before the index-last write
 
 ### Reuse Anchors (from shipped v0.3)
 
@@ -158,7 +160,7 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-05T14:43:32.091Z
+Last session: 2026-06-05T15:18:09.108Z
 Stopped at: Completed 10-01-PLAN.md
 Resume file: None
 
