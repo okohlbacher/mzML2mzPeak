@@ -4,7 +4,7 @@ milestone: v0.5
 milestone_name: — Index enrichment & optical-image import
 status: verifying
 stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-06-05T15:18:56.009Z"
+last_updated: "2026-06-05T15:28:30.180Z"
 last_activity: 2026-06-05
 progress:
   total_phases: 4
@@ -27,8 +27,8 @@ last) and imports optical TIFF images with a full-extent affine into the MS pixe
 
 ## Current Position
 
-Phase: 13 (index-enrichment-index-last-flag-pixel-counts-m-z-bounds) — EXECUTING
-Plan: 1 of 1
+Phase: 14
+Plan: Not started
 Status: Phase complete — ready for verification
 Last activity: 2026-06-05
 
@@ -68,6 +68,7 @@ Last activity: 2026-06-05
 | 08 | 1 | - | - |
 | 09 | 2 | - | - |
 | 12 | 2 | - | - |
+| 13 | 1 | - | - |
 
 **Recent Trend:**
 
