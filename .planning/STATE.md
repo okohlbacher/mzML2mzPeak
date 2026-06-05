@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.5
 milestone_name: — Index enrichment & optical-image import
 status: executing
-stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-06-05T16:24:25.999Z"
+stopped_at: Completed 15-02-PLAN.md
+last_updated: "2026-06-05T16:30:28.046Z"
 last_activity: 2026-06-05
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 7
-  completed_plans: 5
-  percent: 71
+  completed_plans: 6
+  percent: 75
 ---
 
 # Project State
@@ -28,7 +28,7 @@ last) and imports optical TIFF images with a full-extent affine into the MS pixe
 ## Current Position
 
 Phase: 15 (tiff-optical-image-import) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-06-05
 
@@ -92,6 +92,7 @@ Last activity: 2026-06-05
 | Phase 13 P01 | 25m | 2 tasks | 4 files |
 | Phase 14 P01 | 18min | 3 tasks | 6 files |
 | Phase 15 P01 | 10 min | 2 tasks tasks | 3 files files |
+| Phase 15 P02 | 8 min | 2 tasks tasks | 4 files files |
 
 ## Accumulated Context
 
@@ -130,6 +131,7 @@ Recent decisions affecting current (v0.4) work:
 - [Phase ?]: Phase 13: bounded scalar IndexAccumulator populates metadata.imaging is_imaging/pixel_count(+source)/mz_range at runtime, folded before the index-last write
 - [Phase ?]: 14-01: reverse <scanSettings> emits IMS:1000044-47 + IMS:1000053/54 with the UO:0000017 µm unit (UO CV declared, cvList count=3); absolute_offset_um added to ImagingMetadata/schema/spec-doc; pixel_count.z carried, no fabricated z-count accession; offset forward-population deferred to v0.6+; mzdata oracle green; no new crates.
 - [Phase ?]: 15-01: ImageEntry gains optional role/derived_subtype/modality (IMG-05), skip_serializing_if=None; absent role => assumed optical (v0.5 back-compat); schema/imaging.json declares them OPTIONAL (not required), additionalProperties:false retained.
+- [Phase ?]: 15-02: tiff =0.11.3 (default-features=false) added — Decoder::dimensions() only (first IFD, no pixel decode); src/write/image.rs provides full_extent_affine, sha256_and_size (one 64KiB streamed pass), build_image_entry (role=optical); WriteError::ImageDecode + ImageAffineUnknownPixelCount; pins intact (arrow/parquet 57, zip 4.1).
 
 ### Reuse Anchors (from shipped v0.3)
 
@@ -166,8 +168,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-05T16:24:04.486Z
-Stopped at: Completed 10-01-PLAN.md
+Last session: 2026-06-05T16:30:02.877Z
+Stopped at: Completed 15-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

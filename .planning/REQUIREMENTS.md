@@ -59,7 +59,7 @@ small reverse-emit fidelity pass (units/offsets/z). **Reverse image export is OU
   member `images/image_NNNN.tiff` (ordinal) and registered in `FileIndex` as an `Other` entry (name
   only). A regression test proves `MzPeakReader::new` opens an archive containing `images/*.tiff`.
 
-- [ ] **IMG-03**: Per-image descriptive metadata lives in `metadata.imaging.images[]` (NOT the
+- [x] **IMG-03**: Per-image descriptive metadata lives in `metadata.imaging.images[]` (NOT the
   `FileEntry`): `archive_path`, `source_name`, `media_type="image/tiff"`, `width`, `height`,
   `sha256`, `size_bytes`, `affine`. Validator treats a missing/mismatched image as a WARNING.
 
@@ -70,7 +70,7 @@ small reverse-emit fidelity pass (units/offsets/z). **Reverse image export is OU
   (cv_list-MUST, shared-axis grid layout, multi-spectra-per-pixel aggregation) remain FUTURE (v0.6+),
   documented in the spec but NOT implemented in v0.5.
 
-- [ ] **IMG-04**: For each TIFF, read width/height via the `tiff` crate (first IFD authoritative; fail
+- [x] **IMG-04**: For each TIFF, read width/height via the `tiff` crate (first IFD authoritative; fail
   clearly on BigTIFF/malformed) and compute the full-extent affine into the 1-based, top-left, y-down MS
   pixel grid: `a=(Nx−1)/(W−1)`, `e=(Ny−1)/(H−1)`, `b=d=0`, `c=f=1` (W/H=1 → that axis constant 1),
   `maps:"image_px -> ms_px"`, `registration_quality:"assumed_full_extent"`. Warn when `pixel_count`
@@ -90,8 +90,8 @@ small reverse-emit fidelity pass (units/offsets/z). **Reverse image export is OU
 | FID-03 | 14 | Complete |
 | IMG-01 | 15 | Pending |
 | IMG-02 | 15 | Pending |
-| IMG-03 | 15 | Pending |
-| IMG-04 | 15 | Pending |
+| IMG-03 | 15 | Complete |
+| IMG-04 | 15 | Complete |
 | IMG-05 | 15 | Complete |
 
 ## Out of Scope (v0.5)

@@ -94,7 +94,7 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
 **Plans:** 3 plans
 
 - [x] 15-01-PLAN.md — Add optional role/derived_subtype/modality to ImageEntry + schema/imaging.json (+ spec-doc consistency) (IMG-05).
-- [ ] 15-02-PLAN.md — Add tiff crate (default-features=false) + src/write/image.rs (dimensions, full-extent affine, sha256+size, ImageEntry builder w/ role="optical") (IMG-03, IMG-04, IMG-05).
+- [x] 15-02-PLAN.md — Add tiff crate (default-features=false) + src/write/image.rs (dimensions, full-extent affine, sha256+size, ImageEntry builder w/ role="optical") (IMG-03, IMG-04, IMG-05).
 - [ ] 15-03-PLAN.md — Repeatable forward `--image` (reverse-rejected) + convert() terminal-seam import loop (images/image_NNNN.tiff Other members) + fixture + end-to-end tests (IMG-01, IMG-02, IMG-03, IMG-04).
 
 ## Progress
@@ -104,7 +104,7 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
 | 12. Imaging schema & spec prerequisites | v0.5 | 2/2 | Complete    | 2026-06-05 |
 | 13. Index enrichment | v0.5 | 1/1 | Complete    | 2026-06-05 |
 | 14. Reverse-emit fidelity | v0.5 | 1/1 | Complete    | 2026-06-05 |
-| 15. TIFF optical-image import | v0.5 | 1/3 | In Progress|  |
+| 15. TIFF optical-image import | v0.5 | 2/3 | In Progress|  |
 
 <details>
 <summary>✅ v0.4 Reverse Converter (Phases 7–11) — SHIPPED 2026-06-04</summary>
