@@ -78,6 +78,12 @@ pub struct ConvertCli {
     /// extra pass re-digests the `.ibd` + re-decodes the source (~3s on PXD001283).
     #[arg(long, hide = true)]
     pub verify: bool,
+
+    /// Optical TIFF(s) to embed; repeatable (`--image a.tiff --image b.tiff`); forward-only
+    /// (IMG-01). Each TIFF is stored as an `images/image_NNNN.tiff` ZIP member with descriptive
+    /// metadata + a full-extent affine in `metadata.imaging.images[]`. Rejected on the reverse path.
+    #[arg(long = "image", value_name = "PATH", action = clap::ArgAction::Append)]
+    pub images: Vec<PathBuf>,
 }
 
 /// Drive the CLI: dry-run report (CLI-03) or convert + optional verify (CLI-01/02), returning
@@ -170,7 +176,7 @@ fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
     // consumes the reader by value and owns the per-spectrum loop.
     let reader = ImagingReader::open(&cli.input)
         .with_context(|| format!("failed to open imzML reader for {}", cli.input.display()))?;
-    convert(reader, out).context("conversion failed")?;
+    convert(reader, out, &cli.images).context("conversion failed")?;
 
     if let Some(pb) = bar {
         if let Some(n) = total {
@@ -221,6 +227,14 @@ fn run_reverse(cli: &ConvertCli) -> anyhow::Result<()> {
         return Err(anyhow!(
             "--verify / --dry-run are forward-only; reverse roundtrip verification ships in \
              Phase 11"
+        ));
+    }
+
+    // `--image` is forward-only (IMG-01 / T-15-10) — reverse image export is out of scope for
+    // v0.5 (deferred to F8/v0.8). Reject rather than silently running any reverse image logic.
+    if !cli.images.is_empty() {
+        return Err(anyhow!(
+            "--image is forward-only (imzML → mzPeak); reverse image export is out of scope"
         ));
     }
 
@@ -573,6 +587,58 @@ mod tests {
         assert_eq!(cli.input, PathBuf::from("in.imzML"));
         assert_eq!(cli.output, Some(PathBuf::from("out.mzpeak")));
         assert!(!cli.reverse, "default direction must remain forward");
+        // IMG-01: an absent --image collects no paths (empty Vec, never None/panic).
+        assert!(cli.images.is_empty(), "absent --image ⇒ empty Vec");
+    }
+
+    // --- Task 1: repeatable --image (forward-only) ---------------------------------------
+
+    #[test]
+    fn image_flag_repeatable_collects_all() {
+        // IMG-01: `--image a --image b` (ArgAction::Append) collects BOTH paths, in order.
+        let cli = ConvertCli::try_parse_from([
+            "imzml2mzpeak",
+            "in.imzML",
+            "out.mzpeak",
+            "--image",
+            "a.tiff",
+            "--image",
+            "b.tiff",
+        ])
+        .expect("repeatable --image must parse");
+        assert_eq!(
+            cli.images,
+            vec![PathBuf::from("a.tiff"), PathBuf::from("b.tiff")],
+            "both --image paths collected in order"
+        );
+    }
+
+    #[test]
+    fn image_flag_absent_is_empty() {
+        // IMG-01: no --image ⇒ an empty Vec (the forward path threads &[] into convert()).
+        let cli = ConvertCli::try_parse_from(["imzml2mzpeak", "in.imzML", "out.mzpeak"])
+            .expect("bare invocation parses");
+        assert!(cli.images.is_empty(), "absent --image is an empty Vec");
+    }
+
+    #[test]
+    fn reverse_with_image_is_rejected() {
+        // IMG-01 / T-15-10: the reverse path REJECTS --image with a clear forward-only error,
+        // and adds NO reverse image logic. Construct a reverse-direction CLI carrying an image.
+        let cli = ConvertCli::try_parse_from([
+            "imzml2mzpeak",
+            "in.mzpeak",
+            "-o",
+            "out",
+            "--image",
+            "a.tiff",
+        ])
+        .expect("reverse invocation with --image parses (rejection is a runtime guard)");
+        let err = run(cli).expect_err("reverse + --image must be rejected");
+        assert!(
+            err.to_string().contains("forward-only"),
+            "reverse --image rejection names it forward-only, got: {err}"
+        );
     }
 
     #[test]
