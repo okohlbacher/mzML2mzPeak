@@ -99,6 +99,12 @@ impl TranscodedXml {
     pub fn open(&self) -> io::Result<File> {
         File::open(&self.path)
     }
+
+    /// Path to the transcoded temp file, for readers that open by path (e.g. mzdata's general
+    /// `MZReaderType::open_path` on the plain-mzML path). Valid until this guard is dropped.
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
 }
 
 impl Drop for TranscodedXml {
@@ -183,7 +189,7 @@ fn rewrite_prolog(head: &[u8]) -> (Vec<u8>, &[u8]) {
     };
     let close = close_rel + 2;
     let prolog = &text[..close];
-    let rewritten = match (prolog.find("encoding"), prolog.find('=')) {
+    let mut rewritten = match (prolog.find("encoding"), prolog.find('=')) {
         (Some(enc_at), _) => {
             // Replace the quoted value after `encoding=` with `UTF-8`, preserving the quote char.
             let after_kw = &prolog[enc_at + "encoding".len()..];
@@ -204,6 +210,18 @@ fn rewrite_prolog(head: &[u8]) -> (Vec<u8>, &[u8]) {
         }
         _ => prolog.to_string(),
     };
+    // CRITICAL — preserve the prolog's BYTE LENGTH. `UTF-8` is shorter than e.g. `ISO-8859-1`
+    // (5 vs 10 bytes), and shortening the prolog would shift every downstream byte offset. For
+    // imzML that is harmless (binary lives in the offset-indexed `.ibd`), but a plain mzML carries
+    // an `indexedmzML` byte-offset index for its spectra/chromatograms — a shift breaks it (e.g.
+    // `count_chromatograms` then reads 0). Pad the deficit with spaces just before `?>`, which is
+    // valid XML-declaration whitespace, so the rewritten prolog is byte-for-byte the same length.
+    let deficit = prolog.len().saturating_sub(rewritten.len());
+    if deficit > 0 {
+        if let Some(pos) = rewritten.rfind("?>") {
+            rewritten.insert_str(pos, &" ".repeat(deficit));
+        }
+    }
     // The prolog is ASCII; its bytes are valid UTF-8 as-is.
     (rewritten.into_bytes(), &head[close..])
 }
@@ -290,6 +308,25 @@ mod tests {
         guard.open().unwrap().read_to_string(&mut out).unwrap();
         assert!(out.contains("value=\"123456\""), "ASCII offsets/digits untouched");
         assert!(out.contains('µ'), "0xB5 → µ"); // micro sign
+        let _ = std::fs::remove_file(&src);
+    }
+
+    #[test]
+    fn transcode_preserves_total_byte_length_for_ascii_body() {
+        // Byte-length preservation matters for plain mzML: an `indexedmzML` carries byte offsets,
+        // so the transcoded file (when the body is ASCII) MUST be exactly as long as the source —
+        // the `UTF-8`-vs-`ISO-8859-1` prolog deficit is padded with whitespace before `?>`.
+        let body = b"<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n<mzML><run id=\"x\"/></mzML>";
+        let src = write_tmp("len.mzML", body);
+        let guard = transcode_latin1_to_utf8(&src, "ISO-8859-1").unwrap();
+        let mut out = Vec::new();
+        std::io::Read::read_to_end(&mut guard.open().unwrap(), &mut out).unwrap();
+        assert_eq!(
+            out.len(),
+            body.len(),
+            "ASCII-body transcode must preserve total byte length (offset stability)"
+        );
+        assert!(String::from_utf8_lossy(&out).contains("encoding=\"UTF-8\""));
         let _ = std::fs::remove_file(&src);
     }
 

@@ -24,7 +24,9 @@ pub mod spectrum;
 pub mod writer;
 pub mod convert;
 pub mod image;
+pub mod mzml;
 
 pub use spectrum::to_mzdata;
 pub use writer::{ImagingWriter, WriteError};
 pub use convert::convert;
+pub use mzml::{convert_mzml, inspect_mzml, MzmlConvertError, MzmlConvertReport};

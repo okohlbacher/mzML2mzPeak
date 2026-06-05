@@ -127,30 +127,86 @@ pub fn init_logging(log_file: Option<&std::path::Path>) -> anyhow::Result<()> {
 /// the typed library errors wrapped with `anyhow` context so [`classify_exit`] can map them.
 pub fn run(cli: ConvertCli) -> anyhow::Result<()> {
     // Direction policy (T-10-DISP): `--reverse` is the explicit override; otherwise infer from
-    // the input extension. `.imzML`/`.imzml` → forward (the UNCHANGED v0.3 path); `.mzpeak` →
-    // reverse. Anything else errors actionably and names `--reverse` as the escape hatch — no
-    // silent mis-direction.
-    let reverse = if cli.reverse {
-        true
-    } else {
-        match cli.input.extension().and_then(|e| e.to_str()) {
-            Some("imzML") | Some("imzml") => false,
-            Some("mzpeak") => true,
-            _ => {
-                return Err(anyhow!(
-                    "cannot infer direction from {:?}; pass --reverse for mzPeak→imzML, or use a \
-                     .imzML / .mzpeak input",
-                    cli.input
-                ));
-            }
-        }
-    };
-
-    if reverse {
-        run_reverse(&cli)
-    } else {
-        run_forward(cli)
+    // the input extension. `.imzML`/`.imzml` → forward IMAGING (the UNCHANGED v0.3 path);
+    // `.mzML`/`.mzml` → forward PLAIN (non-imaging) conversion; `.mzpeak` → reverse. Anything
+    // else errors actionably and names `--reverse` as the escape hatch — no silent mis-direction.
+    if cli.reverse {
+        return run_reverse(&cli);
     }
+    match cli.input.extension().and_then(|e| e.to_str()) {
+        Some("imzML") | Some("imzml") => run_forward(cli),
+        Some("mzML") | Some("mzml") => run_forward_mzml(cli),
+        Some("mzpeak") => run_reverse(&cli),
+        _ => Err(anyhow!(
+            "cannot infer direction from {:?}; use a .imzML (imaging) or .mzML (plain) input for \
+             forward conversion, or a .mzpeak input (or --reverse) for reverse",
+            cli.input
+        )),
+    }
+}
+
+/// Forward PLAIN-mzML path (non-imaging `.mzML` → mzPeak). Widens the tool beyond imaging:
+/// reads via mzdata's general reader and writes spectra + chromatograms with the reference
+/// writer (no `metadata.imaging` block). Honors `--dry-run` (count report) and `--verify`
+/// (read-back spectrum-count check). `--image` is imaging-only and rejected here.
+fn run_forward_mzml(cli: ConvertCli) -> anyhow::Result<()> {
+    if !cli.images.is_empty() {
+        return Err(anyhow!(
+            "--image is imaging-only and not valid for a plain .mzML input (no spatial extent to \
+             register an optical image against)"
+        ));
+    }
+
+    if cli.dry_run {
+        let report = crate::write::inspect_mzml(&cli.input)
+            .with_context(|| format!("failed to inspect {}", cli.input.display()))?;
+        println!("input:         {} (plain mzML)", cli.input.display());
+        println!("direction:     forward (mzML → mzPeak, non-imaging)");
+        println!("spectra:       {}", report.spectra);
+        println!("chromatograms: {}", report.chromatograms);
+        return Ok(());
+    }
+
+    let out = cli.output.as_deref().ok_or_else(|| {
+        anyhow!(
+            "no output path given — `imzml2mzpeak <input.mzML> <output.mzpeak>` (or pass --dry-run \
+             to inspect the input without writing)"
+        )
+    })?;
+
+    log::info!("converting {} (plain mzML)", cli.input.display());
+    let report = crate::write::convert_mzml(&cli.input, out)
+        .with_context(|| format!("plain-mzML conversion failed for {}", cli.input.display()))?;
+    log::info!(
+        "converted {} spectra + {} chromatograms → {}",
+        report.spectra,
+        report.chromatograms,
+        out.display()
+    );
+
+    if cli.verify {
+        // Plain mzML has no imaging L1 contract; verify by reading the archive back and checking
+        // the spectrum count survives the round-trip (a structural read-back, distinct exit 5).
+        let reader = mzpeak_prototyping::MzPeakReader::new(out).with_context(|| {
+            format!("failed to re-open written archive for --verify: {}", out.display())
+        })?;
+        let read_back = reader.len();
+        if read_back != report.spectra {
+            return Err(anyhow::Error::new(VerifyFailed {
+                total_mismatches: report.spectra.abs_diff(read_back),
+            })
+            .context(format!(
+                "verification: wrote {} spectra but read back {read_back}",
+                report.spectra
+            )));
+        }
+        log::info!(
+            "verification passed (read-back spectrum count {read_back}) for {}",
+            out.display()
+        );
+    }
+
+    Ok(())
 }
 
 /// Forward path (imzML → imaging mzPeak) — the SHIPPED v0.3 dispatch, unchanged. Extracted
