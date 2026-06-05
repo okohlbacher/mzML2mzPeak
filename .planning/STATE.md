@@ -4,13 +4,13 @@ milestone: v0.5
 milestone_name: — Index enrichment & optical-image import
 status: executing
 stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-06-05T14:33:05.790Z"
-last_activity: 2026-06-05 -- Phase 12 planning complete
+last_updated: "2026-06-05T14:38:39.189Z"
+last_activity: 2026-06-05
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 2
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -23,14 +23,14 @@ See: .planning/PROJECT.md (updated 2026-06-03)
 **Core value:** Both-direction imzML↔imaging-mzPeak converter (v0.3 forward + v0.4 reverse shipped).
 v0.5 enriches the forward `index.json` (imaging flag, derived pixel counts, MS1 m/z bounds, written
 last) and imports optical TIFF images with a full-extent affine into the MS pixel grid.
-**Current focus:** Phase 12 — Imaging schema & spec prerequisites (v0.5 kickoff)
+**Current focus:** Phase 12 — imaging-schema-spec-prerequisites
 
 ## Current Position
 
-Phase: 12 — Imaging schema & spec prerequisites (not started)
-Plan: —
+Phase: 12 (imaging-schema-spec-prerequisites) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-06-05 -- Phase 12 planning complete
+Last activity: 2026-06-05
 
 ## v0.5 Locked Decisions (CODEX-reviewed)
 
@@ -84,6 +84,7 @@ Last activity: 2026-06-05 -- Phase 12 planning complete
 | Phase 10 P02 | 12 min | 2 tasks tasks | 1 files files |
 | Phase 10 P03 | 10min | 2 tasks | 2 files |
 | Phase 11 P01 | 17 min | 3 tasks | 4 files |
+| Phase 12 P01 | 10 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -116,6 +117,8 @@ Recent decisions affecting current (v0.4) work:
 - [Phase ?]: Plan 10-02: ConvertCli stays FLAT; direction inferred in run(), no Subcommand enum — RCLI-01 satisfied while keeping the v0.3 positional invocation byte-compatible.
 - [Phase ?]: Plan 10-02: classify_reverse_error introduces NO new exit code — maps ReverseError onto the existing 5-code contract (coordinate=4, unsupported=3, integrity=2 via delegation to classify_integrity_error, generic=1).
 - [Phase ?]: Plan 10-03: end-to-end reverse conformance proven via mzdata::ImzMLReader as oracle (re-read coords/array-shapes/uuid), a 5k-pixel bounded-memory-at-scale test, and a built-binary non-imaging fail-fast (exit 4 + no partial output); zero new crates. RCLI-01/RCLI-02 closed.
+- [Phase ?]: 12-01: ImageAffine pins type/maps/registration_quality via serde defaults + ImageAffine::new(matrix)
+- [Phase ?]: 12-01: PixelCountSource wire strings exactly declared / observed_max (snake_case)
 
 ### Reuse Anchors (from shipped v0.3)
 
@@ -152,7 +155,7 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-04T20:44:22.162Z
+Last session: 2026-06-05T14:38:32.380Z
 Stopped at: Completed 10-01-PLAN.md
 Resume file: None
 
