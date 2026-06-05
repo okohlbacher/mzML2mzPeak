@@ -52,10 +52,10 @@ small reverse-emit fidelity pass (units/offsets/z). **Reverse image export is OU
 
 ### TIFF optical-image import (IMG) — Phase 15
 
-- [ ] **IMG-01**: Forward CLI gains a repeatable `--image <path.tiff>` accepting one or many TIFFs
+- [x] **IMG-01**: Forward CLI gains a repeatable `--image <path.tiff>` accepting one or many TIFFs
   (TIFF only); paths normalized, separators rejected. Reverse image export remains out of scope.
 
-- [ ] **IMG-02**: Each TIFF is added through `ZipArchiveWriter` (`start_other`/`add_file_from_read`) as
+- [x] **IMG-02**: Each TIFF is added through `ZipArchiveWriter` (`start_other`/`add_file_from_read`) as
   member `images/image_NNNN.tiff` (ordinal) and registered in `FileIndex` as an `Other` entry (name
   only). A regression test proves `MzPeakReader::new` opens an archive containing `images/*.tiff`.
 
@@ -88,8 +88,8 @@ small reverse-emit fidelity pass (units/offsets/z). **Reverse image export is OU
 | FID-01 | 14 | Complete |
 | FID-02 | 14 | Complete |
 | FID-03 | 14 | Complete |
-| IMG-01 | 15 | Pending |
-| IMG-02 | 15 | Pending |
+| IMG-01 | 15 | Complete |
+| IMG-02 | 15 | Complete |
 | IMG-03 | 15 | Complete |
 | IMG-04 | 15 | Complete |
 | IMG-05 | 15 | Complete |

@@ -28,7 +28,7 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
 - [x] **Phase 12: Imaging schema & spec prerequisites** - Extend `schema/imaging.json` + `metadata.rs` (+ tests) for `mz_range`, optional `pixel_count(+z)`, `pixel_count_source`, `images[]`; rewrite spec-doc Edit 7 (TIFF-separate-file design) + Edit 8. Unblocks U1/U2. (completed 2026-06-05)
 - [x] **Phase 13: Index enrichment (index-last, flag, pixel counts, m/z bounds)** - Stream coordinate-max + MS1 m/z min/max accumulators; write `metadata.imaging` with `is_imaging`, `pixel_count(+source)`, `mz_range` last. (completed 2026-06-05)
 - [x] **Phase 14: Reverse-emit fidelity (units / offsets / z)** - µm `UO:0000017` units on `IMS:1000044/45/46/47`; round-trip absolute offsets `IMS:1000053/54`; carry `pixel_count.z`. (completed 2026-06-05)
-- [ ] **Phase 15: TIFF optical-image import** - Forward `--image` CLI (repeatable, TIFF-only); store as `images/image_NNNN.tiff` ZIP members indexed `Other`; per-image metadata + sha256/size + full-extent affine in `metadata.imaging.images[]`. (3 plans)
+- [x] **Phase 15: TIFF optical-image import** - Forward `--image` CLI (repeatable, TIFF-only); store as `images/image_NNNN.tiff` ZIP members indexed `Other`; per-image metadata + sha256/size + full-extent affine in `metadata.imaging.images[]`. (3 plans) (completed 2026-06-05)
 
 ## Phase Details
 
@@ -91,7 +91,7 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
   3. `metadata.imaging.images[]` carries `archive_path`/`source_name`/`media_type`/`width`/`height`/`sha256`/`size_bytes`/`affine`; affine = 1-based top-left y-down full-extent (`a=(Nx−1)/(W−1)`, `e=(Ny−1)/(H−1)`, W/H=1 → const 1), `registration_quality:"assumed_full_extent"`; warn when `pixel_count` is observed_max; dims via `tiff` crate (first IFD; fail on BigTIFF/malformed).
   4. Opening + closing adversarial review recorded.
 
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 - [x] 15-01-PLAN.md — Add optional role/derived_subtype/modality to ImageEntry + schema/imaging.json (+ spec-doc consistency) (IMG-05).
 - [x] 15-02-PLAN.md — Add tiff crate (default-features=false) + src/write/image.rs (dimensions, full-extent affine, sha256+size, ImageEntry builder w/ role="optical") (IMG-03, IMG-04, IMG-05).
@@ -104,7 +104,7 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
 | 12. Imaging schema & spec prerequisites | v0.5 | 2/2 | Complete    | 2026-06-05 |
 | 13. Index enrichment | v0.5 | 1/1 | Complete    | 2026-06-05 |
 | 14. Reverse-emit fidelity | v0.5 | 1/1 | Complete    | 2026-06-05 |
-| 15. TIFF optical-image import | v0.5 | 3/3 | Complete   | 2026-06-05 |
+| 15. TIFF optical-image import | v0.5 | 3/3 | Complete    | 2026-06-05 |
 
 <details>
 <summary>✅ v0.4 Reverse Converter (Phases 7–11) — SHIPPED 2026-06-04</summary>
