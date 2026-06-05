@@ -144,6 +144,18 @@ pub struct ImageEntry {
     pub size_bytes: i64,
     /// Full-extent display-hint affine into the MS pixel grid.
     pub affine: ImageAffine,
+    /// OPTIONAL image classification token (IMG-05). The TIFF importer stamps `"optical"`;
+    /// an ABSENT `role` is assumed `"optical"` by readers (v0.5 back-compat). Other tokens:
+    /// `overview` | `histology` | `derived-MS-image` | `fluorescence`. Omitted from JSON when `None`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+    /// OPTIONAL subtype for `role="derived-MS-image"` (e.g. `tic` / `base_peak`) (IMG-05).
+    /// Omitted from JSON when `None`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub derived_subtype: Option<String>,
+    /// OPTIONAL acquisition modality of the image, if known (IMG-05). Omitted from JSON when `None`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub modality: Option<String>,
 }
 
 /// A generic `{x, y}` axis pair. Used for `pixel_size_um` (`AxisPair<f64>`) and
@@ -384,6 +396,9 @@ mod tests {
                 sha256: "deadbeef".to_string(),
                 size_bytes: 12_345_678,
                 affine: ImageAffine::new([2.0, 0.0, 1.0, 0.0, 3.0, 1.0]),
+                role: Some("optical".to_string()),
+                derived_subtype: Some("tic".to_string()),
+                modality: Some("brightfield".to_string()),
             }]),
             pixel_size_um: Some(AxisPair { x: 50.0, y: 50.0 }),
             max_dimension_um: Some(AxisPair { x: 13000, y: 6700 }),
@@ -418,6 +433,10 @@ mod tests {
         assert_eq!(img["affine"]["maps"], Value::from("image_px -> ms_px"));
         assert_eq!(img["affine"]["registration_quality"], Value::from("assumed_full_extent"));
         assert_eq!(img["affine"]["matrix"].as_array().expect("matrix array").len(), 6);
+        // IMG-05 optional classification fields present on a fully-populated image entry.
+        assert_eq!(img["role"], Value::from("optical"));
+        assert_eq!(img["derived_subtype"], Value::from("tic"));
+        assert_eq!(img["modality"], Value::from("brightfield"));
 
         // Round-trip equality.
         let back: ImagingMetadata = serde_json::from_value(v).expect("deserialize");
@@ -437,6 +456,11 @@ mod tests {
             sha256: "deadbeef".to_string(),
             size_bytes: 12_345_678,
             affine: ImageAffine::new([2.0, 0.0, 1.0, 0.0, 3.0, 1.0]),
+            // All three IMG-05 optional fields None: this entry's emitted key set must equal
+            // the schema images-item `required` set (the new fields are optional, not required).
+            role: None,
+            derived_subtype: None,
+            modality: None,
         };
         let v = serde_json::to_value(&entry).expect("serialize");
         let obj = v.as_object().expect("object");
@@ -457,5 +481,69 @@ mod tests {
         assert_eq!(obj["affine"]["type"], af["type"]["const"]);
         assert_eq!(obj["affine"]["maps"], af["maps"]["const"]);
         assert_eq!(obj["affine"]["registration_quality"], af["registration_quality"]["const"]);
+    }
+
+    /// Build a minimal valid [`ImageEntry`] with the three IMG-05 fields all `None`.
+    fn minimal_image_entry() -> ImageEntry {
+        ImageEntry {
+            archive_path: "images/image_0000.tiff".to_string(),
+            source_name: "optical.tiff".to_string(),
+            media_type: "image/tiff".to_string(),
+            width: 2600,
+            height: 1340,
+            sha256: "deadbeef".to_string(),
+            size_bytes: 12_345_678,
+            affine: ImageAffine::new([2.0, 0.0, 1.0, 0.0, 3.0, 1.0]),
+            role: None,
+            derived_subtype: None,
+            modality: None,
+        }
+    }
+
+    /// IMG-05: an all-`None` ImageEntry omits `role`/`derived_subtype`/`modality` from its JSON
+    /// (skip_serializing_if), so a v0.5 image without them stays a strict subset of the schema's
+    /// declared properties (additionalProperties:false) and readers assume `role="optical"`.
+    #[test]
+    fn image_entry_optional_role_fields_skip_when_none() {
+        let v = serde_json::to_value(minimal_image_entry()).expect("serialize");
+        let obj = v.as_object().expect("object");
+        for key in ["role", "derived_subtype", "modality"] {
+            assert!(!obj.contains_key(key), "{key} must be omitted when None");
+        }
+        // A v0.5 JSON (no role keys) still deserializes, with all three defaulting to None.
+        let back: ImageEntry = serde_json::from_value(v).expect("deserialize");
+        assert_eq!(back.role, None);
+        assert_eq!(back.derived_subtype, None);
+        assert_eq!(back.modality, None);
+    }
+
+    /// IMG-05: an ImageEntry carrying all three optional fields round-trips
+    /// (serialize -> deserialize) equal to the original, and each key is a declared schema property
+    /// (additionalProperties:false contract).
+    #[test]
+    fn image_entry_role_round_trips() {
+        let entry = ImageEntry {
+            role: Some("derived-MS-image".to_string()),
+            derived_subtype: Some("base_peak".to_string()),
+            modality: Some("MALDI".to_string()),
+            ..minimal_image_entry()
+        };
+        let v = serde_json::to_value(&entry).expect("serialize");
+        let obj = v.as_object().expect("object");
+        assert_eq!(obj["role"], Value::from("derived-MS-image"));
+        assert_eq!(obj["derived_subtype"], Value::from("base_peak"));
+        assert_eq!(obj["modality"], Value::from("MALDI"));
+
+        // Every emitted key must be a declared property of the schema's images[].items.
+        let schema = load_schema();
+        let props = schema["properties"]["images"]["items"]["properties"]
+            .as_object()
+            .expect("images item properties");
+        for key in obj.keys() {
+            assert!(props.contains_key(key), "emitted image key {key} not declared in schema");
+        }
+
+        let back: ImageEntry = serde_json::from_value(v).expect("deserialize");
+        assert_eq!(back, entry, "ImageEntry with IMG-05 fields must round-trip");
     }
 }
