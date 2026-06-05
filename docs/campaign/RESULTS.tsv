@@ -1,0 +1,14 @@
+dataset	dry_exit	mode	count	fwd_exit	fwd_s	mzpeak_sz	verify_exit	rev_exit	rev_s	rev_imzml_sz	rev_ibd_sz	reconv_exit	reconv_count	notes
+example1-continuous__Example_Continuous	0	continuous	9	0	0	310603	0	0	0	17044	294864	2	?	
+example1-processed__Example_Processed	0	processed	9	0	0	310601	0	0	0	17044	294864	2	?	
+imzML_LA-ESI__180817_NEG_Thaliana_Leaf_bottom_1_	0	Processed	1196	0	4	100264007	0	0	2	2097571	570296736	2	?	
+imzML_LTP__ltpmsi-chilli	2	?	?	2	0	0	2	-	-	0	0	-	-	
+200TopL__170TopR__190BottomL__180BottomR__200Top	101	?	?	101	0	0	101	-	-	0	0	-	-	
+40TopL_10TopR_30BottomL_20BottomR__40TopL_10TopR	101	?	?	101	0	0	101	-	-	0	0	-	-	
+120TopL__90TopR__110BottomL__100BottomR__120TopL	101	?	?	101	0	0	101	-	-	0	0	-	-	
+80TopL__50TopR__70BottomL__60BottomR__80TopL__50	101	?	?	101	1	0	101	-	-	0	0	-	-	
+160TopL__130TopR__150BottomL__140BottomR__160Top	101	?	?	101	0	0	101	-	-	0	0	-	-	
+240TopL__210TopR__230BottomL__220BottomR__240Top	101	?	?	101	0	0	101	-	-	0	0	-	-	
+280TopL__250TopR__270BottomL__260BottomR__280Top	101	?	?	101	0	0	101	-	-	0	0	-	-	
+PXD001283-HR2MSI-urinary-bladder__HR2MSImouseuri	0	Processed	34840	0	8	432223939	0	0	3	60934046	486713344	2	?	
+imzML_AP_SMALDI__HR2MSImouseurinarybladderS096	0	Processed	34840	0	7	432223939	0	0	4	60934046	486713344	2	?	
