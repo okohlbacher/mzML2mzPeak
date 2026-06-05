@@ -16,12 +16,25 @@ use clap::Parser;
 use imzml2mzpeak::cli::{self, ConvertCli};
 
 fn main() -> ExitCode {
-    env_logger::init();
+    // Parse argv FIRST so `--log <FILE>` can redirect the logger before any record is emitted.
+    let cli = ConvertCli::parse();
 
-    match cli::run(ConvertCli::parse()) {
+    // Initialize logging (to the `--log` file, else stderr). A bad `--log` path fails fast.
+    if let Err(e) = cli::init_logging(cli.log.as_deref()) {
+        eprintln!("{e:#}");
+        return ExitCode::from(1);
+    }
+    let logging_to_file = cli.log.is_some();
+
+    match cli::run(cli) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
+            // Always surface the error on the console for the user; if logs were redirected to a
+            // file, also record it there so the log is a complete account of the run.
             eprintln!("{e:#}");
+            if logging_to_file {
+                log::error!("{e:#}");
+            }
             cli::classify_exit(&e)
         }
     }

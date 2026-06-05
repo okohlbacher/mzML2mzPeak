@@ -24,7 +24,7 @@ use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::integrity::header::{IntegrityError, parse_imzml_header};
-use crate::integrity::preflight::preflight;
+use crate::integrity::preflight::preflight_with;
 use crate::read::{ImagingReader, ReadError};
 use crate::schema::{ConformanceLevel, parse_scan_settings};
 use crate::verify::{VerifyError, verify_streaming};
@@ -84,6 +84,43 @@ pub struct ConvertCli {
     /// metadata + a full-extent affine in `metadata.imaging.images[]`. Rejected on the reverse path.
     #[arg(long = "image", value_name = "PATH", action = clap::ArgAction::Append)]
     pub images: Vec<PathBuf>,
+
+    /// Write log output to `FILE` instead of stderr. The conversion's `log` records (progress,
+    /// warnings, integrity notes) are redirected there; the interactive progress bar stays on
+    /// the terminal. Honors `RUST_LOG` for level filtering (defaults to `info`). Applies to both
+    /// the forward and reverse directions.
+    #[arg(long = "log", short = 'l', value_name = "FILE")]
+    pub log: Option<PathBuf>,
+
+    /// Forward-only escape hatch: convert even when the `.ibd` fails its declared checksum
+    /// (`IMS:1000090` MD5 / `IMS:1000091` SHA-1). The UUID linkage is STILL verified; only the
+    /// whole-file checksum is downgraded from a hard error to a loud warning. WARNING: a
+    /// checksum-mismatched `.ibd` may be silently corrupt — conversion can then produce WRONG
+    /// numeric spectra without any further error. Use only for known-imperfect datasets where you
+    /// accept that risk; it works around the gate, it does not repair the data.
+    #[arg(long = "allow-checksum-mismatch")]
+    pub allow_checksum_mismatch: bool,
+}
+
+/// Initialize the global logger. When `log_file` is `Some`, all `log` records are written to
+/// that file (truncating any existing content) instead of stderr; the interactive `indicatif`
+/// progress bar always stays on the terminal. The level filter honors `RUST_LOG` and defaults
+/// to `info`, so a run captures conversion progress + warnings without extra env setup.
+///
+/// Called once from `main` BEFORE [`run`], so it must parse argv first. Returns an error only if
+/// the log file cannot be created (a bad `--log` path is an actionable startup failure, not a
+/// silent fallback to stderr).
+pub fn init_logging(log_file: Option<&std::path::Path>) -> anyhow::Result<()> {
+    use std::fs::File;
+    let mut builder =
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"));
+    if let Some(path) = log_file {
+        let file = File::create(path)
+            .with_context(|| format!("failed to open log file {}", path.display()))?;
+        builder.target(env_logger::Target::Pipe(Box::new(file)));
+    }
+    builder.init();
+    Ok(())
 }
 
 /// Drive the CLI: dry-run report (CLI-03) or convert + optional verify (CLI-01/02), returning
@@ -174,7 +211,7 @@ fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
 
     // Open the reader (runs preflight internally) and stream the conversion. `convert`
     // consumes the reader by value and owns the per-spectrum loop.
-    let reader = ImagingReader::open(&cli.input)
+    let reader = ImagingReader::open_with(&cli.input, cli.allow_checksum_mismatch)
         .with_context(|| format!("failed to open imzML reader for {}", cli.input.display()))?;
     convert(reader, out, &cli.images).context("conversion failed")?;
 
@@ -193,12 +230,13 @@ fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
     // --verify: convert consumed the first reader (one-shot iterator — Pitfall 2), so open a
     // SECOND reader over the same source and stream it against the just-written archive.
     if cli.verify {
-        let reader2 = ImagingReader::open(&cli.input).with_context(|| {
-            format!(
-                "failed to re-open imzML reader for --verify of {}",
-                cli.input.display()
-            )
-        })?;
+        let reader2 = ImagingReader::open_with(&cli.input, cli.allow_checksum_mismatch)
+            .with_context(|| {
+                format!(
+                    "failed to re-open imzML reader for --verify of {}",
+                    cli.input.display()
+                )
+            })?;
         let report = verify_streaming(reader2, out, ConformanceLevel::L1BitForBit)
             .context("verification failed to run")?;
         if !report.passed() {
@@ -389,13 +427,14 @@ fn dry_run(cli: &ConvertCli) -> anyhow::Result<()> {
     let input = &cli.input;
 
     // Integrity gate (reused verbatim — the CLI never bypasses preflight; T-6-integrity).
-    let report = preflight(input)
+    // `--allow-checksum-mismatch` relaxes ONLY the checksum (UUID linkage still enforced).
+    let report = preflight_with(input, cli.allow_checksum_mismatch)
         .with_context(|| format!("integrity preflight failed for {}", input.display()))?;
 
     let header = parse_imzml_header(input)
         .with_context(|| format!("failed to parse imzML header for {}", input.display()))?;
 
-    let storage_mode = ImagingReader::open(input)
+    let storage_mode = ImagingReader::open_with(input, cli.allow_checksum_mismatch)
         .with_context(|| format!("failed to open imzML reader for {}", input.display()))?
         .storage_mode();
 
@@ -599,6 +638,33 @@ mod tests {
         assert!(!cli.reverse, "default direction must remain forward");
         // IMG-01: an absent --image collects no paths (empty Vec, never None/panic).
         assert!(cli.images.is_empty(), "absent --image ⇒ empty Vec");
+    }
+
+    #[test]
+    fn log_flag_parses_long_and_short() {
+        let long = ConvertCli::try_parse_from(["imzml2mzpeak", "in.imzML", "out.mzpeak", "--log", "run.log"])
+            .expect("--log <FILE> must parse");
+        assert_eq!(long.log, Some(PathBuf::from("run.log")));
+        let short = ConvertCli::try_parse_from(["imzml2mzpeak", "in.imzML", "out.mzpeak", "-l", "r.log"])
+            .expect("-l <FILE> must parse");
+        assert_eq!(short.log, Some(PathBuf::from("r.log")));
+        let absent = ConvertCli::try_parse_from(["imzml2mzpeak", "in.imzML", "out.mzpeak"]).unwrap();
+        assert_eq!(absent.log, None, "absent --log ⇒ None (logs to stderr)");
+    }
+
+    #[test]
+    fn init_logging_errors_on_unopenable_path() {
+        // A `--log` path whose parent directory does not exist is an actionable startup failure,
+        // not a silent fallback to stderr. This exercises the error branch BEFORE `builder.init()`
+        // is reached, so it never touches the process-global logger (safe under the test harness).
+        let bad = std::env::temp_dir()
+            .join(format!("i2mp-nodir-{}", std::process::id()))
+            .join("missing")
+            .join("run.log");
+        assert!(
+            init_logging(Some(&bad)).is_err(),
+            "init_logging must fail fast on an un-creatable --log path"
+        );
     }
 
     // --- Task 1: repeatable --image (forward-only) ---------------------------------------
