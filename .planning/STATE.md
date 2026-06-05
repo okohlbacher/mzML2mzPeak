@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
 milestone: v0.5
-milestone_name: Index enrichment & optical-image import
-status: planning
-stopped_at: Roadmap formalized (CODEX-stable); awaiting plan-phase 12
-last_updated: "2026-06-04T22:00:00.000Z"
-last_activity: 2026-06-04 — v0.5 roadmap formalized (phases 12–15) after CODEX adversarial review
+milestone_name: — Index enrichment & optical-image import
+status: executing
+stopped_at: Completed 10-01-PLAN.md
+last_updated: "2026-06-05T14:33:05.790Z"
+last_activity: 2026-06-05 -- Phase 12 planning complete
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 0
+  total_plans: 2
   completed_plans: 0
   percent: 0
 ---
@@ -29,17 +29,19 @@ last) and imports optical TIFF images with a full-extent affine into the MS pixe
 
 Phase: 12 — Imaging schema & spec prerequisites (not started)
 Plan: —
-Status: Roadmap formalized (CODEX adversarial review → STABLE); awaiting plan-phase 12
-Last activity: 2026-06-04 — v0.5 roadmap formalized (phases 12–15)
+Status: Ready to execute
+Last activity: 2026-06-05 -- Phase 12 planning complete
 
 ## v0.5 Locked Decisions (CODEX-reviewed)
 
 - index.json written LAST; `metadata.imaging` gains `mz_range` (MS1-only, `ms_level==1`),
   `pixel_count(+z)` with `pixel_count_source` (declared|observed_max), and `images[]`.
+
 - TIFF optical images: TIFF-only, stored as `images/image_NNNN.tiff` ZIP members (via
   `ZipArchiveWriter`, indexed `Other`); descriptive metadata (incl. sha256/size/affine) in
   `metadata.imaging.images[]` (FileEntry is name-only). Affine = 1-based top-left y-down full-extent,
   `registration_quality:"assumed_full_extent"`. Dims via the new `tiff` crate (first IFD).
+
 - Reverse image export OUT OF SCOPE for v0.5 (deferred to F8/v0.8).
 - Schema (`schema/imaging.json` + `metadata.rs` + tests) updated FIRST (Phase 12) before accumulators.
 - Every change fed back into `docs/mzpeak-imaging-spec-suggestions.md` (Edit 7 rewrite + Edit 8 update).
