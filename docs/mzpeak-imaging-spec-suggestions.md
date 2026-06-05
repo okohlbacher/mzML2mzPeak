@@ -371,6 +371,7 @@
     },
     "pixel_size_um":  {"type": "object", "properties": {"x": {"type": "number"}, "y": {"type": "number"}}},
     "max_dimension_um": {"type": "object", "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}}},
+    "absolute_offset_um": {"type": "object", "description": "OPTIONAL absolute position offset in µm (IMS:1000053/54).", "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}}},
     "scan_pattern":        {"type": "string", "description": "CURIE, child of IMS:1000041"},
     "scan_type":           {"type": "string", "description": "CURIE, child of IMS:1000048"},
     "line_scan_direction": {"type": "string", "description": "CURIE, child of IMS:1000049"},
@@ -395,7 +396,7 @@
 | 5 | coordinate/key typing | Typing Parameter Values | — | base |
 | 6 | imaging coordinates / orientation / conformance | new §Imaging | — | ext. |
 | 7 | optical images as separate TIFF ZIP members (`images/image_NNNN.tiff`, `FileIndex` `Other`, descriptive metadata + affine in `metadata.imaging.images[]`); full `image.parquet` blob + CV registration demoted to **F8 future option** | Entity Type + new file §; converter behaviour | `image.json` (governs F8 future option) | base |
-| 8 | `metadata.imaging` block — adds `pixel_count.z`, `pixel_count_source`, `mz_range`, `images[]`; `pixel_count` optional; `max_dimension_um` integer; index written last | Index File | `imaging.json` | ext. |
+| 8 | `metadata.imaging` block — adds `pixel_count.z`, `pixel_count_source`, `mz_range`, `images[]`, `absolute_offset_um` (µm offset, IMS:1000053/54, reverse-emitted with the UO:0000017 µm unit); `pixel_count` optional; `max_dimension_um` integer; the µm geometry terms (IMS:1000044/45/46/47/53/54) carry `unitCvRef="UO" unitAccession="UO:0000017"`; index written last | Index File | `imaging.json` | ext. |
 | 9 | shared-axis grid layout | Signal Data Layouts | — | base |
 | 10 | imaging provenance | file_description usage | — | ext. |
 

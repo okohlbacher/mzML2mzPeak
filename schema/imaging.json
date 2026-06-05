@@ -92,6 +92,14 @@
         "y": { "type": "integer" }
       }
     },
+    "absolute_offset_um": {
+      "type": "object",
+      "description": "OPTIONAL absolute position offset in µm (IMS:1000053/54).",
+      "properties": {
+        "x": { "type": "integer" },
+        "y": { "type": "integer" }
+      }
+    },
     "scan_pattern": { "type": "string", "description": "IMS CURIE, e.g. IMS:1000413 flyback" },
     "scan_type": { "type": "string", "description": "IMS CURIE, e.g. IMS:1000480 horizontal line scan" },
     "line_scan_direction": { "type": "string", "description": "IMS CURIE, e.g. IMS:1000491 linescan left-right" },

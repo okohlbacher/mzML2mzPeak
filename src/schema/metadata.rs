@@ -194,6 +194,15 @@ pub struct ImagingMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_dimension_um: Option<AxisPair<i64>>,
 
+    /// Absolute position offset in µm `{x, y}` (`IMS:1000053` / `IMS:1000054`) — the run's
+    /// absolute spatial origin offset. OPTIONAL; omitted from the JSON when `None`. The reverse
+    /// emitter re-emits these as µm cvParams when present and NEVER fabricates them when absent
+    /// (FID-02). Forward-population of this field from imzML is DEFERRED to v0.6+ (recorded in
+    /// NEXT-ROADMAP-DRAFT.md "Deferred during v0.5 execution"); for v0.5 the round-trip delivered
+    /// is faithful re-emission of offsets a source mzPeak index already carries.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub absolute_offset_um: Option<AxisPair<i64>>,
+
     /// Scan pattern child-term CURIE, e.g. `"IMS:1000413"` (flyback). OPTIONAL.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scan_pattern: Option<String>,
@@ -237,6 +246,7 @@ mod tests {
             images: None,
             pixel_size_um: None,
             max_dimension_um: None,
+            absolute_offset_um: None,
             scan_pattern: None,
             scan_type: None,
             line_scan_direction: None,
@@ -276,6 +286,39 @@ mod tests {
         assert_eq!(obj["pixel_count"]["x"], Value::from(260));
         assert_eq!(obj["pixel_count"]["y"], Value::from(134));
         assert_eq!(obj["scan_pattern"], Value::from("IMS:1000413"));
+    }
+
+    /// FID-02: `absolute_offset_um = None` produces JSON with NO "absolute_offset_um" key
+    /// (skip_serializing_if), and `Some({x,y})` round-trips equal with the field declared in the
+    /// schema's properties (additionalProperties:false contract).
+    #[test]
+    fn absolute_offset_um_omitted_when_none_present_when_some() {
+        // Absent: no key, no null.
+        let v = serde_json::to_value(minimal()).expect("serialize");
+        assert!(
+            !v.as_object().unwrap().contains_key("absolute_offset_um"),
+            "absolute_offset_um must be omitted when None"
+        );
+
+        // Present: round-trips equal and is a declared schema property.
+        let meta = ImagingMetadata {
+            absolute_offset_um: Some(AxisPair { x: 5000, y: -2000 }),
+            ..minimal()
+        };
+        let v = serde_json::to_value(&meta).expect("serialize");
+        let obj = v.as_object().expect("object");
+        assert_eq!(obj["absolute_offset_um"]["x"], Value::from(5000));
+        assert_eq!(obj["absolute_offset_um"]["y"], Value::from(-2000));
+
+        let schema = load_schema();
+        let allowed = schema["properties"].as_object().expect("schema properties");
+        assert!(
+            allowed.contains_key("absolute_offset_um"),
+            "absolute_offset_um must be declared in schema/imaging.json (additionalProperties:false)"
+        );
+
+        let back: ImagingMetadata = serde_json::from_value(v).expect("deserialize");
+        assert_eq!(back, meta, "absolute_offset_um serialize->deserialize round-trips");
     }
 
     /// The serialized Value satisfies schema/imaging.json's invariants: required keys present,
@@ -344,6 +387,7 @@ mod tests {
             }]),
             pixel_size_um: Some(AxisPair { x: 50.0, y: 50.0 }),
             max_dimension_um: Some(AxisPair { x: 13000, y: 6700 }),
+            absolute_offset_um: Some(AxisPair { x: 5000, y: -2000 }),
             scan_pattern: Some("IMS:1000413".to_string()),
             scan_type: Some("IMS:1000480".to_string()),
             line_scan_direction: Some("IMS:1000491".to_string()),
@@ -363,6 +407,9 @@ mod tests {
 
         // New-field wire shapes.
         assert_eq!(obj["pixel_count"]["z"], Value::from(3));
+        // absolute_offset_um (FID-02) round-trips as an {x,y} integer pair, x positive / y negative.
+        assert_eq!(obj["absolute_offset_um"]["x"], Value::from(5000));
+        assert_eq!(obj["absolute_offset_um"]["y"], Value::from(-2000));
         assert_eq!(obj["pixel_count_source"], Value::from("observed_max"));
         assert_eq!(obj["mz_range"]["min"], Value::from(100.07));
         assert_eq!(obj["mz_range"]["max"], Value::from(999.93));

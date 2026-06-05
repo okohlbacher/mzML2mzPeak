@@ -484,6 +484,10 @@ fn assemble_imaging_metadata(geom: Option<&ImagingRunMetadata>) -> ImagingMetada
         images: None,
         pixel_size_um,
         max_dimension_um,
+        // Forward-population of absolute offsets (IMS:1000053/54) is DEFERRED to v0.6+ (FID-02);
+        // the forward writer carries None and the reverse emitter re-emits offsets a source mzPeak
+        // index already carries. See ImagingMetadata::absolute_offset_um.
+        absolute_offset_um: None,
         scan_pattern: geom.and_then(|g| g.scan_pattern.clone()),
         scan_type: geom.and_then(|g| g.scan_type.clone()),
         line_scan_direction: geom.and_then(|g| g.line_scan_direction.clone()),
