@@ -4,7 +4,7 @@ milestone: v0.5
 milestone_name: — Index enrichment & optical-image import
 status: executing
 stopped_at: Completed 15-02-PLAN.md
-last_updated: "2026-06-05T16:30:28.046Z"
+last_updated: "2026-06-05T16:56:42.045Z"
 last_activity: 2026-06-05
 progress:
   total_phases: 4
@@ -154,6 +154,7 @@ None yet.
 - mzdata must re-read our `.imzML` output → gated free by integrity preflight + forward `convert()` in Phase 11.
 - MzPeakReader O(n²) without metadata cache → call `load_all_spectrum_metadata()` once (Phase 7 / Phase 10).
 - PXD001283 `.ibd` was fetched + UUID-verified during v0.3; reverse acceptance (RDAT-01) reuses the v0.3-produced imaging mzPeak archive as its input.
+- 15-03 BLOCKER (upstream serde defect): mzpeak_prototyping EntityType::Other/DataKind::Other serialize as JSON objects but deserialize string-only via DeserializeFromStr. Any archive with an Other member (our images/*.tiff) makes the reader FileIndex deserialization silently fail (.ok()->None), dropping ALL metadata incl metadata.imaging. Reader still opens via suffix-fallback so spectra read, but images[] + v0.5 index enrichment are unreadable. Blocks IMG-02/03/04. add_file_from_read forces the broken Other entry; ZipArchiveWriter.index is private; mzpeak_prototyping is a git dep (not patchable like vendored mzdata).
 
 ## Deferred Items
 
