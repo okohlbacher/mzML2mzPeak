@@ -1,0 +1,527 @@
+diff --git a/src/integrity/preflight.rs b/src/integrity/preflight.rs
+index b8eb339..b29dc83 100644
+--- a/src/integrity/preflight.rs
++++ b/src/integrity/preflight.rs
+@@ -45,6 +45,18 @@ const CHUNK: usize = 64 * 1024;
+ /// Run the integrity preflight on an imzML path. Returns a [`PreflightReport`] on success;
+ /// a typed [`IntegrityError`] on any UUID mismatch, checksum mismatch, or missing `.ibd`.
+ pub fn preflight(imzml_path: &Path) -> Result<PreflightReport, IntegrityError> {
++    preflight_with(imzml_path, false)
++}
++
++/// Preflight with an opt-in checksum escape hatch. When `allow_checksum_mismatch` is true, a
++/// whole-file `.ibd` checksum mismatch is downgraded from a hard [`IntegrityError`] to a
++/// `log::warn` (the converted output is still produced). The UUID linkage and the
++/// `.ibd`-present checks are ALWAYS enforced — only the checksum is relaxed. Used by the CLI
++/// `--allow-checksum-mismatch` flag for known-imperfect real-world datasets.
++pub fn preflight_with(
++    imzml_path: &Path,
++    allow_checksum_mismatch: bool,
++) -> Result<PreflightReport, IntegrityError> {
+     // (1) Parse the imzML header (bounded; never reads the whole file).
+     let header = header::parse_imzml_header(imzml_path)?;
+ 
+@@ -91,11 +103,22 @@ pub fn preflight(imzml_path: &Path) -> Result<PreflightReport, IntegrityError> {
+     //     over a fixed-size chunked stream (never fs::read the whole sidecar).
+     let computed = compute_digest(&ibd_path, header.checksum_type)?;
+     if computed != header.checksum_hex.to_lowercase() {
+-        return Err(IntegrityError::ChecksumMismatch {
+-            kind: header.checksum_type,
+-            declared: header.checksum_hex.clone(),
+-            computed,
+-        });
++        if allow_checksum_mismatch {
++            log::warn!(
++                "{:?} checksum mismatch for {} (declared {}, computed {}) — proceeding anyway \
++                 because --allow-checksum-mismatch was set; the .ibd may be corrupt or truncated",
++                header.checksum_type,
++                ibd_path.display(),
++                header.checksum_hex,
++                computed,
++            );
++        } else {
++            return Err(IntegrityError::ChecksumMismatch {
++                kind: header.checksum_type,
++                declared: header.checksum_hex.clone(),
++                computed,
++            });
++        }
+     }
+ 
+     Ok(PreflightReport {
+@@ -105,6 +128,15 @@ pub fn preflight(imzml_path: &Path) -> Result<PreflightReport, IntegrityError> {
+     })
+ }
+ 
++/// Resolve the `.ibd` for an imzML by parsing its header (for the declared `IMS:1000070`
++/// name) and applying the same resolution the preflight uses. `pub(crate)` so the read layer
++/// can locate the real `.ibd` when it must hand mzdata an explicit sidecar handle (e.g. the
++/// Latin-1 transcode path opens a UTF-8 temp XML alongside the untouched original `.ibd`).
++pub(crate) fn resolve_ibd_for(imzml_path: &Path) -> Result<PathBuf, IntegrityError> {
++    let header = header::parse_imzml_header(imzml_path)?;
++    resolve_ibd_path(imzml_path, header.ibd_file_name.as_deref())
++}
++
+ /// Resolve the `.ibd` path. Prefer the declared `IMS:1000070` name (relative to the imzML's
+ /// parent dir); fall back to the imzML stem with `.ibd` then `.IBD` (mzdata open_path
+ /// behavior). Hard-fail with [`IntegrityError::MissingIbd`] if the resolved path is absent.
+@@ -232,6 +264,59 @@ mod tests {
+         assert!(uuid_hex_to_bytes("abcd").is_none());
+     }
+ 
++    /// Build a minimal `<stem>.imzML` + `<stem>.ibd` pair in a temp dir: the `.ibd`'s first 16
++    /// bytes are the declared UUID, but its whole-file SHA-1 will NOT match `declared_sha1`.
++    /// Returns the imzML path (with the temp dir kept alive via the returned guard path).
++    fn write_mismatched_pair(tag: &str, ibd_first16: [u8; 16]) -> (PathBuf, PathBuf) {
++        let dir = std::env::temp_dir().join(format!("i2mp_pf_{}_{}", std::process::id(), tag));
++        let _ = std::fs::create_dir_all(&dir);
++        let imzml = dir.join("t.imzML");
++        let ibd = dir.join("t.ibd");
++        let xml = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n\
++            <mzML>\n\
++            <cvParam accession=\"IMS:1000080\" name=\"uuid\" value=\"{00112233-4455-6677-8899-aabbccddeeff}\"/>\n\
++            <cvParam accession=\"IMS:1000091\" name=\"ibd SHA-1\" value=\"0000000000000000000000000000000000000000\"/>\n\
++            <spectrumList count=\"0\">\n\
++            </mzML>\n";
++        std::fs::write(&imzml, xml).unwrap();
++        let mut body = ibd_first16.to_vec();
++        body.extend_from_slice(b"not-the-declared-bytes");
++        std::fs::write(&ibd, &body).unwrap();
++        (imzml, ibd)
++    }
++
++    /// Escape-hatch regression: a whole-file checksum mismatch is a HARD error by default but is
++    /// downgraded to a warning under `allow_checksum_mismatch=true` — while the UUID linkage stays
++    /// enforced in BOTH modes.
++    #[test]
++    fn allow_checksum_mismatch_relaxes_checksum_but_not_uuid() {
++        let good_uuid = [
++            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd,
++            0xee, 0xff,
++        ];
++        // (a) Correct UUID, wrong checksum → strict fails, allow=true succeeds.
++        let (imzml, _ibd) = write_mismatched_pair("ck", good_uuid);
++        assert!(
++            matches!(preflight(&imzml), Err(IntegrityError::ChecksumMismatch { .. })),
++            "strict preflight must hard-fail on checksum mismatch"
++        );
++        assert!(
++            preflight_with(&imzml, true).is_ok(),
++            "--allow-checksum-mismatch must let a checksum-mismatched .ibd through"
++        );
++        let _ = std::fs::remove_dir_all(imzml.parent().unwrap());
++
++        // (b) WRONG UUID → even with allow=true the UUID linkage still hard-fails.
++        let mut bad_uuid = good_uuid;
++        bad_uuid[0] ^= 0xff;
++        let (imzml2, _ibd2) = write_mismatched_pair("uuid", bad_uuid);
++        assert!(
++            matches!(preflight_with(&imzml2, true), Err(IntegrityError::UuidMismatch { .. })),
++            "--allow-checksum-mismatch must NOT relax the UUID linkage check"
++        );
++        let _ = std::fs::remove_dir_all(imzml2.parent().unwrap());
++    }
++
+     /// Campaign ISSUE-5 regression: the sibling-`.ibd` fallback must APPEND `.ibd` to the full
+     /// file stem, not `set_extension` (which would replace a dotted stem's last segment). For a
+     /// reverse output named `a.rev.imzML` the expected sidecar is `a.rev.ibd`, NOT `a.ibd`.
+diff --git a/src/read/mod.rs b/src/read/mod.rs
+index a87a062..6f30f88 100644
+--- a/src/read/mod.rs
++++ b/src/read/mod.rs
+@@ -7,6 +7,7 @@
+ 
+ pub mod record;
+ pub mod stream;
++pub mod transcode;
+ 
+ pub use record::{ImagingSpectrum, NumArray, Representation, RunProvenance, StorageMode};
+ pub use stream::{ImagingReader, ReadError};
+diff --git a/src/read/stream.rs b/src/read/stream.rs
+index 323dcc3..a7eb482 100644
+--- a/src/read/stream.rs
++++ b/src/read/stream.rs
+@@ -39,6 +39,7 @@ use mzdata::spectrum::bindata::{ArrayType, BinaryDataArrayType, ByteArrayView};
+ use crate::integrity::IntegrityError;
+ use crate::integrity::preflight;
+ use crate::read::record::{ImagingSpectrum, NumArray, RunProvenance, StorageMode};
++use crate::read::transcode;
+ 
+ /// A typed read-layer failure.
+ ///
+@@ -102,6 +103,10 @@ pub struct ImagingReader {
+     /// Set once iteration has cleanly ended (EOF) or hard-errored, so a second poll past the
+     /// end keeps returning `None` rather than re-driving the parser.
+     finished: bool,
++    /// Kept alive for the reader's lifetime: when the source imzML declared a non-UTF-8 XML
++    /// encoding (ISSUE-2), `inner` reads from a transcoded UTF-8 temp file owned by this guard,
++    /// which deletes it on drop. `None` for the common UTF-8 fast path.
++    _transcoded: Option<crate::read::transcode::TranscodedXml>,
+ }
+ 
+ impl ImagingReader {
+@@ -112,11 +117,41 @@ impl ImagingReader {
+     /// captures run provenance, and auto-detects the storage mode from the file-level
+     /// `data_mode` param only (IN-03).
+     pub fn open(imzml_path: &Path) -> Result<ImagingReader, ReadError> {
++        Self::open_with(imzml_path, false)
++    }
++
++    /// Like [`ImagingReader::open`] but with the opt-in checksum escape hatch threaded into the
++    /// preflight (CLI `--allow-checksum-mismatch`). When `allow_checksum_mismatch` is true, a
++    /// whole-file `.ibd` checksum mismatch warns instead of failing; the UUID linkage is still
++    /// enforced. The reader path is otherwise identical (incl. the Latin-1 transcode shim).
++    pub fn open_with(
++        imzml_path: &Path,
++        allow_checksum_mismatch: bool,
++    ) -> Result<ImagingReader, ReadError> {
+         // (1) Integrity gate BEFORE any reader construction.
+-        let report = preflight::preflight(imzml_path)?;
++        let report = preflight::preflight_with(imzml_path, allow_checksum_mismatch)?;
+ 
+-        // (2) Open the mzdata reader (preflight already proved the .ibd linkage).
+-        let inner = ImzMLReader::<File, File>::open_path(imzml_path).map_err(ReadError::Open)?;
++        // (2) Open the mzdata reader (preflight already proved the .ibd linkage). If the imzML
++        //     declares a non-UTF-8 XML encoding (ISSUE-2: e.g. ISO-8859-1 DESI files), mzdata's
++        //     UTF-8-only attribute decode would PANIC, so transcode the XML to a UTF-8 temp file
++        //     and hand the reader (temp XML, untouched original .ibd) explicitly. The `.ibd`
++        //     offsets are ASCII in the XML and the UUID text is preserved, so neither the data
++        //     nor mzdata's `.ibd` linkage check is affected.
++        let encoding = transcode::detect_xml_encoding(imzml_path).map_err(ReadError::Open)?;
++        let (inner, transcoded) = match encoding {
++            transcode::XmlEncoding::Utf8 => (
++                ImzMLReader::<File, File>::open_path(imzml_path).map_err(ReadError::Open)?,
++                None,
++            ),
++            transcode::XmlEncoding::Latin1 { declared } => {
++                let guard = transcode::transcode_latin1_to_utf8(imzml_path, &declared)
++                    .map_err(ReadError::Open)?;
++                let ibd_path = preflight::resolve_ibd_for(imzml_path)?;
++                let xml_file = guard.open().map_err(ReadError::Open)?;
++                let ibd_file = File::open(&ibd_path).map_err(ReadError::Open)?;
++                (ImzMLReader::<File, File>::new(xml_file, ibd_file), Some(guard))
++            }
++        };
+ 
+         // (3) Capture run-level provenance + storage mode from the FILE-LEVEL metadata.
+         let md = &inner.imzml_metadata;
+@@ -145,6 +180,7 @@ impl ImagingReader {
+             storage_mode,
+             index: 0,
+             finished: false,
++            _transcoded: transcoded,
+         })
+     }
+ 
+diff --git a/src/read/transcode.rs b/src/read/transcode.rs
+new file mode 100644
+index 0000000..c60b527
+--- /dev/null
++++ b/src/read/transcode.rs
+@@ -0,0 +1,306 @@
++//! Latin-1 → UTF-8 imzML transcode shim (campaign ISSUE-2).
++//!
++//! mzdata's mzML/imzML reader decodes XML attribute values and element text as UTF-8 and
++//! **panics** on the first non-UTF-8 byte (`reading_shared.rs`: `unescape_value().expect(..)`).
++//! A large fraction of real-world imzML (e.g. the Zenodo DESI set) declares
++//! `encoding="ISO-8859-1"` and carries genuine Latin-1 bytes (e.g. `<sourceFile name="à">`,
++//! byte `0xE0`). The vendored mzdata cannot enable quick-xml's `encoding` feature without
++//! losing `unescape_value`, so we fix it at OUR read boundary instead of patching the parser.
++//!
++//! Strategy: when an imzML's XML prolog declares a non-UTF-8 encoding, stream-transcode it to
++//! a UTF-8 temp file (rewriting the prolog's `encoding=` to `UTF-8`) and hand mzdata the temp
++//! XML together with the UNTOUCHED original `.ibd`. This is exact and lossless for ISO-8859-1
++//! (each byte is its own Unicode code point) and cannot affect data integrity: the `.ibd` is
++//! never touched, and the byte offsets that index it live in the XML as ASCII digits, so they
++//! survive transcoding unchanged. The declared UUID text is preserved, so mzdata's `.ibd`
++//! UUID check still passes (and our preflight already hard-validated UUID + checksum).
++//!
++//! Scope: handles ISO-8859-1 / Latin-1 exactly. Any other declared non-UTF-8 encoding is
++//! transcoded as Latin-1 on a best-effort basis with a `log::warn` (correct for the 0x00–0x7F
++//! and 0xA0–0xFF ranges; only the 0x80–0x9F C1 range differs from e.g. windows-1252).
++
++use std::fs::File;
++use std::io::{self, BufReader, BufWriter, Read, Write};
++use std::path::{Path, PathBuf};
++use std::sync::atomic::{AtomicU64, Ordering};
++
++/// The XML-prolog encoding classification that decides whether a transcode is needed.
++#[derive(Debug, Clone, PartialEq, Eq)]
++pub enum XmlEncoding {
++    /// UTF-8, US-ASCII, or no declaration → feed mzdata the file directly (no transcode).
++    Utf8,
++    /// A non-UTF-8 encoding that we transcode as Latin-1. Carries the declared name (for logs).
++    Latin1 { declared: String },
++}
++
++/// Read the XML prolog (`<?xml … ?>`) and classify the declared encoding. Reads at most the
++/// first 512 bytes — the prolog, when present, is the very first construct in the document.
++pub fn detect_xml_encoding(path: &Path) -> io::Result<XmlEncoding> {
++    let mut head = [0u8; 512];
++    let n = {
++        let mut f = File::open(path)?;
++        read_up_to(&mut f, &mut head)?
++    };
++    let head = &head[..n];
++    // The prolog (and its encoding attribute) is pure ASCII, so a lossy decode is safe here.
++    let text = String::from_utf8_lossy(head);
++    // Only look within the prolog `<?xml … ?>`; if there is no prolog there is no declared
++    // encoding and the XML default (UTF-8) applies.
++    let prolog_end = text.find("?>").map(|i| i + 2).unwrap_or(text.len());
++    let prolog = &text[..prolog_end];
++    let Some(enc) = extract_encoding(prolog) else {
++        return Ok(XmlEncoding::Utf8);
++    };
++    let lower = enc.to_ascii_lowercase();
++    match lower.as_str() {
++        "utf-8" | "utf8" | "us-ascii" | "ascii" => Ok(XmlEncoding::Utf8),
++        _ => Ok(XmlEncoding::Latin1 { declared: enc }),
++    }
++}
++
++/// Pull the `encoding="…"` (or `'…'`) value out of an XML prolog string, if present.
++fn extract_encoding(prolog: &str) -> Option<String> {
++    let idx = prolog.find("encoding")?;
++    let rest = &prolog[idx + "encoding".len()..];
++    let eq = rest.find('=')?;
++    let after = rest[eq + 1..].trim_start();
++    let quote = after.chars().next()?;
++    if quote != '"' && quote != '\'' {
++        return None;
++    }
++    let val = &after[1..];
++    let end = val.find(quote)?;
++    Some(val[..end].to_string())
++}
++
++/// Read into `buf` until full or EOF, returning the number of bytes read (handles short reads).
++fn read_up_to<R: Read>(r: &mut R, buf: &mut [u8]) -> io::Result<usize> {
++    let mut filled = 0;
++    while filled < buf.len() {
++        match r.read(&mut buf[filled..]) {
++            Ok(0) => break,
++            Ok(n) => filled += n,
++            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
++            Err(e) => return Err(e),
++        }
++    }
++    Ok(filled)
++}
++
++/// Owns a transcoded temp `.imzML` and deletes it on drop, so the UTF-8 shim never litters
++/// the temp dir even on error paths. The held [`File`] handle is what the reader consumes.
++#[derive(Debug)]
++pub struct TranscodedXml {
++    path: PathBuf,
++}
++
++impl TranscodedXml {
++    /// Open the transcoded temp file for reading (a fresh handle the reader takes ownership of).
++    pub fn open(&self) -> io::Result<File> {
++        File::open(&self.path)
++    }
++}
++
++impl Drop for TranscodedXml {
++    fn drop(&mut self) {
++        let _ = std::fs::remove_file(&self.path);
++    }
++}
++
++/// Monotonic suffix so multiple transcodes in one process never collide on a temp name.
++static SEQ: AtomicU64 = AtomicU64::new(0);
++
++/// Transcode `src` (declared `declared` encoding) to a UTF-8 temp file, rewriting the prolog's
++/// `encoding=` to `UTF-8`. Returns a [`TranscodedXml`] guard whose file is the UTF-8 document.
++///
++/// Streaming + bounded: the prolog is handled as a small head buffer; the body is transcoded
++/// byte-at-a-time through buffered I/O (never loads the whole document into memory).
++pub fn transcode_latin1_to_utf8(src: &Path, declared: &str) -> io::Result<TranscodedXml> {
++    if !declared.eq_ignore_ascii_case("iso-8859-1")
++        && !declared.eq_ignore_ascii_case("iso8859-1")
++        && !declared.eq_ignore_ascii_case("latin1")
++        && !declared.eq_ignore_ascii_case("latin-1")
++    {
++        log::warn!(
++            "imzML declares encoding=\"{declared}\"; transcoding as Latin-1 (best effort — the \
++             0x80–0x9F range may differ from this encoding). Re-export as UTF-8 for exactness."
++        );
++    } else {
++        log::warn!(
++            "imzML declares encoding=\"{declared}\"; transcoding to UTF-8 in a temp file so the \
++             reader can parse it (the .ibd is untouched)."
++        );
++    }
++
++    let stem = src
++        .file_name()
++        .map(|s| s.to_string_lossy().to_string())
++        .unwrap_or_else(|| "input.imzML".to_string());
++    let seq = SEQ.fetch_add(1, Ordering::Relaxed);
++    let dst = std::env::temp_dir().join(format!(
++        "imzml2mzpeak-utf8-{}-{}-{}",
++        std::process::id(),
++        seq,
++        stem
++    ));
++
++    let mut reader = BufReader::new(File::open(src)?);
++    let mut writer = BufWriter::new(File::create(&dst)?);
++    // Use the guard from here on so an early return still cleans up the temp file.
++    let guard = TranscodedXml { path: dst };
++
++    // (1) Prolog: read the `<?xml … ?>` head (ASCII), rewrite its encoding to UTF-8, emit it.
++    //     If there is no prolog, emit nothing special and fall through to the body transcode.
++    let mut head = vec![0u8; 512];
++    let n = read_up_to(&mut reader, &mut head)?;
++    head.truncate(n);
++    let (prolog_out, body_prefix) = rewrite_prolog(&head);
++    writer.write_all(&prolog_out)?;
++    // The bytes of `head` AFTER the prolog still belong to the document body → transcode them.
++    emit_transcoded(&mut writer, body_prefix)?;
++
++    // (2) Body: stream the rest, expanding each byte to its UTF-8 form.
++    let mut buf = vec![0u8; 64 * 1024];
++    loop {
++        let m = reader.read(&mut buf)?;
++        if m == 0 {
++            break;
++        }
++        emit_transcoded(&mut writer, &buf[..m])?;
++    }
++    writer.flush()?;
++    Ok(guard)
++}
++
++/// Given the document head, return (UTF-8 prolog bytes with `encoding="UTF-8"`, remaining body
++/// bytes that followed the prolog). If no prolog is present, the prolog output is empty and the
++/// whole head is returned as body.
++fn rewrite_prolog(head: &[u8]) -> (Vec<u8>, &[u8]) {
++    let text = String::from_utf8_lossy(head);
++    let Some(close_rel) = text.find("?>") else {
++        // No complete prolog in the head — treat all of it as body (rare; tiny files).
++        return (Vec::new(), head);
++    };
++    let close = close_rel + 2;
++    let prolog = &text[..close];
++    let rewritten = match (prolog.find("encoding"), prolog.find('=')) {
++        (Some(enc_at), _) => {
++            // Replace the quoted value after `encoding=` with `UTF-8`, preserving the quote char.
++            let after_kw = &prolog[enc_at + "encoding".len()..];
++            if let Some(eq) = after_kw.find('=') {
++                let pre = &prolog[..enc_at + "encoding".len() + eq + 1];
++                let val_region = after_kw[eq + 1..].trim_start();
++                let quote = val_region.chars().next().unwrap_or('"');
++                // Whitespace between `=` and the quote, preserved minimally as none.
++                if let Some(end) = val_region[1..].find(quote) {
++                    let tail = &val_region[1 + end + 1..];
++                    format!("{pre}{quote}UTF-8{quote}{tail}")
++                } else {
++                    prolog.to_string()
++                }
++            } else {
++                prolog.to_string()
++            }
++        }
++        _ => prolog.to_string(),
++    };
++    // The prolog is ASCII; its bytes are valid UTF-8 as-is.
++    (rewritten.into_bytes(), &head[close..])
++}
++
++/// Write `bytes` to `w`, expanding each byte ≥ 0x80 to its 2-byte UTF-8 form (Latin-1 → UTF-8).
++fn emit_transcoded<W: Write>(w: &mut W, bytes: &[u8]) -> io::Result<()> {
++    let mut out = Vec::with_capacity(bytes.len() + bytes.len() / 8 + 8);
++    for &b in bytes {
++        if b < 0x80 {
++            out.push(b);
++        } else {
++            out.push(0xC0 | (b >> 6));
++            out.push(0x80 | (b & 0x3F));
++        }
++    }
++    w.write_all(&out)
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use std::io::Write;
++
++    fn write_tmp(name: &str, bytes: &[u8]) -> PathBuf {
++        let p = std::env::temp_dir().join(format!(
++            "i2mp-transcode-test-{}-{}-{}",
++            std::process::id(),
++            SEQ.fetch_add(1, Ordering::Relaxed),
++            name
++        ));
++        let mut f = File::create(&p).unwrap();
++        f.write_all(bytes).unwrap();
++        p
++    }
++
++    #[test]
++    fn detects_iso_8859_1() {
++        let p = write_tmp(
++            "iso.imzML",
++            b"<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n<mzML/>",
++        );
++        match detect_xml_encoding(&p).unwrap() {
++            XmlEncoding::Latin1 { declared } => assert_eq!(declared, "ISO-8859-1"),
++            other => panic!("expected Latin1, got {other:?}"),
++        }
++        let _ = std::fs::remove_file(&p);
++    }
++
++    #[test]
++    fn detects_utf8_and_absent_as_utf8() {
++        let p1 = write_tmp("utf8.imzML", b"<?xml version=\"1.0\" encoding=\"UTF-8\"?><mzML/>");
++        let p2 = write_tmp("none.imzML", b"<?xml version=\"1.0\"?><mzML/>");
++        assert_eq!(detect_xml_encoding(&p1).unwrap(), XmlEncoding::Utf8);
++        assert_eq!(detect_xml_encoding(&p2).unwrap(), XmlEncoding::Utf8);
++        let _ = std::fs::remove_file(&p1);
++        let _ = std::fs::remove_file(&p2);
++    }
++
++    #[test]
++    fn transcode_expands_latin1_byte_and_rewrites_prolog() {
++        // `0xE0` is `à` in ISO-8859-1 → `0xC3 0xA0` in UTF-8.
++        let src = write_tmp(
++            "src.imzML",
++            b"<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n<sourceFile name=\"\xe0\"/>",
++        );
++        let guard = transcode_latin1_to_utf8(&src, "ISO-8859-1").unwrap();
++        let mut out = String::new();
++        guard.open().unwrap().read_to_string(&mut out).unwrap();
++        // Valid UTF-8 (read_to_string would have errored otherwise), prolog rewritten, à intact.
++        assert!(out.contains("encoding=\"UTF-8\""), "prolog rewritten: {out}");
++        assert!(!out.contains("ISO-8859-1"), "old encoding removed");
++        assert!(out.contains("name=\"à\""), "Latin-1 byte expanded to UTF-8 à: {out}");
++        let _ = std::fs::remove_file(&src);
++    }
++
++    #[test]
++    fn transcode_preserves_ascii_offsets_and_digits() {
++        let src = write_tmp(
++            "off.imzML",
++            b"<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?><cvParam value=\"123456\" name=\"\xb5\"/>",
++        );
++        let guard = transcode_latin1_to_utf8(&src, "ISO-8859-1").unwrap();
++        let mut out = String::new();
++        guard.open().unwrap().read_to_string(&mut out).unwrap();
++        assert!(out.contains("value=\"123456\""), "ASCII offsets/digits untouched");
++        assert!(out.contains('µ'), "0xB5 → µ"); // micro sign
++        let _ = std::fs::remove_file(&src);
++    }
++
++    #[test]
++    fn temp_file_is_removed_on_drop() {
++        let src = write_tmp("drop.imzML", b"<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?><a/>");
++        let path = {
++            let guard = transcode_latin1_to_utf8(&src, "ISO-8859-1").unwrap();
++            guard.path.clone()
++        };
++        assert!(!path.exists(), "temp transcode file must be deleted on drop");
++        let _ = std::fs::remove_file(&src);
++    }
++}

@@ -39,6 +39,7 @@ use mzdata::spectrum::bindata::{ArrayType, BinaryDataArrayType, ByteArrayView};
 use crate::integrity::IntegrityError;
 use crate::integrity::preflight;
 use crate::read::record::{ImagingSpectrum, NumArray, RunProvenance, StorageMode};
+use crate::read::transcode;
 
 /// A typed read-layer failure.
 ///
@@ -102,6 +103,10 @@ pub struct ImagingReader {
     /// Set once iteration has cleanly ended (EOF) or hard-errored, so a second poll past the
     /// end keeps returning `None` rather than re-driving the parser.
     finished: bool,
+    /// Kept alive for the reader's lifetime: when the source imzML declared a non-UTF-8 XML
+    /// encoding (ISSUE-2), `inner` reads from a transcoded UTF-8 temp file owned by this guard,
+    /// which deletes it on drop. `None` for the common UTF-8 fast path.
+    _transcoded: Option<crate::read::transcode::TranscodedXml>,
 }
 
 impl ImagingReader {
@@ -112,11 +117,41 @@ impl ImagingReader {
     /// captures run provenance, and auto-detects the storage mode from the file-level
     /// `data_mode` param only (IN-03).
     pub fn open(imzml_path: &Path) -> Result<ImagingReader, ReadError> {
-        // (1) Integrity gate BEFORE any reader construction.
-        let report = preflight::preflight(imzml_path)?;
+        Self::open_with(imzml_path, false)
+    }
 
-        // (2) Open the mzdata reader (preflight already proved the .ibd linkage).
-        let inner = ImzMLReader::<File, File>::open_path(imzml_path).map_err(ReadError::Open)?;
+    /// Like [`ImagingReader::open`] but with the opt-in checksum escape hatch threaded into the
+    /// preflight (CLI `--allow-checksum-mismatch`). When `allow_checksum_mismatch` is true, a
+    /// whole-file `.ibd` checksum mismatch warns instead of failing; the UUID linkage is still
+    /// enforced. The reader path is otherwise identical (incl. the Latin-1 transcode shim).
+    pub fn open_with(
+        imzml_path: &Path,
+        allow_checksum_mismatch: bool,
+    ) -> Result<ImagingReader, ReadError> {
+        // (1) Integrity gate BEFORE any reader construction.
+        let report = preflight::preflight_with(imzml_path, allow_checksum_mismatch)?;
+
+        // (2) Open the mzdata reader (preflight already proved the .ibd linkage). If the imzML
+        //     declares a non-UTF-8 XML encoding (ISSUE-2: e.g. ISO-8859-1 DESI files), mzdata's
+        //     UTF-8-only attribute decode would PANIC, so transcode the XML to a UTF-8 temp file
+        //     and hand the reader (temp XML, untouched original .ibd) explicitly. The `.ibd`
+        //     offsets are ASCII in the XML and the UUID text is preserved, so neither the data
+        //     nor mzdata's `.ibd` linkage check is affected.
+        let encoding = transcode::detect_xml_encoding(imzml_path).map_err(ReadError::Open)?;
+        let (inner, transcoded) = match encoding {
+            transcode::XmlEncoding::Utf8 => (
+                ImzMLReader::<File, File>::open_path(imzml_path).map_err(ReadError::Open)?,
+                None,
+            ),
+            transcode::XmlEncoding::Latin1 { declared } => {
+                let guard = transcode::transcode_latin1_to_utf8(imzml_path, &declared)
+                    .map_err(ReadError::Open)?;
+                let ibd_path = preflight::resolve_ibd_for(imzml_path)?;
+                let xml_file = guard.open().map_err(ReadError::Open)?;
+                let ibd_file = File::open(&ibd_path).map_err(ReadError::Open)?;
+                (ImzMLReader::<File, File>::new(xml_file, ibd_file), Some(guard))
+            }
+        };
 
         // (3) Capture run-level provenance + storage mode from the FILE-LEVEL metadata.
         let md = &inner.imzml_metadata;
@@ -145,6 +180,7 @@ impl ImagingReader {
             storage_mode,
             index: 0,
             finished: false,
+            _transcoded: transcoded,
         })
     }
 

@@ -45,6 +45,18 @@ const CHUNK: usize = 64 * 1024;
 /// Run the integrity preflight on an imzML path. Returns a [`PreflightReport`] on success;
 /// a typed [`IntegrityError`] on any UUID mismatch, checksum mismatch, or missing `.ibd`.
 pub fn preflight(imzml_path: &Path) -> Result<PreflightReport, IntegrityError> {
+    preflight_with(imzml_path, false)
+}
+
+/// Preflight with an opt-in checksum escape hatch. When `allow_checksum_mismatch` is true, a
+/// whole-file `.ibd` checksum mismatch is downgraded from a hard [`IntegrityError`] to a
+/// `log::warn` (the converted output is still produced). The UUID linkage and the
+/// `.ibd`-present checks are ALWAYS enforced — only the checksum is relaxed. Used by the CLI
+/// `--allow-checksum-mismatch` flag for known-imperfect real-world datasets.
+pub fn preflight_with(
+    imzml_path: &Path,
+    allow_checksum_mismatch: bool,
+) -> Result<PreflightReport, IntegrityError> {
     // (1) Parse the imzML header (bounded; never reads the whole file).
     let header = header::parse_imzml_header(imzml_path)?;
 
@@ -91,11 +103,22 @@ pub fn preflight(imzml_path: &Path) -> Result<PreflightReport, IntegrityError> {
     //     over a fixed-size chunked stream (never fs::read the whole sidecar).
     let computed = compute_digest(&ibd_path, header.checksum_type)?;
     if computed != header.checksum_hex.to_lowercase() {
-        return Err(IntegrityError::ChecksumMismatch {
-            kind: header.checksum_type,
-            declared: header.checksum_hex.clone(),
-            computed,
-        });
+        if allow_checksum_mismatch {
+            log::warn!(
+                "{:?} checksum mismatch for {} (declared {}, computed {}) — proceeding anyway \
+                 because --allow-checksum-mismatch was set; the .ibd may be corrupt or truncated",
+                header.checksum_type,
+                ibd_path.display(),
+                header.checksum_hex,
+                computed,
+            );
+        } else {
+            return Err(IntegrityError::ChecksumMismatch {
+                kind: header.checksum_type,
+                declared: header.checksum_hex.clone(),
+                computed,
+            });
+        }
     }
 
     Ok(PreflightReport {
@@ -103,6 +126,15 @@ pub fn preflight(imzml_path: &Path) -> Result<PreflightReport, IntegrityError> {
         checksum_type: header.checksum_type,
         checksum_hex: header.checksum_hex,
     })
+}
+
+/// Resolve the `.ibd` for an imzML by parsing its header (for the declared `IMS:1000070`
+/// name) and applying the same resolution the preflight uses. `pub(crate)` so the read layer
+/// can locate the real `.ibd` when it must hand mzdata an explicit sidecar handle (e.g. the
+/// Latin-1 transcode path opens a UTF-8 temp XML alongside the untouched original `.ibd`).
+pub(crate) fn resolve_ibd_for(imzml_path: &Path) -> Result<PathBuf, IntegrityError> {
+    let header = header::parse_imzml_header(imzml_path)?;
+    resolve_ibd_path(imzml_path, header.ibd_file_name.as_deref())
 }
 
 /// Resolve the `.ibd` path. Prefer the declared `IMS:1000070` name (relative to the imzML's
@@ -230,6 +262,59 @@ mod tests {
     #[test]
     fn uuid_hex_to_bytes_rejects_wrong_length() {
         assert!(uuid_hex_to_bytes("abcd").is_none());
+    }
+
+    /// Build a minimal `<stem>.imzML` + `<stem>.ibd` pair in a temp dir: the `.ibd`'s first 16
+    /// bytes are the declared UUID, but its whole-file SHA-1 will NOT match `declared_sha1`.
+    /// Returns the imzML path (with the temp dir kept alive via the returned guard path).
+    fn write_mismatched_pair(tag: &str, ibd_first16: [u8; 16]) -> (PathBuf, PathBuf) {
+        let dir = std::env::temp_dir().join(format!("i2mp_pf_{}_{}", std::process::id(), tag));
+        let _ = std::fs::create_dir_all(&dir);
+        let imzml = dir.join("t.imzML");
+        let ibd = dir.join("t.ibd");
+        let xml = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n\
+            <mzML>\n\
+            <cvParam accession=\"IMS:1000080\" name=\"uuid\" value=\"{00112233-4455-6677-8899-aabbccddeeff}\"/>\n\
+            <cvParam accession=\"IMS:1000091\" name=\"ibd SHA-1\" value=\"0000000000000000000000000000000000000000\"/>\n\
+            <spectrumList count=\"0\">\n\
+            </mzML>\n";
+        std::fs::write(&imzml, xml).unwrap();
+        let mut body = ibd_first16.to_vec();
+        body.extend_from_slice(b"not-the-declared-bytes");
+        std::fs::write(&ibd, &body).unwrap();
+        (imzml, ibd)
+    }
+
+    /// Escape-hatch regression: a whole-file checksum mismatch is a HARD error by default but is
+    /// downgraded to a warning under `allow_checksum_mismatch=true` — while the UUID linkage stays
+    /// enforced in BOTH modes.
+    #[test]
+    fn allow_checksum_mismatch_relaxes_checksum_but_not_uuid() {
+        let good_uuid = [
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd,
+            0xee, 0xff,
+        ];
+        // (a) Correct UUID, wrong checksum → strict fails, allow=true succeeds.
+        let (imzml, _ibd) = write_mismatched_pair("ck", good_uuid);
+        assert!(
+            matches!(preflight(&imzml), Err(IntegrityError::ChecksumMismatch { .. })),
+            "strict preflight must hard-fail on checksum mismatch"
+        );
+        assert!(
+            preflight_with(&imzml, true).is_ok(),
+            "--allow-checksum-mismatch must let a checksum-mismatched .ibd through"
+        );
+        let _ = std::fs::remove_dir_all(imzml.parent().unwrap());
+
+        // (b) WRONG UUID → even with allow=true the UUID linkage still hard-fails.
+        let mut bad_uuid = good_uuid;
+        bad_uuid[0] ^= 0xff;
+        let (imzml2, _ibd2) = write_mismatched_pair("uuid", bad_uuid);
+        assert!(
+            matches!(preflight_with(&imzml2, true), Err(IntegrityError::UuidMismatch { .. })),
+            "--allow-checksum-mismatch must NOT relax the UUID linkage check"
+        );
+        let _ = std::fs::remove_dir_all(imzml2.parent().unwrap());
     }
 
     /// Campaign ISSUE-5 regression: the sibling-`.ibd` fallback must APPEND `.ibd` to the full

@@ -7,6 +7,7 @@
 
 pub mod record;
 pub mod stream;
+pub mod transcode;
 
 pub use record::{ImagingSpectrum, NumArray, Representation, RunProvenance, StorageMode};
 pub use stream::{ImagingReader, ReadError};

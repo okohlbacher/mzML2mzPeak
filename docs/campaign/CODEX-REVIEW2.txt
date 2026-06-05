@@ -1,0 +1,1855 @@
+Reading prompt from stdin...
+OpenAI Codex v0.128.0 (research preview)
+--------
+workdir: /Users/kohlbach/Claude/imzML2mzPeak
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: medium
+reasoning summaries: none
+session id: 019e9988-140d-7433-b052-ceb29a6f0ee2
+--------
+user
+You are an adversarial reviewer. Be skeptical and concrete. Repo: imzML↔imaging-mzPeak converter (Rust).
+Review two correctness-sensitive fixes for the previously-failing datasets. Read (read-only):
+  - docs/campaign/issue2-3-fixes.diff   (the exact diff)
+  - src/read/transcode.rs               (the Latin-1→UTF-8 shim)
+  - src/read/stream.rs                  (ImagingReader::open_with — where the shim is wired)
+  - src/integrity/preflight.rs          (preflight_with + the checksum escape hatch)
+  - vendor/mzdata/src/io/imzml/reader.rs (compare open_path vs new(file, ibd_file), ~lines 542-770, 1385-1410)
+
+Answer each with VERDICT + 1-3 sentences + file:line if you object:
+1. TRANSCODE CORRECTNESS (ISSUE-2): we detect a non-UTF-8 XML prolog, stream-transcode the imzML
+   ISO-8859-1→UTF-8 to a temp file (each byte<0x80 passes; 0x80-0xFF → 2-byte UTF-8), rewrite the
+   prolog encoding to UTF-8, then open mzdata with (temp_xml, ORIGINAL .ibd) via ImzMLReader::new.
+   Is the byte→UTF-8 expansion correct and lossless for ISO-8859-1? Can transcoding the XML change
+   any value mzdata uses for .ibd ACCESS (external array offsets/lengths IMS:1000102/103/104, which
+   are ASCII decimal in the XML)? Could it shift/corrupt spectral data? Any edge case in
+   rewrite_prolog (quote handling, missing prolog, prolog split across the 512-byte head buffer)?
+2. READER SEAM: does ImzMLReader::new(file, ibd_file) do everything open_path does that we rely on
+   (parse_metadata → data_mode/uuid/checksum; the .ibd UUID check)? Anything open_path sets that new
+   does NOT, that ImagingReader/convert later depends on? Is consuming the first 16 .ibd bytes in
+   check_ibd_file safe given array reads use absolute SeekFrom::Start offsets?
+3. ESCAPE HATCH (ISSUE-3): preflight_with(allow_checksum_mismatch) downgrades a whole-file checksum
+   mismatch to a warning but STILL enforces UUID + .ibd-present. Is the UUID check truly still
+   enforced on the allow path? Any way a corrupt .ibd that passes UUID but fails checksum could
+   produce silently wrong spectra without surfacing a decode error? Is defaulting to strict correct?
+4. Any data-integrity or panic risk you'd block the commit on?
+Keep under ~400 words. End with: SHIP IT / FIX FIRST: <one line>.
+
+codex
+I’ll inspect the requested diff and source paths directly, then answer in review mode with only concrete blockers or residual risks.
+exec
+/bin/zsh -lc "sed -n '1,240p' docs/campaign/issue2-3-fixes.diff" in /Users/kohlbach/Claude/imzML2mzPeak
+exec
+/bin/zsh -lc "nl -ba src/integrity/preflight.rs | sed -n '1,280p'" in /Users/kohlbach/Claude/imzML2mzPeak
+ succeeded in 0ms:
+diff --git a/src/cli.rs b/src/cli.rs
+index 2f14973..b2f355f 100644
+--- a/src/cli.rs
++++ b/src/cli.rs
+@@ -24,7 +24,7 @@ use clap::Parser;
+ use indicatif::{ProgressBar, ProgressStyle};
+ 
+ use crate::integrity::header::{IntegrityError, parse_imzml_header};
+-use crate::integrity::preflight::preflight;
++use crate::integrity::preflight::preflight_with;
+ use crate::read::{ImagingReader, ReadError};
+ use crate::schema::{ConformanceLevel, parse_scan_settings};
+ use crate::verify::{VerifyError, verify_streaming};
+@@ -84,6 +84,13 @@ pub struct ConvertCli {
+     /// metadata + a full-extent affine in `metadata.imaging.images[]`. Rejected on the reverse path.
+     #[arg(long = "image", value_name = "PATH", action = clap::ArgAction::Append)]
+     pub images: Vec<PathBuf>,
++
++    /// Forward-only escape hatch: convert even when the `.ibd` fails its declared checksum
++    /// (`IMS:1000090` MD5 / `IMS:1000091` SHA-1). The UUID linkage is STILL verified; only the
++    /// whole-file checksum is downgraded from a hard error to a loud warning. For known-imperfect
++    /// real-world datasets (e.g. a truncated download) where you accept the integrity risk.
++    #[arg(long = "allow-checksum-mismatch")]
++    pub allow_checksum_mismatch: bool,
+ }
+ 
+ /// Drive the CLI: dry-run report (CLI-03) or convert + optional verify (CLI-01/02), returning
+@@ -174,7 +181,7 @@ fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
+ 
+     // Open the reader (runs preflight internally) and stream the conversion. `convert`
+     // consumes the reader by value and owns the per-spectrum loop.
+-    let reader = ImagingReader::open(&cli.input)
++    let reader = ImagingReader::open_with(&cli.input, cli.allow_checksum_mismatch)
+         .with_context(|| format!("failed to open imzML reader for {}", cli.input.display()))?;
+     convert(reader, out, &cli.images).context("conversion failed")?;
+ 
+@@ -193,12 +200,13 @@ fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
+     // --verify: convert consumed the first reader (one-shot iterator — Pitfall 2), so open a
+     // SECOND reader over the same source and stream it against the just-written archive.
+     if cli.verify {
+-        let reader2 = ImagingReader::open(&cli.input).with_context(|| {
+-            format!(
+-                "failed to re-open imzML reader for --verify of {}",
+-                cli.input.display()
+-            )
+-        })?;
++        let reader2 = ImagingReader::open_with(&cli.input, cli.allow_checksum_mismatch)
++            .with_context(|| {
++                format!(
++                    "failed to re-open imzML reader for --verify of {}",
++                    cli.input.display()
++                )
++            })?;
+         let report = verify_streaming(reader2, out, ConformanceLevel::L1BitForBit)
+             .context("verification failed to run")?;
+         if !report.passed() {
+@@ -389,13 +397,14 @@ fn dry_run(cli: &ConvertCli) -> anyhow::Result<()> {
+     let input = &cli.input;
+ 
+     // Integrity gate (reused verbatim — the CLI never bypasses preflight; T-6-integrity).
+-    let report = preflight(input)
++    // `--allow-checksum-mismatch` relaxes ONLY the checksum (UUID linkage still enforced).
++    let report = preflight_with(input, cli.allow_checksum_mismatch)
+         .with_context(|| format!("integrity preflight failed for {}", input.display()))?;
+ 
+     let header = parse_imzml_header(input)
+         .with_context(|| format!("failed to parse imzML header for {}", input.display()))?;
+ 
+-    let storage_mode = ImagingReader::open(input)
++    let storage_mode = ImagingReader::open_with(input, cli.allow_checksum_mismatch)
+         .with_context(|| format!("failed to open imzML reader for {}", input.display()))?
+         .storage_mode();
+ 
+diff --git a/src/integrity/preflight.rs b/src/integrity/preflight.rs
+index b8eb339..b29dc83 100644
+--- a/src/integrity/preflight.rs
++++ b/src/integrity/preflight.rs
+@@ -45,6 +45,18 @@ const CHUNK: usize = 64 * 1024;
+ /// Run the integrity preflight on an imzML path. Returns a [`PreflightReport`] on success;
+ /// a typed [`IntegrityError`] on any UUID mismatch, checksum mismatch, or missing `.ibd`.
+ pub fn preflight(imzml_path: &Path) -> Result<PreflightReport, IntegrityError> {
++    preflight_with(imzml_path, false)
++}
++
++/// Preflight with an opt-in checksum escape hatch. When `allow_checksum_mismatch` is true, a
++/// whole-file `.ibd` checksum mismatch is downgraded from a hard [`IntegrityError`] to a
++/// `log::warn` (the converted output is still produced). The UUID linkage and the
++/// `.ibd`-present checks are ALWAYS enforced — only the checksum is relaxed. Used by the CLI
++/// `--allow-checksum-mismatch` flag for known-imperfect real-world datasets.
++pub fn preflight_with(
++    imzml_path: &Path,
++    allow_checksum_mismatch: bool,
++) -> Result<PreflightReport, IntegrityError> {
+     // (1) Parse the imzML header (bounded; never reads the whole file).
+     let header = header::parse_imzml_header(imzml_path)?;
+ 
+@@ -91,11 +103,22 @@ pub fn preflight(imzml_path: &Path) -> Result<PreflightReport, IntegrityError> {
+     //     over a fixed-size chunked stream (never fs::read the whole sidecar).
+     let computed = compute_digest(&ibd_path, header.checksum_type)?;
+     if computed != header.checksum_hex.to_lowercase() {
+-        return Err(IntegrityError::ChecksumMismatch {
+-            kind: header.checksum_type,
+-            declared: header.checksum_hex.clone(),
+-            computed,
+-        });
++        if allow_checksum_mismatch {
++            log::warn!(
++                "{:?} checksum mismatch for {} (declared {}, computed {}) — proceeding anyway \
++                 because --allow-checksum-mismatch was set; the .ibd may be corrupt or truncated",
++                header.checksum_type,
++                ibd_path.display(),
++                header.checksum_hex,
++                computed,
++            );
++        } else {
++            return Err(IntegrityError::ChecksumMismatch {
++                kind: header.checksum_type,
++                declared: header.checksum_hex.clone(),
++                computed,
++            });
++        }
+     }
+ 
+     Ok(PreflightReport {
+@@ -105,6 +128,15 @@ pub fn preflight(imzml_path: &Path) -> Result<PreflightReport, IntegrityError> {
+     })
+ }
+ 
++/// Resolve the `.ibd` for an imzML by parsing its header (for the declared `IMS:1000070`
++/// name) and applying the same resolution the preflight uses. `pub(crate)` so the read layer
++/// can locate the real `.ibd` when it must hand mzdata an explicit sidecar handle (e.g. the
++/// Latin-1 transcode path opens a UTF-8 temp XML alongside the untouched original `.ibd`).
++pub(crate) fn resolve_ibd_for(imzml_path: &Path) -> Result<PathBuf, IntegrityError> {
++    let header = header::parse_imzml_header(imzml_path)?;
++    resolve_ibd_path(imzml_path, header.ibd_file_name.as_deref())
++}
++
+ /// Resolve the `.ibd` path. Prefer the declared `IMS:1000070` name (relative to the imzML's
+ /// parent dir); fall back to the imzML stem with `.ibd` then `.IBD` (mzdata open_path
+ /// behavior). Hard-fail with [`IntegrityError::MissingIbd`] if the resolved path is absent.
+@@ -232,6 +264,59 @@ mod tests {
+         assert!(uuid_hex_to_bytes("abcd").is_none());
+     }
+ 
++    /// Build a minimal `<stem>.imzML` + `<stem>.ibd` pair in a temp dir: the `.ibd`'s first 16
++    /// bytes are the declared UUID, but its whole-file SHA-1 will NOT match `declared_sha1`.
++    /// Returns the imzML path (with the temp dir kept alive via the returned guard path).
++    fn write_mismatched_pair(tag: &str, ibd_first16: [u8; 16]) -> (PathBuf, PathBuf) {
++        let dir = std::env::temp_dir().join(format!("i2mp_pf_{}_{}", std::process::id(), tag));
++        let _ = std::fs::create_dir_all(&dir);
++        let imzml = dir.join("t.imzML");
++        let ibd = dir.join("t.ibd");
++        let xml = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n\
++            <mzML>\n\
++            <cvParam accession=\"IMS:1000080\" name=\"uuid\" value=\"{00112233-4455-6677-8899-aabbccddeeff}\"/>\n\
++            <cvParam accession=\"IMS:1000091\" name=\"ibd SHA-1\" value=\"0000000000000000000000000000000000000000\"/>\n\
++            <spectrumList count=\"0\">\n\
++            </mzML>\n";
++        std::fs::write(&imzml, xml).unwrap();
++        let mut body = ibd_first16.to_vec();
++        body.extend_from_slice(b"not-the-declared-bytes");
++        std::fs::write(&ibd, &body).unwrap();
++        (imzml, ibd)
++    }
++
++    /// Escape-hatch regression: a whole-file checksum mismatch is a HARD error by default but is
++    /// downgraded to a warning under `allow_checksum_mismatch=true` — while the UUID linkage stays
++    /// enforced in BOTH modes.
++    #[test]
++    fn allow_checksum_mismatch_relaxes_checksum_but_not_uuid() {
++        let good_uuid = [
++            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd,
++            0xee, 0xff,
++        ];
++        // (a) Correct UUID, wrong checksum → strict fails, allow=true succeeds.
++        let (imzml, _ibd) = write_mismatched_pair("ck", good_uuid);
++        assert!(
++            matches!(preflight(&imzml), Err(IntegrityError::ChecksumMismatch { .. })),
++            "strict preflight must hard-fail on checksum mismatch"
++        );
++        assert!(
++            preflight_with(&imzml, true).is_ok(),
++            "--allow-checksum-mismatch must let a checksum-mismatched .ibd through"
++        );
++        let _ = std::fs::remove_dir_all(imzml.parent().unwrap());
++
++        // (b) WRONG UUID → even with allow=true the UUID linkage still hard-fails.
++        let mut bad_uuid = good_uuid;
++        bad_uuid[0] ^= 0xff;
++        let (imzml2, _ibd2) = write_mismatched_pair("uuid", bad_uuid);
++        assert!(
++            matches!(preflight_with(&imzml2, true), Err(IntegrityError::UuidMismatch { .. })),
++            "--allow-checksum-mismatch must NOT relax the UUID linkage check"
++        );
++        let _ = std::fs::remove_dir_all(imzml2.parent().unwrap());
++    }
++
+     /// Campaign ISSUE-5 regression: the sibling-`.ibd` fallback must APPEND `.ibd` to the full
+     /// file stem, not `set_extension` (which would replace a dotted stem's last segment). For a
+     /// reverse output named `a.rev.imzML` the expected sidecar is `a.rev.ibd`, NOT `a.ibd`.
+diff --git a/src/read/stream.rs b/src/read/stream.rs
+index 323dcc3..a7eb482 100644
+--- a/src/read/stream.rs
++++ b/src/read/stream.rs
+@@ -39,6 +39,7 @@ use mzdata::spectrum::bindata::{ArrayType, BinaryDataArrayType, ByteArrayView};
+ use crate::integrity::IntegrityError;
+ use crate::integrity::preflight;
+ use crate::read::record::{ImagingSpectrum, NumArray, RunProvenance, StorageMode};
++use crate::read::transcode;
+ 
+ /// A typed read-layer failure.
+ ///
+@@ -102,6 +103,10 @@ pub struct ImagingReader {
+     /// Set once iteration has cleanly ended (EOF) or hard-errored, so a second poll past the
+     /// end keeps returning `None` rather than re-driving the parser.
+     finished: bool,
++    /// Kept alive for the reader's lifetime: when the source imzML declared a non-UTF-8 XML
++    /// encoding (ISSUE-2), `inner` reads from a transcoded UTF-8 temp file owned by this guard,
++    /// which deletes it on drop. `None` for the common UTF-8 fast path.
++    _transcoded: Option<crate::read::transcode::TranscodedXml>,
+ }
+ 
+ impl ImagingReader {
+@@ -112,11 +117,41 @@ impl ImagingReader {
+     /// captures run provenance, and auto-detects the storage mode from the file-level
+     /// `data_mode` param only (IN-03).
+     pub fn open(imzml_path: &Path) -> Result<ImagingReader, ReadError> {
++        Self::open_with(imzml_path, false)
++    }
++
++    /// Like [`ImagingReader::open`] but with the opt-in checksum escape hatch threaded into the
++    /// preflight (CLI `--allow-checksum-mismatch`). When `allow_checksum_mismatch` is true, a
++    /// whole-file `.ibd` checksum mismatch warns instead of failing; the UUID linkage is still
++    /// enforced. The reader path is otherwise identical (incl. the Latin-1 transcode shim).
++    pub fn open_with(
++        imzml_path: &Path,
++        allow_checksum_mismatch: bool,
++    ) -> Result<ImagingReader, ReadError> {
+         // (1) Integrity gate BEFORE any reader construction.
+-        let report = preflight::preflight(imzml_path)?;
+
+ succeeded in 0ms:
+     1	//! Preflight gate (IN-07): refuse to vouch for a mismatched, corrupt, or missing `.ibd`.
+     2	//!
+     3	//! Generalizes `src/bin/verify_ibd.rs` along the four review-mandated axes:
+     4	//!   1. BOUNDED header parse (see [`crate::integrity::header`]).
+     5	//!   2. PINNED Rust digest crates (`sha1`/`md-5`/`sha2`) streaming the `.ibd` in fixed
+     6	//!      chunks — never `fs::read` the 815MB sidecar.
+     7	//!   3. DECLARED ibd file name (`IMS:1000070`) preferred; sibling-stem fallback otherwise.
+     8	//!   4. A real non-zero exit (the `preflight` binary maps any [`IntegrityError`] to
+     9	//!      `ExitCode::FAILURE`).
+    10	//!
+    11	//! Two checks, BOTH must pass:
+    12	//!   (a) UUID — first 16 bytes of the `.ibd` compared byte-for-byte (RFC-4122 / big-endian)
+    13	//!       to the imzML-declared `IMS:1000080`.
+    14	//!   (b) Checksum — the WHOLE `.ibd` (byte 0..EOF, UUID bytes included) hashed with the
+    15	//!       declared algorithm and compared case-insensitively to the declared hex.
+    16	//!
+    17	//! Scope: UNCOMPRESSED `.ibd` only (the vendored reader is NoCompression-only). Preflight
+    18	//! does not decode arrays, so compression does not affect it.
+    19	
+    20	use std::fs::File;
+    21	use std::io::Read;
+    22	use std::path::{Path, PathBuf};
+    23	
+    24	// `Digest` is the shared RustCrypto trait re-exported by each digest crate; reach it via
+    25	// sha2 (no separate `digest` dependency needed — it is transitive).
+    26	use sha2::digest::Digest;
+    27	
+    28	use crate::integrity::header::{self, ChecksumType, IntegrityError};
+    29	
+    30	/// Successful preflight result: the verified imzML↔.ibd linkage values.
+    31	#[derive(Debug, Clone)]
+    32	pub struct PreflightReport {
+    33	    /// Verified, normalized lowercase UUID.
+    34	    pub uuid: String,
+    35	    /// Which checksum algorithm was verified.
+    36	    pub checksum_type: ChecksumType,
+    37	    /// The verified checksum hex (lowercased).
+    38	    pub checksum_hex: String,
+    39	}
+    40	
+    41	/// Fixed read buffer for the streaming digest (64 KiB) — bounds memory regardless of the
+    42	/// `.ibd` size.
+    43	const CHUNK: usize = 64 * 1024;
+    44	
+    45	/// Run the integrity preflight on an imzML path. Returns a [`PreflightReport`] on success;
+    46	/// a typed [`IntegrityError`] on any UUID mismatch, checksum mismatch, or missing `.ibd`.
+    47	pub fn preflight(imzml_path: &Path) -> Result<PreflightReport, IntegrityError> {
+    48	    preflight_with(imzml_path, false)
+    49	}
+    50	
+    51	/// Preflight with an opt-in checksum escape hatch. When `allow_checksum_mismatch` is true, a
+    52	/// whole-file `.ibd` checksum mismatch is downgraded from a hard [`IntegrityError`] to a
+    53	/// `log::warn` (the converted output is still produced). The UUID linkage and the
+    54	/// `.ibd`-present checks are ALWAYS enforced — only the checksum is relaxed. Used by the CLI
+    55	/// `--allow-checksum-mismatch` flag for known-imperfect real-world datasets.
+    56	pub fn preflight_with(
+    57	    imzml_path: &Path,
+    58	    allow_checksum_mismatch: bool,
+    59	) -> Result<PreflightReport, IntegrityError> {
+    60	    // (1) Parse the imzML header (bounded; never reads the whole file).
+    61	    let header = header::parse_imzml_header(imzml_path)?;
+    62	
+    63	    // (2) Resolve the .ibd path: prefer the declared IMS:1000070 name, else sibling stem.
+    64	    let ibd_path = resolve_ibd_path(imzml_path, header.ibd_file_name.as_deref())?;
+    65	
+    66	    // (3) UUID — first 16 bytes of the .ibd, RFC-4122 / big-endian, byte-for-byte vs the
+    67	    //     declared UUID (built from the parsed hex, NOT a constant).
+    68	    let declared_uuid_bytes = uuid_hex_to_bytes(&header.uuid).ok_or_else(|| {
+    69	        IntegrityError::UuidMismatch {
+    70	            declared: header.uuid.clone(),
+    71	            found: "<unparseable declared UUID>".to_string(),
+    72	        }
+    73	    })?;
+    74	    let mut first16 = [0u8; 16];
+    75	    {
+    76	        let mut f = File::open(&ibd_path)?;
+    77	        f.read_exact(&mut first16).map_err(|e| {
+    78	            // A too-short .ibd is an integrity failure framed as a UUID mismatch.
+    79	            if e.kind() == std::io::ErrorKind::UnexpectedEof {
+    80	                IntegrityError::UuidMismatch {
+    81	                    declared: header.uuid.clone(),
+    82	                    found: "<.ibd shorter than 16 bytes>".to_string(),
+    83	                }
+    84	            } else {
+    85	                IntegrityError::Io(e)
+    86	            }
+    87	        })?;
+    88	    }
+    89	    if first16 != declared_uuid_bytes.as_slice() {
+    90	        return Err(IntegrityError::UuidMismatch {
+    91	            declared: header.uuid.clone(),
+    92	            // RFC-4122 (REQUIRED path) plus a .NET mixed-endian DIAGNOSTIC reading, never
+    93	            // accepted — only to help an operator recognise a non-compliant .NET writer.
+    94	            found: format!(
+    95	                "{} (RFC-4122); .NET mixed-endian diagnostic: {}",
+    96	                format_uuid_rfc4122(&first16),
+    97	                format_uuid_dotnet(&first16),
+    98	            ),
+    99	        });
+   100	    }
+   101	
+   102	    // (4) Checksum — whole-file digest (byte 0..EOF) with the declared algorithm, computed
+   103	    //     over a fixed-size chunked stream (never fs::read the whole sidecar).
+   104	    let computed = compute_digest(&ibd_path, header.checksum_type)?;
+   105	    if computed != header.checksum_hex.to_lowercase() {
+   106	        if allow_checksum_mismatch {
+   107	            log::warn!(
+   108	                "{:?} checksum mismatch for {} (declared {}, computed {}) — proceeding anyway \
+   109	                 because --allow-checksum-mismatch was set; the .ibd may be corrupt or truncated",
+   110	                header.checksum_type,
+   111	                ibd_path.display(),
+   112	                header.checksum_hex,
+   113	                computed,
+   114	            );
+   115	        } else {
+   116	            return Err(IntegrityError::ChecksumMismatch {
+   117	                kind: header.checksum_type,
+   118	                declared: header.checksum_hex.clone(),
+   119	                computed,
+   120	            });
+   121	        }
+   122	    }
+   123	
+   124	    Ok(PreflightReport {
+   125	        uuid: header.uuid,
+   126	        checksum_type: header.checksum_type,
+   127	        checksum_hex: header.checksum_hex,
+   128	    })
+   129	}
+   130	
+   131	/// Resolve the `.ibd` for an imzML by parsing its header (for the declared `IMS:1000070`
+   132	/// name) and applying the same resolution the preflight uses. `pub(crate)` so the read layer
+   133	/// can locate the real `.ibd` when it must hand mzdata an explicit sidecar handle (e.g. the
+   134	/// Latin-1 transcode path opens a UTF-8 temp XML alongside the untouched original `.ibd`).
+   135	pub(crate) fn resolve_ibd_for(imzml_path: &Path) -> Result<PathBuf, IntegrityError> {
+   136	    let header = header::parse_imzml_header(imzml_path)?;
+   137	    resolve_ibd_path(imzml_path, header.ibd_file_name.as_deref())
+   138	}
+   139	
+   140	/// Resolve the `.ibd` path. Prefer the declared `IMS:1000070` name (relative to the imzML's
+   141	/// parent dir); fall back to the imzML stem with `.ibd` then `.IBD` (mzdata open_path
+   142	/// behavior). Hard-fail with [`IntegrityError::MissingIbd`] if the resolved path is absent.
+   143	fn resolve_ibd_path(imzml_path: &Path, declared_name: Option<&str>) -> Result<PathBuf, IntegrityError> {
+   144	    let parent = imzml_path.parent().unwrap_or_else(|| Path::new("."));
+   145	
+   146	    if let Some(name) = declared_name {
+   147	        let trimmed = name.trim();
+   148	        if !trimmed.is_empty() {
+   149	            let candidate = parent.join(trimmed);
+   150	            if candidate.exists() {
+   151	                return Ok(candidate);
+   152	            }
+   153	            // Declared but missing → hard-fail with the resolved path in the message.
+   154	            return Err(IntegrityError::MissingIbd { path: candidate });
+   155	        }
+   156	    }
+   157	
+   158	    // Sibling-stem fallback: <stem>.ibd then <stem>.IBD. APPEND the extension to the full
+   159	    // file stem rather than `set_extension`, which would *replace* a dotted stem's last
+   160	    // segment (e.g. a reverse output "a.rev.imzML" → stem "a.rev" → "a.ibd" instead of the
+   161	    // correct "a.rev.ibd"). This mirrors the reverse-side `derive_reverse_paths` fix and keeps
+   162	    // sidecar resolution consistent with how the reverse emitter actually names the `.ibd`.
+   163	    let stem = imzml_path.file_stem().unwrap_or_default();
+   164	    for ext in [".ibd", ".IBD"] {
+   165	        let mut name = stem.to_os_string();
+   166	        name.push(ext);
+   167	        let p = parent.join(&name);
+   168	        if p.exists() {
+   169	            return Ok(p);
+   170	        }
+   171	    }
+   172	
+   173	    // Nothing found — report the canonical lowercase sibling as the expected path.
+   174	    let mut name = stem.to_os_string();
+   175	    name.push(".ibd");
+   176	    Err(IntegrityError::MissingIbd { path: parent.join(name) })
+   177	}
+   178	
+   179	/// Compute the whole-file digest of `path` with the declared algorithm, streaming in
+   180	/// fixed-size chunks. Returns the lowercase hex digest. Never loads the whole file.
+   181	///
+   182	/// `pub(crate)` so the reverse `.ibd` writer ([`crate::reverse::ibd::IbdWriter::finish`])
+   183	/// can hash the finished sidecar (byte 0..EOF, UUID header included) without re-implementing
+   184	/// the chunked digest loop. The signature is unchanged — the v0.3 preflight tests are
+   185	/// unaffected. `stream_digest`/`CHUNK` stay private (no external caller needs them).
+   186	pub(crate) fn compute_digest(path: &Path, kind: ChecksumType) -> Result<String, IntegrityError> {
+   187	    let mut f = File::open(path)?;
+   188	    let mut buf = vec![0u8; CHUNK];
+   189	    match kind {
+   190	        ChecksumType::Md5 => stream_digest::<md5::Md5>(&mut f, &mut buf),
+   191	        ChecksumType::Sha1 => stream_digest::<sha1::Sha1>(&mut f, &mut buf),
+   192	        ChecksumType::Sha256 => stream_digest::<sha2::Sha256>(&mut f, &mut buf),
+   193	    }
+   194	}
+   195	
+   196	/// Generic streaming-digest loop over the RustCrypto `Digest` trait.
+   197	fn stream_digest<D: Digest>(f: &mut File, buf: &mut [u8]) -> Result<String, IntegrityError> {
+   198	    let mut hasher = D::new();
+   199	    loop {
+   200	        let n = f.read(buf)?;
+   201	        if n == 0 {
+   202	            break;
+   203	        }
+   204	        hasher.update(&buf[..n]);
+   205	    }
+   206	    let out = hasher.finalize();
+   207	    Ok(hex_lower(&out))
+   208	}
+   209	
+   210	/// Lowercase hex encoding (no external hex crate).
+   211	fn hex_lower(bytes: &[u8]) -> String {
+   212	    let mut s = String::with_capacity(bytes.len() * 2);
+   213	    for b in bytes {
+   214	        s.push_str(&format!("{b:02x}"));
+   215	    }
+   216	    s
+   217	}
+   218	
+   219	/// Parse a normalized (dashed or undashed) UUID hex string into its 16 RFC-4122 bytes.
+   220	fn uuid_hex_to_bytes(uuid: &str) -> Option<[u8; 16]> {
+   221	    let hex: String = uuid.chars().filter(|c| c.is_ascii_hexdigit()).collect();
+   222	    if hex.len() != 32 {
+   223	        return None;
+   224	    }
+   225	    let mut out = [0u8; 16];
+   226	    for i in 0..16 {
+   227	        out[i] = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).ok()?;
+   228	    }
+   229	    Some(out)
+   230	}
+   231	
+   232	/// RFC-4122 / big-endian textual form of 16 UUID bytes (the REQUIRED comparison path).
+   233	fn format_uuid_rfc4122(b: &[u8; 16]) -> String {
+   234	    format!(
+   235	        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+   236	        b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], b[9], b[10], b[11], b[12], b[13],
+   237	        b[14], b[15]
+   238	    )
+   239	}
+   240	
+   241	/// .NET mixed-endian reconstruction — DIAGNOSTIC ONLY, never accepted.
+   242	fn format_uuid_dotnet(b: &[u8; 16]) -> String {
+   243	    format!(
+   244	        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+   245	        b[3], b[2], b[1], b[0], b[5], b[4], b[7], b[6], b[8], b[9], b[10], b[11], b[12], b[13],
+   246	        b[14], b[15]
+   247	    )
+   248	}
+   249	
+   250	#[cfg(test)]
+   251	mod tests {
+   252	    use super::*;
+   253	
+   254	    #[test]
+   255	    fn uuid_hex_to_bytes_roundtrip() {
+   256	        let bytes = uuid_hex_to_bytes("554a27fa-79d2-4766-9a2c-862e6d78b1f3").unwrap();
+   257	        assert_eq!(bytes[0], 0x55);
+   258	        assert_eq!(bytes[15], 0xf3);
+   259	        assert_eq!(format_uuid_rfc4122(&bytes), "554a27fa-79d2-4766-9a2c-862e6d78b1f3");
+   260	    }
+   261	
+   262	    #[test]
+   263	    fn uuid_hex_to_bytes_rejects_wrong_length() {
+   264	        assert!(uuid_hex_to_bytes("abcd").is_none());
+   265	    }
+   266	
+   267	    /// Build a minimal `<stem>.imzML` + `<stem>.ibd` pair in a temp dir: the `.ibd`'s first 16
+   268	    /// bytes are the declared UUID, but its whole-file SHA-1 will NOT match `declared_sha1`.
+   269	    /// Returns the imzML path (with the temp dir kept alive via the returned guard path).
+   270	    fn write_mismatched_pair(tag: &str, ibd_first16: [u8; 16]) -> (PathBuf, PathBuf) {
+   271	        let dir = std::env::temp_dir().join(format!("i2mp_pf_{}_{}", std::process::id(), tag));
+   272	        let _ = std::fs::create_dir_all(&dir);
+   273	        let imzml = dir.join("t.imzML");
+   274	        let ibd = dir.join("t.ibd");
+   275	        let xml = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n\
+   276	            <mzML>\n\
+   277	            <cvParam accession=\"IMS:1000080\" name=\"uuid\" value=\"{00112233-4455-6677-8899-aabbccddeeff}\"/>\n\
+   278	            <cvParam accession=\"IMS:1000091\" name=\"ibd SHA-1\" value=\"0000000000000000000000000000000000000000\"/>\n\
+   279	            <spectrumList count=\"0\">\n\
+   280	            </mzML>\n";
+
+exec
+/bin/zsh -lc "nl -ba src/read/transcode.rs | sed -n '1,260p'" in /Users/kohlbach/Claude/imzML2mzPeak
+exec
+/bin/zsh -lc "nl -ba src/read/stream.rs | sed -n '1,260p'" in /Users/kohlbach/Claude/imzML2mzPeak
+ succeeded in 0ms:
+     1	//! Latin-1 → UTF-8 imzML transcode shim (campaign ISSUE-2).
+     2	//!
+     3	//! mzdata's mzML/imzML reader decodes XML attribute values and element text as UTF-8 and
+     4	//! **panics** on the first non-UTF-8 byte (`reading_shared.rs`: `unescape_value().expect(..)`).
+     5	//! A large fraction of real-world imzML (e.g. the Zenodo DESI set) declares
+     6	//! `encoding="ISO-8859-1"` and carries genuine Latin-1 bytes (e.g. `<sourceFile name="à">`,
+     7	//! byte `0xE0`). The vendored mzdata cannot enable quick-xml's `encoding` feature without
+     8	//! losing `unescape_value`, so we fix it at OUR read boundary instead of patching the parser.
+     9	//!
+    10	//! Strategy: when an imzML's XML prolog declares a non-UTF-8 encoding, stream-transcode it to
+    11	//! a UTF-8 temp file (rewriting the prolog's `encoding=` to `UTF-8`) and hand mzdata the temp
+    12	//! XML together with the UNTOUCHED original `.ibd`. This is exact and lossless for ISO-8859-1
+    13	//! (each byte is its own Unicode code point) and cannot affect data integrity: the `.ibd` is
+    14	//! never touched, and the byte offsets that index it live in the XML as ASCII digits, so they
+    15	//! survive transcoding unchanged. The declared UUID text is preserved, so mzdata's `.ibd`
+    16	//! UUID check still passes (and our preflight already hard-validated UUID + checksum).
+    17	//!
+    18	//! Scope: handles ISO-8859-1 / Latin-1 exactly. Any other declared non-UTF-8 encoding is
+    19	//! transcoded as Latin-1 on a best-effort basis with a `log::warn` (correct for the 0x00–0x7F
+    20	//! and 0xA0–0xFF ranges; only the 0x80–0x9F C1 range differs from e.g. windows-1252).
+    21	
+    22	use std::fs::File;
+    23	use std::io::{self, BufReader, BufWriter, Read, Write};
+    24	use std::path::{Path, PathBuf};
+    25	use std::sync::atomic::{AtomicU64, Ordering};
+    26	
+    27	/// The XML-prolog encoding classification that decides whether a transcode is needed.
+    28	#[derive(Debug, Clone, PartialEq, Eq)]
+    29	pub enum XmlEncoding {
+    30	    /// UTF-8, US-ASCII, or no declaration → feed mzdata the file directly (no transcode).
+    31	    Utf8,
+    32	    /// A non-UTF-8 encoding that we transcode as Latin-1. Carries the declared name (for logs).
+    33	    Latin1 { declared: String },
+    34	}
+    35	
+    36	/// Read the XML prolog (`<?xml … ?>`) and classify the declared encoding. Reads at most the
+    37	/// first 512 bytes — the prolog, when present, is the very first construct in the document.
+    38	pub fn detect_xml_encoding(path: &Path) -> io::Result<XmlEncoding> {
+    39	    let mut head = [0u8; 512];
+    40	    let n = {
+    41	        let mut f = File::open(path)?;
+    42	        read_up_to(&mut f, &mut head)?
+    43	    };
+    44	    let head = &head[..n];
+    45	    // The prolog (and its encoding attribute) is pure ASCII, so a lossy decode is safe here.
+    46	    let text = String::from_utf8_lossy(head);
+    47	    // Only look within the prolog `<?xml … ?>`; if there is no prolog there is no declared
+    48	    // encoding and the XML default (UTF-8) applies.
+    49	    let prolog_end = text.find("?>").map(|i| i + 2).unwrap_or(text.len());
+    50	    let prolog = &text[..prolog_end];
+    51	    let Some(enc) = extract_encoding(prolog) else {
+    52	        return Ok(XmlEncoding::Utf8);
+    53	    };
+    54	    let lower = enc.to_ascii_lowercase();
+    55	    match lower.as_str() {
+    56	        "utf-8" | "utf8" | "us-ascii" | "ascii" => Ok(XmlEncoding::Utf8),
+    57	        _ => Ok(XmlEncoding::Latin1 { declared: enc }),
+    58	    }
+    59	}
+    60	
+    61	/// Pull the `encoding="…"` (or `'…'`) value out of an XML prolog string, if present.
+    62	fn extract_encoding(prolog: &str) -> Option<String> {
+    63	    let idx = prolog.find("encoding")?;
+    64	    let rest = &prolog[idx + "encoding".len()..];
+    65	    let eq = rest.find('=')?;
+    66	    let after = rest[eq + 1..].trim_start();
+    67	    let quote = after.chars().next()?;
+    68	    if quote != '"' && quote != '\'' {
+    69	        return None;
+    70	    }
+    71	    let val = &after[1..];
+    72	    let end = val.find(quote)?;
+    73	    Some(val[..end].to_string())
+    74	}
+    75	
+    76	/// Read into `buf` until full or EOF, returning the number of bytes read (handles short reads).
+    77	fn read_up_to<R: Read>(r: &mut R, buf: &mut [u8]) -> io::Result<usize> {
+    78	    let mut filled = 0;
+    79	    while filled < buf.len() {
+    80	        match r.read(&mut buf[filled..]) {
+    81	            Ok(0) => break,
+    82	            Ok(n) => filled += n,
+    83	            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
+    84	            Err(e) => return Err(e),
+    85	        }
+    86	    }
+    87	    Ok(filled)
+    88	}
+    89	
+    90	/// Owns a transcoded temp `.imzML` and deletes it on drop, so the UTF-8 shim never litters
+    91	/// the temp dir even on error paths. The held [`File`] handle is what the reader consumes.
+    92	#[derive(Debug)]
+    93	pub struct TranscodedXml {
+    94	    path: PathBuf,
+    95	}
+    96	
+    97	impl TranscodedXml {
+    98	    /// Open the transcoded temp file for reading (a fresh handle the reader takes ownership of).
+    99	    pub fn open(&self) -> io::Result<File> {
+   100	        File::open(&self.path)
+   101	    }
+   102	}
+   103	
+   104	impl Drop for TranscodedXml {
+   105	    fn drop(&mut self) {
+   106	        let _ = std::fs::remove_file(&self.path);
+   107	    }
+   108	}
+   109	
+   110	/// Monotonic suffix so multiple transcodes in one process never collide on a temp name.
+   111	static SEQ: AtomicU64 = AtomicU64::new(0);
+   112	
+   113	/// Transcode `src` (declared `declared` encoding) to a UTF-8 temp file, rewriting the prolog's
+   114	/// `encoding=` to `UTF-8`. Returns a [`TranscodedXml`] guard whose file is the UTF-8 document.
+   115	///
+   116	/// Streaming + bounded: the prolog is handled as a small head buffer; the body is transcoded
+   117	/// byte-at-a-time through buffered I/O (never loads the whole document into memory).
+   118	pub fn transcode_latin1_to_utf8(src: &Path, declared: &str) -> io::Result<TranscodedXml> {
+   119	    if !declared.eq_ignore_ascii_case("iso-8859-1")
+   120	        && !declared.eq_ignore_ascii_case("iso8859-1")
+   121	        && !declared.eq_ignore_ascii_case("latin1")
+   122	        && !declared.eq_ignore_ascii_case("latin-1")
+   123	    {
+   124	        log::warn!(
+   125	            "imzML declares encoding=\"{declared}\"; transcoding as Latin-1 (best effort — the \
+   126	             0x80–0x9F range may differ from this encoding). Re-export as UTF-8 for exactness."
+   127	        );
+   128	    } else {
+   129	        log::warn!(
+   130	            "imzML declares encoding=\"{declared}\"; transcoding to UTF-8 in a temp file so the \
+   131	             reader can parse it (the .ibd is untouched)."
+   132	        );
+   133	    }
+   134	
+   135	    let stem = src
+   136	        .file_name()
+   137	        .map(|s| s.to_string_lossy().to_string())
+   138	        .unwrap_or_else(|| "input.imzML".to_string());
+   139	    let seq = SEQ.fetch_add(1, Ordering::Relaxed);
+   140	    let dst = std::env::temp_dir().join(format!(
+   141	        "imzml2mzpeak-utf8-{}-{}-{}",
+   142	        std::process::id(),
+   143	        seq,
+   144	        stem
+   145	    ));
+   146	
+   147	    let mut reader = BufReader::new(File::open(src)?);
+   148	    let mut writer = BufWriter::new(File::create(&dst)?);
+   149	    // Use the guard from here on so an early return still cleans up the temp file.
+   150	    let guard = TranscodedXml { path: dst };
+   151	
+   152	    // (1) Prolog: read the `<?xml … ?>` head (ASCII), rewrite its encoding to UTF-8, emit it.
+   153	    //     If there is no prolog, emit nothing special and fall through to the body transcode.
+   154	    let mut head = vec![0u8; 512];
+   155	    let n = read_up_to(&mut reader, &mut head)?;
+   156	    head.truncate(n);
+   157	    let (prolog_out, body_prefix) = rewrite_prolog(&head);
+   158	    writer.write_all(&prolog_out)?;
+   159	    // The bytes of `head` AFTER the prolog still belong to the document body → transcode them.
+   160	    emit_transcoded(&mut writer, body_prefix)?;
+   161	
+   162	    // (2) Body: stream the rest, expanding each byte to its UTF-8 form.
+   163	    let mut buf = vec![0u8; 64 * 1024];
+   164	    loop {
+   165	        let m = reader.read(&mut buf)?;
+   166	        if m == 0 {
+   167	            break;
+   168	        }
+   169	        emit_transcoded(&mut writer, &buf[..m])?;
+   170	    }
+   171	    writer.flush()?;
+   172	    Ok(guard)
+   173	}
+   174	
+   175	/// Given the document head, return (UTF-8 prolog bytes with `encoding="UTF-8"`, remaining body
+   176	/// bytes that followed the prolog). If no prolog is present, the prolog output is empty and the
+   177	/// whole head is returned as body.
+   178	fn rewrite_prolog(head: &[u8]) -> (Vec<u8>, &[u8]) {
+   179	    let text = String::from_utf8_lossy(head);
+   180	    let Some(close_rel) = text.find("?>") else {
+   181	        // No complete prolog in the head — treat all of it as body (rare; tiny files).
+   182	        return (Vec::new(), head);
+   183	    };
+   184	    let close = close_rel + 2;
+   185	    let prolog = &text[..close];
+   186	    let rewritten = match (prolog.find("encoding"), prolog.find('=')) {
+   187	        (Some(enc_at), _) => {
+   188	            // Replace the quoted value after `encoding=` with `UTF-8`, preserving the quote char.
+   189	            let after_kw = &prolog[enc_at + "encoding".len()..];
+   190	            if let Some(eq) = after_kw.find('=') {
+   191	                let pre = &prolog[..enc_at + "encoding".len() + eq + 1];
+   192	                let val_region = after_kw[eq + 1..].trim_start();
+   193	                let quote = val_region.chars().next().unwrap_or('"');
+   194	                // Whitespace between `=` and the quote, preserved minimally as none.
+   195	                if let Some(end) = val_region[1..].find(quote) {
+   196	                    let tail = &val_region[1 + end + 1..];
+   197	                    format!("{pre}{quote}UTF-8{quote}{tail}")
+   198	                } else {
+   199	                    prolog.to_string()
+   200	                }
+   201	            } else {
+   202	                prolog.to_string()
+   203	            }
+   204	        }
+   205	        _ => prolog.to_string(),
+   206	    };
+   207	    // The prolog is ASCII; its bytes are valid UTF-8 as-is.
+   208	    (rewritten.into_bytes(), &head[close..])
+   209	}
+   210	
+   211	/// Write `bytes` to `w`, expanding each byte ≥ 0x80 to its 2-byte UTF-8 form (Latin-1 → UTF-8).
+   212	fn emit_transcoded<W: Write>(w: &mut W, bytes: &[u8]) -> io::Result<()> {
+   213	    let mut out = Vec::with_capacity(bytes.len() + bytes.len() / 8 + 8);
+   214	    for &b in bytes {
+   215	        if b < 0x80 {
+   216	            out.push(b);
+   217	        } else {
+   218	            out.push(0xC0 | (b >> 6));
+   219	            out.push(0x80 | (b & 0x3F));
+   220	        }
+   221	    }
+   222	    w.write_all(&out)
+   223	}
+   224	
+   225	#[cfg(test)]
+   226	mod tests {
+   227	    use super::*;
+   228	    use std::io::Write;
+   229	
+   230	    fn write_tmp(name: &str, bytes: &[u8]) -> PathBuf {
+   231	        let p = std::env::temp_dir().join(format!(
+   232	            "i2mp-transcode-test-{}-{}-{}",
+   233	            std::process::id(),
+   234	            SEQ.fetch_add(1, Ordering::Relaxed),
+   235	            name
+   236	        ));
+   237	        let mut f = File::create(&p).unwrap();
+   238	        f.write_all(bytes).unwrap();
+   239	        p
+   240	    }
+   241	
+   242	    #[test]
+   243	    fn detects_iso_8859_1() {
+   244	        let p = write_tmp(
+   245	            "iso.imzML",
+   246	            b"<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n<mzML/>",
+   247	        );
+   248	        match detect_xml_encoding(&p).unwrap() {
+   249	            XmlEncoding::Latin1 { declared } => assert_eq!(declared, "ISO-8859-1"),
+   250	            other => panic!("expected Latin1, got {other:?}"),
+   251	        }
+   252	        let _ = std::fs::remove_file(&p);
+   253	    }
+   254	
+   255	    #[test]
+   256	    fn detects_utf8_and_absent_as_utf8() {
+   257	        let p1 = write_tmp("utf8.imzML", b"<?xml version=\"1.0\" encoding=\"UTF-8\"?><mzML/>");
+   258	        let p2 = write_tmp("none.imzML", b"<?xml version=\"1.0\"?><mzML/>");
+   259	        assert_eq!(detect_xml_encoding(&p1).unwrap(), XmlEncoding::Utf8);
+   260	        assert_eq!(detect_xml_encoding(&p2).unwrap(), XmlEncoding::Utf8);
+
+ succeeded in 0ms:
+     1	//! Streaming imaging reader (Plan 02-03).
+     2	//!
+     3	//! [`ImagingReader`] turns an `.imzML`/`.ibd` pair into a lazy stream of
+     4	//! [`ImagingSpectrum`] records. Its contract, in order:
+     5	//!
+     6	//!   1. **Preflight first (T-02-06).** [`ImagingReader::open`] runs the Plan 02-02
+     7	//!      integrity preflight ([`crate::integrity::preflight::preflight`]) BEFORE constructing
+     8	//!      the mzdata reader. A preflight failure returns [`ReadError::Integrity`] and NO
+     9	//!      spectrum is ever read.
+    10	//!   2. **Mode from `data_mode` only (IN-03).** Storage mode is taken solely from the
+    11	//!      file-level `reader.imzml_metadata.data_mode` CV param, never inferred from
+    12	//!      `signal_continuity()` or spectrum shape.
+    13	//!   3. **Bounded-memory streaming (IN-08 / T-02-07).** Implements [`Iterator`] yielding ONE
+    14	//!      [`ImagingSpectrum`] at a time via the wrapped reader's fallible `read_into`; it never
+    15	//!      collects or retains all spectra.
+    16	//!   4. **Dtype-preserving decode (IN-04 / T-02-11).** Each axis is decoded AT its declared
+    17	//!      `DataArray.dtype` into a [`NumArray`] variant — never via the coercing
+    18	//!      `mzs()`/`intensities()` accessors.
+    19	//!   5. **Surfaced decode errors (T-02-08 / T-02-09).** mzdata's `Iterator::next()` collapses
+    20	//!      a parse/IO failure into `None` (indistinguishable from a clean end-of-run). We instead
+    21	//!      drive the reader's `pub fn read_into(...) -> Result<usize, MzMLParserError>` directly:
+    22	//!      `MzMLParserError::EOF` is a clean end (→ `None`); ANY other error surfaces as
+    23	//!      `Some(Err(ReadError::Decode))`. A truncated/out-of-range `.ibd` therefore fails the
+    24	//!      iteration with an `Err` instead of silently ending early. A None `raw_arrays()` or a
+    25	//!      per-axis `to_f32`/`to_f64` failure is likewise a hard error, never a zero-length
+    26	//!      substitute (PITFALLS 9/10).
+    27	
+    28	use std::fs::File;
+    29	use std::path::Path;
+    30	
+    31	use mzdata::curie;
+    32	use mzdata::io::MzMLParserError;
+    33	use mzdata::io::imzml::ImzMLReader;
+    34	use mzdata::io::mzml::MzMLParserState;
+    35	use mzdata::prelude::{MZFileReader, ParamDescribed, ParamValue, SpectrumLike};
+    36	use mzdata::spectrum::MultiLayerSpectrum;
+    37	use mzdata::spectrum::bindata::{ArrayType, BinaryDataArrayType, ByteArrayView};
+    38	
+    39	use crate::integrity::IntegrityError;
+    40	use crate::integrity::preflight;
+    41	use crate::read::record::{ImagingSpectrum, NumArray, RunProvenance, StorageMode};
+    42	use crate::read::transcode;
+    43	
+    44	/// A typed read-layer failure.
+    45	///
+    46	/// Distinguishes an integrity gate failure (before any read), a reader-open failure, and the
+    47	/// per-spectrum decode failures that must NEVER be silently swallowed (a missing scan /
+    48	/// coordinate / array, an out-of-scope dtype, or a parse/IO error mid-stream).
+    49	#[derive(Debug, thiserror::Error)]
+    50	pub enum ReadError {
+    51	    /// The integrity preflight refused the pair; no spectrum was read.
+    52	    #[error("integrity preflight failed: {0}")]
+    53	    Integrity(#[from] IntegrityError),
+    54	
+    55	    /// Opening the mzdata reader failed (after preflight passed — e.g. an I/O error).
+    56	    #[error("failed to open imzML reader: {0}")]
+    57	    Open(#[source] std::io::Error),
+    58	
+    59	    /// The spectrum at `index` carries no scan event, so its coordinates cannot be read.
+    60	    #[error("spectrum {index}: no scan event — cannot read imaging coordinates (IMS:1000050/51)")]
+    61	    NoScan { index: usize },
+    62	
+    63	    /// The spectrum at `index` is missing or has an unparseable x/y coordinate. Defensive:
+    64	    /// proven 100% present on real data, but never silently defaulted (SPA-01).
+    65	    #[error("spectrum {index}: missing/unparseable imaging coordinate (IMS:1000050 x / IMS:1000051 y)")]
+    66	    CoordMissing { index: usize },
+    67	
+    68	    /// The spectrum at `index` exposes no binary arrays (or is missing the m/z or intensity
+    69	    /// array). Never substituted with a zero-length array (PITFALLS 9/10).
+    70	    #[error("spectrum {index}: no binary arrays (or missing m/z / intensity array)")]
+    71	    NoArrays { index: usize },
+    72	
+    73	    /// The spectrum at `index` declares an array dtype outside the supported imaging set
+    74	    /// (Float32 / Float64). An int/unknown dtype is a clear error, never a silent coercion.
+    75	    #[error("spectrum {index}: unsupported array dtype {dtype:?} — imaging m/z/intensity must be Float32 or Float64")]
+    76	    UnsupportedDtype {
+    77	        index: usize,
+    78	        dtype: BinaryDataArrayType,
+    79	    },
+    80	
+    81	    /// A parse/IO error occurred while reading the spectrum at `index` (e.g. a
+    82	    /// truncated/out-of-range `.ibd`, or an unsupported `.ibd` compression). Surfaced as an
+    83	    /// `Err` rather than a silent short stream (T-02-09).
+    84	    #[error("spectrum {index}: decode/IO error: {source}")]
+    85	    Decode {
+    86	        index: usize,
+    87	        #[source]
+    88	        source: MzMLParserError,
+    89	    },
+    90	}
+    91	
+    92	/// A streaming reader over an imzML/.ibd pair.
+    93	///
+    94	/// Construct via [`ImagingReader::open`] (which runs the preflight first), then iterate:
+    95	/// each [`Iterator::next`] yields `Some(Ok(ImagingSpectrum))` for a pixel, `Some(Err(..))`
+    96	/// on a decode failure, and `None` only at a clean end-of-run.
+    97	pub struct ImagingReader {
+    98	    inner: ImzMLReader<File, File>,
+    99	    provenance: RunProvenance,
+   100	    storage_mode: StorageMode,
+   101	    /// Index of the NEXT spectrum to be produced (0-based stream position).
+   102	    index: usize,
+   103	    /// Set once iteration has cleanly ended (EOF) or hard-errored, so a second poll past the
+   104	    /// end keeps returning `None` rather than re-driving the parser.
+   105	    finished: bool,
+   106	    /// Kept alive for the reader's lifetime: when the source imzML declared a non-UTF-8 XML
+   107	    /// encoding (ISSUE-2), `inner` reads from a transcoded UTF-8 temp file owned by this guard,
+   108	    /// which deletes it on drop. `None` for the common UTF-8 fast path.
+   109	    _transcoded: Option<crate::read::transcode::TranscodedXml>,
+   110	}
+   111	
+   112	impl ImagingReader {
+   113	    /// Open an imzML/.ibd pair for streaming.
+   114	    ///
+   115	    /// Runs the integrity preflight FIRST: on failure, returns [`ReadError::Integrity`]
+   116	    /// WITHOUT constructing the mzdata reader (T-02-06). On success, opens the reader,
+   117	    /// captures run provenance, and auto-detects the storage mode from the file-level
+   118	    /// `data_mode` param only (IN-03).
+   119	    pub fn open(imzml_path: &Path) -> Result<ImagingReader, ReadError> {
+   120	        Self::open_with(imzml_path, false)
+   121	    }
+   122	
+   123	    /// Like [`ImagingReader::open`] but with the opt-in checksum escape hatch threaded into the
+   124	    /// preflight (CLI `--allow-checksum-mismatch`). When `allow_checksum_mismatch` is true, a
+   125	    /// whole-file `.ibd` checksum mismatch warns instead of failing; the UUID linkage is still
+   126	    /// enforced. The reader path is otherwise identical (incl. the Latin-1 transcode shim).
+   127	    pub fn open_with(
+   128	        imzml_path: &Path,
+   129	        allow_checksum_mismatch: bool,
+   130	    ) -> Result<ImagingReader, ReadError> {
+   131	        // (1) Integrity gate BEFORE any reader construction.
+   132	        let report = preflight::preflight_with(imzml_path, allow_checksum_mismatch)?;
+   133	
+   134	        // (2) Open the mzdata reader (preflight already proved the .ibd linkage). If the imzML
+   135	        //     declares a non-UTF-8 XML encoding (ISSUE-2: e.g. ISO-8859-1 DESI files), mzdata's
+   136	        //     UTF-8-only attribute decode would PANIC, so transcode the XML to a UTF-8 temp file
+   137	        //     and hand the reader (temp XML, untouched original .ibd) explicitly. The `.ibd`
+   138	        //     offsets are ASCII in the XML and the UUID text is preserved, so neither the data
+   139	        //     nor mzdata's `.ibd` linkage check is affected.
+   140	        let encoding = transcode::detect_xml_encoding(imzml_path).map_err(ReadError::Open)?;
+   141	        let (inner, transcoded) = match encoding {
+   142	            transcode::XmlEncoding::Utf8 => (
+   143	                ImzMLReader::<File, File>::open_path(imzml_path).map_err(ReadError::Open)?,
+   144	                None,
+   145	            ),
+   146	            transcode::XmlEncoding::Latin1 { declared } => {
+   147	                let guard = transcode::transcode_latin1_to_utf8(imzml_path, &declared)
+   148	                    .map_err(ReadError::Open)?;
+   149	                let ibd_path = preflight::resolve_ibd_for(imzml_path)?;
+   150	                let xml_file = guard.open().map_err(ReadError::Open)?;
+   151	                let ibd_file = File::open(&ibd_path).map_err(ReadError::Open)?;
+   152	                (ImzMLReader::<File, File>::new(xml_file, ibd_file), Some(guard))
+   153	            }
+   154	        };
+   155	
+   156	        // (3) Capture run-level provenance + storage mode from the FILE-LEVEL metadata.
+   157	        let md = &inner.imzml_metadata;
+   158	        // data_mode is the SOLE source of the storage mode (IN-03) — never signal_continuity().
+   159	        // The metadata field is Option; an absent data_mode maps to StorageMode::Unknown
+   160	        // (preflight already proved the linkage, so an Unknown mode is informational, not a
+   161	        // gate — but it is NEVER backfilled from spectrum shape).
+   162	        let storage_mode = md.data_mode.map(StorageMode::from).unwrap_or(StorageMode::Unknown);
+   163	        // RunProvenance.uuid is Option<String> (no uuid dependency): prefer mzdata's parsed
+   164	        // metadata UUID, lowercased; fall back to the preflight-verified UUID (already
+   165	        // lowercase) so the field is populated even if mzdata surfaces the UUID differently.
+   166	        let uuid = md
+   167	            .uuid
+   168	            .map(|u| u.to_string().to_lowercase())
+   169	            .or_else(|| Some(report.uuid.clone()));
+   170	        let provenance = RunProvenance {
+   171	            uuid,
+   172	            data_mode: storage_mode.clone(),
+   173	            ibd_checksum: md.ibd_checksum.clone(),
+   174	            ibd_checksum_type: md.ibd_checksum_type.clone(),
+   175	        };
+   176	
+   177	        Ok(ImagingReader {
+   178	            inner,
+   179	            provenance,
+   180	            storage_mode,
+   181	            index: 0,
+   182	            finished: false,
+   183	            _transcoded: transcoded,
+   184	        })
+   185	    }
+   186	
+   187	    /// The file-level storage mode, auto-detected from `data_mode` (IN-03).
+   188	    pub fn storage_mode(&self) -> StorageMode {
+   189	        self.storage_mode.clone()
+   190	    }
+   191	
+   192	    /// Run-level provenance captured at open time.
+   193	    pub fn provenance(&self) -> &RunProvenance {
+   194	        &self.provenance
+   195	    }
+   196	
+   197	    /// The underlying mzdata reader as a source of file-level PSI-MS + IMS metadata.
+   198	    ///
+   199	    /// `ImzMLReader` implements [`mzdata::prelude::MSDataFileMetadata`] (vendored
+   200	    /// `reader.rs:1454`); the write layer's `copy_metadata_from(source)` consumes this to
+   201	    /// carry the source `file_description` / instrument / sample metadata into the mzPeak
+   202	    /// archive. Exposed read-only (a `&` borrow) so the writer can copy it before the
+   203	    /// streaming loop consumes the reader by value.
+   204	    pub fn source_metadata(&self) -> &impl mzdata::prelude::MSDataFileMetadata {
+   205	        &self.inner
+   206	    }
+   207	
+   208	    /// Map a fully-read mzdata spectrum into an [`ImagingSpectrum`], decoding each axis at
+   209	    /// its declared dtype. `index` is the stream position (for error context).
+   210	    fn to_imaging(
+   211	        index: usize,
+   212	        spec: &MultiLayerSpectrum,
+   213	    ) -> Result<ImagingSpectrum, ReadError> {
+   214	        // --- Coordinates (SPA-01): read VERBATIM, 1-based, never defaulted. ---
+   215	        let scan = spec
+   216	            .acquisition()
+   217	            .first_scan()
+   218	            .ok_or(ReadError::NoScan { index })?;
+   219	        let x = scan
+   220	            .get_param_by_curie(&curie!(IMS:1000050))
+   221	            .and_then(|p| p.to_i64().ok());
+   222	        let y = scan
+   223	            .get_param_by_curie(&curie!(IMS:1000051))
+   224	            .and_then(|p| p.to_i64().ok());
+   225	        let z = scan
+   226	            .get_param_by_curie(&curie!(IMS:1000052))
+   227	            .and_then(|p| p.to_i64().ok());
+   228	        let (Some(x), Some(y)) = (x, y) else {
+   229	            return Err(ReadError::CoordMissing { index });
+   230	        };
+   231	
+   232	        // --- Arrays (IN-04): decode each at its DECLARED dtype; never coerce. ---
+   233	        let arrays = spec.raw_arrays().ok_or(ReadError::NoArrays { index })?;
+   234	        let mz_da = arrays
+   235	            .get(&ArrayType::MZArray)
+   236	            .ok_or(ReadError::NoArrays { index })?;
+   237	        let intensity_da = arrays
+   238	            .get(&ArrayType::IntensityArray)
+   239	            .ok_or(ReadError::NoArrays { index })?;
+   240	        let mz = Self::decode_axis(index, mz_da)?;
+   241	        let intensity = Self::decode_axis(index, intensity_da)?;
+   242	
+   243	        // --- Carried metadata (IN-05 / IN-06): unchanged, including ms_level 0. ---
+   244	        Ok(ImagingSpectrum {
+   245	            x,
+   246	            y,
+   247	            z,
+   248	            mz,
+   249	            intensity,
+   250	            representation: spec.signal_continuity().into(),
+   251	            ms_level: spec.ms_level(),
+   252	            native_id: spec.id().to_string(),
+   253	        })
+   254	    }
+   255	
+   256	    /// Decode one [`DataArray`](mzdata::spectrum::bindata::DataArray) into a dtype-preserving
+   257	    /// [`NumArray`]. Matches on the array's DECLARED dtype: `to_f32`/`to_f64` return the
+   258	    /// values at their native width (no widen/narrow), so the source representation survives
+   259	    /// (IN-04, L1 bit-for-bit). An int/unknown dtype is [`ReadError::UnsupportedDtype`]; a
+   260	    /// decode failure is [`ReadError::Decode`]. NEVER calls `mzs()`/`intensities()`.
+
+codex
+I’ve confirmed the project-side wiring. I’m now comparing the vendored `open_path` and `new` paths because that’s the main place a correctness regression could hide.
+exec
+/bin/zsh -lc "nl -ba vendor/mzdata/src/io/imzml/reader.rs | sed -n '520,790p'" in /Users/kohlbach/Claude/imzML2mzPeak
+ succeeded in 0ms:
+   520	    num_spectra: Option<u64>,
+   521	
+   522	    buffer: Bytes,
+   523	    instrument_id_map: Box<IncrementingIdMap>,
+   524	
+   525	    centroid_type: PhantomData<C>,
+   526	    deconvoluted_type: PhantomData<D>,
+   527	
+   528	    pub imzml_metadata: ImzMLFileMetadata,
+   529	}
+   530	
+   531	impl<
+   532	        'a,
+   533	        'b: 'a,
+   534	        R: Read + Seek,
+   535	        S: Read + Seek,
+   536	        C: CentroidLike + BuildFromArrayMap,
+   537	        D: DeconvolutedCentroidLike + BuildFromArrayMap,
+   538	    > ImzMLReaderType<R, S, C, D>
+   539	{
+   540	    /// Create a new [`ImzMLReaderType`] instance, wrapping the [`io::Read`] handle
+   541	    /// provided with an [`io::BufReader`] and parses the metadata section of the file.
+   542	    pub fn new(file: R, ibd_file: S) -> ImzMLReaderType<R, S, C, D> {
+   543	        Self::with_buffer_capacity_and_detail_level(file, ibd_file, BUFFER_SIZE, DetailLevel::Full)
+   544	    }
+   545	
+   546	    pub fn with_buffer_capacity_and_detail_level(
+   547	        file: R,
+   548	        ibd_file: S,
+   549	        capacity: usize,
+   550	        detail_level: DetailLevel,
+   551	    ) -> ImzMLReaderType<R, S, C, D> {
+   552	        let handle = BufReader::with_capacity(capacity, file);
+   553	        let ibd_handle = BufReader::with_capacity(capacity, ibd_file);
+   554	        let mut inst = ImzMLReaderType {
+   555	            handle,
+   556	            ibd_handle,
+   557	            state: MzMLParserState::Start,
+   558	            error: None,
+   559	            buffer: Bytes::new(),
+   560	            spectrum_index: OffsetIndex::new("spectrum".to_owned()),
+   561	            chromatogram_index: Box::new(OffsetIndex::new("chromatogram".to_owned())),
+   562	
+   563	            file_description: FileDescription::default(),
+   564	            scan_settings: Default::default(),
+   565	            instrument_configurations: HashMap::new(),
+   566	            softwares: Vec::new(),
+   567	            samples: Vec::new(),
+   568	            data_processings: Vec::new(),
+   569	            reference_param_groups: HashMap::new(),
+   570	            detail_level,
+   571	
+   572	            centroid_type: PhantomData,
+   573	            deconvoluted_type: PhantomData,
+   574	            instrument_id_map: Box::new(IncrementingIdMap::default()),
+   575	            num_spectra: None,
+   576	            run: MassSpectrometryRun::default(),
+   577	            imzml_metadata: ImzMLFileMetadata::default(),
+   578	        };
+   579	        match inst.parse_metadata() {
+   580	            Ok(()) => {}
+   581	            Err(_err) => {}
+   582	        }
+   583	        match inst.check_ibd_file() {
+   584	            Ok(()) => {}
+   585	            Err(_err) => {}
+   586	        }
+   587	        inst.build_index();
+   588	        inst
+   589	    }
+   590	
+   591	
+   592	
+   593	    /// Attempt to open the IBD file based on metadata or by deriving the filename
+   594	    fn check_ibd_file(&mut self) -> io::Result<()> {
+   595	            
+   596	            // Validate UUID if available
+   597	            if let Some(expected_uuid) = &self.imzml_metadata.uuid {
+   598	                let mut ibd_uuid_bytes = [0u8; 16];
+   599	                self.ibd_handle.read_exact(&mut ibd_uuid_bytes)?;
+   600	                let ibd_uuid = Uuid::from_bytes(ibd_uuid_bytes);
+   601	                if *expected_uuid != ibd_uuid {
+   602	                    warn!(
+   603	                        "UUID mismatch between imzML ({}) and IBD ({})",
+   604	                        expected_uuid, ibd_uuid
+   605	                    );
+   606	                }
+   607	            }
+   608	            // TODO check that the checksum matches if available
+   609	            
+   610	            Ok(())
+   611	        }
+   612	
+   613	    /**Parse the metadata section of the file using [`ImzmlMetadataBuilder`]
+   614	     */
+   615	    fn parse_metadata(&mut self) -> Result<(), MzMLParserError> {
+   616	        let mut reader = Reader::from_reader(&mut self.handle);
+   617	        reader.trim_text(true);
+   618	        let mut accumulator = ImzmlMetadataBuilder {
+   619	            mzml_metadata_builder: FileMetadataBuilder {
+   620	                instrument_id_map: Some(&mut self.instrument_id_map),
+   621	                ..Default::default()
+   622	            },
+   623	            imzml_metadata: ImzMLFileMetadata::default(),
+   624	        };
+   625	        loop {
+   626	            match reader.read_event_into(&mut self.buffer) {
+   627	                Ok(Event::Start(ref e)) => {
+   628	                    match accumulator.start_element(e, self.state) {
+   629	                        Ok(state) => {
+   630	                            self.state = state;
+   631	                            match &self.state {
+   632	                                MzMLParserState::SpectrumList | MzMLParserState::Spectrum => break,
+   633	                                MzMLParserState::ParserError => {
+   634	                                    log::error!(
+   635	                                        "Encountered an error while starting {:?}",
+   636	                                        String::from_utf8_lossy(&self.buffer)
+   637	                                    );
+   638	                                }
+   639	                                _ => {}
+   640	                            }
+   641	                        }
+   642	                        Err(message) => {
+   643	                            self.state = MzMLParserState::ParserError;
+   644	                            self.error = Some(Box::new(message));
+   645	                        }
+   646	                    };
+   647	                }
+   648	                Ok(Event::End(ref e)) => {
+   649	                    match accumulator.end_element(e, self.state) {
+   650	                        Ok(state) => {
+   651	                            self.state = state;
+   652	                        }
+   653	                        Err(message) => {
+   654	                            self.state = MzMLParserState::ParserError;
+   655	                            self.error = Some(Box::new(message));
+   656	                        }
+   657	                    };
+   658	                }
+   659	                Ok(Event::Text(ref e)) => {
+   660	                    match accumulator.text(e, self.state) {
+   661	                        Ok(state) => {
+   662	                            self.state = state;
+   663	                        }
+   664	                        Err(message) => {
+   665	                            self.state = MzMLParserState::ParserError;
+   666	                            self.error = Some(Box::new(message));
+   667	                        }
+   668	                    };
+   669	                }
+   670	                Ok(Event::Empty(ref e)) => {
+   671	                    match accumulator.empty_element(e, self.state, reader.buffer_position()) {
+   672	                        Ok(state) => {
+   673	                            self.state = state;
+   674	                        }
+   675	                        Err(message) => {
+   676	                            self.state = MzMLParserState::ParserError;
+   677	                            self.error = Some(Box::new(message));
+   678	                        }
+   679	                    }
+   680	                }
+   681	                Ok(Event::Eof) => {
+   682	                    break;
+   683	                }
+   684	                Err(err) => match &err {
+   685	                    XMLError::EndEventMismatch {
+   686	                        expected,
+   687	                        found: _found,
+   688	                    } => {
+   689	                        if expected.is_empty() && self.state == MzMLParserState::Resume {
+   690	                            continue;
+   691	                        } else {
+   692	                            self.error = Some(Box::new(MzMLParserError::IncompleteElementError(
+   693	                                String::from_utf8_lossy(&self.buffer).to_string(),
+   694	                                self.state,
+   695	                            )));
+   696	                            self.state = MzMLParserState::ParserError;
+   697	                        }
+   698	                    }
+   699	                    _ => {
+   700	                        self.error = Some(Box::new(MzMLParserError::IncompleteElementError(
+   701	                            String::from_utf8_lossy(&self.buffer).to_string(),
+   702	                            self.state,
+   703	                        )));
+   704	                        self.state = MzMLParserState::ParserError;
+   705	                    }
+   706	                },
+   707	                _ => {}
+   708	            };
+   709	            self.buffer.clear();
+   710	            match self.state {
+   711	                MzMLParserState::SpectrumList | MzMLParserState::ParserError => {
+   712	                    break;
+   713	                }
+   714	                _ => {}
+   715	            };
+   716	        }
+   717	        // Extract standard mzML metadata (already present)
+   718	        self.file_description = accumulator.mzml_metadata_builder.file_description;
+   719	        self.instrument_configurations = accumulator
+   720	            .mzml_metadata_builder
+   721	            .instrument_configurations
+   722	            .into_iter()
+   723	            .map(|ic| (ic.id, ic))
+   724	            .collect();
+   725	        self.softwares = accumulator.mzml_metadata_builder.softwares;
+   726	        self.samples = accumulator.mzml_metadata_builder.samples;
+   727	        self.data_processings = accumulator.mzml_metadata_builder.data_processings;
+   728	        self.reference_param_groups = accumulator.mzml_metadata_builder.reference_param_groups;
+   729	        self.scan_settings = accumulator.mzml_metadata_builder.scan_settings;
+   730	        self.run.id = accumulator.mzml_metadata_builder.run_id;
+   731	        self.run.default_instrument_id = accumulator.mzml_metadata_builder.default_instrument_config;
+   732	        self.run.default_source_file_id = accumulator.mzml_metadata_builder.default_source_file;
+   733	        self.run.start_time = accumulator.mzml_metadata_builder.start_timestamp;
+   734	        self.run.default_data_processing_id = accumulator.mzml_metadata_builder.default_data_processing;
+   735	        self.num_spectra = accumulator.mzml_metadata_builder.num_spectra;
+   736	
+   737	
+   738	        let imzml_metadata = accumulator.imzml_metadata;
+   739	
+   740	        // Validate required metadata
+   741	        let data_mode = imzml_metadata.data_mode.ok_or_else(|| {
+   742	            MzMLParserError::IncompleteElementError(
+   743	                "Missing required imzML data mode (IMS:1000030 or IMS:1000031)".to_string(),
+   744	                MzMLParserState::FileContents,
+   745	            )
+   746	        })?;
+   747	        self.imzml_metadata.data_mode = Some(data_mode);
+   748	        
+   749	        let uuid = imzml_metadata.uuid.ok_or_else(|| {
+   750	            MzMLParserError::IncompleteElementError(
+   751	                "Missing required imzML UUID (IMS:1000080)".to_string(),
+   752	                MzMLParserState::FileContents,
+   753	            )
+   754	        })?;
+   755	        self.imzml_metadata.uuid = Some(uuid);
+   756	        
+   757	        let checksum = imzml_metadata.ibd_checksum.ok_or_else(|| {
+   758	            MzMLParserError::IncompleteElementError(
+   759	                "Missing required imzML IBD checksum".to_string(),
+   760	                MzMLParserState::FileContents,
+   761	            )
+   762	        })?;
+   763	        let checksum_for_log = checksum.clone();
+   764	        self.imzml_metadata.ibd_checksum = Some(checksum);
+   765	        self.imzml_metadata.ibd_checksum_type = imzml_metadata.ibd_checksum_type;
+   766	        
+   767	        log::debug!("Parsed imzML metadata - Mode: {:?}, UUID: {}, Checksum: {}", 
+   768	                   data_mode, uuid, checksum_for_log);
+   769	
+   770	        match self.state {
+   771	            MzMLParserState::SpectrumDone | MzMLParserState::ChromatogramDone => Ok(()),
+   772	            MzMLParserState::ParserError => {
+   773	                Err(*self
+   774	                    .error
+   775	                    .take()
+   776	                    .unwrap_or(Box::new(MzMLParserError::UnknownError(
+   777	                        MzMLParserState::ParserError,
+   778	                    ))))
+   779	            }
+   780	            _ => Err(MzMLParserError::IncompleteSpectrum),
+   781	        }
+   782	    }
+   783	
+   784	    pub(crate) fn _parse_into<
+   785	        B: MzMLSAX + SpectrumBuilding<'a, C, D, MultiLayerSpectrum<C, D>> + 'a,
+   786	    >(
+   787	        &'b mut self,
+   788	        mut accumulator: B,
+   789	    ) -> Result<(B, usize), MzMLParserError> {
+   790	        if self.state == MzMLParserState::EOF {
+
+exec
+/bin/zsh -lc "nl -ba vendor/mzdata/src/io/imzml/reader.rs | sed -n '1360,1435p'" in /Users/kohlbach/Claude/imzML2mzPeak
+exec
+/bin/zsh -lc "nl -ba src/read/transcode.rs | sed -n '260,420p'" in /Users/kohlbach/Claude/imzML2mzPeak
+ succeeded in 0ms:
+  1360	    pub fn new(reader: &'a mut ImzMLReaderType<R, S, C, D>) -> Self {
+  1361	        Self { reader, index: 0 }
+  1362	    }
+  1363	}
+  1364	
+  1365	impl<
+  1366	        R: Read + Seek,
+  1367	        S: Read + Seek,
+  1368	        C: CentroidLike + BuildFromArrayMap,
+  1369	        D: DeconvolutedCentroidLike + BuildFromArrayMap,
+  1370	    > Iterator for ChromatogramIter<'_, R, S, C, D>
+  1371	{
+  1372	    type Item = Chromatogram;
+  1373	
+  1374	    fn next(&mut self) -> Option<Self::Item> {
+  1375	        if self.index < self.reader.chromatogram_index.len() {
+  1376	            let result = self.reader.get_chromatogram_by_index(self.index);
+  1377	            self.index += 1;
+  1378	            result
+  1379	        } else {
+  1380	            None
+  1381	        }
+  1382	    }
+  1383	}
+  1384	
+  1385	/// For open_file we assume that the IBD file is named the same as the imzML file
+  1386	impl<C: CentroidLike + BuildFromArrayMap, D: DeconvolutedCentroidLike + BuildFromArrayMap>
+  1387	    MZFileReader<C, D, MultiLayerSpectrum<C, D>> for ImzMLReaderType<fs::File, fs::File, C, D>
+  1388	{
+  1389	    fn open_file(_source: fs::File) -> io::Result<Self> {
+  1390	        #[cfg(feature = "filename")]
+  1391	        {
+  1392	            // Get the path from the file using the filename crate
+  1393	            let xml_path = filename::file_name(&_source)
+  1394	                .ok_or_else(|| {
+  1395	                    io::Error::new(io::ErrorKind::InvalidInput, "Source file has no path")
+  1396	                })?;
+  1397	                
+  1398	            // Derive IBD path from imzML path
+  1399	            let mut ibd_path = xml_path.with_extension("ibd");
+  1400	            if !ibd_path.exists() {
+  1401	                // Try .IBD (uppercase)
+  1402	                ibd_path = xml_path.with_extension("IBD");
+  1403	                if !ibd_path.exists() {
+  1404	                    return Err(io::Error::new(
+  1405	                        io::ErrorKind::NotFound,
+  1406	                        format!(
+  1407	                            "Could not find associated IBD file for imzML at {}",
+  1408	                            ibd_path.display()
+  1409	                        ),
+  1410	                    ));
+  1411	                }
+  1412	            }
+  1413	            
+  1414	            // Open the IBD file
+  1415	            let ibd_file = fs::File::open(&ibd_path)?;
+  1416	            
+  1417	            // Create the reader with both files
+  1418	            Ok(Self::new(_source, ibd_file))
+  1419	        }
+  1420	        #[cfg(not(feature = "filename"))]
+  1421	        {
+  1422	            // Cannot implement without filename feature
+  1423	            Err(io::Error::new(
+  1424	                io::ErrorKind::Unsupported,
+  1425	                "Cannot open imzML from File handle without the `filename` feature - use open_path() or ImzMLReaderType::new() directly"
+  1426	            ))
+  1427	        }
+  1428	    }
+  1429	
+  1430	    
+  1431	    fn open_path<P>(path: P) -> io::Result<Self>
+  1432	        where
+  1433	            P: Into<std::path::PathBuf> + Clone, 
+  1434	        {
+  1435	            let path: std::path::PathBuf = path.into();
+
+ succeeded in 0ms:
+   260	        assert_eq!(detect_xml_encoding(&p2).unwrap(), XmlEncoding::Utf8);
+   261	        let _ = std::fs::remove_file(&p1);
+   262	        let _ = std::fs::remove_file(&p2);
+   263	    }
+   264	
+   265	    #[test]
+   266	    fn transcode_expands_latin1_byte_and_rewrites_prolog() {
+   267	        // `0xE0` is `à` in ISO-8859-1 → `0xC3 0xA0` in UTF-8.
+   268	        let src = write_tmp(
+   269	            "src.imzML",
+   270	            b"<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n<sourceFile name=\"\xe0\"/>",
+   271	        );
+   272	        let guard = transcode_latin1_to_utf8(&src, "ISO-8859-1").unwrap();
+   273	        let mut out = String::new();
+   274	        guard.open().unwrap().read_to_string(&mut out).unwrap();
+   275	        // Valid UTF-8 (read_to_string would have errored otherwise), prolog rewritten, à intact.
+   276	        assert!(out.contains("encoding=\"UTF-8\""), "prolog rewritten: {out}");
+   277	        assert!(!out.contains("ISO-8859-1"), "old encoding removed");
+   278	        assert!(out.contains("name=\"à\""), "Latin-1 byte expanded to UTF-8 à: {out}");
+   279	        let _ = std::fs::remove_file(&src);
+   280	    }
+   281	
+   282	    #[test]
+   283	    fn transcode_preserves_ascii_offsets_and_digits() {
+   284	        let src = write_tmp(
+   285	            "off.imzML",
+   286	            b"<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?><cvParam value=\"123456\" name=\"\xb5\"/>",
+   287	        );
+   288	        let guard = transcode_latin1_to_utf8(&src, "ISO-8859-1").unwrap();
+   289	        let mut out = String::new();
+   290	        guard.open().unwrap().read_to_string(&mut out).unwrap();
+   291	        assert!(out.contains("value=\"123456\""), "ASCII offsets/digits untouched");
+   292	        assert!(out.contains('µ'), "0xB5 → µ"); // micro sign
+   293	        let _ = std::fs::remove_file(&src);
+   294	    }
+   295	
+   296	    #[test]
+   297	    fn temp_file_is_removed_on_drop() {
+   298	        let src = write_tmp("drop.imzML", b"<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?><a/>");
+   299	        let path = {
+   300	            let guard = transcode_latin1_to_utf8(&src, "ISO-8859-1").unwrap();
+   301	            guard.path.clone()
+   302	        };
+   303	        assert!(!path.exists(), "temp transcode file must be deleted on drop");
+   304	        let _ = std::fs::remove_file(&src);
+   305	    }
+   306	}
+
+exec
+/bin/zsh -lc 'rg -n "check_ibd_file|open_path|fn new|read_external_array|SeekFrom::Start|external" vendor/mzdata/src/io/imzml/reader.rs' in /Users/kohlbach/Claude/imzML2mzPeak
+ succeeded in 0ms:
+243:    pub fn new() -> Self {
+309:    fn new_precursor_mut(&mut self) -> &mut Precursor {
+313:    fn new_selected_ion(&mut self) -> &mut SelectedIon {
+366:                                                // IMS:1000102 - external offset
+371:                                                        .expect("Failed to extract external offset")
+374:                                                // IMS:1000103 - external array length
+377:                                                        "Failed to extract external array length",
+380:                                                // IMS:1000104 - external encoded length
+422:                        "The external data offset and length were missing".to_owned(),
+438:                        .name("external offset")
+446:                        .name("external array length")
+455:                            .name("external encoded length")
+542:    pub fn new(file: R, ibd_file: S) -> ImzMLReaderType<R, S, C, D> {
+583:        match inst.check_ibd_file() {
+594:    fn check_ibd_file(&mut self) -> io::Result<()> {
+976:                        .find(|p| p.accession == Some(1000102))  // IMS:1000102 external offset
+981:                        .find(|p| p.accession == Some(1000103))  // IMS:1000103 external array length
+987:                    self.ibd_handle.seek(SeekFrom::Start(offset))
+1078:        match self.seek(SeekFrom::Start(position)) {
+1130:        self.seek(SeekFrom::Start(offset))
+1138:        self.seek(SeekFrom::Start(start))
+1149:        self.seek(SeekFrom::Start(offset))
+1157:        self.seek(SeekFrom::Start(start))
+1219:        self.handle.seek(SeekFrom::Start(offset))
+1224:        self.handle.seek(SeekFrom::Start(start))
+1237:        self.handle.seek(SeekFrom::Start(byte_offset)).ok()?;
+1241:        self.handle.seek(SeekFrom::Start(start))
+1249:        self.handle.seek(SeekFrom::Start(0))
+1284:            Some(offset) => match self.handle.seek(SeekFrom::Start(offset)) {
+1294:            Some(offset) => match self.handle.seek(SeekFrom::Start(offset)) {
+1304:            Some(offset) => match self.handle.seek(SeekFrom::Start(offset)) {
+1360:    pub fn new(reader: &'a mut ImzMLReaderType<R, S, C, D>) -> Self {
+1425:                "Cannot open imzML from File handle without the `filename` feature - use open_path() or ImzMLReaderType::new() directly"
+1431:    fn open_path<P>(path: P) -> io::Result<Self>
+
+exec
+/bin/zsh -lc "nl -ba vendor/mzdata/src/io/imzml/reader.rs | sed -n '940,1010p'" in /Users/kohlbach/Claude/imzML2mzPeak
+exec
+/bin/zsh -lc "nl -ba vendor/mzdata/src/io/imzml/reader.rs | sed -n '1430,1495p'" in /Users/kohlbach/Claude/imzML2mzPeak
+ succeeded in 0ms:
+   940	            _ => {}
+   941	        }
+   942	        
+   943	        let detail_level = self.detail_level;
+   944	        let accumulator = ImzMLSpectrumBuilder::<C, D>::with_detail_level(detail_level);
+   945	
+   946	
+   947	        match self._parse_into(accumulator) {
+   948	            Ok((accumulator, sz)) => {
+   949	                accumulator.into_spectrum(spectrum);
+   950	                if detail_level != DetailLevel::MetadataOnly {
+   951	                    self.load_ibd_arrays(spectrum)?;
+   952	                }
+   953	                if detail_level == DetailLevel::Full {
+   954	                    if let Err(e) = spectrum.try_build_peaks() {
+   955	                        log::debug!("Failed to eagerly load peaks from centroid spectrum: {e}");
+   956	                    }
+   957	                }
+   958	                Ok(sz)
+   959	            }
+   960	            Err(err) => {
+   961	                match &err {
+   962	                    MzMLParserError::EOF => {},
+   963	                    err => log::error!("Error while reading ImzML spectrum: {err}")
+   964	                };
+   965	                Err(err)
+   966	            },
+   967	        }
+   968	    }
+   969	
+   970	    fn load_ibd_arrays(&mut self, spectrum: &mut MultiLayerSpectrum<C, D>) -> Result<(), MzMLParserError> {
+   971	        if let Some(ref mut arrays) = spectrum.arrays {
+   972	            for array in arrays.byte_buffer_map.values_mut() {
+   973	                // Look for IBD parameters we stored during parsing
+   974	                let offset_param = array.params.as_ref()
+   975	                    .and_then(|params| params.iter()
+   976	                        .find(|p| p.accession == Some(1000102))  // IMS:1000102 external offset
+   977	                        .and_then(|p| p.value.to_u64().ok()));
+   978	                    
+   979	                let length_param = array.params.as_ref()
+   980	                    .and_then(|params| params.iter()
+   981	                        .find(|p| p.accession == Some(1000103))  // IMS:1000103 external array length
+   982	                        .and_then(|p| p.value.to_u64().ok()));
+   983	
+   984	                if let (Some(offset), Some(length)) = (offset_param, length_param) {
+   985	                    // Read from IBD file
+   986	                    use std::io::{Seek, SeekFrom};
+   987	                    self.ibd_handle.seek(SeekFrom::Start(offset))
+   988	                        .map_err(|e| MzMLParserError::IOError(MzMLParserState::BinaryDataArray, e))?;
+   989	                    
+   990	                    match array.compression {
+   991	                        // NoCompression in imzML IBD means raw, unencoded bytes of the native dtype
+   992	                        BinaryCompressionType::NoCompression | BinaryCompressionType::Decoded => {
+   993	                            let elem_size = array.dtype.size_of();
+   994	                            let total_bytes = (length as usize) * elem_size;
+   995	                            let mut buffer = vec![0u8; total_bytes];
+   996	                            self.ibd_handle.read_exact(&mut buffer)
+   997	                                .map_err(|e| MzMLParserError::IOError(MzMLParserState::BinaryDataArray, e))?;
+   998	                            array.data = buffer.into();
+   999	                            array.compression = BinaryCompressionType::Decoded;
+  1000	                        }
+  1001	                        // Strictly speaking there are specific CVs for compression of the IBD rather than using the ones in the standard PSI ontology.
+  1002	                        // For now this should be considered a TODO rather than trying something technically incorrect.
+  1003	                        other => {
+  1004	                            return Err(MzMLParserError::IncompleteElementError(
+  1005	                                format!("Unsupported compression type {:?} for imzML IBD data", other),
+  1006	                                MzMLParserState::BinaryDataArray,
+  1007	                            ));
+  1008	                        }
+  1009	                    }
+  1010	                }
+
+ succeeded in 0ms:
+  1430	    
+  1431	    fn open_path<P>(path: P) -> io::Result<Self>
+  1432	        where
+  1433	            P: Into<std::path::PathBuf> + Clone, 
+  1434	        {
+  1435	            let path: std::path::PathBuf = path.into();
+  1436	            let xml_file = fs::File::open(&path)?;
+  1437	            let mut ibd_path = path.with_extension("ibd");
+  1438	            if !ibd_path.exists() {
+  1439	                ibd_path = path.with_extension("IBD");
+  1440	            }
+  1441	            let ibd_file = fs::File::open(&ibd_path)?;
+  1442	            let reader = ImzMLReaderType::new(xml_file, ibd_file);
+  1443	            // Index is already built in the constructor
+  1444	            Ok(reader)
+  1445	        }
+  1446	
+  1447	    fn construct_index_from_stream(&mut self) -> u64 {
+  1448	        // Index should already be constructed during metadata parsing
+  1449	        self.spectrum_index.len() as u64
+  1450	    }
+  1451	
+  1452	}
+  1453	
+  1454	impl<R: Read + Seek, S: Read + Seek, C: CentroidLike, D: DeconvolutedCentroidLike> MSDataFileMetadata
+  1455	    for ImzMLReaderType<R, S, C, D>
+  1456	{
+  1457	    crate::impl_metadata_trait!();
+  1458	
+  1459	    fn scan_settings(&self) -> Option<&Vec<ScanSettings>> {
+  1460	        Some(&self.scan_settings)
+  1461	    }
+  1462	
+  1463	    fn scan_settings_mut(&mut self) -> Option<&mut Vec<ScanSettings>> {
+  1464	        Some(&mut self.scan_settings)
+  1465	    }
+  1466	
+  1467	    fn spectrum_count_hint(&self) -> Option<u64> {
+  1468	        self.num_spectra
+  1469	    }
+  1470	
+  1471	    fn set_spectrum_count_hint(&mut self, _value: Option<u64>) {
+  1472	        self.num_spectra = _value;
+  1473	    }
+  1474	
+  1475	    fn run_description(&self) -> Option<&MassSpectrometryRun> {
+  1476	        Some(&self.run)
+  1477	    }
+  1478	
+  1479	    fn run_description_mut(&mut self) -> Option<&mut MassSpectrometryRun> {
+  1480	        Some(&mut self.run)
+  1481	    }
+  1482	}
+  1483	
+  1484	pub type ImzMLReader<R, S> = ImzMLReaderType<R, S, CentroidPeak, DeconvolutedPeak>;
+
+exec
+/bin/zsh -lc "nl -ba vendor/mzdata/src/io/imzml/reader.rs | sed -n '340,430p'" in /Users/kohlbach/Claude/imzML2mzPeak
+ succeeded in 0ms:
+   340	
+   341	    fn empty_element(
+   342	        &mut self,
+   343	        event: &quick_xml::events::BytesStart,
+   344	        state: MzMLParserState,
+   345	        reader_position: usize,
+   346	    ) -> ParserResult {
+   347	        let elt_name = event.name();
+   348	        match elt_name.as_ref() {
+   349	            b"cvParam" | b"userParam" => {
+   350	                match &state {
+   351	                    MzMLParserState::BinaryDataArray => {
+   352	                        match MzMLSpectrumBuilder::<'a, C, D>::handle_param(
+   353	                            event,
+   354	                            reader_position,
+   355	                            state,
+   356	                        ) {
+   357	                            Ok(param) => {
+   358	                                match &state {
+   359	                                    MzMLParserState::BinaryDataArray => {
+   360	                                        // Check if this is an IMS namespace parameter
+   361	                                        if param.is_controlled()
+   362	                                            && param.controlled_vocabulary
+   363	                                                == Some(ControlledVocabulary::IMS)
+   364	                                        {
+   365	                                            match param.accession.unwrap() {
+   366	                                                // IMS:1000102 - external offset
+   367	                                                1000102 => {
+   368	                                                    self.current_ibd_param.offset = param
+   369	                                                        .value
+   370	                                                        .to_u64()
+   371	                                                        .expect("Failed to extract external offset")
+   372	                                                        as usize
+   373	                                                }
+   374	                                                // IMS:1000103 - external array length
+   375	                                                1000103 => self.current_ibd_param.length =
+   376	                                                    param.value.to_u64().expect(
+   377	                                                        "Failed to extract external array length",
+   378	                                                    )
+   379	                                                        as usize,
+   380	                                                // IMS:1000104 - external encoded length
+   381	                                                1000104 => {
+   382	                                                    self.current_ibd_param.encoded_length = param
+   383	                                                        .value
+   384	                                                        .to_u64()
+   385	                                                        .ok()
+   386	                                                        .map(|v| v as usize);
+   387	                                                }
+   388	                                                _ => self.inner.fill_param_into(param, state),
+   389	                                            }
+   390	                                        } else {
+   391	                                            // Delegate all non-IMS parameters to the inner mzML parser
+   392	                                            self.inner.fill_param_into(param, state)
+   393	                                        }
+   394	                                    }
+   395	                                    _ => self.inner.fill_param_into(param, state),
+   396	                                }
+   397	                                return Ok(state);
+   398	                            }
+   399	                            Err(err) => return Err(err),
+   400	                        }
+   401	                    }
+   402	                    _ => return self.inner.empty_element(event, state, reader_position),
+   403	                }
+   404	            }
+   405	            // Delegate referenceableParamGroupRef to inner parser so array type/dtype get set
+   406	            b"referenceableParamGroupRef" => {
+   407	                return self.inner.empty_element(event, state, reader_position);
+   408	            }
+   409	            _ => {}
+   410	        }
+   411	        Ok(state)
+   412	    }
+   413	
+   414	    fn end_element(&mut self, event: &BytesEnd, state: MzMLParserState) -> ParserResult {
+   415	        let elt_name = event.name();
+   416	        match elt_name.as_ref() {
+   417	            b"binaryDataArray" => {
+   418	                if self.current_ibd_param.offset == 0
+   419	                    && self.current_ibd_param.length == 0
+   420	                {
+   421	                    return Err(MzMLParserError::IncompleteElementError(
+   422	                        "The external data offset and length were missing".to_owned(),
+   423	                        MzMLParserState::BinaryDataArray,
+   424	                    ));
+   425	                }
+   426	
+   427	                let data_request = mem::take(&mut self.current_ibd_param);
+   428	                let array = self.inner.current_array_mut();
+   429	
+   430	                // Store IBD info as parameters in the array with proper IMS CV tagging
+
+exec
+/bin/zsh -lc "nl -ba src/read/stream.rs | sed -n '280,380p'" in /Users/kohlbach/Claude/imzML2mzPeak
+ succeeded in 0ms:
+   280	                    source: MzMLParserError::ArrayDecodingError(
+   281	                        MzMLParserState::BinaryDataArray,
+   282	                        ArrayType::Unknown,
+   283	                        e,
+   284	                    ),
+   285	                })?;
+   286	                Ok(NumArray::F64(v.into_owned()))
+   287	            }
+   288	            other => Err(ReadError::UnsupportedDtype { index, dtype: other }),
+   289	        }
+   290	    }
+   291	}
+   292	
+   293	impl Iterator for ImagingReader {
+   294	    type Item = Result<ImagingSpectrum, ReadError>;
+   295	
+   296	    fn next(&mut self) -> Option<Self::Item> {
+   297	        if self.finished {
+   298	            return None;
+   299	        }
+   300	        // Guard like read_next(): once the parser reports EOF, stop cleanly.
+   301	        if self.inner.state == MzMLParserState::EOF {
+   302	            self.finished = true;
+   303	            return None;
+   304	        }
+   305	
+   306	        let index = self.index;
+   307	        // Drive the FALLIBLE read path directly (NOT next()/read_next(), which swallow
+   308	        // non-EOF errors into None — see module docs / decode_error_handling).
+   309	        let mut spec = MultiLayerSpectrum::default();
+   310	        match self.inner.read_into(&mut spec) {
+   311	            Ok(_sz) => {
+   312	                self.index += 1;
+   313	                Some(Self::to_imaging(index, &spec))
+   314	            }
+   315	            // Clean end-of-run: the ONLY case that yields None.
+   316	            Err(MzMLParserError::EOF) => {
+   317	                self.finished = true;
+   318	                None
+   319	            }
+   320	            // Any other parser/IO error (truncated/out-of-range .ibd, unsupported
+   321	            // compression, malformed XML) surfaces as an Err — never a silent short stream.
+   322	            Err(source) => {
+   323	                self.finished = true;
+   324	                Some(Err(ReadError::Decode { index, source }))
+   325	            }
+   326	        }
+   327	    }
+   328	}
+
+codex
+1. **TRANSCODE CORRECTNESS: VERDICT PASS WITH EDGE**
+ISO-8859-1 byte to Unicode scalar U+00xx to UTF-8 is lossless; ASCII decimal offsets/lengths survive byte-for-byte as characters, and `.ibd` bytes are untouched, so spectral payload offsets are not shifted. Edge: a non-UTF-8 declaration found within 512 bytes but whose closing `?>` lands after the 512-byte head will transcode but not rewrite the prolog, because `rewrite_prolog` treats the whole head as body. I would not block for normal XML declarations, but the bounded assumption is real: [src/read/transcode.rs](/Users/kohlbach/Claude/imzML2mzPeak/src/read/transcode.rs:36), [src/read/transcode.rs](/Users/kohlbach/Claude/imzML2mzPeak/src/read/transcode.rs:178).
+
+2. **READER SEAM: VERDICT PASS**
+`open_path` just opens XML plus derived `.ibd`, then calls `new`; `new` does `parse_metadata`, `check_ibd_file`, and `build_index`, so the transcode path is not skipping reader initialization that `open_path` performs. Consuming the first 16 `.ibd` bytes in `check_ibd_file` is safe because actual array reads seek absolute offsets before reading: [vendor/mzdata/src/io/imzml/reader.rs](/Users/kohlbach/Claude/imzML2mzPeak/vendor/mzdata/src/io/imzml/reader.rs:583), [vendor/mzdata/src/io/imzml/reader.rs](/Users/kohlbach/Claude/imzML2mzPeak/vendor/mzdata/src/io/imzml/reader.rs:987).
+
+3. **ESCAPE HATCH: VERDICT PASS WITH INTEGRITY CAVEAT**
+UUID is still enforced before checksum relaxation; the allow path only changes the branch after `computed != declared`, so a UUID mismatch returns before the warning path. A corrupt `.ibd` that preserves UUID and has in-range bytes can absolutely produce silently wrong numeric spectra; decode errors only catch truncation/out-of-range/unsupported compression, not semantically wrong floats. Strict-by-default is therefore correct: [src/integrity/preflight.rs](/Users/kohlbach/Claude/imzML2mzPeak/src/integrity/preflight.rs:89), [src/integrity/preflight.rs](/Users/kohlbach/Claude/imzML2mzPeak/src/integrity/preflight.rs:105).
+
+4. **BLOCKERS: VERDICT NO BLOCKER**
+No commit-blocking data-integrity regression found in these fixes. Residual panic risk remains in vendored parsing for nonnumeric external offset/length via `expect`, but that is pre-existing malformed-input behavior, not introduced by the transcode or checksum escape hatch: [vendor/mzdata/src/io/imzml/reader.rs](/Users/kohlbach/Claude/imzML2mzPeak/vendor/mzdata/src/io/imzml/reader.rs:368).
+
+SHIP IT: fixes are sound for the stated datasets; document the checksum escape hatch as “may produce wrong spectra” if not already prominent.
+tokens used
+43.645
+1. **TRANSCODE CORRECTNESS: VERDICT PASS WITH EDGE**
+ISO-8859-1 byte to Unicode scalar U+00xx to UTF-8 is lossless; ASCII decimal offsets/lengths survive byte-for-byte as characters, and `.ibd` bytes are untouched, so spectral payload offsets are not shifted. Edge: a non-UTF-8 declaration found within 512 bytes but whose closing `?>` lands after the 512-byte head will transcode but not rewrite the prolog, because `rewrite_prolog` treats the whole head as body. I would not block for normal XML declarations, but the bounded assumption is real: [src/read/transcode.rs](/Users/kohlbach/Claude/imzML2mzPeak/src/read/transcode.rs:36), [src/read/transcode.rs](/Users/kohlbach/Claude/imzML2mzPeak/src/read/transcode.rs:178).
+
+2. **READER SEAM: VERDICT PASS**
+`open_path` just opens XML plus derived `.ibd`, then calls `new`; `new` does `parse_metadata`, `check_ibd_file`, and `build_index`, so the transcode path is not skipping reader initialization that `open_path` performs. Consuming the first 16 `.ibd` bytes in `check_ibd_file` is safe because actual array reads seek absolute offsets before reading: [vendor/mzdata/src/io/imzml/reader.rs](/Users/kohlbach/Claude/imzML2mzPeak/vendor/mzdata/src/io/imzml/reader.rs:583), [vendor/mzdata/src/io/imzml/reader.rs](/Users/kohlbach/Claude/imzML2mzPeak/vendor/mzdata/src/io/imzml/reader.rs:987).
+
+3. **ESCAPE HATCH: VERDICT PASS WITH INTEGRITY CAVEAT**
+UUID is still enforced before checksum relaxation; the allow path only changes the branch after `computed != declared`, so a UUID mismatch returns before the warning path. A corrupt `.ibd` that preserves UUID and has in-range bytes can absolutely produce silently wrong numeric spectra; decode errors only catch truncation/out-of-range/unsupported compression, not semantically wrong floats. Strict-by-default is therefore correct: [src/integrity/preflight.rs](/Users/kohlbach/Claude/imzML2mzPeak/src/integrity/preflight.rs:89), [src/integrity/preflight.rs](/Users/kohlbach/Claude/imzML2mzPeak/src/integrity/preflight.rs:105).
+
+4. **BLOCKERS: VERDICT NO BLOCKER**
+No commit-blocking data-integrity regression found in these fixes. Residual panic risk remains in vendored parsing for nonnumeric external offset/length via `expect`, but that is pre-existing malformed-input behavior, not introduced by the transcode or checksum escape hatch: [vendor/mzdata/src/io/imzml/reader.rs](/Users/kohlbach/Claude/imzML2mzPeak/vendor/mzdata/src/io/imzml/reader.rs:368).
+
+SHIP IT: fixes are sound for the stated datasets; document the checksum escape hatch as “may produce wrong spectra” if not already prominent.

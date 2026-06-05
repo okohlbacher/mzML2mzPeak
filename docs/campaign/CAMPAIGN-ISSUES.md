@@ -16,8 +16,8 @@
 | zenodo-LTP chilli | — | ✗ integrity (2) | — | **ISSUE-3** (data) |
 | zenodo-DESI ×7 (centroid) | — | ✗ panic (101) | — | **ISSUE-2** |
 
-3/13 fully round-trip (the largest real datasets, incl. PXD001283 + AP-SMALDI 34,840 spectra L1
-bit-for-bit). The 7 DESI + 2 Example-1 fail before/at conversion; LTP is a corrupt-`.ibd` dataset.
+> This table is the **as-found** snapshot of the first run. After the fixes below, **all 13
+> datasets convert** (12 cleanly; LTP under `--allow-checksum-mismatch`). See "Post-fix status".
 
 ---
 
@@ -94,8 +94,8 @@ only swap when the stem already ends `.imzML`/`.imzml`. Status: **FIXING.**
 |-------|----------|------------|
 | ISSUE-1 forward ms_level-0 panic | CRITICAL | **FIXED** (vendored visitor defaults ms_level 0 → MS1 + warn). example1 ×2 now forward-convert + L1-verify PASS. Regression: `tests/write_roundtrip.rs::convert_ms_level_zero_imzml_does_not_panic`. |
 | ISSUE-4 reverse `-o` dotted stem | MINOR | **FIXED** (`derive_reverse_paths` appends, preserving dots). Regression: `cli.rs::derive_reverse_paths_dotted_stem_is_preserved`. |
-| ISSUE-2 DESI Latin-1 read panic | CRITICAL | **FILED, not auto-fixed** (non-trivial: vendored-mzdata Latin-1 tolerance). v0.6 candidate. |
-| ISSUE-3 LTP `.ibd` checksum | DATA | **No code change** — converter correctly hard-fails; re-fetch the dataset. |
+| ISSUE-2 DESI Latin-1 read panic | CRITICAL | **FIXED** via a pre-transcode shim at our read boundary (`src/read/transcode.rs`): when an imzML declares a non-UTF-8 prolog, we stream-transcode it to a UTF-8 temp file (ISO-8859-1→UTF-8 is exact; `.ibd` untouched, offsets are ASCII, UUID preserved) and hand mzdata `(temp_xml, real_ibd)` via `ImzMLReader::new`. NO vendored-mzdata surgery. Investigation showed the only non-UTF-8 byte in all 7 DESI files is `0xE0` (`à`) in one `<sourceFile name>`; downstream shape (processed/uncompressed/centroid/ms0→MS1/full geometry) was already supported. **All 7 DESI now forward-convert + L1-verify PASS**, and one full back-and-forth verified (20,022 spectra, count preserved). Regressions: `transcode::{detects_iso_8859_1, transcode_expands_latin1_byte_and_rewrites_prolog, …}`. |
+| ISSUE-3 LTP `.ibd` checksum | DATA | **No silent change** — strict default still hard-fails (exit 2, correct). Added opt-in `--allow-checksum-mismatch` (UUID linkage still enforced; checksum downgraded to a loud WARN) so a known-imperfect file can be converted with eyes open. LTP then converts (4,166 spectra). **The dataset should still be re-fetched** — the flag accepts integrity risk, it does not repair it. Regression: `preflight.rs::allow_checksum_mismatch_relaxes_checksum_but_not_uuid`. |
 | ISSUE-5 preflight sidecar resolution for *dotted* stems | MINOR | **FIXED** (our code, `src/integrity/preflight.rs::resolve_ibd_path`). Root cause was *ours*, not vendored mzdata: the sibling fallback used `parent.join(stem).set_extension("ibd")`, and `set_extension` **replaces** a dotted stem's last segment (`a.rev` → `a.ibd`). Now APPENDS `.ibd` to the full stem (twin of the ISSUE-4 fix). Regression: `preflight.rs::resolve_ibd_path_preserves_dotted_stem`. Verified end-to-end: dotted-stem `imzML→mzpeak→imzML→mzpeak` round-trips on example1 **and** HR2MSI (34,840 spectra, consistent UUID, count preserved). |
 | ISSUE-6 HR2MSI reconv "UUID mismatch" | NOT A BUG | Symptom of ISSUE-5 + a *stale* run-1 `.ibd` in the shared out dir. With ISSUE-5 fixed, the dotted-stem back-and-forth round-trips with a consistent UUID even in the shared dir. |
 
@@ -114,11 +114,14 @@ The single FIX-FIRST item (the `-o out.mzpeak` test + resolve ISSUE-5) is **done
 A clean `imzML → mzpeak → imzML → mzpeak` chain (fresh dir, default stem) PASSES end-to-end:
 `forward + L1 --verify` ✓ → `reverse` ✓ → `re-forward` ✓ → integrity OK, UUID consistent.
 
-**Convertible datasets (5/13) round-trip:** example1-continuous, example1-processed (post ISSUE-1
-fix), LA-ESI, PXD001283-HR2MSI, AP-SMALDI — incl. two 34,840-spectrum L1 bit-for-bit passes.
-**Blocked (8/13):** 7× DESI (ISSUE-2 Latin-1, real code gap → v0.6) + 1× LTP (ISSUE-3 corrupt data).
+**Final coverage: 13/13 datasets convert.** 12 convert cleanly (5 original + 7 DESI via the
+transcode shim); the 1 corrupt LTP dataset converts under the explicit `--allow-checksum-mismatch`
+opt-in (and should be re-fetched). The forward+L1 and back-and-forth pipeline is sound on
+continuous, processed, UTF-8, and ISO-8859-1 imzML across 5 instrument sources.
 
 ## Carried to v0.6
-- **ISSUE-2:** make the spectrum read path Latin-1-tolerant (vendored-mzdata lossy/ISO-8859-1 attribute
-  decode, or pre-transcode header) — unblocks all ISO-8859-1 imzML (DESI + much real-world MSI).
+- **Re-fetch** the LTP `ltpmsi-chilli` dataset (declared SHA-1 ≠ actual `.ibd`); `--allow-checksum-mismatch`
+  is a workaround, not a repair.
+- **Transcode robustness:** the shim handles ISO-8859-1 exactly and other non-UTF-8 as best-effort
+  Latin-1 (warns). If a real windows-1252 file with 0x80–0x9F content appears, add a proper cp1252 map.
 - File the two upstream issues (mzpeak_prototyping FileEntry serde from v0.5; mzdata Latin-1 panic).
