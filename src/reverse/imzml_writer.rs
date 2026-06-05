@@ -139,6 +139,38 @@ fn emit_cv_param(
     Ok(())
 }
 
+/// Emit one valued `<cvParam>` carrying the micrometre (µm) unit (FID-01 / FID-02): identical to
+/// [`emit_cv_param`] but with the trailing `unitCvRef="UO" unitAccession="UO:0000017"
+/// unitName="micrometer"` attributes before the self-close. Used for the geometry terms whose
+/// values are physical µm lengths — `IMS:1000044/45` (max dimension), `IMS:1000046/47` (pixel
+/// size) and `IMS:1000053/54` (absolute position offset).
+///
+/// The dynamic `value` is routed through [`emit_escaped`] exactly as [`emit_cv_param`]; the unit
+/// attribute values are STATIC scaffolding written with [`emit_raw`] (threat T-14-UNITBREAK — the
+/// constant unit string is producer-controlled, never caller data). The UO CV is declared in the
+/// header `<cvList>` so `unitCvRef="UO"` resolves (FID-01 / checker WR-1).
+fn emit_cv_param_um(
+    sink: &mut impl Write,
+    cv_ref: &str,
+    accession: &str,
+    name: &str,
+    value: &str,
+) -> Result<(), ReverseError> {
+    emit_raw(sink, "<cvParam cvRef=\"")?;
+    emit_escaped(sink, cv_ref)?;
+    emit_raw(sink, "\" accession=\"")?;
+    emit_escaped(sink, accession)?;
+    emit_raw(sink, "\" name=\"")?;
+    emit_escaped(sink, name)?;
+    emit_raw(sink, "\" value=\"")?;
+    emit_escaped(sink, value)?;
+    emit_raw(
+        sink,
+        "\" unitCvRef=\"UO\" unitAccession=\"UO:0000017\" unitName=\"micrometer\"/>",
+    )?;
+    Ok(())
+}
+
 /// Streamed writer for one `.imzML` document.
 ///
 /// Holds a [`BufWriter`] sink (never buffers all 34,840 spectra). [`Self::new`] eagerly writes
@@ -261,8 +293,11 @@ impl ImzmlWriter {
         )?;
 
         // cvList — MUST contain <cv id="IMS"> so the reader recognizes IMS accessions
-        // (reader.rs is_imzml + ControlledVocabulary::IMS).
-        emit_raw(sink, "<cvList count=\"2\">")?;
+        // (reader.rs is_imzml + ControlledVocabulary::IMS). The UO (Unit Ontology) CV is declared
+        // too (count=3) so every `unitCvRef="UO" unitAccession="UO:0000017"` on the µm geometry
+        // terms (IMS:1000044/45/46/47/53/54) resolves to a declared CV rather than dangling
+        // (FID-01 / checker WR-1).
+        emit_raw(sink, "<cvList count=\"3\">")?;
         emit_raw(
             sink,
             "<cv id=\"MS\" fullName=\"PSI-MS controlled vocabulary\" \
@@ -272,6 +307,11 @@ impl ImzmlWriter {
             sink,
             "<cv id=\"IMS\" fullName=\"Mass Spectrometry Imaging controlled vocabulary\" \
              URI=\"https://raw.githubusercontent.com/imzML/imzML/master/imagingMS.obo\"/>",
+        )?;
+        emit_raw(
+            sink,
+            "<cv id=\"UO\" fullName=\"Unit Ontology\" \
+             URI=\"https://raw.githubusercontent.com/bio-ontology-research-group/unit-ontology/master/unit.obo\"/>",
         )?;
         emit_raw(sink, "</cvList>\n")?;
 
@@ -361,25 +401,52 @@ impl ImzmlWriter {
         };
         emit_raw(sink, "<scanSettingsList count=\"1\">")?;
         emit_raw(sink, "<scanSettings id=\"ss_reverse\">")?;
-        // pixel_count → IMS:1000042 (x) / IMS:1000043 (y)
+        // pixel_count → IMS:1000042 (x) / IMS:1000043 (y). These are dimensionless GRID COUNTS, so
+        // they carry NO unit (the plain emit_cv_param). FID-03 (z carry-through): meta.pixel_count.z
+        // is carried end-to-end on ImagingMetadata (convert.rs deserializes it) but is intentionally
+        // NOT emitted here — there is NO standard IMS accession for a z grid COUNT (IMS:1000042=x
+        // count, IMS:1000043=y count only; no z-count term exists). The per-pixel z COORDINATE
+        // IMS:1000052 is a separate concept and is emitted in write_spectrum. Fabricating a bogus
+        // z-count accession would be a fidelity bug (threat T-14-FAB), so z is carried, never coined.
         if let Some(pc) = meta.pixel_count {
             emit_cv_param(sink, "IMS", "IMS:1000042", "max count of pixels x", &pc.x.to_string())?;
             emit_cv_param(sink, "IMS", "IMS:1000043", "max count of pixels y", &pc.y.to_string())?;
         }
-        // max_dimension_um → IMS:1000044 (x) / IMS:1000045 (y)
+        // max_dimension_um → IMS:1000044 (x) / IMS:1000045 (y), carrying the µm unit (FID-01).
         if let Some(md) = meta.max_dimension_um {
-            emit_cv_param(sink, "IMS", "IMS:1000044", "max dimension x", &md.x.to_string())?;
-            emit_cv_param(sink, "IMS", "IMS:1000045", "max dimension y", &md.y.to_string())?;
+            emit_cv_param_um(sink, "IMS", "IMS:1000044", "max dimension x", &md.x.to_string())?;
+            emit_cv_param_um(sink, "IMS", "IMS:1000045", "max dimension y", &md.y.to_string())?;
         }
-        // pixel_size_um → IMS:1000046 (x) / IMS:1000047 (y). A non-finite value (NaN/±inf) is
-        // OMITTED rather than emitted as an invalid numeric cvParam token (WR-03).
+        // pixel_size_um → IMS:1000046 (x) / IMS:1000047 (y), carrying the µm unit (FID-01). A
+        // non-finite value (NaN/±inf) is OMITTED rather than emitted as an invalid numeric cvParam
+        // token (WR-03) — the omitted axis emits neither the term nor a unit.
         if let Some(ps) = meta.pixel_size_um {
             if let Some(x) = format_f64(ps.x) {
-                emit_cv_param(sink, "IMS", "IMS:1000046", "pixel size x", &x)?;
+                emit_cv_param_um(sink, "IMS", "IMS:1000046", "pixel size x", &x)?;
             }
             if let Some(y) = format_f64(ps.y) {
-                emit_cv_param(sink, "IMS", "IMS:1000047", "pixel size y", &y)?;
+                emit_cv_param_um(sink, "IMS", "IMS:1000047", "pixel size y", &y)?;
             }
+        }
+        // absolute_offset_um → IMS:1000053 (x) / IMS:1000054 (y), carrying the µm unit (FID-02).
+        // Emitted ONLY when present; absent offsets emit nothing (never fabricated — threat
+        // T-14-FAB). Values are i64 (AxisPair<i64>) → to_string() always yields a valid integer
+        // token, so no format_f64 non-finite guard is needed here (threat T-14-INVNUM).
+        if let Some(off) = meta.absolute_offset_um {
+            emit_cv_param_um(
+                sink,
+                "IMS",
+                "IMS:1000053",
+                "absolute position offset x",
+                &off.x.to_string(),
+            )?;
+            emit_cv_param_um(
+                sink,
+                "IMS",
+                "IMS:1000054",
+                "absolute position offset y",
+                &off.y.to_string(),
+            )?;
         }
         emit_raw(sink, "</scanSettings></scanSettingsList>\n")?;
         Ok(())
@@ -681,7 +748,7 @@ mod tests {
     }
 
     use crate::reverse::ArrayRef;
-    use crate::schema::metadata::{AxisPair, ImagingMetadata};
+    use crate::schema::metadata::{AxisPair, ImagingMetadata, PixelCount};
 
     /// Read the emitted document as a UTF-8 string (also proves valid UTF-8).
     fn read_text(path: &std::path::Path) -> String {
@@ -699,6 +766,7 @@ mod tests {
             images: None,
             pixel_size_um: Some(AxisPair { x: 50.0, y: 50.0 }),
             max_dimension_um: None,
+            absolute_offset_um: None,
             scan_pattern: None,
             scan_type: None,
             line_scan_direction: None,
@@ -720,6 +788,9 @@ mod tests {
 
         let text = read_text(&path);
         assert!(text.contains("<cv id=\"IMS\""), "must declare <cv id=\"IMS\">");
+        // FID-01 / WR-1: the UO CV is declared and the cvList count is 3 so unitCvRef="UO" resolves.
+        assert!(text.contains("<cvList count=\"3\">"), "cvList count is 3 (MS + IMS + UO)");
+        assert!(text.contains("<cv id=\"UO\""), "must declare <cv id=\"UO\"> (Unit Ontology)");
         assert!(text.contains("IMS:1000080"), "UUID accession present");
         assert!(
             text.contains(&uuid.to_string()),
@@ -888,6 +959,7 @@ mod tests {
             // x is NaN (must be omitted), y is finite (must be emitted).
             pixel_size_um: Some(AxisPair { x: f64::NAN, y: 25.0 }),
             max_dimension_um: None,
+            absolute_offset_um: None,
             scan_pattern: None,
             scan_type: None,
             line_scan_direction: None,
@@ -926,6 +998,169 @@ mod tests {
         assert!(!text.contains("IMS:1000042"), "pixel-count omitted (None)");
         assert!(!text.contains("IMS:1000044"), "max-dimension omitted (None)");
 
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// FID-01: the four µm geometry terms IMS:1000044/45 (max dimension) and IMS:1000046/47 (pixel
+    /// size) each carry `unitCvRef="UO" unitAccession="UO:0000017" unitName="micrometer"`, the UO CV
+    /// is declared in the header `<cvList count="3">`, and the dimensionless pixel COUNTS
+    /// IMS:1000042/43 carry NO unit.
+    #[test]
+    fn scansettings_emits_um_units() {
+        let dir = tempdir();
+        let path = dir.join("units.imzML");
+        let meta = ImagingMetadata {
+            is_imaging: true,
+            pixel_count: Some(PixelCount { x: 10, y: 20, z: None }),
+            pixel_count_source: None,
+            mz_range: None,
+            images: None,
+            pixel_size_um: Some(AxisPair { x: 50.0, y: 50.0 }),
+            max_dimension_um: Some(AxisPair { x: 13000, y: 6700 }),
+            absolute_offset_um: None,
+            scan_pattern: None,
+            scan_type: None,
+            line_scan_direction: None,
+            linescan_sequence: None,
+            coordinate_base: 1,
+        };
+        let w = ImzmlWriter::new(&path, Uuid::new_v4(), "deadbeef", 0, Some(&meta)).unwrap();
+        w.finish().unwrap();
+
+        let text = read_text(&path);
+        // WR-1: the UO CV is declared so unitCvRef="UO" resolves, and the cvList count is 3.
+        assert!(text.contains("<cvList count=\"3\">"), "cvList count bumped to 3 for UO");
+        assert!(text.contains("<cv id=\"UO\""), "UO (Unit Ontology) CV declared in cvList");
+
+        // Each of the four µm terms carries the UO:0000017 unit triple.
+        for acc in ["IMS:1000044", "IMS:1000045", "IMS:1000046", "IMS:1000047"] {
+            let needle = format!("accession=\"{acc}\"");
+            let frag = &text[text.find(&needle).expect("term present")..];
+            let close = frag.find("/>").expect("self-close present");
+            let cv = &frag[..close];
+            assert!(
+                cv.contains("unitCvRef=\"UO\""),
+                "{acc} must carry unitCvRef=\"UO\""
+            );
+            assert!(
+                cv.contains("unitAccession=\"UO:0000017\""),
+                "{acc} must carry unitAccession=\"UO:0000017\""
+            );
+            assert!(
+                cv.contains("unitName=\"micrometer\""),
+                "{acc} must carry unitName=\"micrometer\""
+            );
+        }
+
+        // The dimensionless pixel COUNTS must NOT carry a unit.
+        for acc in ["IMS:1000042", "IMS:1000043"] {
+            let needle = format!("accession=\"{acc}\"");
+            let frag = &text[text.find(&needle).expect("count term present")..];
+            let close = frag.find("/>").expect("self-close present");
+            let cv = &frag[..close];
+            assert!(
+                !cv.contains("unitAccession"),
+                "{acc} is a dimensionless count and must NOT carry a unit"
+            );
+        }
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// FID-03: z carry-through — `pixel_count.z = Some(N)` survives serde onto the
+    /// `ImagingMetadata` the reverse path feeds the emitter, and NO fabricated z-grid-COUNT IMS
+    /// accession appears in the emitted document (there is no standard z-count term; the per-pixel
+    /// z COORDINATE IMS:1000052 is separate and handled in write_spectrum).
+    #[test]
+    fn pixel_count_z_carried_no_fabricated_zcount() {
+        // The value reaches the reverse path unchanged through a serde round-trip (the exact path
+        // convert.rs uses: serde_json::from_value::<ImagingMetadata>).
+        let meta = ImagingMetadata {
+            is_imaging: true,
+            pixel_count: Some(PixelCount { x: 10, y: 20, z: Some(3) }),
+            pixel_count_source: None,
+            mz_range: None,
+            images: None,
+            pixel_size_um: None,
+            max_dimension_um: None,
+            absolute_offset_um: None,
+            scan_pattern: None,
+            scan_type: None,
+            line_scan_direction: None,
+            linescan_sequence: None,
+            coordinate_base: 1,
+        };
+        let v = serde_json::to_value(&meta).unwrap();
+        let back: ImagingMetadata = serde_json::from_value(v).unwrap();
+        assert_eq!(
+            back.pixel_count.unwrap().z,
+            Some(3),
+            "pixel_count.z survives the convert.rs from_value path unchanged"
+        );
+
+        // Emit it and confirm no bogus z-grid-count accession is fabricated. The only legitimate
+        // z-bearing accession (IMS:1000052, the per-pixel z COORDINATE) is emitted by write_spectrum,
+        // never by scanSettings — so a scanSettings-only fixture must contain neither a z-count nor
+        // IMS:1000052.
+        let dir = tempdir();
+        let path = dir.join("zcarry.imzML");
+        let w = ImzmlWriter::new(&path, Uuid::new_v4(), "deadbeef", 0, Some(&back)).unwrap();
+        w.finish().unwrap();
+        let text = read_text(&path);
+        assert!(text.contains("IMS:1000042"), "x grid count still emitted");
+        assert!(text.contains("IMS:1000043"), "y grid count still emitted");
+        assert!(
+            !text.contains("IMS:1000052"),
+            "no per-pixel z coordinate in a scanSettings-only fixture (it lives in write_spectrum)"
+        );
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// FID-02: when `absolute_offset_um = Some({x,y})`, IMS:1000053/54 are emitted with the value
+    /// AND the UO:0000017 µm unit; when `None`, NEITHER offset term is emitted (never fabricated).
+    #[test]
+    fn scansettings_emits_absolute_offsets() {
+        // Present case.
+        let dir = tempdir();
+        let path = dir.join("offsets.imzML");
+        let meta = ImagingMetadata {
+            absolute_offset_um: Some(AxisPair { x: 5000, y: -2000 }),
+            ..meta_with_pixel_size()
+        };
+        let w = ImzmlWriter::new(&path, Uuid::new_v4(), "deadbeef", 0, Some(&meta)).unwrap();
+        w.finish().unwrap();
+        let text = read_text(&path);
+        assert!(
+            text.contains("accession=\"IMS:1000053\" name=\"absolute position offset x\" value=\"5000\""),
+            "offset x emitted with value"
+        );
+        assert!(
+            text.contains("accession=\"IMS:1000054\" name=\"absolute position offset y\" value=\"-2000\""),
+            "offset y emitted with value (negative integer token)"
+        );
+        // Each offset carries the µm unit.
+        for acc in ["IMS:1000053", "IMS:1000054"] {
+            let needle = format!("accession=\"{acc}\"");
+            let frag = &text[text.find(&needle).expect("offset term present")..];
+            let close = frag.find("/>").expect("self-close present");
+            let cv = &frag[..close];
+            assert!(
+                cv.contains("unitAccession=\"UO:0000017\""),
+                "{acc} must carry the µm unit"
+            );
+        }
+        fs::remove_dir_all(&dir).ok();
+
+        // Absent case: NEITHER term emitted.
+        let dir = tempdir();
+        let path = dir.join("nooffset.imzML");
+        let meta = meta_with_pixel_size(); // absolute_offset_um: None
+        let w = ImzmlWriter::new(&path, Uuid::new_v4(), "deadbeef", 0, Some(&meta)).unwrap();
+        w.finish().unwrap();
+        let text = read_text(&path);
+        assert!(!text.contains("IMS:1000053"), "offset x omitted when None (never fabricated)");
+        assert!(!text.contains("IMS:1000054"), "offset y omitted when None (never fabricated)");
         fs::remove_dir_all(&dir).ok();
     }
 
@@ -1329,5 +1564,46 @@ mod tests {
 
             fs::remove_dir_all(&dir).ok();
         }
+    }
+
+    /// FID-01 + FID-02 oracle: a fixture whose scanSettings carries the µm-unit-bearing
+    /// max_dimension_um + pixel_size_um (IMS:1000044-47) AND the absolute offsets IMS:1000053/54
+    /// re-reads through `mzdata::ImzMLReader` without error — the unit attributes and the new offset
+    /// cvParams do not break the oracle (threats T-14-UNITBREAK / T-14-INVNUM).
+    #[test]
+    fn units_and_offsets_roundread() {
+        let dir = tempdir();
+        let pixels = two_pixel_fixture();
+        let meta = ImagingMetadata {
+            is_imaging: true,
+            pixel_count: Some(PixelCount { x: 2, y: 1, z: Some(1) }),
+            pixel_count_source: None,
+            mz_range: None,
+            images: None,
+            pixel_size_um: Some(AxisPair { x: 50.0, y: 50.0 }),
+            max_dimension_um: Some(AxisPair { x: 13000, y: 6700 }),
+            absolute_offset_um: Some(AxisPair { x: 5000, y: -2000 }),
+            scan_pattern: None,
+            scan_type: None,
+            line_scan_direction: None,
+            linescan_sequence: None,
+            coordinate_base: 1,
+        };
+        let (xml_path, ibd_path) = emit_fixture(&dir, &pixels, Some(&meta));
+
+        let mut reader = ImzMLReader::<File, File>::new(
+            File::open(&xml_path).unwrap(),
+            File::open(&ibd_path).unwrap(),
+        );
+        assert!(
+            reader.imzml_metadata.uuid.is_some(),
+            "unit+offset-bearing fixture still parses required metadata"
+        );
+        let mut spec = MultiLayerSpectrum::default();
+        reader
+            .read_into(&mut spec)
+            .expect("unit+offset-bearing scanSettings fixture re-reads without error");
+
+        fs::remove_dir_all(&dir).ok();
     }
 }
