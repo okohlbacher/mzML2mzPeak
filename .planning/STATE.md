@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.5
 milestone_name: — Index enrichment & optical-image import
-status: executing
+status: verifying
 stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-06-05T15:38:55.601Z"
-last_activity: 2026-06-05 -- Phase 14 planning complete
+last_updated: "2026-06-05T15:47:01.685Z"
+last_activity: 2026-06-05
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 4
-  completed_plans: 3
-  percent: 50
+  completed_plans: 4
+  percent: 75
 ---
 
 # Project State
@@ -23,14 +23,14 @@ See: .planning/PROJECT.md (updated 2026-06-03)
 **Core value:** Both-direction imzML↔imaging-mzPeak converter (v0.3 forward + v0.4 reverse shipped).
 v0.5 enriches the forward `index.json` (imaging flag, derived pixel counts, MS1 m/z bounds, written
 last) and imports optical TIFF images with a full-extent affine into the MS pixel grid.
-**Current focus:** Phase 13 — index-enrichment-index-last-flag-pixel-counts-m-z-bounds
+**Current focus:** Phase 14 — reverse-emit-fidelity-units-offsets-z
 
 ## Current Position
 
-Phase: 14
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-06-05 -- Phase 14 planning complete
+Phase: 14 (reverse-emit-fidelity-units-offsets-z) — EXECUTING
+Plan: 1 of 1
+Status: Phase complete — ready for verification
+Last activity: 2026-06-05
 
 ## v0.5 Locked Decisions (CODEX-reviewed)
 
@@ -89,6 +89,7 @@ Last activity: 2026-06-05 -- Phase 14 planning complete
 | Phase 12 P01 | 10 | 2 tasks | 4 files |
 | Phase 12 P02 | 2 | 2 tasks | 1 files |
 | Phase 13 P01 | 25m | 2 tasks | 4 files |
+| Phase 14 P01 | 18min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -125,6 +126,7 @@ Recent decisions affecting current (v0.4) work:
 - [Phase ?]: 12-01: PixelCountSource wire strings exactly declared / observed_max (snake_case)
 - [Phase ?]: Spec-doc Edit 7 rewritten to TIFF-separate-ZIP-member design; images.parquet-blob + CV-registration design demoted to F8 future option (Phase 12-02)
 - [Phase ?]: Phase 13: bounded scalar IndexAccumulator populates metadata.imaging is_imaging/pixel_count(+source)/mz_range at runtime, folded before the index-last write
+- [Phase ?]: 14-01: reverse <scanSettings> emits IMS:1000044-47 + IMS:1000053/54 with the UO:0000017 µm unit (UO CV declared, cvList count=3); absolute_offset_um added to ImagingMetadata/schema/spec-doc; pixel_count.z carried, no fabricated z-count accession; offset forward-population deferred to v0.6+; mzdata oracle green; no new crates.
 
 ### Reuse Anchors (from shipped v0.3)
 
@@ -161,7 +163,7 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-05T15:18:09.108Z
+Last session: 2026-06-05T15:46:38.959Z
 Stopped at: Completed 10-01-PLAN.md
 Resume file: None
 

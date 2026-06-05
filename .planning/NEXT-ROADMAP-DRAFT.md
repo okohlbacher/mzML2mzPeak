@@ -176,3 +176,11 @@ U1/U2 JSON would fail validation. Before any accumulator/import code:
   grid counts (`IMS:1000042/43`), so real forward output always reports `observed_max`. To make
   "declared" reachable, the forward path must parse imzML `<scanSettings>` geometry (as the reverse
   side already does in `src/schema/geometry.rs`). Pairs naturally with F4 (authoritative scan_settings).
+
+- **Forward-population of `absolute_offset_um` (Phase 14 FID-02):** the reverse emitter faithfully
+  re-emits `IMS:1000053/54` absolute position offsets (µm) WHEN a source mzPeak index carries
+  `metadata.imaging.absolute_offset_um`, but the forward writer always sets that field to `None`
+  (`src/write/writer.rs::assemble_imaging_metadata`). To populate it the forward path must read the
+  offsets parsed on the read side (`ImagingRunMetadata.absolute_offset_x/y` in
+  `src/schema/geometry.rs`) into the index block. Pairs naturally with the declared-geometry
+  threading item above (both need forward `<scanSettings>` geometry surfaced into `metadata.imaging`).

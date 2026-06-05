@@ -44,11 +44,11 @@ small reverse-emit fidelity pass (units/offsets/z). **Reverse image export is OU
 
 ### Reverse-emit fidelity (FID) — Phase 14
 
-- [ ] **FID-01**: Reverse imzML emitter attaches the µm unit (`UO:0000017`) to `IMS:1000044/45/46/47`.
-- [ ] **FID-02**: Absolute position offsets `IMS:1000053/54` round-trip (carried in `ImagingMetadata`
+- [x] **FID-01**: Reverse imzML emitter attaches the µm unit (`UO:0000017`) to `IMS:1000044/45/46/47`.
+- [x] **FID-02**: Absolute position offsets `IMS:1000053/54` round-trip (carried in `ImagingMetadata`
   and re-emitted in `<scanSettings>`).
 
-- [ ] **FID-03**: `pixel_count.z` is carried through the imaging metadata path.
+- [x] **FID-03**: `pixel_count.z` is carried through the imaging metadata path.
 
 ### TIFF optical-image import (IMG) — Phase 15
 
@@ -85,9 +85,9 @@ small reverse-emit fidelity pass (units/offsets/z). **Reverse image export is OU
 | IDX-01 | 13 | Complete |
 | IDX-02 | 13 | Complete |
 | IDX-03 | 13 | Complete |
-| FID-01 | 14 | Pending |
-| FID-02 | 14 | Pending |
-| FID-03 | 14 | Pending |
+| FID-01 | 14 | Complete |
+| FID-02 | 14 | Complete |
+| FID-03 | 14 | Complete |
 | IMG-01 | 15 | Pending |
 | IMG-02 | 15 | Pending |
 | IMG-03 | 15 | Pending |

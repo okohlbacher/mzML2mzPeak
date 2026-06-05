@@ -77,7 +77,7 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
 
 **Plans:** 1 plan
 
-- [ ] 14-01-PLAN.md — µm UO:0000017 unit on IMS:1000044-47 + offsets IMS:1000053/54 (emit-when-present, µm) + add optional `absolute_offset_um` to ImagingMetadata/imaging.json/spec-doc + carry pixel_count.z; all proven against the mzdata::ImzMLReader oracle (FID-01, FID-02, FID-03).
+- [x] 14-01-PLAN.md — µm UO:0000017 unit on IMS:1000044-47 + offsets IMS:1000053/54 (emit-when-present, µm) + add optional `absolute_offset_um` to ImagingMetadata/imaging.json/spec-doc + carry pixel_count.z; all proven against the mzdata::ImzMLReader oracle (FID-01, FID-02, FID-03).
 
 ### Phase 15: TIFF optical-image import
 
@@ -97,7 +97,7 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
 |-------|-----------|----------------|--------|-----------|
 | 12. Imaging schema & spec prerequisites | v0.5 | 2/2 | Complete    | 2026-06-05 |
 | 13. Index enrichment | v0.5 | 1/1 | Complete    | 2026-06-05 |
-| 14. Reverse-emit fidelity | v0.5 | 0/1 | Planned     | - |
+| 14. Reverse-emit fidelity | v0.5 | 1/1 | Complete   | 2026-06-05 |
 | 15. TIFF optical-image import | v0.5 | 0/? | Not started | - |
 
 <details>
