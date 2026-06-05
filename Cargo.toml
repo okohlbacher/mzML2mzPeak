@@ -91,6 +91,14 @@ encoding_rs = "=0.8.35"
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "=1.0.150"
 
+# --- TIFF dimension read (Phase 15, IMG-04): the de-facto pure-Rust TIFF reader
+# (image-rs/image-tiff). We use ONLY Decoder::dimensions() (reads the first IFD, no pixel
+# decode). default-features=false drops every codec (deflate/jpeg/lzw/fax) so no new
+# transitive copy can fracture the arrow/parquet/zip type graph — dimensions need no codecs.
+# Pinned EXACTLY to =0.11.3 (CLAUDE.md: match-pins discipline; human-verified legitimacy gate
+# cleared — image-rs org crate, 82M+ downloads). ---
+tiff = { version = "=0.11.3", default-features = false }
+
 # --- Application-boundary helpers: pinned with `=` at upstream-aligned versions. ---
 anyhow = "=1.0.102"
 thiserror = "=2.0.18"
