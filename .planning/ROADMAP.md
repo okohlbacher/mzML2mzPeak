@@ -25,7 +25,7 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
 
 ## Phases
 
-- [ ] **Phase 12: Imaging schema & spec prerequisites** - Extend `schema/imaging.json` + `metadata.rs` (+ tests) for `mz_range`, optional `pixel_count(+z)`, `pixel_count_source`, `images[]`; rewrite spec-doc Edit 7 (TIFF-separate-file design) + Edit 8. Unblocks U1/U2.
+- [x] **Phase 12: Imaging schema & spec prerequisites** - Extend `schema/imaging.json` + `metadata.rs` (+ tests) for `mz_range`, optional `pixel_count(+z)`, `pixel_count_source`, `images[]`; rewrite spec-doc Edit 7 (TIFF-separate-file design) + Edit 8. Unblocks U1/U2. (completed 2026-06-05)
 - [ ] **Phase 13: Index enrichment (index-last, flag, pixel counts, m/z bounds)** - Stream coordinate-max + MS1 m/z min/max accumulators; write `metadata.imaging` with `is_imaging`, `pixel_count(+source)`, `mz_range` last.
 - [ ] **Phase 14: Reverse-emit fidelity (units / offsets / z)** - µm `UO:0000017` units on `IMS:1000044/45/46/47`; round-trip absolute offsets `IMS:1000053/54`; carry `pixel_count.z`.
 - [ ] **Phase 15: TIFF optical-image import** - Forward `--image` CLI (repeatable, TIFF-only); store as `images/image_NNNN.tiff` ZIP members indexed `Other`; per-image metadata + sha256/size + full-extent affine in `metadata.imaging.images[]`.
@@ -43,7 +43,7 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
   2. Spec-doc Edit 7 rewritten to TIFF-separate-ZIP-member + affine-in-index design; the `images.parquet` blob/CV-registration design demoted to a clearly-marked future option (F8). Edit 8 updated (`mz_range`, `pixel_count_source`, `images[]`, index-written-last note).
   3. Opening + closing adversarial review recorded.
 
-**Plans:** 2 plans (wave 1, parallel — no file overlap)
+**Plans:** 2/2 plans complete
 
 - [x] 12-01-PLAN.md — Extend schema/imaging.json + src/schema/metadata.rs (+tests) for mz_range, optional pixel_count(+z), pixel_count_source, images[]; confirm max_dimension_um integer (SCH-01).
 - [x] 12-02-PLAN.md — Rewrite spec-doc Edit 7 (TIFF-separate-ZIP-member design), update Edit 8 + Part B imaging.json snippet + Part C inventory; demote blob/CV design to F8 (SPEC-01).
@@ -87,7 +87,7 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 12. Imaging schema & spec prerequisites | v0.5 | 2/2 | Complete   | 2026-06-05 |
+| 12. Imaging schema & spec prerequisites | v0.5 | 2/2 | Complete    | 2026-06-05 |
 | 13. Index enrichment | v0.5 | 0/? | Not started | - |
 | 14. Reverse-emit fidelity | v0.5 | 0/? | Not started | - |
 | 15. TIFF optical-image import | v0.5 | 0/? | Not started | - |
