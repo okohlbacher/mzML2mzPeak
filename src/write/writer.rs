@@ -464,7 +464,7 @@ fn wire_metadata_into(target: &mut impl MSDataFileMetadata, prov: &RunProvenance
 /// are hand-invented — only what the geometry parse supplied (CONTEXT Area 4).
 fn assemble_imaging_metadata(geom: Option<&ImagingRunMetadata>) -> ImagingMetadata {
     let pixel_count = geom.and_then(|g| match (g.grid_x, g.grid_y) {
-        (Some(x), Some(y)) => Some(PixelCount { x, y }),
+        (Some(x), Some(y)) => Some(PixelCount { x, y, z: None }),
         _ => None,
     });
     let pixel_size_um = geom.and_then(|g| match (g.pixel_size_x, g.pixel_size_y) {
@@ -478,6 +478,9 @@ fn assemble_imaging_metadata(geom: Option<&ImagingRunMetadata>) -> ImagingMetada
     ImagingMetadata {
         is_imaging: true,
         pixel_count,
+        pixel_count_source: None,
+        mz_range: None,
+        images: None,
         pixel_size_um,
         max_dimension_um,
         scan_pattern: geom.and_then(|g| g.scan_pattern.clone()),

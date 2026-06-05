@@ -46,6 +46,104 @@ pub struct PixelCount {
     pub x: i64,
     /// Grid pixel count along y.
     pub y: i64,
+    /// OPTIONAL grid depth (z-stack); omitted from JSON when `None` (2D imaging).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub z: Option<i64>,
+}
+
+/// Provenance of [`ImagingMetadata::pixel_count`]: whether the grid counts were
+/// `declared` by the imzML (`IMS:1000042/43`) or derived from the maximum observed
+/// coordinates (`observed_max`). Serializes to the snake_case wire strings
+/// `"declared"` / `"observed_max"`.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PixelCountSource {
+    /// Grid counts came directly from the imzML (`IMS:1000042/43`). Wire: `"declared"`.
+    Declared,
+    /// Grid counts derived from the maximum observed coordinates. Wire: `"observed_max"`.
+    ObservedMax,
+}
+
+/// MS1-only observed m/z bounds across the run. Serializes to `{"min":..,"max":..}`.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct MzRange {
+    /// Minimum observed m/z.
+    pub min: f64,
+    /// Maximum observed m/z.
+    pub max: f64,
+}
+
+/// Full-extent display-hint affine mapping 0-based image pixels to 1-based MS pixels.
+///
+/// The `type`, `maps`, and `registration_quality` fields are const-pinned to the schema's
+/// literals on serialize (`"affine"`, `"image_px -> ms_px"`, `"assumed_full_extent"`) via
+/// `#[serde(default = ...)]` constructors so they always round-trip exactly. `matrix` is a
+/// fixed-length 6-number array `[a,b,c,d,e,f]` with
+/// `(x_ms,y_ms) = (a·col + b·row + c, d·col + e·row + f)`.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ImageAffine {
+    /// Always the literal `"affine"` (schema const). Rust field renamed from the keyword `type`.
+    #[serde(rename = "type", default = "affine_type_default")]
+    pub affine_type: String,
+    /// `[a,b,c,d,e,f]` affine coefficients (fixed length 6).
+    pub matrix: [f64; 6],
+    /// Always the literal `"image_px -> ms_px"` (schema const).
+    #[serde(default = "affine_maps_default")]
+    pub maps: String,
+    /// Always the literal `"assumed_full_extent"` (schema const).
+    #[serde(default = "affine_registration_quality_default")]
+    pub registration_quality: String,
+}
+
+fn affine_type_default() -> String {
+    "affine".to_string()
+}
+
+fn affine_maps_default() -> String {
+    "image_px -> ms_px".to_string()
+}
+
+fn affine_registration_quality_default() -> String {
+    "assumed_full_extent".to_string()
+}
+
+impl ImageAffine {
+    /// Build an [`ImageAffine`] from its `matrix`, pinning the const fields to their
+    /// schema literals (`type="affine"`, `maps="image_px -> ms_px"`,
+    /// `registration_quality="assumed_full_extent"`).
+    pub fn new(matrix: [f64; 6]) -> Self {
+        Self {
+            affine_type: affine_type_default(),
+            matrix,
+            maps: affine_maps_default(),
+            registration_quality: affine_registration_quality_default(),
+        }
+    }
+}
+
+/// Per-image descriptive metadata for an optical image stored as a ZIP member.
+/// Serialized into `metadata.imaging.images[]` (the FileEntry stays name-only).
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ImageEntry {
+    /// Path of the image within the mzPeak ZIP, e.g. `images/image_0000.tiff`.
+    pub archive_path: String,
+    /// Original filename of the imported image.
+    pub source_name: String,
+    /// IANA media type of the stored image (default `"image/tiff"`).
+    pub media_type: String,
+    /// Image width in pixels.
+    pub width: i64,
+    /// Image height in pixels.
+    pub height: i64,
+    /// SHA-256 hex digest of the stored image bytes.
+    pub sha256: String,
+    /// Size of the stored image in bytes.
+    pub size_bytes: i64,
+    /// Full-extent display-hint affine into the MS pixel grid.
+    pub affine: ImageAffine,
 }
 
 /// A generic `{x, y}` axis pair. Used for `pixel_size_um` (`AxisPair<f64>`) and
@@ -64,7 +162,7 @@ pub struct AxisPair<T> {
 /// `Option` and OMITTED from the JSON when `None` (D-03/D-06). The coordinate columns and
 /// `ms_run.parameters` remain authoritative — this block is discovery-only and MAY be
 /// incomplete. See the module-level doc for the SPA-04 provenance→`file_description` split.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ImagingMetadata {
     /// Always `true` for an imaging dataset — the discovery flag readers branch on.
     pub is_imaging: bool,
@@ -73,6 +171,20 @@ pub struct ImagingMetadata {
     /// imzML omits grid counts. The Phase-5 verifier MAY derive it from max coordinates.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pixel_count: Option<PixelCount>,
+
+    /// Provenance of `pixel_count` — `declared` (from imzML) or `observed_max`
+    /// (derived from max coordinates). OPTIONAL; omitted when `None`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pixel_count_source: Option<PixelCountSource>,
+
+    /// MS1-only observed m/z bounds `{min, max}` across the run. OPTIONAL.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mz_range: Option<MzRange>,
+
+    /// Per-image descriptive metadata for optical images stored as ZIP members.
+    /// OPTIONAL; omitted when `None` (no images imported).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub images: Option<Vec<ImageEntry>>,
 
     /// Physical pixel size in µm `{x, y}` (`IMS:1000046` / `IMS:1000047`). OPTIONAL.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -120,6 +232,9 @@ mod tests {
         ImagingMetadata {
             is_imaging: true,
             pixel_count: None,
+            pixel_count_source: None,
+            mz_range: None,
+            images: None,
             pixel_size_um: None,
             max_dimension_um: None,
             scan_pattern: None,
@@ -152,7 +267,7 @@ mod tests {
     #[test]
     fn includes_present_fields() {
         let meta = ImagingMetadata {
-            pixel_count: Some(PixelCount { x: 260, y: 134 }),
+            pixel_count: Some(PixelCount { x: 260, y: 134, z: None }),
             scan_pattern: Some("IMS:1000413".to_string()),
             ..minimal()
         };
@@ -204,5 +319,96 @@ mod tests {
         }
         // all-None case: exactly the two required keys, nothing more
         assert_eq!(obj.len(), 2, "all-None instance emits exactly the required keys");
+    }
+
+    /// A fully-populated instance: every emitted top-level key must be declared in
+    /// `schema/imaging.json`'s `properties` (additionalProperties:false contract), the new
+    /// fields must serialize to their expected wire shapes, and a serialize->deserialize
+    /// round-trip must equal the original.
+    #[test]
+    fn round_trips_full_shape() {
+        let original = ImagingMetadata {
+            is_imaging: true,
+            pixel_count: Some(PixelCount { x: 260, y: 134, z: Some(3) }),
+            pixel_count_source: Some(PixelCountSource::ObservedMax),
+            mz_range: Some(MzRange { min: 100.07, max: 999.93 }),
+            images: Some(vec![ImageEntry {
+                archive_path: "images/image_0000.tiff".to_string(),
+                source_name: "optical.tiff".to_string(),
+                media_type: "image/tiff".to_string(),
+                width: 2600,
+                height: 1340,
+                sha256: "deadbeef".to_string(),
+                size_bytes: 12_345_678,
+                affine: ImageAffine::new([2.0, 0.0, 1.0, 0.0, 3.0, 1.0]),
+            }]),
+            pixel_size_um: Some(AxisPair { x: 50.0, y: 50.0 }),
+            max_dimension_um: Some(AxisPair { x: 13000, y: 6700 }),
+            scan_pattern: Some("IMS:1000413".to_string()),
+            scan_type: Some("IMS:1000480".to_string()),
+            line_scan_direction: Some("IMS:1000491".to_string()),
+            linescan_sequence: Some("IMS:1000401".to_string()),
+            coordinate_base: 1,
+        };
+
+        let v = serde_json::to_value(&original).expect("serialize");
+        let obj = v.as_object().expect("object");
+
+        // additionalProperties:false contract — every emitted top-level key is a declared property.
+        let schema = load_schema();
+        let allowed = schema["properties"].as_object().expect("schema properties");
+        for key in obj.keys() {
+            assert!(allowed.contains_key(key), "emitted key {key} not declared in schema");
+        }
+
+        // New-field wire shapes.
+        assert_eq!(obj["pixel_count"]["z"], Value::from(3));
+        assert_eq!(obj["pixel_count_source"], Value::from("observed_max"));
+        assert_eq!(obj["mz_range"]["min"], Value::from(100.07));
+        assert_eq!(obj["mz_range"]["max"], Value::from(999.93));
+        let img = &obj["images"][0];
+        assert_eq!(img["affine"]["type"], Value::from("affine"));
+        assert_eq!(img["affine"]["maps"], Value::from("image_px -> ms_px"));
+        assert_eq!(img["affine"]["registration_quality"], Value::from("assumed_full_extent"));
+        assert_eq!(img["affine"]["matrix"].as_array().expect("matrix array").len(), 6);
+
+        // Round-trip equality.
+        let back: ImagingMetadata = serde_json::from_value(v).expect("deserialize");
+        assert_eq!(back, original, "serialize->deserialize must round-trip");
+    }
+
+    /// The ImageEntry-emitted JSON's keys must equal the schema's images-item `required`
+    /// set, and the affine const fields must match the schema consts (doc<->struct agreement).
+    #[test]
+    fn images_item_matches_schema() {
+        let entry = ImageEntry {
+            archive_path: "images/image_0000.tiff".to_string(),
+            source_name: "optical.tiff".to_string(),
+            media_type: "image/tiff".to_string(),
+            width: 2600,
+            height: 1340,
+            sha256: "deadbeef".to_string(),
+            size_bytes: 12_345_678,
+            affine: ImageAffine::new([2.0, 0.0, 1.0, 0.0, 3.0, 1.0]),
+        };
+        let v = serde_json::to_value(&entry).expect("serialize");
+        let obj = v.as_object().expect("object");
+
+        let schema = load_schema();
+        let item = &schema["properties"]["images"]["items"];
+        let required: std::collections::BTreeSet<String> = item["required"]
+            .as_array()
+            .expect("images item required array")
+            .iter()
+            .map(|x| x.as_str().unwrap().to_string())
+            .collect();
+        let emitted: std::collections::BTreeSet<String> = obj.keys().cloned().collect();
+        assert_eq!(emitted, required, "ImageEntry keys must equal schema images-item required set");
+
+        // affine consts agree with the schema.
+        let af = &item["properties"]["affine"]["properties"];
+        assert_eq!(obj["affine"]["type"], af["type"]["const"]);
+        assert_eq!(obj["affine"]["maps"], af["maps"]["const"]);
+        assert_eq!(obj["affine"]["registration_quality"], af["registration_quality"]["const"]);
     }
 }

@@ -694,6 +694,9 @@ mod tests {
         ImagingMetadata {
             is_imaging: true,
             pixel_count: None,
+            pixel_count_source: None,
+            mz_range: None,
+            images: None,
             pixel_size_um: Some(AxisPair { x: 50.0, y: 50.0 }),
             max_dimension_um: None,
             scan_pattern: None,
@@ -879,6 +882,9 @@ mod tests {
         let meta = ImagingMetadata {
             is_imaging: true,
             pixel_count: None,
+            pixel_count_source: None,
+            mz_range: None,
+            images: None,
             // x is NaN (must be omitted), y is finite (must be emitted).
             pixel_size_um: Some(AxisPair { x: f64::NAN, y: 25.0 }),
             max_dimension_um: None,
