@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.4
-milestone_name: — Reverse Converter
-status: Awaiting next milestone
-stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-06-04T21:16:46.676Z"
-last_activity: 2026-06-04 — Milestone v0.4 completed and archived
+milestone: v0.5
+milestone_name: Index enrichment & optical-image import
+status: planning
+stopped_at: Roadmap formalized (CODEX-stable); awaiting plan-phase 12
+last_updated: "2026-06-04T22:00:00.000Z"
+last_activity: 2026-06-04 — v0.5 roadmap formalized (phases 12–15) after CODEX adversarial review
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 10
-  completed_plans: 10
-  percent: 100
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -20,15 +20,30 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-06-03)
 
-**Core value:** Reconstruct a valid imzML (`.imzML` + `.ibd`, UUID linkage) from any conformant imaging mzPeak archive without losing per-pixel coordinates or surviving m/z+intensity — `mzPeak → imzML → mzPeak` round-trips at L1 (surviving points bit-for-bit).
-**Current focus:** Phase 11 — reverse-roundtrip-verification-pxd001283-acceptance
+**Core value:** Both-direction imzML↔imaging-mzPeak converter (v0.3 forward + v0.4 reverse shipped).
+v0.5 enriches the forward `index.json` (imaging flag, derived pixel counts, MS1 m/z bounds, written
+last) and imports optical TIFF images with a full-extent affine into the MS pixel grid.
+**Current focus:** Phase 12 — Imaging schema & spec prerequisites (v0.5 kickoff)
 
 ## Current Position
 
-Phase: Milestone v0.4 complete
+Phase: 12 — Imaging schema & spec prerequisites (not started)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-06-04 — Milestone v0.4 completed and archived
+Status: Roadmap formalized (CODEX adversarial review → STABLE); awaiting plan-phase 12
+Last activity: 2026-06-04 — v0.5 roadmap formalized (phases 12–15)
+
+## v0.5 Locked Decisions (CODEX-reviewed)
+
+- index.json written LAST; `metadata.imaging` gains `mz_range` (MS1-only, `ms_level==1`),
+  `pixel_count(+z)` with `pixel_count_source` (declared|observed_max), and `images[]`.
+- TIFF optical images: TIFF-only, stored as `images/image_NNNN.tiff` ZIP members (via
+  `ZipArchiveWriter`, indexed `Other`); descriptive metadata (incl. sha256/size/affine) in
+  `metadata.imaging.images[]` (FileEntry is name-only). Affine = 1-based top-left y-down full-extent,
+  `registration_quality:"assumed_full_extent"`. Dims via the new `tiff` crate (first IFD).
+- Reverse image export OUT OF SCOPE for v0.5 (deferred to F8/v0.8).
+- Schema (`schema/imaging.json` + `metadata.rs` + tests) updated FIRST (Phase 12) before accumulators.
+- Every change fed back into `docs/mzpeak-imaging-spec-suggestions.md` (Edit 7 rewrite + Edit 8 update).
+- Full design + CODEX review resolutions: `.planning/NEXT-ROADMAP-DRAFT.md`.
 
 ## Performance Metrics
 

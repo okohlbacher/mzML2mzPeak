@@ -21,12 +21,22 @@ green in ~11 s, ~535 MB bounded. Milestone audit passed (15/15 reqs, 5/5 integra
 full real PXD001283 dataset: converts + masking-aware L1 roundtrip in ~7 s, 366 MB bounded.
 Tag `v0.3`; see `MILESTONES.md`.
 
-## Next Milestone
+## Current Milestone: v0.5 — Index enrichment & optical-image import
 
-Not yet scoped. Run `/gsd:new-milestone` to define the next version. Candidate directions carried
-forward from v0.4 deferrals: continuous-mode imzML emission (mirror source mode), copying source
-`<sourceFileList>` provenance into reverse output, and hardening against third-party (non-v0.3)
-imaging-mzPeak variability beyond best-effort.
+**Scoped 2026-06-04; roadmap CODEX-adversarial-reviewed to STABLE.** Forward-direction enrichment:
+- `index.json` written **last** with `metadata.imaging` = imaging flag + derived per-dimension MS
+  pixel counts (`pixel_count_source` declared|observed_max) + global **MS1 m/z bounds** (`mz_range`).
+- Import one or more optical **TIFF** images on `imzML→mzPeak` as separate ZIP members
+  (`images/image_NNNN.tiff`), each with width/height, sha256/size, and a full-extent **affine** into
+  the MS pixel grid — all recorded in `metadata.imaging.images[]`. New CLI `--image` (repeatable).
+- Reverse-emit fidelity: µm units (`UO:0000017`), absolute offsets `IMS:1000053/54`, z-count.
+- Every change fed back into `docs/mzpeak-imaging-spec-suggestions.md` + `schema/*.json`.
+- Phases 12–15. Reverse image export deferred. Full plan: `.planning/ROADMAP.md` +
+  `.planning/NEXT-ROADMAP-DRAFT.md`.
+
+**Later (v0.6+):** `cv_list`, authoritative `scan_settings_list`, `pixel` facet / ion-mobility,
+continuous-mode shared-axis, full `image` entity + reverse export, L2 conformance — see
+`NEXT-ROADMAP-DRAFT.md §B`.
 
 ## Requirements
 
