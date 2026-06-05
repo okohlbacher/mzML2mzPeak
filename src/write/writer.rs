@@ -56,9 +56,10 @@ use mzdata::params::Param;
 use mzdata::prelude::{ByteArrayView, MSDataFileMetadata, ParamDescribed};
 use mzdata::spectrum::MultiLayerSpectrum;
 
+use crate::read::record::NumArray;
 use crate::read::{RunProvenance, StorageMode};
 use crate::schema::{ImagingMetadata, ImagingRunMetadata};
-use crate::schema::metadata::{AxisPair, PixelCount};
+use crate::schema::metadata::{AxisPair, MzRange, PixelCount, PixelCountSource};
 
 /// A typed write-layer failure.
 ///
@@ -491,9 +492,261 @@ fn assemble_imaging_metadata(geom: Option<&ImagingRunMetadata>) -> ImagingMetada
     }
 }
 
+/// A bounded-memory streaming accumulator for the `metadata.imaging` index aggregates
+/// (IDX-01/02/03).
+///
+/// It holds ONLY scalar running state — coordinate maxima plus two `Option<f64>` m/z bounds —
+/// so memory stays O(1) across the whole conversion pass (IDX-01 bounded-memory contract,
+/// threat T-13-02): a dataset of any size cannot exhaust memory because NO per-spectrum vectors
+/// are ever buffered. [`IndexAccumulator::observe`] is called once per [`ImagingSpectrum`]
+/// (`crate::read::ImagingSpectrum`) BEFORE it is converted/discarded; [`IndexAccumulator::fold_into`]
+/// merges the results into the cloned [`ImagingMetadata`] block just before the index is written.
+///
+/// Coordinate maxima track every observed spectrum unconditionally; the m/z bounds are gated on
+/// `ms_level == 1` (MS1 only, IDX-03) and finite-guarded (`is_finite`, threat T-13-01) so a
+/// NaN/±∞ m/z value can never poison the emitted `mz_range`.
+#[derive(Debug, Default)]
+pub(crate) struct IndexAccumulator {
+    /// Max observed 1-based x coordinate (`IMS:1000050`).
+    x_max: i64,
+    /// Max observed 1-based y coordinate (`IMS:1000051`).
+    y_max: i64,
+    /// Max observed 1-based z coordinate (`IMS:1000052`); `None` until any spectrum carries z.
+    z_max: Option<i64>,
+    /// Whether ANY spectrum has been observed (distinguishes an empty run from coords at 0).
+    seen_any: bool,
+    /// Running min of finite MS1 m/z values; `None` until the first finite MS1 m/z is seen.
+    mz_min: Option<f64>,
+    /// Running max of finite MS1 m/z values; `None` until the first finite MS1 m/z is seen.
+    mz_max: Option<f64>,
+}
+
+impl IndexAccumulator {
+    /// A fresh accumulator with no observations.
+    pub(crate) fn new() -> Self {
+        Self::default()
+    }
+
+    /// Observe one spectrum's coordinates + m/z BEFORE it is converted.
+    ///
+    /// Coordinate maxima update unconditionally (every spectrum contributes to the observed
+    /// pixel extent — IDX-02). The m/z min/max update ONLY when `ms_level == 1` (MS1-only,
+    /// IDX-03); m/z values are iterated WITHOUT allocating (the `NumArray` variant is matched
+    /// directly — no `as_f64()` Vec per spectrum, keeping the accumulator zero-allocation per
+    /// the O(1) memory intent) and each non-finite value (NaN/±∞) is skipped so it can never
+    /// corrupt the bound (threat T-13-01). An empty m/z array contributes nothing.
+    pub(crate) fn observe(&mut self, x: i64, y: i64, z: Option<i64>, ms_level: u8, mz: &NumArray) {
+        // Coordinate extent: always counts (this is also where the early sampled-first spectrum
+        // and ms_level != 1 spectra contribute — only the m/z bound is MS1-gated).
+        self.seen_any = true;
+        if x > self.x_max {
+            self.x_max = x;
+        }
+        if y > self.y_max {
+            self.y_max = y;
+        }
+        if let Some(zv) = z {
+            self.z_max = Some(self.z_max.map_or(zv, |cur| cur.max(zv)));
+        }
+
+        // MS1 m/z bounds only. Iterate the variant DIRECTLY (no per-spectrum Vec allocation):
+        // F32 widens each value on the fly, F64 copies — statistics only, never persisted.
+        if ms_level == 1 {
+            match mz {
+                NumArray::F32(v) => {
+                    for &val in v {
+                        self.update_mz(val as f64);
+                    }
+                }
+                NumArray::F64(v) => {
+                    for &val in v {
+                        self.update_mz(val);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Fold a single finite m/z value into the running min/max (threat T-13-01: skip non-finite).
+    fn update_mz(&mut self, val: f64) {
+        if !val.is_finite() {
+            return;
+        }
+        self.mz_min = Some(self.mz_min.map_or(val, |cur| cur.min(val)));
+        self.mz_max = Some(self.mz_max.map_or(val, |cur| cur.max(val)));
+    }
+
+    /// Merge the accumulated aggregates into a cloned `metadata.imaging` block, just before it
+    /// is written to the index (IDX-01 index-last seam).
+    ///
+    /// `pixel_count` / `pixel_count_source` (IDX-02):
+    ///   * if `block.pixel_count` is already `Some` (geometry declared `IMS:1000042/43`) → keep
+    ///     the declared counts untouched and set `pixel_count_source = Declared`;
+    ///   * else if any spectrum was observed → set `pixel_count` from the observed coordinate
+    ///     maxima and `pixel_count_source = ObservedMax` (never fabricated beyond observed);
+    ///   * else (empty run) → leave both `None`.
+    ///
+    /// `mz_range` (IDX-03): set from the MS1 min/max when at least one finite MS1 m/z was seen,
+    /// otherwise left `None` (the caller in `convert.rs` logs the no-MS1 omission).
+    pub(crate) fn fold_into(&self, block: &mut ImagingMetadata) {
+        if block.pixel_count.is_some() {
+            block.pixel_count_source = Some(PixelCountSource::Declared);
+        } else if self.seen_any {
+            block.pixel_count = Some(PixelCount {
+                x: self.x_max,
+                y: self.y_max,
+                z: self.z_max,
+            });
+            block.pixel_count_source = Some(PixelCountSource::ObservedMax);
+        }
+
+        if let (Some(min), Some(max)) = (self.mz_min, self.mz_max) {
+            block.mz_range = Some(MzRange { min, max });
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::read::record::NumArray;
+    use crate::schema::metadata::{MzRange, PixelCount, PixelCountSource};
+
+    /// A minimal all-`None` imaging block (is_imaging + base only) for fold_into tests.
+    fn minimal_block() -> ImagingMetadata {
+        assemble_imaging_metadata(None)
+    }
+
+    /// observed_max derivation: two coords (3,7,None) then (11,5,None), no declared geometry →
+    /// fold produces pixel_count{x:11,y:5,z:None} with source ObservedMax.
+    #[test]
+    fn accumulator_observed_max_derives_pixel_count_from_max_coord() {
+        let mut acc = IndexAccumulator::new();
+        // Each axis independently tracks its MAX (per the behavior contract — NOT the last
+        // value): from (3,7) then (11,5) the independent maxima are x=11, y=7.
+        acc.observe(3, 7, None, 1, &NumArray::F64(vec![100.0]));
+        acc.observe(11, 5, None, 1, &NumArray::F64(vec![200.0]));
+        let mut block = minimal_block();
+        acc.fold_into(&mut block);
+        let pc = block.pixel_count.expect("observed_max derives a pixel_count");
+        assert_eq!(pc.x, 11, "x_max is the per-axis max (11), not tied to the y winner");
+        assert_eq!(pc.y, 7, "y_max is the per-axis max observed y (7), independent of x");
+        assert_eq!(pc.z, None, "no z observed → None");
+        assert_eq!(block.pixel_count_source, Some(PixelCountSource::ObservedMax));
+    }
+
+    /// Declared path: a block already carrying pixel_count (from geometry) keeps its counts
+    /// untouched and sets source Declared.
+    #[test]
+    fn accumulator_declared_path_leaves_counts_sets_declared() {
+        let mut acc = IndexAccumulator::new();
+        // The accumulator observed larger coords, but a DECLARED block must win unchanged.
+        acc.observe(99, 99, None, 1, &NumArray::F64(vec![100.0]));
+        let mut block = minimal_block();
+        block.pixel_count = Some(PixelCount { x: 13, y: 9, z: None });
+        acc.fold_into(&mut block);
+        let pc = block.pixel_count.expect("declared pixel_count preserved");
+        assert_eq!(pc.x, 13, "declared x untouched");
+        assert_eq!(pc.y, 9, "declared y untouched");
+        assert_eq!(block.pixel_count_source, Some(PixelCountSource::Declared));
+    }
+
+    /// MS1-only m/z range: MS1 [100.0, 350.25] + a non-MS1 (ms_level 0) [5.0, 9999.0] →
+    /// mz_range {min:100.0, max:350.25} (the non-MS1 extremes are excluded).
+    #[test]
+    fn accumulator_mz_range_is_ms1_only() {
+        let mut acc = IndexAccumulator::new();
+        acc.observe(1, 1, None, 1, &NumArray::F64(vec![100.0, 350.25]));
+        acc.observe(2, 1, None, 0, &NumArray::F64(vec![5.0, 9999.0]));
+        let mut block = minimal_block();
+        acc.fold_into(&mut block);
+        let r = block.mz_range.expect("MS1 m/z observed → mz_range set");
+        assert_eq!(r, MzRange { min: 100.0, max: 350.25 }, "non-MS1 excluded from bounds");
+    }
+
+    /// Zero MS1 spectra observed → mz_range stays None after fold (omission, not a bogus range).
+    #[test]
+    fn accumulator_no_ms1_leaves_mz_range_none() {
+        let mut acc = IndexAccumulator::new();
+        acc.observe(1, 1, None, 0, &NumArray::F64(vec![5.0, 9999.0]));
+        acc.observe(2, 1, None, 2, &NumArray::F64(vec![1.0, 2.0]));
+        let mut block = minimal_block();
+        acc.fold_into(&mut block);
+        assert!(block.mz_range.is_none(), "no MS1 → mz_range omitted");
+        // Coords still derive a pixel_count (non-MS1 spectra count toward coordinate extent).
+        let pc = block.pixel_count.expect("coords still derive pixel_count");
+        assert_eq!((pc.x, pc.y), (2, 1));
+    }
+
+    /// A NaN in an MS1 m/z array is skipped; the bounds come from the finite values only.
+    #[test]
+    fn accumulator_skips_nonfinite_mz() {
+        let mut acc = IndexAccumulator::new();
+        acc.observe(
+            1,
+            1,
+            None,
+            1,
+            &NumArray::F64(vec![f64::NAN, 110.5, f64::INFINITY, 90.0, f64::NEG_INFINITY]),
+        );
+        let mut block = minimal_block();
+        acc.fold_into(&mut block);
+        let r = block.mz_range.expect("finite values still produce a range");
+        assert_eq!(r, MzRange { min: 90.0, max: 110.5 }, "NaN/±∞ never poison the bounds");
+    }
+
+    /// z present on observed spectra → folded pixel_count carries z = max observed z; a mix of
+    /// present/absent z is allowed (z tracks the max of present values).
+    #[test]
+    fn accumulator_carries_max_z_when_present() {
+        let mut acc = IndexAccumulator::new();
+        acc.observe(1, 1, None, 1, &NumArray::F64(vec![100.0])); // z absent
+        acc.observe(2, 2, Some(4), 1, &NumArray::F64(vec![101.0])); // z present = 4
+        acc.observe(3, 3, Some(2), 1, &NumArray::F64(vec![102.0])); // z present = 2
+        let mut block = minimal_block();
+        acc.fold_into(&mut block);
+        let pc = block.pixel_count.expect("observed_max pixel_count");
+        assert_eq!(pc.x, 3);
+        assert_eq!(pc.y, 3);
+        assert_eq!(pc.z, Some(4), "z is the max of present z values, absent contributes nothing");
+    }
+
+    /// An F32 m/z array contributes via the variant-direct iteration (no as_f64 Vec alloc);
+    /// the bounds are computed over the widened-on-the-fly values.
+    #[test]
+    fn accumulator_handles_f32_mz_variant() {
+        let mut acc = IndexAccumulator::new();
+        acc.observe(1, 1, None, 1, &NumArray::F32(vec![100.5_f32, 200.25_f32]));
+        let mut block = minimal_block();
+        acc.fold_into(&mut block);
+        let r = block.mz_range.expect("f32 m/z observed → range set");
+        assert_eq!(r.min, 100.5_f32 as f64);
+        assert_eq!(r.max, 200.25_f32 as f64);
+    }
+
+    /// An empty accumulator (no spectra observed) leaves both pixel_count and mz_range untouched.
+    #[test]
+    fn accumulator_empty_run_leaves_block_untouched() {
+        let acc = IndexAccumulator::new();
+        let mut block = minimal_block();
+        acc.fold_into(&mut block);
+        assert!(block.pixel_count.is_none(), "no spectra → no pixel_count");
+        assert!(block.pixel_count_source.is_none(), "no spectra → no source");
+        assert!(block.mz_range.is_none(), "no spectra → no mz_range");
+    }
+
+    /// An empty m/z array on an MS1 spectrum contributes nothing to the m/z bounds (but its
+    /// coordinates still count toward the observed extent).
+    #[test]
+    fn accumulator_empty_mz_contributes_nothing_to_range() {
+        let mut acc = IndexAccumulator::new();
+        acc.observe(5, 6, None, 1, &NumArray::F64(vec![]));
+        let mut block = minimal_block();
+        acc.fold_into(&mut block);
+        assert!(block.mz_range.is_none(), "empty MS1 m/z array → no range");
+        let pc = block.pixel_count.expect("coords still observed");
+        assert_eq!((pc.x, pc.y), (5, 6));
+    }
 
     /// `WriteError` wraps each upstream error type as a distinct `#[from]` arm. Construct one
     /// via the `From` impl and confirm the variant + message round-trip.
