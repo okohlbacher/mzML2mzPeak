@@ -28,7 +28,7 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
 - [x] **Phase 12: Imaging schema & spec prerequisites** - Extend `schema/imaging.json` + `metadata.rs` (+ tests) for `mz_range`, optional `pixel_count(+z)`, `pixel_count_source`, `images[]`; rewrite spec-doc Edit 7 (TIFF-separate-file design) + Edit 8. Unblocks U1/U2. (completed 2026-06-05)
 - [x] **Phase 13: Index enrichment (index-last, flag, pixel counts, m/z bounds)** - Stream coordinate-max + MS1 m/z min/max accumulators; write `metadata.imaging` with `is_imaging`, `pixel_count(+source)`, `mz_range` last. (completed 2026-06-05)
 - [x] **Phase 14: Reverse-emit fidelity (units / offsets / z)** - µm `UO:0000017` units on `IMS:1000044/45/46/47`; round-trip absolute offsets `IMS:1000053/54`; carry `pixel_count.z`. (completed 2026-06-05)
-- [ ] **Phase 15: TIFF optical-image import** - Forward `--image` CLI (repeatable, TIFF-only); store as `images/image_NNNN.tiff` ZIP members indexed `Other`; per-image metadata + sha256/size + full-extent affine in `metadata.imaging.images[]`.
+- [ ] **Phase 15: TIFF optical-image import** - Forward `--image` CLI (repeatable, TIFF-only); store as `images/image_NNNN.tiff` ZIP members indexed `Other`; per-image metadata + sha256/size + full-extent affine in `metadata.imaging.images[]`. (3 plans)
 
 ## Phase Details
 
@@ -83,13 +83,19 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
 
 **Goal**: Import one or more optical TIFFs on forward conversion, store each as a separate ZIP member, and record per-image metadata + a full-extent affine into the MS pixel grid in `index.json`.
 **Depends on**: Phase 12 (schema `images[]`) and Phase 13 (global pixel-count coordinate space).
-**Requirements**: IMG-01, IMG-02, IMG-03, IMG-04
+**Requirements**: IMG-01, IMG-02, IMG-03, IMG-04, IMG-05
 **Success Criteria**:
 
   1. Forward CLI `--image <path.tiff>` (repeatable, TIFF only); paths normalized, separators rejected; reverse export out of scope.
   2. Each TIFF added via `ZipArchiveWriter` as `images/image_NNNN.tiff`, registered `Other`; `MzPeakReader::new` opens an archive with `images/*.tiff` (regression test).
   3. `metadata.imaging.images[]` carries `archive_path`/`source_name`/`media_type`/`width`/`height`/`sha256`/`size_bytes`/`affine`; affine = 1-based top-left y-down full-extent (`a=(Nx−1)/(W−1)`, `e=(Ny−1)/(H−1)`, W/H=1 → const 1), `registration_quality:"assumed_full_extent"`; warn when `pixel_count` is observed_max; dims via `tiff` crate (first IFD; fail on BigTIFF/malformed).
   4. Opening + closing adversarial review recorded.
+
+**Plans:** 3 plans
+
+- [ ] 15-01-PLAN.md — Add optional role/derived_subtype/modality to ImageEntry + schema/imaging.json (+ spec-doc consistency) (IMG-05).
+- [ ] 15-02-PLAN.md — Add tiff crate (default-features=false) + src/write/image.rs (dimensions, full-extent affine, sha256+size, ImageEntry builder w/ role="optical") (IMG-03, IMG-04, IMG-05).
+- [ ] 15-03-PLAN.md — Repeatable forward `--image` (reverse-rejected) + convert() terminal-seam import loop (images/image_NNNN.tiff Other members) + fixture + end-to-end tests (IMG-01, IMG-02, IMG-03, IMG-04).
 
 ## Progress
 
@@ -98,7 +104,7 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
 | 12. Imaging schema & spec prerequisites | v0.5 | 2/2 | Complete    | 2026-06-05 |
 | 13. Index enrichment | v0.5 | 1/1 | Complete    | 2026-06-05 |
 | 14. Reverse-emit fidelity | v0.5 | 1/1 | Complete    | 2026-06-05 |
-| 15. TIFF optical-image import | v0.5 | 0/? | Not started | - |
+| 15. TIFF optical-image import | v0.5 | 0/3 | Planned     | - |
 
 <details>
 <summary>✅ v0.4 Reverse Converter (Phases 7–11) — SHIPPED 2026-06-04</summary>
