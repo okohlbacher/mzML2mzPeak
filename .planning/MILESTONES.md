@@ -1,5 +1,18 @@
 # Milestones
 
+## v0.5 Index enrichment & optical-image import (Shipped: 2026-06-05)
+
+**Phases completed:** 4 phases, 7 plans, 7 tasks
+
+**Key accomplishments:**
+
+- schema/imaging.json + src/schema/metadata.rs extended with mz_range, optional pixel_count.z, pixel_count_source enum, and images[] (with const-pinned affine), all additionalProperties:false-clean and round-trip-tested
+- 1. [Rule 3 - Blocking issue] Self-inflicted grep false-positive in explanatory prose
+- Task 1 — `IndexAccumulator` (`src/write/writer.rs`)
+- Reverse `<scanSettings>` now emits IMS:1000044-47 + IMS:1000053/54 with the UO:0000017 µm unit (UO CV declared in cvList), adds an optional `absolute_offset_um` to ImagingMetadata/schema/spec-doc, and carries `pixel_count.z` through — all proven against the mzdata::ImzMLReader oracle.
+
+---
+
 ## v0.4 Reverse Converter (Shipped: 2026-06-04)
 
 **Phases completed:** 5 phases, 10 plans, 7 tasks

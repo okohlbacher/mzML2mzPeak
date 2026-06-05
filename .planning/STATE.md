@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v0.5
 milestone_name: — Index enrichment & optical-image import
-status: executing
+status: Awaiting next milestone
 stopped_at: Completed 15-02-PLAN.md
-last_updated: "2026-06-05T17:23:30.312Z"
-last_activity: 2026-06-05
+last_updated: "2026-06-05T17:28:41.468Z"
+last_activity: 2026-06-05 — Milestone v0.5 completed and archived
 progress:
   total_phases: 4
   completed_phases: 4
@@ -27,10 +27,10 @@ last) and imports optical TIFF images with a full-extent affine into the MS pixe
 
 ## Current Position
 
-Phase: 15
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-06-05
+Phase: Milestone v0.5 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-05 — Milestone v0.5 completed and archived
 
 ## v0.5 Locked Decisions (CODEX-reviewed)
 

@@ -10,6 +10,14 @@ Convert an arbitrary imzML imaging dataset into a valid imaging mzPeak file **wi
 
 ## Current State
 
+**v0.5 shipped (2026-06-05)** — forward `index.json` enrichment + optical-image import. The forward
+converter now writes `metadata.imaging` **last** with the imaging flag, derived per-dimension pixel
+counts (`pixel_count_source`), and global MS1 `mz_range`; a repeatable `--image` flag imports optical
+**TIFF**s as `images/image_NNNN.tiff` ZIP members with a full-extent affine + sha256 recorded in
+`metadata.imaging.images[]`; reverse emit gained µm units / absolute offsets / z-carry. Audit passed
+(13/13 reqs, 14/14 integration); 161 lib + integration tests green. Required vendoring a 2nd upstream
+fork (`mzpeak_prototyping` FileEntry serde round-trip) — tech debt to drop upstream. Tag `v0.5`.
+
 **v0.4 shipped (2026-06-04)** — the **reverse** converter (imaging mzPeak → imzML) is complete.
 The binary now converts **both directions** (direction inferred from the input extension:
 `.imzML` → forward, `.mzpeak` → reverse). The reverse path hand-rolls a byte-exact `.ibd` writer
@@ -21,27 +29,25 @@ green in ~11 s, ~535 MB bounded. Milestone audit passed (15/15 reqs, 5/5 integra
 full real PXD001283 dataset: converts + masking-aware L1 roundtrip in ~7 s, 366 MB bounded.
 Tag `v0.3`; see `MILESTONES.md`.
 
-## Current Milestone: v0.5 — Index enrichment & optical-image import
+## Next Milestone
 
-**Scoped 2026-06-04; roadmap CODEX-adversarial-reviewed to STABLE.** Forward-direction enrichment:
-- `index.json` written **last** with `metadata.imaging` = imaging flag + derived per-dimension MS
-  pixel counts (`pixel_count_source` declared|observed_max) + global **MS1 m/z bounds** (`mz_range`).
-- Import one or more optical **TIFF** images on `imzML→mzPeak` as separate ZIP members
-  (`images/image_NNNN.tiff`), each with width/height, sha256/size, and a full-extent **affine** into
-  the MS pixel grid — all recorded in `metadata.imaging.images[]`. New CLI `--image` (repeatable).
-- Reverse-emit fidelity: µm units (`UO:0000017`), absolute offsets `IMS:1000053/54`, z-count.
-- Every change fed back into `docs/mzpeak-imaging-spec-suggestions.md` + `schema/*.json`.
-- Phases 12–15. Reverse image export deferred. Full plan: `.planning/ROADMAP.md` +
-  `.planning/NEXT-ROADMAP-DRAFT.md`.
-
-**Later (v0.6+):** `cv_list`, authoritative `scan_settings_list`, `pixel` facet / ion-mobility,
-continuous-mode shared-axis, full `image` entity + reverse export, L2 conformance — see
-`NEXT-ROADMAP-DRAFT.md §B`.
+Not yet scoped — run `/gsd:new-milestone` for v0.6. Strong candidates (`NEXT-ROADMAP-DRAFT.md` §B +
+"Deferred during v0.5"): **forward declared-geometry threading** (revives IDX-02 "declared" pixel
+counts + FID-02 forward-population by parsing imzML `<scanSettings>`), `cv_list` (MUST), authoritative
+`scan_settings_list` (F4), `pixel` facet / multi-spectrum-per-pixel (F6), continuous-mode shared-axis
+(F7), full `image` entity + **reverse image export** (F8), L2 conformance (F10). Also: file the
+upstream `mzpeak_prototyping` FileEntry-serde issue and drop the vendored fork when fixed.
 
 ## Requirements
 
 ### Validated
 
+- **v0.5 (shipped 2026-06-05) — Index enrichment & optical-image import.** All 13 v0.5 requirements
+  (SCH/SPEC/IDX/FID/IMG) delivered + tested (161 lib + integration green). Forward `index.json`
+  enriched (written last: imaging flag, derived pixel counts + `pixel_count_source`, MS1 `mz_range`);
+  `--image` TIFF import (ZIP `Other` members + full-extent affine + sha256 in `metadata.imaging.images[]`,
+  role=optical); reverse µm units/offsets/z. Vendored+patched `mzpeak_prototyping` FileEntry serde (the
+  load-bearing read-back fix). See `milestones/v0.5-REQUIREMENTS.md` / `milestones/v0.5-MILESTONE-AUDIT.md`.
 - **v0.4 (shipped 2026-06-04) — Reverse converter.** All 15 v0.4 requirements
   (RMZ/IBD/IXML/RCLI/RVER/RDAT) delivered and proven on real data (full PXD001283, 34,840
   spectra, `mzPeak → imzML → mzPeak` L1 bit-for-bit roundtrip, ~535 MB bounded). Notable outcomes:
