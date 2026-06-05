@@ -31,6 +31,14 @@ crate. **Reverse image export is OUT OF SCOPE** (deferred to F8/v0.8).
   `source_name` (original basename), `media_type:"image/tiff"`, `width`, `height`, `sha256`,
   `size_bytes`, `affine`. Validator treats a missing/mismatched image as a WARNING (auxiliary; not
   the spectral L1 contract).
+- **IMG-05 image role (V2 absorb, user decision 2026-06-05):** ALSO extend `schema/imaging.json` +
+  `ImageEntry` with optional `role` (string; default/assumed `"optical"` when absent — for back-compat
+  with v0.5 files), `derived_subtype` (optional; for `role="derived-MS-image"`, e.g. `tic`/`base_peak`),
+  and `modality` (optional). The TIFF importer sets `role="optical"` on each imported image. This
+  restores doc↔schema consistency with the committed V2 spec (`images[]` snippet now carries these).
+  The bigger V2 items — **cv_list as MUST, the concrete shared-axis grid layout, and
+  multi-spectra-per-pixel aggregation — are explicitly FUTURE (v0.6+)** and are NOT implemented here
+  (they live in the spec doc as forward design only).
 - **IMG-04 dimensions + affine:**
   - Read width/height via the **`tiff` crate** (first IFD authoritative; fail clearly on
     BigTIFF/unsupported/malformed). NEW dependency — acceptable for this milestone.
