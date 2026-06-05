@@ -167,3 +167,12 @@ U1/U2 JSON would fail validation. Before any accumulator/import code:
 
 -
 -
+
+## Deferred during v0.5 execution (→ v0.6+)
+
+- **Forward declared-geometry threading (Phase 13 WR-01):** the index accumulator's
+  `pixel_count_source:"declared"` branch is implemented + unit-tested but DORMANT in production —
+  the forward reader exposes only mzdata's metadata, which does NOT surface imzML `<scanSettings>`
+  grid counts (`IMS:1000042/43`), so real forward output always reports `observed_max`. To make
+  "declared" reachable, the forward path must parse imzML `<scanSettings>` geometry (as the reverse
+  side already does in `src/schema/geometry.rs`). Pairs naturally with F4 (authoritative scan_settings).
