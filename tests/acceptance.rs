@@ -64,7 +64,7 @@ fn acceptance_pxd001283_full_roundtrip() {
     //     the reader by value, so this reader cannot be reused for verify below.
     let t_convert = std::time::Instant::now();
     let reader = ImagingReader::open(input).expect("open source for convert");
-    convert(reader, &out).expect("full-dataset conversion completes");
+    convert(reader, &out, &[]).expect("full-dataset conversion completes");
     let convert_secs = t_convert.elapsed().as_secs_f64();
     eprintln!(
         "[acceptance] convert: {} spectra streamed in {:.1}s -> {}",

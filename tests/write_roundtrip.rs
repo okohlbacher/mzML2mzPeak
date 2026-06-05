@@ -360,7 +360,7 @@ fn convert_real_path_observes_sampled_first_spectrum() {
 
     // The REAL production path: open the committed imzML/.ibd pair and run convert() end-to-end.
     let reader = ImagingReader::open(processed).expect("open committed processed fixture");
-    convert(reader, &out).expect("real convert() of the processed fixture succeeds");
+    convert(reader, &out, &[]).expect("real convert() of the processed fixture succeeds");
 
     let mzreader = MzPeakReader::new(&out).expect("reader opens the convert() output");
     let imaging = mzreader

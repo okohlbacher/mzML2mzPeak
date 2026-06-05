@@ -20,11 +20,13 @@
 //! Chromatograms are emitted empty: `write_chromatogram` is never called and no TIC is
 //! synthesized (CONTEXT Area 3). The `chromatograms_*` facets are written empty by `finish`.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use mzdata::prelude::SpectrumLike;
 
 use crate::read::ImagingReader;
+use crate::schema::metadata::PixelCountSource;
+use crate::write::image::{build_image_entry, full_extent_affine, read_tiff_dimensions, sha256_and_size};
 use crate::write::writer::IndexAccumulator;
 use crate::write::{ImagingWriter, WriteError, to_mzdata};
 
@@ -38,7 +40,19 @@ use crate::write::{ImagingWriter, WriteError, to_mzdata};
 ///
 /// The output path is used VERBATIM by [`ImagingWriter::new`] (`File::create`); its contents
 /// are never interpreted (V12).
-pub fn convert(mut reader: ImagingReader, out_path: &Path) -> Result<(), WriteError> {
+///
+/// `image_paths` are optional optical TIFFs (forward-only, IMG-01) embedded at the terminal seam
+/// (AFTER `acc.fold_into` sets `pixel_count`, AFTER `finish_parquet()` opens the ZIP, BEFORE the
+/// index is written). Each becomes an `images/image_NNNN.tiff` `Other` ZIP member (0-based,
+/// 4-digit ordinal — the archive name is ALWAYS this deterministic ordinal, never attacker-
+/// controlled), with per-image metadata + a full-extent affine pushed into
+/// `metadata.imaging.images[]` (IMG-02/03/04). An empty slice reproduces the no-image output
+/// byte-for-byte (`block.images` stays `None`, omitted from the index).
+pub fn convert(
+    mut reader: ImagingReader,
+    out_path: &Path,
+    image_paths: &[PathBuf],
+) -> Result<(), WriteError> {
     // (1) SAMPLE the data-facet dtype from the FIRST spectrum, then build the writer with a
     //     POINT-column schema derived from that sample — mirroring the reference converter's
     //     `sample_array_types_from_spectrum_source` (examples/convert.rs:414). A real imzML file
@@ -134,6 +148,77 @@ pub fn convert(mut reader: ImagingReader, out_path: &Path) -> Result<(), WriteEr
         );
     }
     let mut zip = writer.finish_parquet()?;
+
+    // (4b) Optical-image import (IMG-01/02/03/04). The ordering is LOAD-BEARING: pixel_count was
+    //      set by `acc.fold_into` above (so the affine's Nx×Ny is known), and the ZIP is now open
+    //      after finish_parquet — so each TIFF can be streamed in as an `Other` member BEFORE the
+    //      index (with its `images[]`) is serialized just below. An empty `image_paths` does
+    //      nothing: `block.images` stays `None` and the no-image output is unchanged.
+    if !image_paths.is_empty() {
+        // The full-extent affine needs the MS pixel grid (Nx×Ny). If pixel_count is unknown
+        // (e.g. a coordinate-less / empty run), there is no grid to map images onto — fail with a
+        // clear typed error (IMG-04) rather than fabricating an affine.
+        let pc = block.pixel_count.ok_or_else(|| {
+            WriteError::ImageAffineUnknownPixelCount {
+                out_path: out_path.display().to_string(),
+            }
+        })?;
+        let (nx, ny) = (pc.x, pc.y);
+
+        // observed_max grid counts are an APPROXIMATION (the max observed coordinate, not a
+        // declared grid), so the overlay affine they yield is approximate too — warn (IMG-04).
+        if block.pixel_count_source == Some(PixelCountSource::ObservedMax) {
+            log::warn!(
+                "imaging image overlay affine is approximate — pixel_count is observed_max, not declared"
+            );
+        }
+
+        let mut images = Vec::with_capacity(image_paths.len());
+        for (i, path) in image_paths.iter().enumerate() {
+            // The derived source_name is descriptive-only, but it is attacker-influenced — reject
+            // any residual path separator so a crafted basename can never imply a path (T-15-06 /
+            // V5). The ARCHIVE name is the fixed ordinal below, never the source name.
+            let source_name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .ok_or_else(|| WriteError::ImageDecode {
+                    path: path.display().to_string(),
+                    detail: "image path has no UTF-8 file name component".to_string(),
+                })?
+                .to_string();
+            if source_name.contains('/') || source_name.contains('\\') {
+                return Err(WriteError::ImageDecode {
+                    path: path.display().to_string(),
+                    detail: format!(
+                        "derived source_name {source_name:?} contains a path separator"
+                    ),
+                });
+            }
+
+            // Read W/H from the first IFD only (no pixel decode — bounded memory, T-15-09).
+            let (w, h) = read_tiff_dimensions(path)?;
+
+            // Deterministic 0-based, 4-digit ordinal — NEVER attacker-controlled (T-15-06).
+            let name = format!("images/image_{i:04}.tiff");
+
+            // Stream the TIFF bytes into the ZIP as an `Other` member (64 KiB chunks inside
+            // add_file_from_read — never a whole-file load, never a raw zip write; T-15-07/09).
+            let mut f = std::fs::File::open(path)?;
+            zip.add_file_from_read(&mut f, Some(&name), None)?;
+
+            // SHA-256 + exact byte size over a SECOND bounded streamed pass (IMG-03, T-15-08).
+            let (sha256, size) = sha256_and_size(path)?;
+
+            let matrix = full_extent_affine(nx, ny, w, h);
+            images.push(build_image_entry(name, source_name, w, h, sha256, size, matrix));
+        }
+
+        // Set images[] ONLY when ≥1 image was imported, so a no-image run omits the key entirely.
+        if !images.is_empty() {
+            block.images = Some(images);
+        }
+    }
+
     zip.add_index_metadata("imaging", &block)
         .map_err(WriteError::Json)?;
     // ZipArchiveWriter::finish(self) returns ZipResult<()>; map the zip error into the I/O arm
