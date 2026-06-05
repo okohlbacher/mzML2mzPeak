@@ -506,7 +506,7 @@ fn assemble_imaging_metadata(geom: Option<&ImagingRunMetadata>) -> ImagingMetada
 /// `ms_level == 1` (MS1 only, IDX-03) and finite-guarded (`is_finite`, threat T-13-01) so a
 /// NaN/±∞ m/z value can never poison the emitted `mz_range`.
 #[derive(Debug, Default)]
-pub(crate) struct IndexAccumulator {
+pub struct IndexAccumulator {
     /// Max observed 1-based x coordinate (`IMS:1000050`).
     x_max: i64,
     /// Max observed 1-based y coordinate (`IMS:1000051`).
@@ -523,7 +523,7 @@ pub(crate) struct IndexAccumulator {
 
 impl IndexAccumulator {
     /// A fresh accumulator with no observations.
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self::default()
     }
 
@@ -535,7 +535,7 @@ impl IndexAccumulator {
     /// directly — no `as_f64()` Vec per spectrum, keeping the accumulator zero-allocation per
     /// the O(1) memory intent) and each non-finite value (NaN/±∞) is skipped so it can never
     /// corrupt the bound (threat T-13-01). An empty m/z array contributes nothing.
-    pub(crate) fn observe(&mut self, x: i64, y: i64, z: Option<i64>, ms_level: u8, mz: &NumArray) {
+    pub fn observe(&mut self, x: i64, y: i64, z: Option<i64>, ms_level: u8, mz: &NumArray) {
         // Coordinate extent: always counts (this is also where the early sampled-first spectrum
         // and ms_level != 1 spectra contribute — only the m/z bound is MS1-gated).
         self.seen_any = true;
@@ -588,7 +588,7 @@ impl IndexAccumulator {
     ///
     /// `mz_range` (IDX-03): set from the MS1 min/max when at least one finite MS1 m/z was seen,
     /// otherwise left `None` (the caller in `convert.rs` logs the no-MS1 omission).
-    pub(crate) fn fold_into(&self, block: &mut ImagingMetadata) {
+    pub fn fold_into(&self, block: &mut ImagingMetadata) {
         if block.pixel_count.is_some() {
             block.pixel_count_source = Some(PixelCountSource::Declared);
         } else if self.seen_any {
