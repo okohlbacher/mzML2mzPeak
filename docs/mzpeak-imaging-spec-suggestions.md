@@ -92,17 +92,61 @@
 >
 > **Conformance (lossless levels).** **L0** retains source provenance (UUID + `.ibd` checksum). **L1** (default) requires decoded arrays equal to the source **bit-for-bit** (Δ = 0; no dtype widening/narrowing; identical length/order). **L2** (opt-in) permits opaque transforms with declared per-axis bounds (m/z relative error ≤ 1e-7; intensity relative error ≤ 1e-3), recorded with the transform in the array index.
 
-### Edit 7 — New `image` entity in `## Entity Type`
+### Edit 7 — Optical images as separate TIFF ZIP members (v0.5 design)
 **Location:** "Entity Type" / "Adding a new Entity Type", plus a new file section.
-**Action:** add an entity type and a file section.
+**Action:** describe how optical images are stored and registered.
 
-> Add entity type `image`. An imaging archive _MAY_ contain an `images.parquet` ([data kind](#data-kind) `metadata`+blob) holding **one or more** images — optical/microscopy overviews, derived MS overview images (e.g. TIC-per-pixel), or other modalities. Each image's binary payload is stored as a Parquet `LargeBinary` blob column (`image/tiff` is the default media type; other modalities are permitted). Governed by [`schema/image.json`](../schema/image.json).
+> **Optical images (v0.5).** An imaging archive _MAY_ embed **one or more optical images** —
+> microscopy / histology overviews of the imaged sample. In v0.5 optical images are **TIFF-only**.
+> Each image is stored as a **separate ZIP member** named `images/image_NNNN.tiff`, where `NNNN` is the
+> 0-based import order (zero-padded, e.g. `images/image_0000.tiff`, `images/image_0001.tiff`). Images
+> are added through the writer's ZIP API (`ZipArchiveWriter::start_other` / `add_file_from_read`) and
+> the bytes are copied **verbatim** (no re-encoding, no EXIF / orientation correction). Each member is
+> **registered in the archive's `FileIndex` as an `Other` entry by member name only**, so that
+> `MzPeakReader` still opens the archive unchanged.
 >
-> Per-image fields: `id`, `role` (**🔣 new CV term**, e.g. optical / overview / histology / derived-MS-image / fluorescence), `modality`, `media_type` (default `"image/tiff"`), `width`, `height`, `data` (blob), optional `source_uri` + `checksum` (provenance for an image pulled in from an external reference such as imzML `IMS:1006008` "optical image location"), and a `registration` object.
+> **Where descriptive metadata lives.** The `FileIndex` `FileEntry` carries ONLY `name`,
+> `entity_type`, and `data_kind` — it _CANNOT_ hold descriptive fields. Therefore **all** per-image
+> descriptive metadata lives in the [imaging index block](#imaging-index-block) under
+> `metadata.imaging.images[]`, with each entry keyed back to its ZIP member by `archive_path`. Each
+> `images[]` entry carries: `archive_path` (the ZIP member name, e.g. `images/image_0000.tiff`),
+> `source_name` (the original file basename), `media_type` (`"image/tiff"`), `width`, `height` (read
+> from the first TIFF IFD via the `tiff` crate; page 0 is authoritative), `sha256` and `size_bytes` of
+> the stored bytes (per-image integrity; a missing/mismatched image is a reader/validator **WARNING**,
+> not a hard error — optical images are auxiliary and are not part of the spectral L1 contract), and an
+> `affine` object.
 >
-> **`registration`** describes the mapping of **image pixel coordinates → MS pixel coordinates**: `{ "type": "affine", "matrix": [a, b, c, d, e, f], "maps": "image_px -> ms_px" }`, where `(x_ms, y_ms) = (a·col + b·row + c, d·col + e·row + f)`. Full multi-image / deformable registration is a known open problem and is **deferred**; v1 defines the affine slot and the `image_px -> ms_px` direction. **🔣** the registration-transform and image-role/modality terms require new CV accessions.
+> **`affine` (full-extent display hint, NOT true registration).** The `affine` maps the image's pixel
+> grid onto the MS pixel grid as an *unregistered* display hint:
+> `{ "type": "affine", "matrix": [a, b, c, d, e, f], "maps": "image_px -> ms_px",
+> "registration_quality": "assumed_full_extent" }`, where
+> `(x_ms, y_ms) = (a·col + b·row + c, d·col + e·row + f)` maps **0-based** image pixel centres onto the
+> **1-based, top-left-origin, y-down** MS pixel grid (matching the [display orientation](#imaging---coordinates-and-ion-images)).
+> For a `W×H` TIFF over an `Nx×Ny` MS grid the naive full-extent fit is `a = (Nx−1)/(W−1)`, `b = 0`,
+> `c = 1`, `d = 0`, `e = (Ny−1)/(H−1)`, `f = 1`. A degenerate axis (`W == 1` or `H == 1`) maps to the
+> constant `1` (no division by zero). `registration_quality` is fixed at `"assumed_full_extent"`: this
+> is a coarse overlay (aspect-ratio mismatch or sparse grids can misalign) and _MUST NOT_ be treated as
+> a true co-registration. No new CV registration term is required for this display hint. When
+> `pixel_count_source == "observed_max"` the grid extent is derived rather than declared, so the
+> overlay is approximate and a writer _SHOULD_ emit a WARNING.
 >
-> **Converter behaviour.** On imzML→mzPeak conversion, an externally referenced optical image (`IMS:1006008`) _SHOULD_ be pulled into the archive as an `image` blob with `source_uri`/`checksum` retained. On mzPeak→imzML conversion, an embedded image _SHOULD_ be written out as a TIFF and referenced externally. A pre-computed overview MS image (TIC/base-peak per pixel) _MAY_ be stored as an `image` with the derived-MS-image role (it is always also derivable from the data).
+> **Converter behaviour.** On `imzML → mzPeak` conversion, optical TIFFs supplied to the converter
+> are imported as above. **Reverse (`mzPeak → imzML`) image export is OUT OF SCOPE for v0.5** — the
+> reverse path drops embedded optical images (a documented degrade; the spectral L1 round-trip bar is
+> unaffected).
+>
+> #### Future / richer option (F8 — deferred, NOT v0.5)
+>
+> The following richer `image` entity is **deferred** to a future milestone (F8) and is **not** the
+> v0.5 design; it is retained here as the future-rich path:
+>
+> > Add entity type `image`. An imaging archive _MAY_ contain an `images.parquet` ([data kind](#data-kind) `metadata`+blob) holding **one or more** images — optical/microscopy overviews, derived MS overview images (e.g. TIC-per-pixel), or other modalities. Each image's binary payload is stored as a Parquet `LargeBinary` blob column (`image/tiff` is the default media type; other modalities are permitted). Governed by [`schema/image.json`](../schema/image.json) (which governs this **F8 future option**, not the v0.5 design above).
+> >
+> > Per-image fields: `id`, `role` (**🔣 new CV term**, e.g. optical / overview / histology / derived-MS-image / fluorescence), `modality`, `media_type` (default `"image/tiff"`), `width`, `height`, `data` (blob), optional `source_uri` + `checksum` (provenance for an image pulled in from an external reference such as imzML `IMS:1006008` "optical image location"), and a `registration` object.
+> >
+> > **`registration`** describes the mapping of **image pixel coordinates → MS pixel coordinates**: `{ "type": "affine", "matrix": [a, b, c, d, e, f], "maps": "image_px -> ms_px" }`, where `(x_ms, y_ms) = (a·col + b·row + c, d·col + e·row + f)`. Full multi-image / deformable registration is a known open problem and is **deferred**; this F8 option defines the affine slot and the `image_px -> ms_px` direction with CV-governed registration terms. **🔣** the registration-transform and image-role/modality terms require new CV accessions.
+> >
+> > **Converter behaviour (F8).** On imzML→mzPeak conversion, an externally referenced optical image (`IMS:1006008`) _SHOULD_ be pulled into the archive as an `image` blob with `source_uri`/`checksum` retained. On mzPeak→imzML conversion, an embedded image _SHOULD_ be written out as a TIFF and referenced externally. A pre-computed overview MS image (TIC/base-peak per pixel) _MAY_ be stored as an `image` with the derived-MS-image role (it is always also derivable from the data).
 
 ### Edit 8 — Imaging index block in `# Index File - mzpeak_index.json`
 **Location:** "Index File".
