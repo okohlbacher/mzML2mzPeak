@@ -409,8 +409,8 @@ impl ImzmlWriter {
         // IMS:1000052 is a separate concept and is emitted in write_spectrum. Fabricating a bogus
         // z-count accession would be a fidelity bug (threat T-14-FAB), so z is carried, never coined.
         if let Some(pc) = meta.pixel_count {
-            emit_cv_param(sink, "IMS", "IMS:1000042", "max count of pixels x", &pc.x.to_string())?;
-            emit_cv_param(sink, "IMS", "IMS:1000043", "max count of pixels y", &pc.y.to_string())?;
+            emit_cv_param(sink, "IMS", "IMS:1000042", "max count of pixel x", &pc.x.to_string())?;
+            emit_cv_param(sink, "IMS", "IMS:1000043", "max count of pixel y", &pc.y.to_string())?;
         }
         // max_dimension_um → IMS:1000044 (x) / IMS:1000045 (y), carrying the µm unit (FID-01).
         if let Some(md) = meta.max_dimension_um {
