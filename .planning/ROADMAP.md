@@ -41,6 +41,11 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
   2. Spec-doc Edit 7 rewritten to TIFF-separate-ZIP-member + affine-in-index design; the `images.parquet` blob/CV-registration design demoted to a clearly-marked future option (F8). Edit 8 updated (`mz_range`, `pixel_count_source`, `images[]`, index-written-last note).
   3. Opening + closing adversarial review recorded.
 
+
+**Plans:** 2 plans (wave 1, parallel — no file overlap)
+- [ ] 12-01-PLAN.md — Extend schema/imaging.json + src/schema/metadata.rs (+tests) for mz_range, optional pixel_count(+z), pixel_count_source, images[]; confirm max_dimension_um integer (SCH-01).
+- [ ] 12-02-PLAN.md — Rewrite spec-doc Edit 7 (TIFF-separate-ZIP-member design), update Edit 8 + Part B imaging.json snippet + Part C inventory; demote blob/CV design to F8 (SPEC-01).
+
 ### Phase 13: Index enrichment (index-last, flag, pixel counts, m/z bounds)
 **Goal**: Write `metadata.imaging` last with the imaging flag, per-dimension pixel counts (declared or observed_max), and global MS1 m/z bounds, via bounded-memory streaming accumulators.
 **Depends on**: Phase 12 (schema).
@@ -74,7 +79,7 @@ The milestone roadmap itself was CODEX-reviewed to STABLE before formalization.
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 12. Imaging schema & spec prerequisites | v0.5 | 0/? | Not started | - |
+| 12. Imaging schema & spec prerequisites | v0.5 | 0/2 | Planned | - |
 | 13. Index enrichment | v0.5 | 0/? | Not started | - |
 | 14. Reverse-emit fidelity | v0.5 | 0/? | Not started | - |
 | 15. TIFF optical-image import | v0.5 | 0/? | Not started | - |
