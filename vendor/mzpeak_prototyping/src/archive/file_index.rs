@@ -236,3 +236,12 @@ impl Deref for FileIndex {
         &self.files
     }
 }
+
+// WR-02 (imzml2mzpeak v0.5): the Display↔FromStr round-trip for the EMITTED `DataKind`/`EntityType`
+// values is pinned by a regression test in OUR crate (`tests/file_index_roundtrip.rs`), not here —
+// this vendored crate is a `[patch]` dependency (not a workspace member), so its own `#[cfg(test)]`
+// modules are never compiled or run. KNOWN, INTENTIONAL asymmetry (NOT changed): `FromStr`
+// lowercases input, so a mixed-case `Other` payload colliding with a unit-variant name (e.g.
+// `Other("Spectrum")`) re-parses to the unit variant. This codebase never constructs such a value
+// (the only `Other` it writes is `Other("other")` for `images/*.tiff`), so it is latent; the
+// lowercasing is upstream read-time leniency and is left as-is.
