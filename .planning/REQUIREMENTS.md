@@ -63,7 +63,7 @@ small reverse-emit fidelity pass (units/offsets/z). **Reverse image export is OU
   `FileEntry`): `archive_path`, `source_name`, `media_type="image/tiff"`, `width`, `height`,
   `sha256`, `size_bytes`, `affine`. Validator treats a missing/mismatched image as a WARNING.
 
-- [ ] **IMG-05** (V2 absorb): extend `schema/imaging.json` + `ImageEntry` with optional
+- [x] **IMG-05** (V2 absorb): extend `schema/imaging.json` + `ImageEntry` with optional
   `role` (default/assumed `"optical"` when absent), `derived_subtype` (for `role="derived-MS-image"`,
   e.g. `tic`/`base_peak`), and `modality`; the TIFF importer sets `role="optical"` on each imported
   image. Restores doc↔schema consistency with the V2 spec (`images[]` snippet). The bigger V2 items
@@ -92,7 +92,7 @@ small reverse-emit fidelity pass (units/offsets/z). **Reverse image export is OU
 | IMG-02 | 15 | Pending |
 | IMG-03 | 15 | Pending |
 | IMG-04 | 15 | Pending |
-| IMG-05 | 15 | Pending |
+| IMG-05 | 15 | Complete |
 
 ## Out of Scope (v0.5)
 

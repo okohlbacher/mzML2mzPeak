@@ -4,14 +4,14 @@ milestone: v0.5
 milestone_name: — Index enrichment & optical-image import
 status: executing
 stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-06-05T16:19:29.791Z"
-last_activity: 2026-06-05 -- Phase 15 planning complete
+last_updated: "2026-06-05T16:24:25.999Z"
+last_activity: 2026-06-05
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 7
-  completed_plans: 4
-  percent: 57
+  completed_plans: 5
+  percent: 71
 ---
 
 # Project State
@@ -23,14 +23,14 @@ See: .planning/PROJECT.md (updated 2026-06-03)
 **Core value:** Both-direction imzML↔imaging-mzPeak converter (v0.3 forward + v0.4 reverse shipped).
 v0.5 enriches the forward `index.json` (imaging flag, derived pixel counts, MS1 m/z bounds, written
 last) and imports optical TIFF images with a full-extent affine into the MS pixel grid.
-**Current focus:** Phase 14 — reverse-emit-fidelity-units-offsets-z
+**Current focus:** Phase 15 — tiff-optical-image-import
 
 ## Current Position
 
-Phase: 15
-Plan: Not started
+Phase: 15 (tiff-optical-image-import) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-06-05 -- Phase 15 planning complete
+Last activity: 2026-06-05
 
 ## v0.5 Locked Decisions (CODEX-reviewed)
 
@@ -91,6 +91,7 @@ Last activity: 2026-06-05 -- Phase 15 planning complete
 | Phase 12 P02 | 2 | 2 tasks | 1 files |
 | Phase 13 P01 | 25m | 2 tasks | 4 files |
 | Phase 14 P01 | 18min | 3 tasks | 6 files |
+| Phase 15 P01 | 10 min | 2 tasks tasks | 3 files files |
 
 ## Accumulated Context
 
@@ -128,6 +129,7 @@ Recent decisions affecting current (v0.4) work:
 - [Phase ?]: Spec-doc Edit 7 rewritten to TIFF-separate-ZIP-member design; images.parquet-blob + CV-registration design demoted to F8 future option (Phase 12-02)
 - [Phase ?]: Phase 13: bounded scalar IndexAccumulator populates metadata.imaging is_imaging/pixel_count(+source)/mz_range at runtime, folded before the index-last write
 - [Phase ?]: 14-01: reverse <scanSettings> emits IMS:1000044-47 + IMS:1000053/54 with the UO:0000017 µm unit (UO CV declared, cvList count=3); absolute_offset_um added to ImagingMetadata/schema/spec-doc; pixel_count.z carried, no fabricated z-count accession; offset forward-population deferred to v0.6+; mzdata oracle green; no new crates.
+- [Phase ?]: 15-01: ImageEntry gains optional role/derived_subtype/modality (IMG-05), skip_serializing_if=None; absent role => assumed optical (v0.5 back-compat); schema/imaging.json declares them OPTIONAL (not required), additionalProperties:false retained.
 
 ### Reuse Anchors (from shipped v0.3)
 
@@ -164,7 +166,7 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-05T15:46:38.959Z
+Last session: 2026-06-05T16:24:04.486Z
 Stopped at: Completed 10-01-PLAN.md
 Resume file: None
 
