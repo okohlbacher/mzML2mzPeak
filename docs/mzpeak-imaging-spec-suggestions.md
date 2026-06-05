@@ -124,6 +124,8 @@
 >
 > **[V2] Image `role`.** Each `images[]` entry _SHOULD_ carry a `role` — `optical` (assumed when absent, for back-compat with v0.5 files), `overview`, `histology`, `derived-MS-image`, `fluorescence`, … — and, for `derived-MS-image`, an optional `derived_subtype` (`tic`, `base_peak`, …) and `modality`. This lets a reader tell an optical/histology overlay (drives the overlay display, ADD-01) apart from a pre-computed MS overview it can use as an instant-TIC fast path (ADD-02). A pre-computed TIC/base-peak overview _MAY_ be written as an additional `images/image_NNNN.tiff` member with `role: derived-MS-image`; it is always also derivable from the spectra, so its absence is not an error.
 >
+> **In-repo schema status (imzml2mzpeak, v0.5 / Phase 15).** The in-repo [`schema/imaging.json`](../schema/imaging.json) and the `ImageEntry` struct now ALSO declare these three fields — `role`, `derived_subtype`, `modality` — as OPTIONAL on `images[].items` (NOT in `required`, `additionalProperties:false` retained), closing the doc↔in-repo-schema gap previously tagged `[V2-codex]`. The forward TIFF importer (Plan 03) stamps `role="optical"`; absent ⇒ assumed `optical`.
+>
 > **`affine` (full-extent display hint, NOT true registration).** The `affine` maps the image's pixel
 > grid onto the MS pixel grid as an *unregistered* display hint:
 > `{ "type": "affine", "matrix": [a, b, c, d, e, f], "maps": "image_px -> ms_px",

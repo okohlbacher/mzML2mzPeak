@@ -54,6 +54,9 @@
           "height": { "type": "integer", "description": "Image height in pixels." },
           "sha256": { "type": "string", "description": "SHA-256 hex digest of the stored image bytes." },
           "size_bytes": { "type": "integer", "description": "Size of the stored image in bytes." },
+          "role": { "type": "string", "description": "OPTIONAL (IMG-05) image role token (default-assumed \"optical\" when absent): optical | overview | histology | derived-MS-image | fluorescence | …" },
+          "derived_subtype": { "type": "string", "description": "OPTIONAL (IMG-05) for role=derived-MS-image: tic | base_peak | …" },
+          "modality": { "type": "string", "description": "OPTIONAL (IMG-05) acquisition modality of the image, if known." },
           "affine": {
             "type": "object",
             "description": "Full-extent display-hint affine mapping 0-based image pixels to 1-based MS pixels.",
