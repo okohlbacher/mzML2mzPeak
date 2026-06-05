@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.5
 milestone_name: — Index enrichment & optical-image import
-status: executing
+status: verifying
 stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-06-05T14:38:39.189Z"
+last_updated: "2026-06-05T14:44:05.903Z"
 last_activity: 2026-06-05
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 0
+  completed_plans: 2
+  percent: 25
 ---
 
 # Project State
@@ -29,7 +29,7 @@ last) and imports optical TIFF images with a full-extent affine into the MS pixe
 
 Phase: 12 (imaging-schema-spec-prerequisites) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-05
 
 ## v0.5 Locked Decisions (CODEX-reviewed)
@@ -85,6 +85,7 @@ Last activity: 2026-06-05
 | Phase 10 P03 | 10min | 2 tasks | 2 files |
 | Phase 11 P01 | 17 min | 3 tasks | 4 files |
 | Phase 12 P01 | 10 | 2 tasks | 4 files |
+| Phase 12 P02 | 2 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -119,6 +120,7 @@ Recent decisions affecting current (v0.4) work:
 - [Phase ?]: Plan 10-03: end-to-end reverse conformance proven via mzdata::ImzMLReader as oracle (re-read coords/array-shapes/uuid), a 5k-pixel bounded-memory-at-scale test, and a built-binary non-imaging fail-fast (exit 4 + no partial output); zero new crates. RCLI-01/RCLI-02 closed.
 - [Phase ?]: 12-01: ImageAffine pins type/maps/registration_quality via serde defaults + ImageAffine::new(matrix)
 - [Phase ?]: 12-01: PixelCountSource wire strings exactly declared / observed_max (snake_case)
+- [Phase ?]: Spec-doc Edit 7 rewritten to TIFF-separate-ZIP-member design; images.parquet-blob + CV-registration design demoted to F8 future option (Phase 12-02)
 
 ### Reuse Anchors (from shipped v0.3)
 
@@ -155,7 +157,7 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-05T14:38:32.380Z
+Last session: 2026-06-05T14:43:32.091Z
 Stopped at: Completed 10-01-PLAN.md
 Resume file: None
 

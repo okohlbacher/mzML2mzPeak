@@ -22,7 +22,7 @@ small reverse-emit fidelity pass (units/offsets/z). **Reverse image export is OU
   `width`, `height`, `sha256`, `size_bytes`, `affine`); fix `max_dimension_um` type. Schema stays
   `additionalProperties:false` and validates the new shape.
 
-- [ ] **SPEC-01**: Rewrite spec-doc **Edit 7** to the TIFF-separate-ZIP-member + affine-in-index design
+- [x] **SPEC-01**: Rewrite spec-doc **Edit 7** to the TIFF-separate-ZIP-member + affine-in-index design
   (demote the `images.parquet` blob + CV-registration design to a clearly-marked future option, F8);
   update **Edit 8** with `mz_range`, `pixel_count_source`, `images[]`, and the "index written last"
   note; apply the F1 self-corrections (`pixel_count` optional, `max_dimension_um` type) to `imaging.json`
@@ -74,7 +74,7 @@ small reverse-emit fidelity pass (units/offsets/z). **Reverse image export is OU
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
 | SCH-01 | 12 | Complete |
-| SPEC-01 | 12 | Pending |
+| SPEC-01 | 12 | Complete |
 | IDX-01 | 13 | Pending |
 | IDX-02 | 13 | Pending |
 | IDX-03 | 13 | Pending |
