@@ -14,6 +14,11 @@ raw sizes are from each repository's file API or a downloaded copy. The underlyi
 the git-ignored `data/raw-examples/` (working notes in its local `README.md`); this doc is the tracked
 record.
 
+> **Regenerated 2026-06-06** on the migrated stack (mzdata 0.64.1 + upstream mzpeak `8435967`, with
+> m/z sort-on-write and the explicit spectrum-type CV). Full corpus e2e: **32/32 PASS**. All 18 mzPeak
+> sizes are **unchanged** from the previous run at 0.1 MB resolution — the conformance changes did not
+> affect output size.
+
 | dataset | raw MB | mzML MB | mzPeak MB | mzPeak/mzML | mzPeak/raw | raw source |
 |---|--:|--:|--:|--:|--:|---|
 | agilent-qtof | — | 2.3 | 0.8 | 0.35× | — | Zenodo: mzML-only |
