@@ -105,16 +105,16 @@ Bring the forward converter into mzPeak spec conformance:
   `metadata.imaging.images[]`); TIFF dimensions read via the existing first-IFD reader, other formats
   embed verbatim with `media_type` by extension.
 
-- [ ] **OPT-02**: Descriptive optical-image CV attributes present in the source — `IMS:1006010/11/12`
+- [x] **OPT-02**: Descriptive optical-image CV attributes present in the source — `IMS:1006010/11/12`
   (subject / of-analysed-sample / adjacent-section), `IMS:1006013` (morphological classification),
   `IMS:1006015` (staining method), `IMS:1006017` (alignment method) — are captured into the image
   entry's metadata (mapped onto `role`/`derived_subtype`/`modality` + provenance fields).
 
-- [ ] **OPT-03**: If the referenced optical-image file is missing or unreadable, the converter emits a
+- [x] **OPT-03**: If the referenced optical-image file is missing or unreadable, the converter emits a
   WARNING and continues — spectral conversion **never fails** on an absent auxiliary image (images are
   not part of the L1 spectral contract).
 
-- [ ] **OPT-04**: Auto-discovered images and explicit `--image` images coexist without collision
+- [x] **OPT-04**: Auto-discovered images and explicit `--image` images coexist without collision
   (deterministic `image_NNNN` ordering; the same resolved path is not embedded twice).
 
 ### Reverse optical image export (RIMG) — Phase 21
@@ -187,9 +187,9 @@ GEO×3, SRC×2, OPT×4, RIMG×3). No orphans, no duplicates.
 | SRC-01 | Phase 19 | Complete |
 | SRC-02 | Phase 19 | Complete |
 | OPT-01 | Phase 20 | Complete |
-| OPT-02 | Phase 20 | Pending |
-| OPT-03 | Phase 20 | Pending |
-| OPT-04 | Phase 20 | Pending |
+| OPT-02 | Phase 20 | Complete |
+| OPT-03 | Phase 20 | Complete |
+| OPT-04 | Phase 20 | Complete |
 | RIMG-01 | Phase 21 | Pending |
 | RIMG-02 | Phase 21 | Pending |
 | RIMG-03 | Phase 21 | Pending |

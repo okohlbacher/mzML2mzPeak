@@ -4,13 +4,13 @@ milestone: v0.6
 milestone_name: — Spec conformance — dtypes + CV/geometry/provenance
 status: verifying
 stopped_at: Completed 19-01-PLAN.md (SRC-01/SRC-02 — source_files[] .imzML + .ibd, reused UUID/checksum, no second hash. Phase 19 complete 1/1).
-last_updated: "2026-06-06T03:29:50.110Z"
+last_updated: "2026-06-06T03:42:25.477Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 13
-  completed_plans: 11
+  completed_plans: 12
   percent: 67
 ---
 
@@ -99,6 +99,7 @@ matching `schema/*.json`.
 | Phase 18 P03 | 6min | 2 tasks | 1 files |
 | Phase 19 P01 | ~10min | 2 tasks | 5 files |
 | Phase 20 P01 | 12min | 2 tasks | 4 files |
+| Phase 20 P02 | ~10 min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -157,6 +158,9 @@ Key file touchpoints for Phase 16 (from the milestone scoping):
 - [Phase 18]: Plan 18-03 (GEO-03): tests/scan_settings.rs locks the two-level proof. Level 1 (non-vacuous) parses Synthetic_FullGeometry (declared 3×3/100µm/300µm + IMS:1000413) into BOTH scan_settings_list_from_geometry AND the derived imaging block (reached via the PUBLIC ImagingWriter::write_run_metadata + imaging_metadata() seam, since assemble_imaging_metadata is pub(crate)) and asserts geometry equality + correct IMS accessions + UO:0000017 µm unit (µm terms unit-bearing; grid + scan-pattern unitless). Level 2 converts Example_Processed via convert_with(Some(&geom)) (NOT the convert() wrapper, which passes None and omits the key) and asserts a well-formed scan_settings_list (id + parameters[]) in MzPeakReader.file_index().metadata. Two-fixture split documented (no fixture pairs a declared grid with an .ibd). Phase 18 complete (3/3).
 - [Phase ?]: Phase 20: optical decode_latin1 also XML-unescapes (H&amp;E to H&E); geometry numeric values never needed it.
 - [Phase ?]: Phase 20: is_tiff detects by magic bytes not extension so Aperio .svs gets TIFF dimensions.
+- [Phase ?]: Plan 20-02: EmbedMode Strict/Soft is the only --image vs auto-discovered asymmetry (format identical, Option B pre-flight)
+- [Phase ?]: Plan 20-02: descriptive optical CV attrs folded into existing ImageEntry optional fields (IMS:1006017 alignment as a modality suffix) — no schema field added
+- [Phase ?]: Plan 20-02: global dedup by canonicalized path over the whole embed list (--image + auto), --image first then auto in document order
 
 ### Pending Todos
 
@@ -194,7 +198,7 @@ Items acknowledged and carried forward to v0.7+:
 
 ## Session Continuity
 
-Last session: 2026-06-06T03:28:01.912Z
+Last session: 2026-06-06T03:41:56.406Z
 Stopped at: Completed 19-01-PLAN.md (SRC-01/SRC-02 — source_files[] .imzML + .ibd, reused UUID/checksum, no second hash. Phase 19 complete 1/1).
 Resume file: None
 
