@@ -126,18 +126,30 @@ fn single_image_imports_with_metadata_and_affine() {
     let _ = std::fs::remove_file(&out);
 }
 
-/// IMG-02: two `--image` paths produce image_0000.tiff + image_0001.tiff (0-based ordinals),
-/// and DUPLICATE source basenames (the same fixture file twice) both land under DISTINCT ordinal
-/// archive names — no collision (the archive name is the ordinal, never the source basename).
+/// IMG-02: two DISTINCT `--image` paths produce image_0000.tiff + image_0001.tiff (0-based
+/// ordinals) — even when their source basenames collide, the archive name is the ordinal, never the
+/// source basename.
+///
+/// Phase 20 / OPT-04: passing the SAME on-disk file twice now DEDUPS to ONE member (dedup by
+/// canonicalized resolved path — "never embed the same file twice"). The v0.5 behavior of two
+/// identical `--image` paths yielding two members is superseded by OPT-04's global dedup. This test
+/// therefore uses two DISTINCT files (a temp copy of the fixture) for the distinct-ordinal case and
+/// separately asserts the same-file-twice dedup.
 #[test]
 fn two_images_and_duplicate_basenames_get_distinct_ordinals() {
     let out = temp_out("dup");
     let _ = std::fs::remove_file(&out);
 
+    // Two DISTINCT on-disk files (same basename "optical_4x3.tiff" via a subdir copy) → distinct
+    // ordinals. A temp copy gives a second distinct path that canonicalizes differently.
+    let copy_dir = std::env::temp_dir().join(format!("mzml2mzpeak_dupcopy_{}", std::process::id()));
+    std::fs::create_dir_all(&copy_dir).unwrap();
+    let copy = copy_dir.join("optical_4x3.tiff");
+    std::fs::copy(TIFF_FIXTURE, &copy).unwrap();
+
     let reader = open_fixture();
-    // The SAME path twice → duplicate source basename "optical_4x3.tiff", distinct ordinals.
-    let paths = [PathBuf::from(TIFF_FIXTURE), PathBuf::from(TIFF_FIXTURE)];
-    convert(reader, &out, &paths).expect("convert() with two --image succeeds");
+    let paths = [PathBuf::from(TIFF_FIXTURE), copy.clone()];
+    convert(reader, &out, &paths).expect("convert() with two distinct --image succeeds");
 
     let mzreader = MzPeakReader::new(&out).expect("reader opens the two-image archive");
     let files = mzreader.list_all_files_in_archive();
@@ -150,12 +162,35 @@ fn two_images_and_duplicate_basenames_get_distinct_ordinals() {
 
     let imaging = imaging_block(&mzreader);
     let images = imaging["images"].as_array().expect("images array");
-    assert_eq!(images.len(), 2, "two images recorded");
+    assert_eq!(images.len(), 2, "two distinct images recorded");
     assert_eq!(images[0]["archive_path"], Value::from("images/image_0000.tiff"));
     assert_eq!(images[1]["archive_path"], Value::from("images/image_0001.tiff"));
     // Both carry the SAME (duplicate) source basename — accepted; archive names stay distinct.
     assert_eq!(images[0]["source_name"], Value::from("optical_4x3.tiff"));
     assert_eq!(images[1]["source_name"], Value::from("optical_4x3.tiff"));
+
+    let _ = std::fs::remove_file(&out);
+    std::fs::remove_dir_all(&copy_dir).ok();
+}
+
+/// Phase 20 / OPT-04: the SAME on-disk `--image` path passed TWICE dedups to exactly ONE member
+/// (dedup by canonicalized resolved path — never embed the same file twice).
+#[test]
+fn duplicate_same_image_path_dedups_to_one() {
+    let out = temp_out("dupsame");
+    let _ = std::fs::remove_file(&out);
+
+    let reader = open_fixture();
+    let paths = [PathBuf::from(TIFF_FIXTURE), PathBuf::from(TIFF_FIXTURE)];
+    convert(reader, &out, &paths).expect("convert() with the same --image twice succeeds");
+
+    let mzreader = MzPeakReader::new(&out).expect("reader opens the dedup archive");
+    let imaging = imaging_block(&mzreader);
+    let images = imaging["images"].as_array().expect("images array");
+    assert_eq!(images.len(), 1, "the same file passed twice embeds once (OPT-04 dedup)");
+    let files = mzreader.list_all_files_in_archive();
+    let img_members: Vec<_> = files.iter().filter(|f| f.starts_with("images/")).collect();
+    assert_eq!(img_members.len(), 1, "exactly one images/* member; got {img_members:?}");
 
     let _ = std::fs::remove_file(&out);
 }

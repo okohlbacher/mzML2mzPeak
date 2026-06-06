@@ -288,48 +288,136 @@ pub fn convert_with(
     }
     let mut zip = writer.finish_parquet()?;
 
-    // (4b) Optical-image import (IMG-01/02/03/04). The ordering is LOAD-BEARING: pixel_count was
-    //      set by `acc.fold_into` above (so the affine's Nx×Ny is known), and the ZIP is now open
-    //      after finish_parquet — so each TIFF can be streamed in as an `Other` member BEFORE the
-    //      index (with its `images[]`) is serialized just below. An empty `image_paths` does
-    //      nothing: `block.images` stays `None` and the no-image output is unchanged.
-    if !image_paths.is_empty() {
-        // The full-extent affine needs the MS pixel grid (Nx×Ny). If pixel_count is unknown
-        // (e.g. a coordinate-less / empty run), there is no grid to map images onto — fail with a
-        // clear typed error (IMG-04) rather than fabricating an affine.
-        let pc = block.pixel_count.ok_or_else(|| {
-            WriteError::ImageAffineUnknownPixelCount {
-                out_path: out_path.display().to_string(),
+    // (4b) Optical-image import — coexist + dedup + deterministic order (OPT-01/02/03/04). The
+    //      ordering is LOAD-BEARING: pixel_count was set by `acc.fold_into` above (so the affine's
+    //      Nx×Ny is known), and the ZIP is now open after finish_parquet — so each image can be
+    //      streamed in as an `Other` member BEFORE the index (with its `images[]`) is serialized
+    //      just below.
+    //
+    //      EMBED ORDER (OPT-04, deterministic + documented): explicit `--image` entries FIRST
+    //      (Strict, no descriptive attrs — the v0.5 hard-fail contract is unchanged), THEN
+    //      auto-discovered `IMS:1006008` entries in imzML DOCUMENT ORDER (Soft, with descriptive
+    //      attrs). Each list element is `(PathBuf, EmbedMode, Option<OpticalImageRef>)`.
+    //
+    //      DEDUP (OPT-04): by CANONICALIZED resolved path — a set of canonicalized paths already
+    //      embedded; an auto-discovered path that canonicalizes to one a `--image` (or an earlier
+    //      auto ref) already covers is SKIPPED (embed once). `--image X` + an imzML that also
+    //      references X therefore embeds X exactly once. Canonicalization falls back to a lexical
+    //      compare when a path is not yet canonicalizable (mirrors cli.rs::same_file_path).
+    //
+    //      An empty `--image` list AND no auto-discovered refs leaves `block.images = None` (the
+    //      no-image output is byte-identical to v0.5).
+
+    // (1) Assemble the ordered embed list: --image (strict) first, then auto-discovered (soft).
+    let mut embed_list: Vec<(PathBuf, EmbedMode, Option<OpticalImageRef>)> = Vec::new();
+    for path in image_paths.iter() {
+        embed_list.push((path.clone(), EmbedMode::Strict, None));
+    }
+    // AUTO-DISCOVER (OPT-01): when input_path is Some, parse every IMS:1006008 ref and resolve it
+    // relative to the .imzML directory. A resolve REJECTION (path-escape) → a DISTINCT warning
+    // (naming the traversal/escape/rejected reason — NOT a generic "missing file" — T-20-01) and
+    // SKIP the ref. A successful resolve appends a soft entry carrying its descriptive attrs.
+    if let Some(input) = input_path {
+        // A parse error (malformed imzML XML / I/O) is non-fatal for the AUXILIARY optical data
+        // (OPT-03): warn + continue with no auto-discovered images, never abort the spectral run.
+        match crate::schema::parse_optical_images(input) {
+            Ok(refs) => {
+                let imzml_dir = input.parent().unwrap_or_else(|| Path::new("."));
+                for r in refs {
+                    match crate::schema::resolve_optical_location(&r.location, imzml_dir) {
+                        Ok(resolved) => embed_list.push((resolved, EmbedMode::Soft, Some(r))),
+                        Err(crate::schema::OpticalParseError::PathEscape { location }) => {
+                            // DISTINCT traversal warning (T-20-01) — soft-fail must NOT mask an
+                            // escape; the "rejected path traversal" token distinguishes it from a
+                            // plain missing-file skip warning.
+                            log::warn!(
+                                "rejected optical image location {location:?}: path traversal \
+                                 escapes the imzML directory tree — skipping (auto-discovered)"
+                            );
+                        }
+                        Err(e) => {
+                            // Other resolve errors are non-fatal too (auxiliary data) — warn + skip.
+                            log::warn!(
+                                "skipping auto-discovered optical image {:?}: {e}",
+                                r.location
+                            );
+                        }
+                    }
+                }
             }
-        })?;
-        let (nx, ny) = (pc.x, pc.y);
-
-        // observed_max grid counts are an APPROXIMATION (the max observed coordinate, not a
-        // declared grid), so the overlay affine they yield is approximate too — warn (IMG-04).
-        if block.pixel_count_source == Some(PixelCountSource::ObservedMax) {
-            log::warn!(
-                "imaging image overlay affine is approximate — pixel_count is observed_max, not declared"
-            );
-        }
-
-        let mut images = Vec::with_capacity(image_paths.len());
-        // A running ordinal advanced ONLY by an embed that actually wrote a member, so a skipped
-        // soft image leaves no gap (ordinals are dense + contiguous over SUCCESSFUL embeds).
-        let mut ordinal: usize = 0;
-        for path in image_paths.iter() {
-            // Explicit --image entries are STRICT (hard-fail, the v0.5 contract — CONTEXT scope
-            // fence) and carry NO descriptive attrs.
-            if let Some(entry) =
-                embed_one_image(&mut zip, path, ordinal, nx, ny, None, EmbedMode::Strict)?
-            {
-                images.push(entry);
-                ordinal += 1;
+            Err(e) => {
+                log::warn!(
+                    "optical-image auto-discovery parse failed for {:?}: {e} — no images \
+                     auto-embedded (spectral conversion continues)",
+                    input.display()
+                );
             }
         }
+    }
 
-        // Set images[] ONLY when ≥1 image was imported, so a no-image run omits the key entirely.
-        if !images.is_empty() {
-            block.images = Some(images);
+    if !embed_list.is_empty() {
+        // The full-extent affine needs the MS pixel grid (Nx×Ny). If pixel_count is unknown (a
+        // coordinate-less / empty run), there is no grid to map images onto. A STRICT --image then
+        // hard-fails (IMG-04, unchanged); an auto-only run soft-fails (warn + embed nothing).
+        match block.pixel_count {
+            None => {
+                let has_strict = embed_list.iter().any(|(_, m, _)| *m == EmbedMode::Strict);
+                if has_strict {
+                    return Err(WriteError::ImageAffineUnknownPixelCount {
+                        out_path: out_path.display().to_string(),
+                    });
+                }
+                log::warn!(
+                    "MS pixel_count is unknown (coordinate-less run) — cannot build image \
+                     overlay affine; skipping all auto-discovered optical images"
+                );
+            }
+            Some(pc) => {
+                let (nx, ny) = (pc.x, pc.y);
+
+                // observed_max grid counts are an APPROXIMATION (the max observed coordinate, not a
+                // declared grid), so the overlay affine they yield is approximate too — warn.
+                if block.pixel_count_source == Some(PixelCountSource::ObservedMax) {
+                    log::warn!(
+                        "imaging image overlay affine is approximate — pixel_count is observed_max, not declared"
+                    );
+                }
+
+                let mut images = Vec::with_capacity(embed_list.len());
+                // A running ordinal advanced ONLY by an embed that actually wrote a member, so a
+                // skipped soft image leaves no gap (dense + contiguous over SUCCESSFUL embeds).
+                let mut ordinal: usize = 0;
+                // DEDUP set: canonicalized (or lexical-fallback) paths already embedded.
+                let mut seen: Vec<PathBuf> = Vec::with_capacity(embed_list.len());
+
+                for (path, mode, descriptive) in embed_list.iter() {
+                    let key = canonical_key(path);
+                    if seen.iter().any(|k| *k == key) {
+                        // Already embedded this resolved file (e.g. --image X + imzML also → X) —
+                        // embed once (OPT-04). A soft duplicate is silently skipped (not warned:
+                        // it is intentional coexistence, not a defect).
+                        continue;
+                    }
+                    if let Some(entry) = embed_one_image(
+                        &mut zip,
+                        path,
+                        ordinal,
+                        nx,
+                        ny,
+                        descriptive.as_ref(),
+                        *mode,
+                    )? {
+                        images.push(entry);
+                        seen.push(key);
+                        ordinal += 1;
+                    }
+                }
+
+                // Set images[] ONLY when ≥1 image was embedded, so a no-image run omits the key.
+                if !images.is_empty() {
+                    block.images = Some(images);
+                }
+            }
         }
     }
 
@@ -362,6 +450,15 @@ pub fn convert_with(
     zip.finish()
         .map_err(|e| WriteError::Io(std::io::Error::other(e)))?;
     Ok(ConversionOutcome { narrowing })
+}
+
+/// A best-effort canonicalized dedup key for an embed path (OPT-04): tries `fs::canonicalize`
+/// (resolves `.`/`..`/symlinks for an existing file), falling back to a lexical compare via the
+/// raw `PathBuf` when the path is not yet canonicalizable (mirrors the cli.rs `same_file_path`
+/// discipline). Two paths that resolve to the SAME on-disk file yield the SAME key, so a file named
+/// by BOTH `--image X` and an imzML `IMS:1006008` reference is embedded exactly once.
+fn canonical_key(path: &Path) -> PathBuf {
+    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
 /// Embed ONE optical image (any format) into the open ZIP as `images/image_{ordinal:04}.<ext>`,
