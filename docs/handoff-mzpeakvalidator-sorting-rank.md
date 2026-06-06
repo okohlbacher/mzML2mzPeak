@@ -1,7 +1,7 @@
 # Handoff → mzPeakValidator: gate `mz_monotonic_peaks` on the declared `sorting_rank`
 
 **To:** `~/Claude/mzPeakValidator` (separate repo) · **From:** mzML2mzPeak (converter) ·
-**Date:** 2026-06-06 · **Status:** converter side RESOLVED (quick task 260606-a8f)
+**Date:** 2026-06-06 · **Status:** converter side RESOLVED (quick task 260606-a8f); **validator side RESOLVED 2026-06-06** — mzPeakValidator catalog 1.3 gates `grouped_monotonic` on the declared `sorting_rank` (enforces only when `point.mz` declares a numeric rank; skips with an info finding otherwise; matched by `path` to avoid decoy suppression).
 
 > This is a HANDOFF note only. It describes the change the validator should make so the two repos
 > agree. **Do NOT** make any edits to the converter based on this doc — they are already done.
