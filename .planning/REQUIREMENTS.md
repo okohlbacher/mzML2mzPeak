@@ -81,7 +81,7 @@ Bring the forward converter into mzPeak spec conformance:
   Edit 3) carrying the imaging geometry (per-dimension pixel counts, pixel sizes, scan pattern, µm
   offsets).
 
-- [ ] **GEO-02**: The `metadata.imaging` index geometry block becomes a **derived copy** of the
+- [x] **GEO-02**: The `metadata.imaging` index geometry block becomes a **derived copy** of the
   authoritative `scan_settings_list` (single source of truth; the index value is regenerated from, and
   matches, the facet).
 
@@ -182,7 +182,7 @@ GEO×3, SRC×2, OPT×4, RIMG×3). No orphans, no duplicates.
 | CVL-01 | Phase 17 | Complete |
 | CVL-02 | Phase 17 | Complete |
 | GEO-01 | Phase 18 | Complete |
-| GEO-02 | Phase 18 | Pending |
+| GEO-02 | Phase 18 | Complete |
 | GEO-03 | Phase 18 | Pending |
 | SRC-01 | Phase 19 | Pending |
 | SRC-02 | Phase 19 | Pending |
