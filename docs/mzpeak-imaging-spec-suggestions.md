@@ -52,6 +52,8 @@
 >
 > **`scan_settings_list`.** Mirrors mzML `scanSettingsList`. Each `scan_settings` carries an `id`, a `parameters` list of CV params, and an optional `targets` list. This is the home for **run-constant imaging geometry**: grid size (`IMS:1000042` "max count of pixel x", `IMS:1000043` "max count of pixel y"), pixel size (`IMS:1000046/47`), max physical dimensions (`IMS:1000044/45`, unit µm `UO:0000017`), absolute position offsets (`IMS:1000053/54`), and the acquisition-geometry **child** terms written directly (e.g. `IMS:1000413` "flyback", `IMS:1000480` "horizontal line scan", `IMS:1000491` "linescan left right", `IMS:1000401` "top down"). A `spectrum`/`scan` _MAY_ reference its settings via `scan_settings_ref`; otherwise the run default applies. Governed by [`schema/scan_settings.json`](../schema/scan_settings.json).
 >
+> **Single source of truth.** The `mzML2mzPeak` converter emits exactly ONE run-constant `scan_settings` (`id` `scansettings1`) whose `parameters` are built from the parsed run geometry by a single builder, `src/schema/scan_settings.rs::scan_settings_list_from_geometry`. It emits ONLY the geometry terms the source actually declared (absent terms are omitted, never fabricated; `grid_z` is never emitted since no standard IMS z-count accession exists). Each `parameters` item is a CV-param object `{cv_ref, accession, name, value?, unit_cv_ref?, unit_accession?}`; the µm geometry terms (`IMS:1000044/45/46/47/53/54`) carry `unit_cv_ref`/`unit_accession` `UO:0000017`, while grid counts and scan-pattern child terms do not. The `metadata.imaging` geometry block is a **derived copy** of this facet (forward-ref to GEO-02), equal by construction; `scan_settings_list` is authoritative.
+>
 > **[V2-codex] Placement of `scan_settings_ref`.** Because the current `scan` facet has no primary key of its own and the run-level geometry normally applies to every scan, `scan_settings_ref` _SHOULD_ be added to the `scan` group when settings vary within a run and _MAY_ be added to `spectrum` only when the reference is spectrum-level metadata. Readers _MUST_ treat an absent `scan_settings_ref` as a reference to the first/default `scan_settings_list` entry.
 >
 > **NOTE:** this element already exists in the mzML schema and is read/written by mzdata when present; its prior absence from mzPeak was an oversight. Geometry _MUST NOT_ be scattered into `run.parameters`.
@@ -261,6 +263,7 @@
 ```
 
 ### `schema/scan_settings.json`
+> **NOTE:** `param.json` is not (yet) a repo schema, so the `parameters` item shape is **inlined** here — matching how the `metadata.imaging` block and the reverse imzML emitter encode cvParams. This mirrors `schema/scan_settings.json` in the repo field-for-field.
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
@@ -271,10 +274,26 @@
     "type": "object",
     "properties": {
       "id":         {"type": "string"},
-      "parameters": {"type": "array", "items": {"$ref": "param.json"}},
+      "parameters": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "cv_ref":         {"type": "string"},
+            "accession":      {"type": "string"},
+            "name":           {"type": "string"},
+            "value":          {"type": ["string", "null"]},
+            "unit_cv_ref":    {"type": ["string", "null"]},
+            "unit_accession": {"type": ["string", "null"]}
+          },
+          "required": ["cv_ref", "accession", "name"],
+          "additionalProperties": false
+        }
+      },
       "targets":    {"type": "array", "items": {"type": "object"}}
     },
-    "required": ["id", "parameters"]
+    "required": ["id", "parameters"],
+    "additionalProperties": false
   }
 }
 ```
