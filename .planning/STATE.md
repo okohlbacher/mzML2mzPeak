@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: — Spec conformance — dtypes + CV/geometry/provenance
-status: verifying
-stopped_at: Completed 16-02-PLAN.md (L1 redefined to value-equal-at-canonical-width + canonical-width verify comparators).
-last_updated: "2026-06-06T01:42:41.178Z"
+status: completed
+stopped_at: Completed 16-04-PLAN.md (dtype tests migrated to canonical width + mixed-dtype regression; checkpoint APPROVED-WITH-CAVEAT — PXD001283 full-dataset --ignored run outstanding pending real .ibd). Phase 16 complete (4/4).
+last_updated: "2026-06-06T01:46:06.925Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 6
@@ -31,9 +31,9 @@ fidelity contract the geometry facet (Phase 18) and the external validator depen
 
 ## Current Position
 
-Phase: 16 — Canonical-width dtype conformance (In Progress)
-Plan: 16-03 complete (3 of 4); next is 16-04 (acceptance gate / cross-test inversions)
-Status: Phase complete — ready for verification
+Phase: 16 — Canonical-width dtype conformance (Complete — 4/4 plans)
+Plan: 16-04 complete (4 of 4); checkpoint APPROVED-WITH-CAVEAT (full PXD001283 --ignored run outstanding pending real .ibd)
+Status: Phase 16 complete — ready for phase 17 (cv_list)
 Last activity: 2026-06-06
 
 ## v0.6 Roadmap (Phases 16–21)
@@ -178,7 +178,7 @@ Items acknowledged and carried forward to v0.7+:
 
 ## Session Continuity
 
-Last session: 2026-06-06T01:42:34.895Z
+Last session: 2026-06-06T01:45:54.801Z
 Stopped at: Completed 16-02-PLAN.md (L1 redefined to value-equal-at-canonical-width + canonical-width verify comparators).
 Resume file: None
 

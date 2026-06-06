@@ -20,7 +20,7 @@
 
 ### v0.6 — Spec conformance — dtypes + CV/geometry/provenance (Phases 16–21)
 
-- [ ] **Phase 16: Canonical-width dtype conformance** — forward casts the data facet to `mz=f64`/`intensity=f32`, records narrowing provenance + CLI warning, redefines L1 to value-equal-at-canonical-width.
+- [x] **Phase 16: Canonical-width dtype conformance** — forward casts the data facet to `mz=f64`/`intensity=f32`, records narrowing provenance + CLI warning, redefines L1 to value-equal-at-canonical-width.
 - [ ] **Phase 17: cv_list file-level CV declaration** — forward declares every CV (MS/IMS/UO) referenced in the archive (spec Edit 2).
 - [ ] **Phase 18: scan_settings_list authoritative geometry facet** — forward emits the authoritative geometry facet; the index geometry block becomes a derived copy (spec Edit 3).
 - [ ] **Phase 19: source_files[] provenance** — forward records input `.imzML`/`.ibd` provenance reusing the integrity preflight's UUID/checksum (spec Edit 10).

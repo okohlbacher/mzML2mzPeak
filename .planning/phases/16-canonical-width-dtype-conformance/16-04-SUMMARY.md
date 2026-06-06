@@ -63,7 +63,7 @@ completed: 2026-06-06
 
 - **Duration:** ~12 min
 - **Completed:** 2026-06-06
-- **Tasks:** 2 autonomous tasks completed + 1 human-verify checkpoint REACHED (not auto-passed)
+- **Tasks:** 2 autonomous tasks completed + 1 human-verify checkpoint APPROVED-WITH-CAVEAT (orchestrator re-ran suite; PXD001283 full-dataset run outstanding pending real `.ibd`)
 - **Files modified:** 6
 
 ## Accomplishments
@@ -109,8 +109,28 @@ None — no new security-relevant surface. T-16-06 (acceptance gate strictness) 
 - `cargo build` — clean. `cargo clippy` — no errors; only pre-existing style lints (e.g. `iter().any()` in untouched test bodies) + vendored-mzdata noise, all out of scope.
 - Stale-assertion grep: `grep -rn 'bit-for-bit at source|no widen|source width' tests/` returns no STALE profile-data-facet source-width preservation assertion (remaining hits are superseded-history comments or the genuinely-exact f64→f64 Unknown-pixel peaks-facet case).
 
-## PXD001283 acceptance gate status (for the checkpoint)
-The full-dataset acceptance gates (`tests/acceptance.rs::acceptance_pxd001283_full_roundtrip` and `tests/reverse_roundtrip.rs::pxd001283_reverse_acceptance`) remain `#[ignore]` because the real 815 MB `.ibd` sidecar is NOT present in the checkout. They are NOT un-ignored and NO `.ibd` was fabricated. The human running the checkpoint can only verify the full-dataset gate if they have the real PXD001283 `.ibd` locally; otherwise the canonical-width invariant is verified by the synthetic mixed-dtype regression + the unchanged gate code.
+## Checkpoint resolution (Task 3 — human-verify, gate="blocking")
+
+**Status: APPROVED-WITH-CAVEAT.** The orchestrator independently re-ran the suite:
+- `cargo build` — clean.
+- `cargo test --no-fail-fast` — 179 lib tests + all integration binaries pass; 0 failures; 3 `#[ignore]`'d (the PXD001283 full-dataset acceptance gate + 2 other heavy tests).
+- The mixed-/narrowing-dtype regression and the `reverse_read_spike` inversion both pass.
+
+### OUTSTANDING manual verification (does NOT block plan completion)
+The PXD001283 full-dataset gate (`acceptance_pxd001283_full_roundtrip`, and the analogous `tests/reverse_roundtrip.rs::pxd001283_reverse_acceptance`) CANNOT run in this environment — there is no `data/` dir and no `.ibd` sidecar in the checkout. The gates remain correctly `#[ignore]`-gated; they were NOT un-ignored and NO `.ibd` was fabricated.
+
+For the real PXD001283 dataset, the canonical-width invariant is verified here by **(a)** the synthetic mixed-dtype regression (`mixed_dtype_source_converts_value_equal_at_canonical_width`, proving lossless f32→f64 m/z widening AND lossy f64→f32 intensity narrowing value-equal end-to-end) and **(b)** the unchanged, still-conformant gate code (real `report.passed()` over the full dataset at `L1BitForBit`, not weakened).
+
+The full 34,840-spectrum run remains an OUTSTANDING manual verification to perform once the real `.ibd` is present locally:
+```
+cargo test --release --test acceptance -- --ignored
+```
+Expect `report.passed() == true` with NO intensity-narrowing warning (PXD001283 is already canonical f64 m/z + f32 intensity).
+
+## Notes / Tech-Debt (for downstream code review)
+- **Pre-existing unused-imports warning** (non-blocking, flagged for code review): `cargo build` emits
+  `warning: unused imports: curie and impl_param_described` at `use crate::{curie, impl_param_described, ParamList};`.
+  Pre-existing style noise, not introduced by this plan — the downstream code-review step should clean it up.
 
 ## Self-Check: PASSED
 - All 6 modified files exist on disk.
