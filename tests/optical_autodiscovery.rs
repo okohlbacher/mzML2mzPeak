@@ -275,8 +275,8 @@ fn ordering_image_first_then_discovered() {
 
 /// (g) OPT-01 non-TIFF — the multimodal fixture carries TWO IMS:1006008 (optical_4x3.tiff +
 /// optical_2x2.png). Both auto-embed; the archive has two images[] entries, one media_type
-/// "image/tiff" (with dims) and one "image/png" embedded verbatim (width 0 / height 0 — dims
-/// omitted for a non-TIFF).
+/// "image/tiff" (first-IFD dims) and one "image/png" embedded verbatim but now WITH its intrinsic
+/// 2×2 dims read from the PNG IHDR (backlog 999.2).
 #[test]
 fn non_tiff_embeds_verbatim() {
     let out = temp_out("multimodal");
@@ -296,14 +296,14 @@ fn non_tiff_embeds_verbatim() {
     assert_eq!(tiff["width"].as_i64(), Some(TIFF_W));
     assert_eq!(tiff["height"].as_i64(), Some(TIFF_H));
 
-    // image_0001 == the PNG (second IMS:1006008), embedded VERBATIM: media_type by extension,
-    // width/height omitted (0/0), but a valid sha256/size over the stored bytes.
+    // image_0001 == the PNG (second IMS:1006008), embedded VERBATIM but now with its IHDR dims
+    // (2×2, backlog 999.2), media_type from the PNG magic, and a valid sha256/size over the bytes.
     let png = &images[1];
     assert_eq!(png["archive_path"], Value::from("images/image_0001.png"));
     assert_eq!(png["source_name"], Value::from("optical_2x2.png"));
-    assert_eq!(png["media_type"], Value::from("image/png"), "non-TIFF media_type by extension");
-    assert_eq!(png["width"].as_i64(), Some(0), "non-TIFF omits width (0)");
-    assert_eq!(png["height"].as_i64(), Some(0), "non-TIFF omits height (0)");
+    assert_eq!(png["media_type"], Value::from("image/png"), "media_type from PNG magic");
+    assert_eq!(png["width"].as_i64(), Some(2), "PNG IHDR width (999.2)");
+    assert_eq!(png["height"].as_i64(), Some(2), "PNG IHDR height (999.2)");
     assert_eq!(png["sha256"].as_str().map(str::len), Some(64), "verbatim bytes digested");
     assert!(png["size_bytes"].as_i64().unwrap() > 0);
 

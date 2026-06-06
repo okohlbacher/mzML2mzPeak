@@ -28,8 +28,8 @@ use crate::read::ImagingReader;
 use crate::schema::metadata::{ImageEntry, PixelCountSource};
 use crate::schema::optical::OpticalImageRef;
 use crate::write::image::{
-    build_image_entry, full_extent_affine, is_tiff, media_type_for_extension, read_tiff_dimensions,
-    sha256_and_size,
+    build_image_entry, detect_format, full_extent_affine, media_type_for_extension,
+    read_jpeg_dimensions, read_png_dimensions, read_tiff_dimensions, sha256_and_size, ImageFormat,
 };
 use crate::write::spectrum::{to_mzdata_canonical, CastNarrowing};
 use crate::write::writer::IndexAccumulator;
@@ -136,15 +136,16 @@ pub fn convert_with(
     //     GENERALIZED (Phase 20 / OPT-01, Option B): this loop NO LONGER TIFF-locks `--image`. The
     //     old v0.5 code called `read_tiff_dimensions(path)?` UNCONDITIONALLY, which hard-failed any
     //     non-TIFF the user explicitly passed (a .png/.svs/.jpg). The existence/readability proof
-    //     is now carried by `is_tiff(path)` (it opens + reads the first 4 magic bytes, returning
-    //     `Err(ImageDecode)` on a missing/unreadable file — propagated below). If `is_tiff` returns
-    //     `Ok(true)` we STILL read the first IFD via `read_tiff_dimensions` (proving the TIFF is a
-    //     well-formed, decodable TIFF, as v0.5 did); if `Ok(false)` we ACCEPT the path verbatim
-    //     (dims omitted, media_type by extension at the embed seam) — format is NOT an error. The
-    //     ONLY asymmetry the phase introduces between `--image` and auto-discovered is the FAIL
-    //     MODE (`--image` = Strict hard-fail here, auto = Soft warn+continue), NOT the format: BOTH
-    //     accept any format. This preserves `--image`'s hard-fail on missing/unreadable/separator
-    //     (CONTEXT scope fence) while lifting the v0.5 TIFF-only restriction.
+    //     is now carried by `detect_format(path)` (it opens + reads the leading magic bytes,
+    //     returning `Err(ImageDecode)` on a missing/unreadable file — propagated below). If it
+    //     reports a TIFF we STILL read the first IFD via `read_tiff_dimensions` (proving the TIFF is
+    //     well-formed/decodable, as v0.5 did); any other format is ACCEPTED here and dimensioned
+    //     best-effort at the embed seam (TIFF dims authoritative, PNG/JPEG best-effort — 999.2) —
+    //     format is NOT an error. The ONLY asymmetry the phase introduces between `--image` and
+    //     auto-discovered is the FAIL MODE (`--image` = Strict hard-fail here, auto = Soft
+    //     warn+continue), NOT the format: BOTH accept any format. This preserves `--image`'s
+    //     hard-fail on missing/unreadable/separator (CONTEXT scope fence) while lifting the v0.5
+    //     TIFF-only restriction.
     for path in image_paths {
         // The derived source_name is descriptive-only, but it is attacker-influenced — reject any
         // residual path separator here too, so the failure surfaces before output exists (matches
@@ -162,9 +163,10 @@ pub fn convert_with(
                 detail: format!("derived source_name {source_name:?} contains a path separator"),
             });
         }
-        // Existence/readability proof (is_tiff opens + reads 4 bytes → Err on missing/unreadable),
-        // then a TIFF gets its IFD validated too. A non-TIFF is accepted (format is not an error).
-        if is_tiff(path)? {
+        // Existence/readability proof (detect_format opens + reads magic → Err on missing/unreadable),
+        // then a TIFF gets its IFD validated too. A non-TIFF is accepted (format is not an error;
+        // PNG/JPEG dimensions are read best-effort at the embed seam).
+        if detect_format(path)? == ImageFormat::Tiff {
             let _ = read_tiff_dimensions(path)?;
         }
     }
@@ -465,11 +467,15 @@ fn canonical_key(path: &Path) -> PathBuf {
 /// returning its assembled [`ImageEntry`] — the single per-image seam shared by the strict
 /// `--image` loop and the soft auto-discovery loop (Phase 20 / OPT-01/02/03).
 ///
-/// FORMAT (identical in both modes): branch on [`is_tiff`]. A TIFF (or TIFF-based `.svs`) gets its
-/// first-IFD `(w, h)` via [`read_tiff_dimensions`] and `media_type = "image/tiff"`; a non-TIFF is
-/// embedded VERBATIM with `(w, h) = (0, 0)` (the "dimensions omitted" sentinel — NO schema field
-/// added) and `media_type` derived from the source extension ([`media_type_for_extension`], default
-/// `"bin"`/`application/octet-stream`). The archive member preserves the SOURCE EXTENSION
+/// FORMAT (identical in both modes): branch on [`detect_format`] (magic bytes). A TIFF (or
+/// TIFF-based `.svs`) gets its first-IFD `(w, h)` via [`read_tiff_dimensions`] and
+/// `media_type = "image/tiff"`. A PNG / JPEG gets its intrinsic `(w, h)` best-effort via
+/// [`read_png_dimensions`] / [`read_jpeg_dimensions`] (backlog 999.2) with `media_type`
+/// `"image/png"` / `"image/jpeg"`; an unreadable header degrades to `(0, 0)` rather than failing.
+/// Any other blob is embedded VERBATIM with `(w, h) = (0, 0)` (the "dimensions omitted" sentinel —
+/// NO schema field added) and `media_type` derived from the source extension
+/// ([`media_type_for_extension`], default `"bin"`/`application/octet-stream`). The archive member
+/// preserves the SOURCE EXTENSION
 /// (`image_{ordinal:04}.<ext>`, NOT a forced `.tiff`) per OPT-01; the ordinal is the ONLY part of
 /// the name that reaches the archive (the attacker-controlled basename never does — T-20-04 /
 /// T-15-06).
@@ -537,26 +543,34 @@ fn embed_one_image(
         );
     }
 
-    // Branch on TIFF-by-magic-bytes. `is_tiff` opens + reads the first 4 bytes, so its Err arm is
-    // the existence/readability proof for BOTH formats (a missing/unreadable file fails here).
-    let tiff = match is_tiff(path) {
-        Ok(b) => b,
-        Err(e) => fail!(e, "file is missing or unreadable"),
-    };
-    let (w, h, media_type) = if tiff {
-        // A well-formed TIFF: read first-IFD dims (proves it decodes); media_type image/tiff.
-        match read_tiff_dimensions(path) {
+    // Branch on format-by-magic-bytes. `detect_format` opens + reads the leading bytes, so its Err
+    // arm is the existence/readability proof for ALL formats (a missing/unreadable file fails here).
+    // TIFF dimension reads are authoritative (a malformed TIFF is an error, preserving the v0.5
+    // `--image` contract); PNG/JPEG dimension reads are BEST-EFFORT (backlog 999.2) — a header we
+    // can't parse falls back to the dimensionless (0/0) embed rather than failing the conversion.
+    let (w, h, media_type) = match detect_format(path) {
+        Ok(ImageFormat::Tiff) => match read_tiff_dimensions(path) {
             Ok((w, h)) => (w, h, "image/tiff".to_string()),
             Err(e) => fail!(e, "TIFF dimensions could not be read (malformed TIFF)"),
+        },
+        Ok(ImageFormat::Png) => {
+            let (w, h) = read_png_dimensions(path).unwrap_or((0, 0));
+            (w, h, "image/png".to_string())
         }
-    } else {
-        // A non-TIFF: embed verbatim, dimensions omitted (0/0), media_type by extension.
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("bin")
-            .to_ascii_lowercase();
-        (0u32, 0u32, media_type_for_extension(&ext))
+        Ok(ImageFormat::Jpeg) => {
+            let (w, h) = read_jpeg_dimensions(path).unwrap_or((0, 0));
+            (w, h, "image/jpeg".to_string())
+        }
+        Ok(ImageFormat::Other) => {
+            // An unrecognized blob: embed verbatim, dimensions omitted (0/0), media_type by extension.
+            let ext = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("bin")
+                .to_ascii_lowercase();
+            (0u32, 0u32, media_type_for_extension(&ext))
+        }
+        Err(e) => fail!(e, "file is missing or unreadable"),
     };
 
     // The archive member preserves the SOURCE EXTENSION (OPT-01) — image_{ordinal:04}.<ext>, NOT a

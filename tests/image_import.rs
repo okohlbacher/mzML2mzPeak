@@ -228,8 +228,8 @@ fn bad_image_fails_fast_and_leaves_no_output() {
 
 /// Phase 20 / OPT-01: an explicit `--image` to a NON-TIFF (.png) now succeeds (the pre-flight is
 /// no longer TIFF-locked). The produced archive carries `images/image_0000.png` with media_type
-/// `image/png`, width 0 / height 0 (dimensions omitted for a verbatim non-TIFF embed), and a valid
-/// sha256/size — proving the v0.5 TIFF-only restriction is lifted while `--image` stays strict.
+/// `image/png`, its real intrinsic 2×2 dimensions (read from the PNG IHDR — backlog 999.2), and a
+/// valid sha256/size — proving the v0.5 TIFF-only restriction is lifted while `--image` stays strict.
 #[test]
 fn explicit_image_non_tiff_png_succeeds() {
     const PNG_FIXTURE: &str = "tests/fixtures/imaging/optical_2x2.png";
@@ -253,9 +253,9 @@ fn explicit_image_non_tiff_png_succeeds() {
     let img = &imaging["images"][0];
     assert_eq!(img["archive_path"], Value::from("images/image_0000.png"));
     assert_eq!(img["source_name"], Value::from("optical_2x2.png"));
-    assert_eq!(img["media_type"], Value::from("image/png"), "media_type by extension");
-    assert_eq!(img["width"].as_i64(), Some(0), "non-TIFF embed omits width (0)");
-    assert_eq!(img["height"].as_i64(), Some(0), "non-TIFF embed omits height (0)");
+    assert_eq!(img["media_type"], Value::from("image/png"), "media_type from PNG magic");
+    assert_eq!(img["width"].as_i64(), Some(2), "PNG IHDR width (999.2)");
+    assert_eq!(img["height"].as_i64(), Some(2), "PNG IHDR height (999.2)");
     assert_eq!(img["role"], Value::from("optical"));
     let sha = img["sha256"].as_str().expect("sha256 hex string");
     assert_eq!(sha.len(), 64, "sha256 is a 64-hex-char digest");

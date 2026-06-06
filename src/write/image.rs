@@ -143,32 +143,153 @@ pub(crate) fn build_image_entry(
     }
 }
 
-/// Detect a TIFF (including TIFF-based formats like Aperio `.svs`) by its MAGIC BYTES — NOT by
-/// file extension (Phase 20 / OPT-01).
+/// The optical-image container formats we can read intrinsic `(width, height)` for, detected by
+/// MAGIC BYTES — never by file extension (Phase 20 / OPT-01 + backlog 999.2).
 ///
-/// Reads only the FIRST 4 bytes and returns `Ok(true)` for the TIFF magic `II\x2A\x00`
-/// (little-endian) or `MM\x00\x2A` (big-endian), `Ok(false)` for anything else. Detection is
-/// by magic bytes so a `.svs` (Aperio is TIFF-based) is recognized as a TIFF and gets its
-/// first-IFD dimensions via [`read_tiff_dimensions`], while a mislabeled `.tif` that is not a
-/// TIFF is treated as a verbatim embed.
+/// `Other` is any blob we still embed verbatim but cannot dimension (so its affine degrades to the
+/// constant-axis full-extent identity). TIFF subsumes TIFF-based formats like Aperio `.svs`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ImageFormat {
+    Tiff,
+    Png,
+    Jpeg,
+    Other,
+}
+
+/// Detect the container format of `path` from its leading MAGIC BYTES (Phase 20 / OPT-01 +
+/// backlog 999.2).
 ///
-/// A read error (file missing/unreadable, or fewer than 4 bytes) surfaces as
-/// [`WriteError::ImageDecode`] so the soft-fail caller in Plan 02 can distinguish "not a TIFF"
-/// (`Ok(false)`) from "could not read" (`Err`).
-// Consumed by Plan 02's convert.rs auto-discovery seam; only this module's tests call it now.
-#[allow(dead_code)]
-pub(crate) fn is_tiff(path: &Path) -> Result<bool, WriteError> {
+/// Reads at most the first 8 bytes, so this doubles as the existence/readability proof: a
+/// missing/unreadable file surfaces [`WriteError::ImageDecode`], letting the soft-fail caller
+/// distinguish "could not read" (`Err`) from "unrecognized format" ([`ImageFormat::Other`]). A
+/// short-but-readable file (fewer than 8 bytes) that matches no magic is simply `Other` — it is
+/// readable, just not a recognized image, so it embeds verbatim. Magic-byte detection means a
+/// `.svs` (Aperio is TIFF-based) is recognized as TIFF and a mislabeled extension never misleads.
+pub(crate) fn detect_format(path: &Path) -> Result<ImageFormat, WriteError> {
     let display = path.display().to_string();
     let mut f = File::open(path).map_err(|e| WriteError::ImageDecode {
         path: display.clone(),
         detail: e.to_string(),
     })?;
-    let mut magic = [0u8; 4];
-    f.read_exact(&mut magic).map_err(|e| WriteError::ImageDecode {
+    let mut magic = [0u8; 8];
+    let n = read_prefix(&mut f, &mut magic).map_err(|e| WriteError::ImageDecode {
         path: display,
         detail: e.to_string(),
     })?;
-    Ok(matches!(&magic, b"II\x2A\x00" | b"MM\x00\x2A"))
+    let m = &magic[..n];
+    Ok(if m.starts_with(b"II\x2A\x00") || m.starts_with(b"MM\x00\x2A") {
+        ImageFormat::Tiff
+    } else if m.starts_with(b"\x89PNG\r\n\x1a\n") {
+        ImageFormat::Png
+    } else if m.starts_with(b"\xFF\xD8\xFF") {
+        ImageFormat::Jpeg
+    } else {
+        ImageFormat::Other
+    })
+}
+
+/// Fill `buf` from `r`, returning the number of bytes actually read (may be `< buf.len()` only at
+/// EOF). Handles short reads that `Read::read` is permitted to return mid-stream.
+fn read_prefix(r: &mut impl Read, buf: &mut [u8]) -> std::io::Result<usize> {
+    let mut filled = 0;
+    while filled < buf.len() {
+        match r.read(&mut buf[filled..])? {
+            0 => break,
+            n => filled += n,
+        }
+    }
+    Ok(filled)
+}
+
+/// Read a PNG's `(width, height)` from its IHDR chunk WITHOUT decoding pixels (backlog 999.2).
+///
+/// A PNG is an 8-byte signature followed immediately by the IHDR chunk:
+/// `[len:4][type:4 = "IHDR"][width:4 BE][height:4 BE]…`. So `width` is at byte offset 16 and
+/// `height` at 20 — this reads only the first 24 bytes and validates the signature + `IHDR` type.
+/// A truncated/invalid header surfaces [`WriteError::ImageDecode`] (callers treat it as best-effort
+/// and fall back to the dimensionless embed).
+pub(crate) fn read_png_dimensions(path: &Path) -> Result<(u32, u32), WriteError> {
+    let display = path.display().to_string();
+    let mut f = File::open(path).map_err(|e| WriteError::ImageDecode {
+        path: display.clone(),
+        detail: e.to_string(),
+    })?;
+    let mut head = [0u8; 24];
+    f.read_exact(&mut head).map_err(|e| WriteError::ImageDecode {
+        path: display.clone(),
+        detail: format!("PNG truncated before IHDR: {e}"),
+    })?;
+    if &head[0..8] != b"\x89PNG\r\n\x1a\n" || &head[12..16] != b"IHDR" {
+        return Err(WriteError::ImageDecode {
+            path: display,
+            detail: "not a PNG or missing IHDR chunk".to_string(),
+        });
+    }
+    let w = u32::from_be_bytes([head[16], head[17], head[18], head[19]]);
+    let h = u32::from_be_bytes([head[20], head[21], head[22], head[23]]);
+    Ok((w, h))
+}
+
+/// Read a JPEG's `(width, height)` from its first SOF (Start Of Frame) marker WITHOUT decoding
+/// pixels (backlog 999.2).
+///
+/// After the SOI (`FFD8`), a JPEG is a sequence of marker segments `[FF][marker][len:2 BE][payload]`.
+/// The SOFn markers (`C0`–`CF`, excluding the non-frame `C4` DHT / `C8` JPG / `CC` DAC) carry
+/// `[precision:1][height:2 BE][width:2 BE]` at the payload start. We walk segments, skipping each by
+/// its declared length (and the parameter-less RSTn / TEM markers), until the first SOF. A malformed
+/// stream or one with no SOF surfaces [`WriteError::ImageDecode`] (callers treat it as best-effort).
+pub(crate) fn read_jpeg_dimensions(path: &Path) -> Result<(u32, u32), WriteError> {
+    let display = path.display().to_string();
+    let err = |detail: String| WriteError::ImageDecode {
+        path: display.clone(),
+        detail,
+    };
+    let mut r = BufReader::new(File::open(path).map_err(|e| err(e.to_string()))?);
+
+    let byte = |r: &mut BufReader<File>| -> Result<u8, WriteError> {
+        let mut b = [0u8; 1];
+        r.read_exact(&mut b).map_err(|e| err(e.to_string()))?;
+        Ok(b[0])
+    };
+
+    if byte(&mut r)? != 0xFF || byte(&mut r)? != 0xD8 {
+        return Err(err("not a JPEG (missing SOI marker)".to_string()));
+    }
+    loop {
+        // Advance to the next marker: it is the first non-`FF` byte after one-or-more `FF`s
+        // (`FF` may repeat as fill bytes between segments).
+        let mut marker = byte(&mut r)?;
+        if marker != 0xFF {
+            return Err(err("expected a JPEG marker (0xFF) between segments".to_string()));
+        }
+        while marker == 0xFF {
+            marker = byte(&mut r)?;
+        }
+        match marker {
+            0xD9 => return Err(err("reached end of image (EOI) before any SOF".to_string())),
+            // Parameter-less standalone markers (RSTn 0xD0–0xD7, TEM 0x01): no length, no payload.
+            0x01 | 0xD0..=0xD7 => continue,
+            _ => {}
+        }
+        let len = u16::from_be_bytes([byte(&mut r)?, byte(&mut r)?]) as i64;
+        if len < 2 {
+            return Err(err(format!("invalid JPEG segment length {len}")));
+        }
+        // SOF markers: 0xC0–0xCF EXCEPT 0xC4 (DHT), 0xC8 (JPG), 0xCC (DAC).
+        let is_sof = (0xC0..=0xCF).contains(&marker)
+            && marker != 0xC4
+            && marker != 0xC8
+            && marker != 0xCC;
+        if is_sof {
+            let _precision = byte(&mut r)?;
+            let h = u16::from_be_bytes([byte(&mut r)?, byte(&mut r)?]) as u32;
+            let w = u16::from_be_bytes([byte(&mut r)?, byte(&mut r)?]) as u32;
+            return Ok((w, h));
+        }
+        // Not a frame header — skip its payload (length counts the 2 length bytes themselves).
+        std::io::copy(&mut r.by_ref().take((len - 2) as u64), &mut std::io::sink())
+            .map_err(|e| err(e.to_string()))?;
+    }
 }
 
 /// Map a file extension (case-insensitive, no leading dot) to an IANA media type for the
@@ -328,44 +449,96 @@ mod tests {
         assert_eq!(e.role.as_deref(), Some("optical"));
     }
 
-    /// is_tiff: true for BOTH TIFF byte orders, false for PNG magic.
-    #[test]
-    fn is_tiff_detects_both_byte_orders_and_rejects_png() {
-        fn write_magic(name: &str, bytes: &[u8]) -> std::path::PathBuf {
-            let mut tmp = std::env::temp_dir();
-            tmp.push(format!("mzml2mzpeak_istiff_{}_{}.bin", std::process::id(), name));
-            let mut f = File::create(&tmp).unwrap();
-            f.write_all(bytes).unwrap();
-            tmp
-        }
-
-        // Little-endian "II\x2A\x00" → true.
-        let le = write_magic("le", b"II\x2A\x00rest of file");
-        assert!(is_tiff(&le).unwrap(), "little-endian TIFF magic → true");
-        std::fs::remove_file(&le).ok();
-
-        // Big-endian "MM\x00\x2A" → true.
-        let be = write_magic("be", b"MM\x00\x2Arest of file");
-        assert!(is_tiff(&be).unwrap(), "big-endian TIFF magic → true");
-        std::fs::remove_file(&be).ok();
-
-        // PNG magic "\x89PNG" → false.
-        let png = write_magic("png", b"\x89PNG\r\n\x1a\n");
-        assert!(!is_tiff(&png).unwrap(), "PNG magic → false");
-        std::fs::remove_file(&png).ok();
+    /// Write `bytes` to a uniquely-named temp file and return its path.
+    fn write_tmp(name: &str, bytes: &[u8]) -> std::path::PathBuf {
+        let mut tmp = std::env::temp_dir();
+        tmp.push(format!("mzml2mzpeak_{}_{}.bin", std::process::id(), name));
+        File::create(&tmp).unwrap().write_all(bytes).unwrap();
+        tmp
     }
 
-    /// is_tiff: a missing/unreadable file surfaces WriteError::ImageDecode (Err), distinct from
-    /// "not a TIFF" (Ok(false)) — the distinction the soft-fail caller in Plan 02 needs.
+    /// detect_format: recognizes all four cases by magic bytes (both TIFF byte orders, PNG, JPEG),
+    /// and falls back to `Other` for an unrecognized blob.
     #[test]
-    fn is_tiff_missing_file_errors() {
+    fn detect_format_classifies_by_magic_bytes() {
+        let cases: &[(&str, &[u8], ImageFormat)] = &[
+            ("tiff_le", b"II\x2A\x00rest", ImageFormat::Tiff),
+            ("tiff_be", b"MM\x00\x2Arest", ImageFormat::Tiff),
+            ("png", b"\x89PNG\r\n\x1a\nrest", ImageFormat::Png),
+            ("jpeg", b"\xFF\xD8\xFF\xE0rest", ImageFormat::Jpeg),
+            ("other", b"GIF89a-not-handled", ImageFormat::Other),
+            ("tiny", b"hi", ImageFormat::Other), // short-but-readable → Other, not Err
+        ];
+        for (name, bytes, want) in cases {
+            let p = write_tmp(name, bytes);
+            assert_eq!(detect_format(&p).unwrap(), *want, "{name}");
+            std::fs::remove_file(&p).ok();
+        }
+    }
+
+    /// detect_format: a missing/unreadable file surfaces WriteError::ImageDecode (Err), distinct
+    /// from an unrecognized-but-readable blob (Ok(Other)) — the distinction the soft-fail caller needs.
+    #[test]
+    fn detect_format_missing_file_errors() {
         let mut tmp = std::env::temp_dir();
-        tmp.push(format!("mzml2mzpeak_istiff_missing_{}.bin", std::process::id()));
+        tmp.push(format!("mzml2mzpeak_detect_missing_{}.bin", std::process::id()));
         std::fs::remove_file(&tmp).ok(); // ensure absent
-        match is_tiff(&tmp) {
+        match detect_format(&tmp) {
             Err(WriteError::ImageDecode { .. }) => {}
             other => panic!("expected WriteError::ImageDecode for a missing file, got {other:?}"),
         }
+    }
+
+    /// read_png_dimensions: parses width/height from the IHDR chunk of a minimal valid PNG header.
+    #[test]
+    fn read_png_dimensions_parses_ihdr() {
+        // 8-byte signature + IHDR: len=13, "IHDR", width=640 (0x0280), height=480 (0x01E0).
+        let mut png = Vec::new();
+        png.extend_from_slice(b"\x89PNG\r\n\x1a\n");
+        png.extend_from_slice(&13u32.to_be_bytes());
+        png.extend_from_slice(b"IHDR");
+        png.extend_from_slice(&640u32.to_be_bytes());
+        png.extend_from_slice(&480u32.to_be_bytes());
+        png.extend_from_slice(&[8, 2, 0, 0, 0]); // bit depth, color type, etc.
+        let p = write_tmp("png_real", &png);
+        assert_eq!(read_png_dimensions(&p).unwrap(), (640, 480));
+        std::fs::remove_file(&p).ok();
+    }
+
+    /// read_png_dimensions: a truncated / non-PNG file surfaces WriteError::ImageDecode (best-effort).
+    #[test]
+    fn read_png_dimensions_rejects_truncated() {
+        let p = write_tmp("png_trunc", b"\x89PNG\r\n\x1a\nshort");
+        assert!(matches!(read_png_dimensions(&p), Err(WriteError::ImageDecode { .. })));
+        std::fs::remove_file(&p).ok();
+    }
+
+    /// read_jpeg_dimensions: walks marker segments to the first SOF0 and reads width/height,
+    /// correctly skipping an intervening APP0 (JFIF) segment by its declared length.
+    #[test]
+    fn read_jpeg_dimensions_walks_to_sof() {
+        let mut jpg = Vec::new();
+        jpg.extend_from_slice(&[0xFF, 0xD8]); // SOI
+        // APP0 (FFE0), length 16, "JFIF\0" + 9 bytes of payload — must be skipped by length.
+        jpg.extend_from_slice(&[0xFF, 0xE0, 0x00, 0x10]);
+        jpg.extend_from_slice(b"JFIF\0\x01\x01\x00\x00\x01\x00\x01\x00\x00");
+        // SOF0 (FFC0): len=17, precision=8, height=300 (0x012C), width=400 (0x0190), 3 components.
+        jpg.extend_from_slice(&[0xFF, 0xC0, 0x00, 0x11, 0x08]);
+        jpg.extend_from_slice(&300u16.to_be_bytes());
+        jpg.extend_from_slice(&400u16.to_be_bytes());
+        jpg.extend_from_slice(&[0x03, 0x01, 0x22, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01]);
+        let p = write_tmp("jpeg_real", &jpg);
+        assert_eq!(read_jpeg_dimensions(&p).unwrap(), (400, 300));
+        std::fs::remove_file(&p).ok();
+    }
+
+    /// read_jpeg_dimensions: a stream with no SOF marker surfaces WriteError::ImageDecode.
+    #[test]
+    fn read_jpeg_dimensions_no_sof_errors() {
+        // SOI then immediate EOI — no frame header.
+        let p = write_tmp("jpeg_nosof", &[0xFF, 0xD8, 0xFF, 0xD9]);
+        assert!(matches!(read_jpeg_dimensions(&p), Err(WriteError::ImageDecode { .. })));
+        std::fs::remove_file(&p).ok();
     }
 
     /// media_type_for_extension: tif/tiff/svs → image/tiff; png/jpg/jpeg mapped; unknown →
