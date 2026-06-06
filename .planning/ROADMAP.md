@@ -143,15 +143,19 @@ size/compression-ratio benchmark in `data/raw-examples/README.md`. **NOT a conve
 converter intentionally does NOT ingest raw formats; raw is a size reference only. The clean project
 metric (**mzPeak/mzML**) is already complete for all 18 mzML datasets (mzPeak is 0.07×–0.65× of mzML).
 
-**Surfaced by:** the 2026-06-06 raw survey (`data/raw-examples/README.md`). Done so far: 3 single-file
-Thermo `.raw` acquired (LTQ XL 70 MB, Velos 210 MB, FT-ICR 221 MB) + the full mzPeak/mzML table.
+**Surfaced by:** the 2026-06-06 raw survey (`data/raw-examples/README.md`). **Done:** the full
+mzPeak/mzML table for all 18 datasets + 4 Thermo `.raw` sizes (LTQ XL 70, Velos 210, FT-ICR 221 — all
+downloaded; Lumos 659 — size-only). Survey conclusion: **vendor raw exists almost only for the Thermo
+datasets PRIDE archives natively**; the 4 Zenodo deposits, both PRIDE peak deposits, and the MetaboLights
+studies (verified MTBLS520) are **mzML-only** (no raw to fetch).
 
-**Remaining (size-reference only, optional):**
-1. Directory-format raw sizes — Bruker `.d` (timsTOF/micrOTOF/impact), Waters `.raw`, Agilent `.D` —
-   need zip/subtree size probing per repo.
-2. Multi-GB Astral `.raw` (MSV000100943) — record size without pulling 6 GB.
-3. Optional `scripts/fetch-raw-examples.sh` (gated, like the GBM sections) for reproducibility, using the
-   confirmed URLs. Sciex PXD066465 is mzML-only (no raw to fetch).
+**Remaining (size-reference only, optional — the table is otherwise complete):**
+1. **MassIVE raw sizes** — bruker-timstof (`.d`), sciex-zenotof (`.wiff2`), thermo-astral (multi-GB
+   `.raw`). Need the dataset's versioned FTP path / MassIVE file API (the anonymous listing didn't
+   return here). Record sizes without pulling the multi-GB Astral.
+2. Optional download of the Lumos `.raw` (659 MB, size already recorded) if the actual file is wanted.
+3. Optional `scripts/fetch-raw-examples.sh` (gated, like the GBM sections) for reproducibility of the
+   acquired Thermo `.raw` set.
 
 **Requirements:** TBD
 **Plans:** 0 plans
