@@ -42,10 +42,12 @@ parquet = { version = "=57.0.0", features = ["encryption"] }
 zip = "=4.1.0"
 # imzml is the NON-default addition that makes `mzdata::io::imzml` exist; the other
 # features mirror upstream so the unioned single copy is identical to upstream + imzml.
-# 0.64.0: matches upstream mzpeak_prototyping@8435967's `mzdata = 0.64.0` requirement and is the
-# first published mzdata to include `ChromatogramSource::count_chromatograms` upstream — so the
-# vendored mzdata fork (which only added that method) is dropped (no [patch.crates-io] mzdata below).
-mzdata = { version = "=0.64.0", features = ["imzml", "serde", "bruker_tdf", "nalgebra", "zstd", "numpress"] }
+# 0.64.1: the latest mzdata (master HEAD eb70388) — NOT yet published on crates.io (max published is
+# 0.64.0), so it is VENDORED as an unmodified pinned snapshot via [patch.crates-io] below. Satisfies
+# upstream mzpeak_prototyping@8435967's `mzdata = 0.64.0` (^0.64) requirement; both unify to one copy.
+# 0.64.x upstreamed `ChromatogramSource::count_chromatograms`, so this vendored copy is UNPATCHED
+# (a clean snapshot, not a fork) — drop the vendoring once 0.64.1 is published to crates.io.
+mzdata = { version = "=0.64.1", features = ["imzml", "serde", "bruker_tdf", "nalgebra", "zstd", "numpress"] }
 mzpeaks = "=1.0.9"
 
 # --- Write path: git-only reference implementation, pinned to a CONCRETE commit rev.
@@ -115,9 +117,12 @@ env_logger = "=0.11.8"
 # CLI (Phase 06-02), never in a library module (mirrors the anyhow binary-only boundary). ---
 indicatif = "=0.17.11"
 
-# --- (RESOLVED 2026-06-06) The mzdata fork is GONE. mzdata 0.64.0 upstreamed
-# `ChromatogramSource::count_chromatograms` (the fork's only patch), so we now depend on the
-# published crate directly (mzdata = 0.64.1 above) with no [patch.crates-io] mzdata redirect. ---
+# --- VENDORED SNAPSHOT (not a fork): mzdata 0.64.1 (master HEAD eb70388) is not yet published on
+# crates.io (max published 0.64.0), so we pin an UNMODIFIED snapshot here. 0.64.x already upstreamed
+# `ChromatogramSource::count_chromatograms` — there are NO local patches; this exists only to track
+# 0.64.1 ahead of its crates.io release. Drop this [patch] once mzdata 0.64.1 is published. ---
+[patch.crates-io]
+mzdata = { path = "vendor/mzdata" }
 
 # --- VENDORED PATCH (plan 15-03): the upstream mzpeak_prototyping FileEntry enums
 # `EntityType`/`DataKind` derive `Serialize` but deserialize via `DeserializeFromStr`;

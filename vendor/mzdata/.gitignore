@@ -1,0 +1,8 @@
+/target
+test/data/*.index.json
+.vscode/*
+Untitled*
+test.mzML
+tmp.mzML
+*.sh
+*.py
