@@ -64,4 +64,46 @@ deferrals): `pixel` facet / multi-spectrum-per-pixel (F6), continuous-mode share
 `image` entity / `images.parquet` blob + CV-governed registration / true co-registration (F8), CV
 governance / canonical IMS URI minting (F9 — resolves the `TODO(F9)` placeholders), L2 conformance (F10),
 forward declared-geometry threading beyond parsed (GEO-F), reverse `<sourceFileList>` copy (RSRC). Also:
-file the upstream `mzpeak_prototyping` FileEntry-serde issue and drop the vendored fork when fixed.
+file the upstream `mzpeak_prototyping` FileEntry-serde issue and drop the vendored fork when fixed
+(tracked as Backlog 999.1 below).
+
+## Backlog
+
+### Phase 999.1: Upstream the 3 vendored mzpeak_prototyping patches (BACKLOG)
+
+**Goal:** File PR(s) against `HUPO-PSI/mzPeak` for the three robustness fixes our `vendor/mzpeak_prototyping`
+fork carries, then drop the fork + the `[patch."https://github.com/HUPO-PSI/mzPeak"]` redirect in
+`Cargo.toml`. The fork is **load-bearing** (Phase-21 reverse image read-back depends on patch #1), so the
+fork can only be dropped once patch #1 lands upstream.
+
+**State of the fork (analysed 2026-06-06):** our fork is based on upstream rev `d1aaaf84`; upstream HEAD
+`4843d88` is only ONE **docs-only** commit ahead (the `ion_mobility → ion_mobility_value` doc rename — our
+own PR #19) → **zero Rust drift**, so all three patches still apply cleanly and none are obsoleted. The fork
+diverges in exactly **3 source files**, each a fix for real-world imzML the reference impl panics on / drops:
+
+1. **`src/archive/file_index.rs` — serde round-trip symmetry (load-bearing; strongest PR).** `DataKind` /
+   `EntityType` derive `SerializeDisplay` (not `Serialize`) + add `Display` impls. The derived `Serialize`
+   emitted the `Other(String)` variant as a JSON object `{"other":"..."}` that `DeserializeFromStr` can't
+   read back — so any archive with an `Other` member (e.g. `images/*.tiff`) wrote an `index.json` whose
+   `FileEntry` failed to deserialize and the reader's `.ok()` **silently dropped the ENTIRE `FileIndex`**
+   (losing all metadata incl. `metadata.imaging`). A general read-back correctness bug, not just imaging.
+2. **`src/reader/metadata.rs` — null-index guard.** The aux-array-count facet reader `unwrap()`'d a
+   **nullable** index column; a null row (the empty-chromatogram placeholder a spectra-only archive writes)
+   panicked the reader on any **ion-mobility** archive. Fix: skip null rows
+   (`let Some(idx) = i else { continue }`). Matches our commit `0f5a786`.
+3. **`src/writer/visitor.rs` — ms_level 0 spectrum-type default.** Real imzML (canonical ms-imaging.org
+   Example-1 3×3) declares `MS:1000511 value="0"` with no explicit spectrum-type cvParam; upstream
+   `panic!("Couldn't infer spectrum type from MS level")` crashed forward conversion. Fix: default ms_level
+   0 → MS1 (`MS:1000579`) with a `log::warn!`. Labelled "v0.5 campaign ISSUE-1".
+
+**Notes:** only patch #1 is documented in the `Cargo.toml` `[patch]` note (+ a draft at
+`.planning/milestones/v0.5-phases/15-tiff-optical-image-import/deferred-items.md`); #2 and #3 carry inline
+`VENDORED PATCH` comments but are NOT in the drop-the-fork tracking — the upstream surface is **three**
+distinct fixes, not one. All three are small, self-contained, well-commented (good PRs). Bumping the git rev
+`d1aaaf84 → 4843d88` is safe but cosmetic (doc-only).
+
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with `/gsd:review-backlog` when ready)
