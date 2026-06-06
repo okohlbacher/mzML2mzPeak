@@ -232,20 +232,36 @@ pub fn convert_mzml_with(
                 }
             }
         } else if entry.signal_continuity() == SignalContinuity::Centroid {
-            // Option 3 (visibility) + Option 2 (opt-in repair). Centroid m/z arrives in the raw
-            // arrays in source order (the converter never re-sorts by default — CR-01); detect when
-            // it is non-monotonic so we can count it, and optionally repair it under --sort-peaks.
-            if let Some(arrays) = entry.arrays.as_mut() {
-                if let Ok(mzs) = arrays.mzs() {
-                    if !mzs_nondecreasing(&mzs) {
-                        nonmono.count += 1;
-                        if nonmono.indices.len() < CENTROID_NONMONOTONIC_INDEX_CAP {
-                            nonmono.indices.push(spectra as u64);
-                        }
-                        if sort_peaks {
+            // Option 3 (visibility) + Option 2 (opt-in repair). The writer consumes the spectrum's
+            // primary representation in SOURCE order (the converter never re-sorts by default —
+            // CR-01); detect when its m/z is non-monotonic so we can count it, and optionally repair
+            // it under --sort-peaks. The m/z the writer sees is `peaks()`'s — which prefers a picked
+            // peak set over the raw arrays — so observe the SAME m/z the writer will, and when
+            // repairing, sort the raw arrays AND drop the (now stale) picked peak set so the writer
+            // falls back to the sorted arrays.
+            let observed_mz: Option<Vec<f64>> = match entry.peaks.as_ref() {
+                Some(peaks) => Some(
+                    peaks
+                        .iter()
+                        .map(|p| mzpeaks::CoordinateLike::<mzpeaks::MZ>::coordinate(p))
+                        .collect(),
+                ),
+                None => entry.arrays.as_ref().and_then(|a| a.mzs().ok().map(|c| c.to_vec())),
+            };
+            if let Some(mzs) = observed_mz {
+                if !mzs_nondecreasing(&mzs) {
+                    nonmono.count += 1;
+                    if nonmono.indices.len() < CENTROID_NONMONOTONIC_INDEX_CAP {
+                        nonmono.indices.push(spectra as u64);
+                    }
+                    if sort_peaks {
+                        // Repair the raw arrays in place, then drop the picked peak set so `peaks()`
+                        // resolves to the freshly-sorted arrays the writer will consume.
+                        if let Some(arrays) = entry.arrays.as_mut() {
                             let perm = argsort_mz(&mzs);
-                            drop(mzs);
                             permute_arrays(arrays, &perm)?;
+                            entry.peaks = None;
+                            entry.deconvoluted_peaks = None;
                             sort_applied = true;
                         }
                     }
