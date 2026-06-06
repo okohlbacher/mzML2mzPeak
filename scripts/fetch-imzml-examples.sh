@@ -51,8 +51,29 @@ zen zenodo-LA-ESI    imzML_LA-ESI.zip
 zen zenodo-AP-SMALDI imzML_AP_SMALDI.zip
 zen zenodo-LTP       imzML_LTP.zip
 
+# --- 4) Zenodo 18187395 — GBM MALDI phenomics: the multi-optical-image case ---
+# Each per-section ZIP bundles imzml/{.imzML,.ibd} + HE-XML/.svs (H&E whole-slide,
+# optical #1) + Optical/.tif (unstained bright-field, optical #2) + TM/.xlsx (MSI<->
+# histology transform). The ZIP has no section-name parent inside, so we nest under it.
+# 29 sections exist (record file list); we fetch only the smallest by default.
+# Override with: GBM_SECTIONS="24_Test_P15_r2 16_Train_P10_r2" bash scripts/fetch-imzml-examples.sh
+GBM=zenodo-18187395-GBM-multimodal
+GBM_SECTIONS="${GBM_SECTIONS:-24_Test_P15_r2}"   # smallest section (~248 MB)
+for sec in $GBM_SECTIONS; do
+  dest="$GBM/$sec"
+  if find "$dest" -iname '*.imzML' 2>/dev/null | grep -q .; then
+    echo "  exists: $dest (already extracted)"; continue
+  fi
+  mkdir -p "$dest"
+  echo "  fetch : $dest ($sec.zip)"
+  curl -fL --retry 3 -o "$dest/$sec.zip" "https://zenodo.org/api/records/18187395/files/$sec.zip/content"
+  ( cd "$dest" && unzip -o -q "$sec.zip" && rm -f "$sec.zip" )
+done
+
 echo
 echo "Done. Reconstructed tree under $BASE :"
 du -sh "$BASE"/*/ 2>/dev/null
 echo
-echo "Expected: 7 dirs, 13 .imzML/.ibd pairs, 3 optical .tif (PXD001283, LA-ESI, AP-SMALDI)."
+echo "Expected: 8 dirs. Core: 13 .imzML/.ibd pairs + 3 optical .tif (PXD001283, LA-ESI, AP-SMALDI)."
+echo "Plus GBM multimodal (Zenodo 18187395): each section adds 1 .imzML/.ibd + 2 optical images"
+echo "(.svs H&E + .tif bright-field) + transform .xlsx. Default: 1 section (24_Test_P15_r2)."

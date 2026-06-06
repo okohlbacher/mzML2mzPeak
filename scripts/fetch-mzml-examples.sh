@@ -67,8 +67,50 @@ dl "$M?file=f.MSV000101607/peak/SBA415.mzML&forceDownload=true" \
 dl "$M?file=f.MSV000100943/ccms_peak/RAW/20240912_WFB_exp01_magnet_5_0.mzML&forceDownload=true" \
    "thermo-orbitrap-astral/20240912_WFB_exp01_magnet_5_0.mzML" --no-resume
 
+# --- Extended coverage: new vendors / analyzer classes / modalities (all single small .mzML) ---
+# Shimadzu LCMS-9030 Q-TOF — NEW VENDOR — MetaboLights MTBLS13204 (CC0) ~37.9 MB
+dl "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS13204/FILES/DERIVED_FILES/Blind_P1_pos_012.mzML" \
+   "shimadzu-lcms-9030-qtof/Blind_P1_pos_012.mzML"
+
+# Agilent 8890 GC / 7000D — NEW MODALITY: GC-MS / electron ionization — MetaboLights MTBLS11550 ~16.7 MB
+dl "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS11550/FILES/DERIVED_FILES/GC/EFWS-1.mzML" \
+   "agilent-8890-gc-ei/EFWS-1.mzML"
+
+# Agilent 6490 Triple Quad — NEW ANALYZER: QqQ + SRM chromatograms — PRIDE PXD041762 (CC0) ~5.5 MB
+dl "https://ftp.pride.ebi.ac.uk/pride/data/archive/2024/01/PXD041762/REC-2349_P2_F1.mzML" \
+   "agilent-6490-triplequad/REC-2349_P2_F1.mzML"
+
+# Sciex QTRAP 6500 — NEW ANALYZER: hybrid Q–linear-ion-trap (QqLIT), MRM — PRIDE PXD066465 (CC0) ~3.1 MB
+dl "https://ftp.pride.ebi.ac.uk/pride/data/archive/2026/02/PXD066465/Drug_substance_3_scheduled_MRM.mzML" \
+   "sciex-qtrap-6500/Drug_substance_3_scheduled_MRM.mzML"
+
+# Agilent 6560 IM-QTOF — NEW ION MOBILITY: drift-tube (DTIMS), CE-MS — Zenodo 18481720 (CC-BY-4.0) ~3.4 MB
+dl "https://zenodo.org/api/records/18481720/files/CEMS_10ppm.mzML/content" \
+   "agilent-6560-dtims-imqtof/CEMS_10ppm.mzML"
+
+# Thermo LTQ FT Ultra — NEW ANALYZER: FT-ICR — MetaboLights MTBLS3512 ~31.6 MB
+dl "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS3512/FILES/mtab_BIOS_CRAM1620_1_072617_34.mzML" \
+   "thermo-ltq-ft-ultra-fticr/mtab_BIOS_CRAM1620_1_072617_34.mzML"
+
+# Thermo LTQ XL — NEW ANALYZER: pure linear ion trap — PRIDE PXD059878 ~182 MB
+dl "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/10/PXD059878/2013_30_Amrutha_050713_1.mzML" \
+   "thermo-ltq-xl-iontrap/2013_30_Amrutha_050713_1.mzML"
+
+# Bruker impact II — UHR-QTOF (≠ timsTOF/micrOTOF) — MetaboLights MTBLS12824, HILIC assay ~32.9 MB
+dl "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS12824/FILES/21P0055_Tissue_Georges_NEG_N_01_17471.mzML" \
+   "bruker-impact-ii-qtof/21P0055_Tissue_Georges_NEG_N_01_17471.mzML"
+
+# Sciex ZenoTOF 7600 — newest Sciex flagship (EAD/Zeno trap) — MassIVE MSV000095995 (CC0) ~94 MB
+dl "$M?file=f.MSV000095995/ccms_peak/20240826_RNAseB_Reduced_50ngul_1ul_MRM_03.mzML&forceDownload=true" \
+   "sciex-zenotof-7600/20240826_RNAseB_Reduced_50ngul_1ul_MRM_03.mzML" --no-resume
+
 echo
 echo "Done. Reconstructed tree under $BASE :"
 du -sh "$BASE"/*/ 2>/dev/null
 echo
-echo "Expected: 9 instruments, 9 .mzML files (~9.6 GB total)."
+echo "Expected: 18 instruments, 18 .mzML files (~10.0 GB total)."
+echo "  Core 9 (~9.6 GB): Astral, Fusion Lumos, Q Exactive Plus, LTQ Orbitrap Velos, timsTOF Pro,"
+echo "    micrOTOF-Q II, TripleTOF 6600, Xevo G2-S, Agilent QTOF DMRM."
+echo "  Extended 9 (~407 MB): Shimadzu LCMS-9030 (new vendor), Agilent GC-EI (GC-MS modality),"
+echo "    Agilent 6490 QqQ (SRM), Sciex QTRAP 6500 (QqLIT), Agilent 6560 DTIMS, LTQ FT Ultra (FT-ICR),"
+echo "    LTQ XL (ion trap), Bruker impact II (UHR-QTOF), Sciex ZenoTOF 7600."
