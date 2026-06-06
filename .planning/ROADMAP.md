@@ -58,6 +58,8 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 > **Standing rule (carried from v0.5):** every spec-conformance requirement is delivered in THREE
 > places — implementation (`src/…`), the spec-change doc `docs/mzpeak-imaging-spec-suggestions.md`, and
 > the matching `schema/*.json`. A phase is not "done" until all three are consistent.
+> **Exception (Phase 19):** `source_files[]` is base mzPeak `file_description` — NO new `schema/*.json`;
+> the rule reduces to TWO places (impl + spec doc Edit 10), per the locked 19-CONTEXT decision.
 
 ### Phase 16: Canonical-width dtype conformance
 
@@ -123,9 +125,12 @@ Plans:
 
   1. The forward output records a `source_files[]` entry for each input file (`.imzML` and `.ibd`) with name, location, media type, and checksum.
   2. The recorded checksum/UUID is the one the integrity preflight already computed — verified by no second hash pass over the input occurring during conversion.
-  3. The change is reflected in all three places: implementation (`src/…`), `docs/mzpeak-imaging-spec-suggestions.md` (Edit 10), and the matching `schema/*.json`.
+  3. The change is reflected in BOTH applicable places: implementation (`src/…`) and `docs/mzpeak-imaging-spec-suggestions.md` (Edit 10). NO new `schema/*.json` — `source_files[]` is base mzPeak `file_description`, so the three-places rule reduces to two here (locked 19-CONTEXT decision).
 
-**Plans**: TBD
+**Plans**: 1 plan (1 wave)
+Plans:
+
+- [ ] 19-01-PLAN.md — thread input `.imzML` path + push `source_files[]` (.imzML + .ibd) in write_run_metadata reusing RunProvenance UUID/checksum (no re-hash) + spec Edit 10 + read-back test (SRC-01, SRC-02)
 
 ### Phase 20: Optical image auto-discovery & auto-embed
 
@@ -168,7 +173,7 @@ Plans:
 | 16. Canonical-width dtype conformance | v0.6 | 4/4 | Complete   | 2026-06-06 |
 | 17. cv_list file-level CV declaration | v0.6 | 2/2 | Complete   | 2026-06-06 |
 | 18. scan_settings_list authoritative geometry facet | v0.6 | 3/3 | Complete |  |
-| 19. source_files[] provenance | v0.6 | 0/? | Not started | - |
+| 19. source_files[] provenance | v0.6 | 0/1 | Planned | - |
 | 20. Optical image auto-discovery & auto-embed | v0.6 | 0/? | Not started | - |
 | 21. Reverse optical image export | v0.6 | 0/? | Not started | - |
 
