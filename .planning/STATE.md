@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: — Spec conformance — dtypes + CV/geometry/provenance
-status: verifying
-stopped_at: Completed 20-03-PLAN.md
-last_updated: "2026-06-06T04:28:41.406Z"
-last_activity: 2026-06-06
+status: Awaiting next milestone
+stopped_at: Completed milestone v0.6 (21-03-PLAN.md)
+last_updated: "2026-06-06T05:00:00.000Z"
+last_activity: 2026-06-06 — Milestone v0.6 completed and archived
 progress:
   total_phases: 6
   completed_phases: 6
@@ -31,10 +31,10 @@ fidelity contract the geometry facet (Phase 18) and the external validator depen
 
 ## Current Position
 
-Phase: 19 — source_files[] provenance (complete — 1/1 plan)
-Plan: 19-01 complete (1 of 1); SRC-01/SRC-02. file_description.source_files[] lists the input .imzML (id="imzml") + sibling .ibd (id="ibd"); the .ibd entry carries the source UUID (IMS:1000080) + checksum CURIE (IMS:1000090/91/92) reused verbatim from RunProvenance — no second hashing pass. contents mapping untouched (additive). Read-back proof in tests/source_files.rs.
-Status: Phase complete — ready for verification
-Last activity: 2026-06-06
+Phase: Milestone v0.6 complete (6/6 phases, 16/16 plans) — archived
+Plan: —
+Status: Awaiting next milestone (run /gsd:new-milestone for v0.7)
+Last activity: 2026-06-06 — Milestone v0.6 completed and archived (tag v0.6); audit PASSED (21/21 reqs, 21/21 integration, 5/5 E2E); 335 tests green
 
 ## v0.6 Roadmap (Phases 16–21)
 

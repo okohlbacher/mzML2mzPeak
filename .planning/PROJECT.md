@@ -8,21 +8,18 @@ A command-line converter that reads imzML mass spectrometry **imaging** (MSI) fi
 
 Convert an arbitrary imzML imaging dataset into a valid imaging mzPeak file **without losing spatial or spectral information** — i.e. every pixel's coordinates and its m/z + intensity data survive the roundtrip.
 
-## Current Milestone: v0.6 Spec conformance — dtypes + CV/geometry/provenance
-
-**Goal:** Bring the converter into mzPeak spec conformance — fix the binary-array dtype mismatch (HUPO-PSI #11) via canonical-width casting, then add the carried-forward CV / geometry / provenance facets.
-
-**Target features:**
-- **Canonical-width dtype conformance (lead, relaxes L1):** forward emits canonical mzPeak data-facet dtypes (`point.mz=f64`, `point.intensity=f32`); records a provenance note + CLI-warns whenever an axis is narrowed; L1 / verify / reverse-roundtrip redefined to "value-equal at canonical width"; all dtype-preservation tests updated. Must land first — it touches the core fidelity contract the geometry facet and the validator depend on.
-- **`cv_list` (F3):** file-level CV declaration (spec Edit 2).
-- **`scan_settings_list` (F4):** authoritative geometry facet; the index block becomes a derived copy (spec Edit 3).
-- **`source_files[]` (F5):** source-file provenance (spec Edit 10).
-- **Optical image auto-discovery + auto-embed:** follow the source imzML's `IMS:1006008` "optical image location" reference and embed the referenced image automatically (no manual `--image`), capturing the descriptive optical CV attributes.
-- **Reverse optical image export:** write embedded optical-image members back out as external files + re-emit `IMS:1006008`, restoring forward↔reverse symmetry. Both optical features operate on the existing v0.5 separate-TIFF-member representation; the F8 `images.parquet` blob + CV-registration redesign stays deferred.
-
-**Locked decisions:** narrowing is recorded (metadata provenance note + CLI warning), not silent; `ConformanceLevel::L1` is redefined from bit-for-bit-at-source-width to value-equal-at-canonical-mzPeak-width (`mz=f64`, `intensity=f32`), so the reverse roundtrip bar becomes value-equal rather than dtype-identical.
-
 ## Current State
+
+**v0.6 shipped (2026-06-06)** — spec conformance: dtypes + CV/geometry/provenance. 6 phases (16–21),
+21/21 requirements, **335 tests green**, audit PASSED (21/21 integration, 5/5 E2E). The binary-array dtype
+collision (HUPO-PSI #11) is resolved: `ConformanceLevel::L1` is redefined from bit-for-bit-at-source-width
+to **value-equal at canonical mzPeak width** (`mz=f64`, `intensity=f32`); the forward data facet always
+casts to canonical dtypes and **records + CLI-warns** any intensity narrowing (never silent). The forward
+archive now also carries a file-level `cv_list`, an authoritative `scan_settings_list` geometry facet (the
+`metadata.imaging` geometry is a derived copy of it), and `file_description.source_files[]` provenance. The
+optical story is complete in both directions: forward **auto-discovery** of `IMS:1006008` references
+(any-format embed, descriptive CV attrs, soft-fail, dedup with `--image`) and **reverse export** of embedded
+images with `IMS:1006008` re-emission — restoring forward↔reverse optical symmetry. Tag `v0.6`.
 
 **v0.5 shipped (2026-06-05)** — forward `index.json` enrichment + optical-image import. The forward
 converter now writes `metadata.imaging` **last** with the imaging flag, derived per-dimension pixel
@@ -45,18 +42,25 @@ Tag `v0.3`; see `MILESTONES.md`.
 
 ## Next Milestone
 
-**v0.6 now scoped** (see Current Milestone above): canonical-width dtype conformance (lead) + `cv_list`
-(F3) + `scan_settings_list` (F4) + `source_files[]` (F5). Still-deferred candidates for v0.7+
-(`NEXT-ROADMAP-DRAFT.md` §B + "Deferred during v0.5"): **forward declared-geometry threading** (IDX-02
-"declared" pixel counts + FID-02 forward-population via imzML `<scanSettings>`), `pixel` facet /
-multi-spectrum-per-pixel (F6), continuous-mode shared-axis + emit (F7), full `image` entity + **reverse
-image export** (F8), L2 conformance (F10), reverse `sourceFileList` copy. Also: file the upstream
-`mzpeak_prototyping` FileEntry-serde issue and drop the vendored fork when fixed.
+Not yet scoped — run `/gsd:new-milestone` for v0.7. Candidates (`NEXT-ROADMAP-DRAFT.md` §B + "Deferred
+during v0.6"): `pixel` facet / multi-spectrum-per-pixel (F6), continuous-mode shared-axis + emit (F7),
+full `image` entity / `images.parquet` blob + CV-governed registration / true co-registration (F8), CV
+governance / canonical IMS URI minting (F9 — resolves the v0.6 `TODO(F9)` placeholders), L2 conformance
+(F10), forward declared-geometry threading beyond parsed (GEO-F), reverse `<sourceFileList>` copy (RSRC),
+perfectly-bijective descriptive optical round-trip. Also: file the upstream `mzpeak_prototyping`
+FileEntry-serde issue and drop the vendored fork when fixed (now load-bearing for Phase-21 reverse).
 
 ## Requirements
 
 ### Validated
 
+- **v0.6 (shipped 2026-06-06) — Spec conformance: dtypes + CV/geometry/provenance.** All 21 v0.6
+  requirements (DTY/CVL/GEO/SRC/OPT/RIMG) delivered + tested (335 tests green). Canonical-width dtype
+  conformance (L1 redefined to value-equal-at-canonical-width; narrowing recorded + CLI-warned);
+  file-level `cv_list`; authoritative `scan_settings_list` geometry facet (index geometry = derived copy);
+  `file_description.source_files[]` provenance (no re-hash); optical auto-discovery via `IMS:1006008`
+  (any-format, soft-fail, dedup) + reverse optical export (forward↔reverse symmetry restored). Audit
+  PASSED (21/21 integration, 5/5 E2E). See `milestones/v0.6-REQUIREMENTS.md` / `milestones/v0.6-MILESTONE-AUDIT.md`.
 - **v0.5 (shipped 2026-06-05) — Index enrichment & optical-image import.** All 13 v0.5 requirements
   (SCH/SPEC/IDX/FID/IMG) delivered + tested (161 lib + integration green). Forward `index.json`
   enriched (written last: imaging flag, derived pixel counts + `pixel_count_source`, MS1 `mz_range`);
@@ -73,19 +77,13 @@ image export** (F8), L2 conformance (F10), reverse `sourceFileList` copy. Also: 
   (ENV/IN/SPA/SCH/OUT/VER/CLI/DAT) delivered and proven on real data (full PXD001283, 34,840
   spectra, masking-aware L1 roundtrip). See `MILESTONES.md` / `milestones/v0.3-REQUIREMENTS.md`.
 
-### Active (v0.6 — Spec conformance)
+### Active (next milestone — not yet scoped)
 
-Scoped 2026-06-05. Detailed REQ-IDs in `.planning/REQUIREMENTS.md`:
-- [ ] Canonical-width dtype conformance: forward casts the data facet to `mz=f64` / `intensity=f32`, records narrowing provenance + CLI warning, L1 redefined to value-equal-at-canonical-width
-- [ ] `cv_list` file-level CV declaration (F3)
-- [ ] `scan_settings_list` authoritative geometry facet; index block becomes derived copy (F4)
-- [ ] `source_files[]` provenance (F5)
-- [ ] Optical image auto-discovery + auto-embed via `IMS:1006008` (OPT)
-- [ ] Reverse optical image export + `IMS:1006008` re-emit (RIMG)
-
-Still-deferred (v0.7+): continuous-mode imzML emission, reverse `<sourceFileList>` copy, third-party
-imaging-mzPeak hardening, `pixel` facet (F6), full `image` entity / `images.parquet` blob + CV
-registration (F8-rich), L2 conformance (F10).
+Run `/gsd:new-milestone` to define v0.7. Carried-forward candidates: `pixel` facet / multi-spectrum-per-pixel
+(F6), continuous-mode shared-axis + emit (F7), full `image` entity / `images.parquet` blob + CV-governed
+registration / true co-registration (F8), CV governance / canonical IMS URI minting (F9), L2 conformance
+(F10), forward declared-geometry threading beyond parsed (GEO-F), reverse `<sourceFileList>` copy (RSRC),
+perfectly-bijective descriptive optical round-trip, third-party imaging-mzPeak hardening.
 
 ### Out of Scope
 
@@ -139,4 +137,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-05 — scoped milestone v0.6 (Spec conformance — dtypes + CV/geometry/provenance)*
+*Last updated: 2026-06-06 — shipped milestone v0.6 (Spec conformance — dtypes + CV/geometry/provenance)*

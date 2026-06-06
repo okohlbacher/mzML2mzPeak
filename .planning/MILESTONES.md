@@ -1,5 +1,34 @@
 # Milestones
 
+## v0.6 Spec conformance — dtypes + CV/geometry/provenance (Shipped: 2026-06-06)
+
+**Phases completed:** 6 phases (16–21), 16 plans, 21 requirements. **335 tests green.** Audit PASSED
+(21/21 reqs, 21/21 integration, 5/5 E2E flows).
+
+**Key accomplishments:**
+
+- **Canonical-width dtype conformance (Phase 16):** resolved the binary-array dtype collision
+  (HUPO-PSI #11). `ConformanceLevel::L1` redefined from bit-for-bit-at-source-width to **value-equal at
+  canonical mzPeak width** (`mz=f64`, `intensity=f32`); the forward data facet always casts to canonical
+  dtypes; intensity narrowing is recorded (DataProcessing provenance note) + CLI-warned, never silent;
+  verify comparators + reverse roundtrip compare at canonical width.
+- **Three spec-conformance facets:** file-level `cv_list` (Phase 17, MS/IMS/UO, shared constant with the
+  reverse `<cvList>`); authoritative `scan_settings_list` geometry facet with the `metadata.imaging`
+  geometry block now a **derived copy** of it (Phase 18, one `ImagingRunMetadata` projected two ways);
+  `file_description.source_files[]` provenance reusing the preflight UUID/checksum with no re-hash (Phase 19).
+- **Optical-image story completed:** forward **auto-discovery** of `IMS:1006008` references (Phase 20,
+  any-format embed via magic-byte TIFF detection, descriptive CV attrs captured, soft-fail on missing,
+  coexist/dedup with `--image`) + **reverse export** of embedded images with `IMS:1006008` re-emission
+  (Phase 21) — restoring forward↔reverse optical symmetry (closes the v0.5 MAJOR-8 degrade).
+- **Anti-drift shared constants** across forward/reverse (CV URIs, geometry IMS accessions, optical
+  `IMS:1006xxx`) — integration-verified with zero drift, zero orphaned/missing/broken cross-phase wiring.
+
+**Tech debt / carried:** the vendored `mzpeak_prototyping` FileEntry-serde fork is now load-bearing for
+Phase-21 reverse image read-back (file upstream + drop when fixed); PXD001283 full-dataset acceptance
+stays `#[ignore]`-gated pending the real 815 MB `.ibd`. Tag `v0.6`.
+
+---
+
 ## v0.5 Index enrichment & optical-image import (Shipped: 2026-06-05)
 
 **Phases completed:** 4 phases, 7 plans, 7 tasks
