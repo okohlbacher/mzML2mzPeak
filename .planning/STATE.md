@@ -4,13 +4,13 @@ milestone: v0.6
 milestone_name: — Spec conformance — dtypes + CV/geometry/provenance
 status: verifying
 stopped_at: Completed 20-03-PLAN.md
-last_updated: "2026-06-06T04:10:48.042Z"
+last_updated: "2026-06-06T04:21:12.876Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 16
-  completed_plans: 14
+  completed_plans: 15
   percent: 83
 ---
 
@@ -102,6 +102,7 @@ matching `schema/*.json`.
 | Phase 20 P02 | ~10 min | 2 tasks | 5 files |
 | Phase 20 P03 | 12m | 2 tasks | 8 files |
 | Phase 21 P01 | 4min | 1 tasks | 4 files |
+| Phase 21 P02 | 8min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -204,7 +205,7 @@ Items acknowledged and carried forward to v0.7+:
 
 ## Session Continuity
 
-Last session: 2026-06-06T04:10:19.847Z
+Last session: 2026-06-06T04:21:05.133Z
 Stopped at: Completed 20-03-PLAN.md
 Resume file: None
 

@@ -124,7 +124,7 @@ Bring the forward converter into mzPeak spec conformance:
   produced `.imzML`. (Depends on the v0.5 vendored `FileEntry`-serde fix that makes `Other` members
   readable.)
 
-- [ ] **RIMG-02**: The reverse `.imzML` re-emits the `IMS:1006008` optical image location (pointing at
+- [x] **RIMG-02**: The reverse `.imzML` re-emits the `IMS:1006008` optical image location (pointing at
   the exported file) plus any preserved descriptive attributes (subject / staining / alignment method),
   restoring forward↔reverse optical symmetry (addresses the v0.5 MAJOR-8 degrade).
 
@@ -191,5 +191,5 @@ GEO×3, SRC×2, OPT×4, RIMG×3). No orphans, no duplicates.
 | OPT-03 | Phase 20 | Complete |
 | OPT-04 | Phase 20 | Complete |
 | RIMG-01 | Phase 21 | Complete |
-| RIMG-02 | Phase 21 | Pending |
+| RIMG-02 | Phase 21 | Complete |
 | RIMG-03 | Phase 21 | Pending |

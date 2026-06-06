@@ -167,7 +167,7 @@ Plans:
 **Plans**: 3 plans
 
 - [x] 21-01-PLAN.md — Reverse image-member export primitive (read ZIP member bytes out, write external file beside .imzML, export-filename path guard, bounded streaming) [RIMG-01]
-- [ ] 21-02-PLAN.md — Shared IMS constants + inverse-fold recovery + <sampleList>/<sample> IMS:1006008 emit wired into reverse convert [RIMG-02]
+- [x] 21-02-PLAN.md — Shared IMS constants + inverse-fold recovery + <sampleList>/<sample> IMS:1006008 emit wired into reverse convert [RIMG-02]
 - [ ] 21-03-PLAN.md — Forward→reverse round-trip + no-op + soft-posture tests + spec doc Edit 7 (affine degrade) [RIMG-03]
 
 **UI hint**: yes
@@ -185,7 +185,7 @@ Plans:
 | 18. scan_settings_list authoritative geometry facet | v0.6 | 3/3 | Complete |  |
 | 19. source_files[] provenance | v0.6 | 1/1 | Complete   | 2026-06-06 |
 | 20. Optical image auto-discovery & auto-embed | v0.6 | 3/3 | Complete   | 2026-06-06 |
-| 21. Reverse optical image export | v0.6 | 1/3 | In Progress|  |
+| 21. Reverse optical image export | v0.6 | 2/3 | In Progress|  |
 
 ## Next
 
