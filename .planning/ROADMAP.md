@@ -130,7 +130,7 @@ Plans:
 **Plans**: 1 plan (1 wave)
 Plans:
 
-- [ ] 19-01-PLAN.md — thread input `.imzML` path + push `source_files[]` (.imzML + .ibd) in write_run_metadata reusing RunProvenance UUID/checksum (no re-hash) + spec Edit 10 + read-back test (SRC-01, SRC-02)
+- [x] 19-01-PLAN.md — thread input `.imzML` path + push `source_files[]` (.imzML + .ibd) in write_run_metadata reusing RunProvenance UUID/checksum (no re-hash) + spec Edit 10 + read-back test (SRC-01, SRC-02)
 
 ### Phase 20: Optical image auto-discovery & auto-embed
 
@@ -173,7 +173,7 @@ Plans:
 | 16. Canonical-width dtype conformance | v0.6 | 4/4 | Complete   | 2026-06-06 |
 | 17. cv_list file-level CV declaration | v0.6 | 2/2 | Complete   | 2026-06-06 |
 | 18. scan_settings_list authoritative geometry facet | v0.6 | 3/3 | Complete |  |
-| 19. source_files[] provenance | v0.6 | 0/1 | Planned | - |
+| 19. source_files[] provenance | v0.6 | 1/1 | Complete   | 2026-06-06 |
 | 20. Optical image auto-discovery & auto-embed | v0.6 | 0/? | Not started | - |
 | 21. Reverse optical image export | v0.6 | 0/? | Not started | - |
 

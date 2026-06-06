@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: — Spec conformance — dtypes + CV/geometry/provenance
 status: verifying
-stopped_at: Completed 18-03-PLAN.md (GEO-03 two-level consistency proof — tests/scan_settings.rs: Level 1 projection derived-copy over declared 3×3/100µm/300µm geometry, Level 2 convert_with(Some) public-seam scan_settings_list emission). Phase 18 complete (3/3).
-last_updated: "2026-06-06T02:47:00.000Z"
+stopped_at: Completed 19-01-PLAN.md (SRC-01/SRC-02 — file_description.source_files[] lists .imzML + .ibd; the .ibd carries the reused UUID/checksum CURIE params, no second hash. Phase 19 complete 1/1).
+last_updated: "2026-06-06T03:02:03.118Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 6
-  completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
-  percent: 38
+  completed_phases: 4
+  total_plans: 10
+  completed_plans: 10
+  percent: 67
 ---
 
 # Project State
@@ -31,8 +31,8 @@ fidelity contract the geometry facet (Phase 18) and the external validator depen
 
 ## Current Position
 
-Phase: 18 — scan_settings_list authoritative geometry facet (complete — 3/3 plans)
-Plan: 18-03 complete (3 of 3); GEO-03 two-level consistency proof in tests/scan_settings.rs (Level 1 declared-geometry projection derived-copy, Level 2 convert_with(Some) public-seam emission). GEO-01/02/03 all complete.
+Phase: 19 — source_files[] provenance (complete — 1/1 plan)
+Plan: 19-01 complete (1 of 1); SRC-01/SRC-02. file_description.source_files[] lists the input .imzML (id="imzml") + sibling .ibd (id="ibd"); the .ibd entry carries the source UUID (IMS:1000080) + checksum CURIE (IMS:1000090/91/92) reused verbatim from RunProvenance — no second hashing pass. contents mapping untouched (additive). Read-back proof in tests/source_files.rs.
 Status: Phase complete — ready for verification
 Last activity: 2026-06-06
 
@@ -80,7 +80,7 @@ matching `schema/*.json`.
 
 **Velocity:**
 
-- Total plans completed (v0.3): 17; (v0.4): 10; (v0.5): 7; (v0.6): 9.
+- Total plans completed (v0.3): 17; (v0.4): 10; (v0.5): 7; (v0.6): 10.
 - Average duration: — min
 - Total execution time: — hours
 
@@ -97,6 +97,7 @@ matching `schema/*.json`.
 | Phase 18 P01 | 12min | 2 tasks | 4 files |
 | Phase 18 P02 | 10min | 2 tasks | 3 files |
 | Phase 18 P03 | 6min | 2 tasks | 1 files |
+| Phase 19 P01 | ~10min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -151,6 +152,7 @@ Key file touchpoints for Phase 16 (from the milestone scoping):
 - [Phase ?]: Plan 18-01: scan_settings_list facet — inline CV-param shape (param.json absent), one settings entry even for all-None geometry, grid_z never emitted, CV names/units copied from reverse emitter (three-places rule)
 - [Phase 18]: Plan 18-02: convert_with gains geometry: Option<&ImagingRunMetadata>; back-compat convert wrapper passes None so existing callers stay byte-identical
 - [Phase 18]: Plan 18-02: metadata.imaging geometry (incl. absolute_offset_um) is a derived copy of the same ImagingRunMetadata that builds scan_settings_list (GEO-02 single source of truth)
+- [Phase 19]: Plan 19-01 (SRC-01/SRC-02): forward archive emits file_description.source_files[] — two entries: the input .imzML (id="imzml") + sibling .ibd (id="ibd", stem+.ibd, path-strings only, no open/hash). The .ibd entry's params carry the source UUID (IMS:1000080) + checksum CURIE (IMS:1000090 MD5 / IMS:1000091 SHA-1 / IMS:1000092 SHA-256) REUSED verbatim from RunProvenance — NO compute_digest on the write path (SRC-02). Threaded via NEW write_run_metadata_from(input_path: Option<&Path>) + convert_with(.., input_path) (mirrors Phase-18 geometry threading); back-compat write_run_metadata / convert() pass None ⇒ no source_files (existing callers byte-identical). A SHARED checksum_curie_param keys MD5/SHA-1/SHA-256 (dashed + un-dashed mzdata "SHA1"/"SHA256") for BOTH the contents mapping and the .ibd source-file params so they can't drift (added SHA-256→IMS:1000092 to the existing keying). source_files is ADDITIVE — contents UUID/checksum/mode untouched. Vendor raw file omitted (SHOULD, unavailable). Read-back proof: tests/source_files.rs (Example_Processed, path-threaded convert_with seam). Spec Edit 10 clarified. Phase 19 complete (1/1).
 - [Phase 18]: Plan 18-03 (GEO-03): tests/scan_settings.rs locks the two-level proof. Level 1 (non-vacuous) parses Synthetic_FullGeometry (declared 3×3/100µm/300µm + IMS:1000413) into BOTH scan_settings_list_from_geometry AND the derived imaging block (reached via the PUBLIC ImagingWriter::write_run_metadata + imaging_metadata() seam, since assemble_imaging_metadata is pub(crate)) and asserts geometry equality + correct IMS accessions + UO:0000017 µm unit (µm terms unit-bearing; grid + scan-pattern unitless). Level 2 converts Example_Processed via convert_with(Some(&geom)) (NOT the convert() wrapper, which passes None and omits the key) and asserts a well-formed scan_settings_list (id + parameters[]) in MzPeakReader.file_index().metadata. Two-fixture split documented (no fixture pairs a declared grid with an .ibd). Phase 18 complete (3/3).
 
 ### Pending Todos
@@ -189,10 +191,10 @@ Items acknowledged and carried forward to v0.7+:
 
 ## Session Continuity
 
-Last session: 2026-06-06T02:47:00.000Z
-Stopped at: Completed 18-03-PLAN.md (GEO-03 two-level consistency proof — Phase 18 complete 3/3).
+Last session: 2026-06-06T03:02:03.118Z
+Stopped at: Completed 19-01-PLAN.md (SRC-01/SRC-02 — source_files[] .imzML + .ibd, reused UUID/checksum, no second hash. Phase 19 complete 1/1).
 Resume file: None
 
 ## Operator Next Steps
 
-- Phase 18 complete (GEO-01/02/03). Next milestone phase: Phase 19 (source_files[] provenance, SRC-01/02) — reuse the integrity preflight's UUID/checksum, no second hash.
+- Phase 19 complete (SRC-01/02). Next milestone phase: Phase 20 (optical image auto-discovery & auto-embed, IMS:1006008, OPT-01..04) — operates on the v0.5 separate-TIFF-member representation.

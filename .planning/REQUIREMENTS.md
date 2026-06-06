@@ -90,10 +90,10 @@ Bring the forward converter into mzPeak spec conformance:
 
 ### Source-file provenance — `source_files[]` (SRC) — Phase 19
 
-- [ ] **SRC-01**: The forward output records `source_files[]` provenance (input `.imzML` + `.ibd`:
+- [x] **SRC-01**: The forward output records `source_files[]` provenance (input `.imzML` + `.ibd`:
   name, location, media type, checksum) per spec Edit 10.
 
-- [ ] **SRC-02**: `source_files[]` reuses the UUID/checksum already computed by the integrity preflight
+- [x] **SRC-02**: `source_files[]` reuses the UUID/checksum already computed by the integrity preflight
   — no second hashing pass over the input.
 
 ### Optical image auto-discovery & auto-embed (OPT) — Phase 20
@@ -184,8 +184,8 @@ GEO×3, SRC×2, OPT×4, RIMG×3). No orphans, no duplicates.
 | GEO-01 | Phase 18 | Complete |
 | GEO-02 | Phase 18 | Complete |
 | GEO-03 | Phase 18 | Complete |
-| SRC-01 | Phase 19 | Pending |
-| SRC-02 | Phase 19 | Pending |
+| SRC-01 | Phase 19 | Complete |
+| SRC-02 | Phase 19 | Complete |
 | OPT-01 | Phase 20 | Pending |
 | OPT-02 | Phase 20 | Pending |
 | OPT-03 | Phase 20 | Pending |
