@@ -153,14 +153,28 @@ pub fn to_mzdata_canonical(
     //     through to `auxiliary_arrays` (DAT-01).
     let narrowing = CastNarrowing {
         // m/z NEVER narrows (only widened or equal). intensity narrows iff its source is F64.
+        // (dtype is permutation-invariant, so this is read from the source axis directly.)
         intensity_f64_to_f32: matches!(s.intensity, NumArray::F64(_)),
     };
+
+    // (SORT-ON-WRITE) Guarantee the primary m/z axis is ascending before it reaches the writer
+    // (backlog: HUPO-PSI/mzPeak#23). mzPeak's `point.mz` column is declared `sorting_rank: 0`
+    // (ascending), and its Parquet range index + chunked-layout binning REQUIRE a sorted main axis
+    // — declaring `0` on an unsorted column is a conformance defect AND silently breaks m/z range
+    // slices downstream. So we sort the (m/z, intensity) pair by ascending m/z here and feed the
+    // sorted pair to BOTH facets. This is a no-op (no reorder, just an O(n) check) for the common
+    // case — continuous imaging shares one already-ascending axis, and instruments emit ascending
+    // m/z — so real data is byte-unchanged. It does NOT lose data (the (m/z,intensity) multiset is
+    // preserved); it only reorders, so the value-equal roundtrip still holds. This intentionally
+    // relaxes the former "no-reorder / bit-for-bit source order" stance (see L1 contract notes).
+    let (mz, intensity) = sort_mz_intensity(&s.mz, &s.intensity);
+
     let mut arrays = BinaryArrayMap::new();
-    arrays.add(num_to_dataarray_f64(ArrayType::MZArray, Unit::MZ, &s.mz)?);
+    arrays.add(num_to_dataarray_f64(ArrayType::MZArray, Unit::MZ, &mz)?);
     arrays.add(num_to_dataarray_f32(
         ArrayType::IntensityArray,
         Unit::DetectorCounts,
-        &s.intensity,
+        &intensity,
     )?);
 
     // (2) description: id + ms_level carried verbatim; signal_continuity from Representation
@@ -223,7 +237,7 @@ pub fn to_mzdata_canonical(
     // `(description, Option<arrays>, Option<peaks>, Option<deconvoluted_peaks>)`
     // (spectrum_types.rs:1063).
     let peaks = match s.representation {
-        Representation::Centroid => Some(centroid_peak_set(s)),
+        Representation::Centroid => Some(centroid_peak_set(&mz, &intensity)),
         Representation::Profile | Representation::Unknown => None,
     };
     Ok((
@@ -241,28 +255,23 @@ fn first_non_finite_mz(arr: &NumArray) -> Option<usize> {
     }
 }
 
-/// Build a `CentroidPeak` set from a centroid spectrum's m/z + intensity axes, pairing the
-/// `i`-th m/z with the `i`-th intensity. m/z is read at its source width (via the non-coercing
-/// `NumArray` accessors — `as_f64` only widens F32, never narrows F64) and intensity is taken
-/// at f32 to match the `CentroidPeak` shape (the reference peaks facet stores intensity as
-/// Float32). The peak `index` is the point's position in the spectrum.
+/// Build a `CentroidPeak` set from a centroid spectrum's (already m/z-sorted) m/z + intensity
+/// axes, pairing the `i`-th m/z with the `i`-th intensity. The inputs are the ascending pair
+/// produced by [`sort_mz_intensity`] in `to_mzdata_canonical`, so the peaks facet shares the data
+/// facet's ordering. m/z is read at its source width (via the non-coercing `NumArray` accessors —
+/// `as_f64` only widens F32, never narrows F64) and intensity is taken at f32 to match the
+/// `CentroidPeak` shape (the reference peaks facet stores intensity as Float32). The peak `index`
+/// is the point's position in the (sorted) spectrum.
 ///
-/// Uses `PeakSetVec::wrap` (NOT `::new`) deliberately (CR-01): `PeakSetVec::new`
-/// (mzpeaks-1.0.9/src/peak_set.rs:596) calls `_sort` (peak_set.rs:635-636), which
-/// `sort_by(|a, b| a.partial_cmp(b).unwrap())`s the peaks by m/z. That would (a) reorder the
-/// peaks facet relative to the source m/z↔intensity pairing when the source axis is not already
-/// ascending, breaking the read↔write order symmetry, and (b) panic on a NaN m/z because
-/// `partial_cmp` returns `None`. `::wrap` (peak_set.rs:628) preserves the source order
-/// verbatim and never compares values, so the i-th peak stays paired with the i-th source
-/// point. The authoritative raw m/z + intensity arrays are also attached at source dtype in
-/// `to_mzdata`, so the data facet remains the bit-for-bit source of truth (L1) regardless of
-/// how the peaks facet is later consumed. Non-finite m/z is rejected upstream in `to_mzdata`
-/// (CR-02), so this function never sees a NaN.
-fn centroid_peak_set(s: &ImagingSpectrum) -> mzpeaks::PeakSet {
+/// Uses `PeakSetVec::wrap` (NOT `::new`): the input is already ascending, so wrapping preserves
+/// that order without a second sort, and `::wrap` never calls `partial_cmp` (so it cannot panic on
+/// a value the way `::new`'s internal `_sort` would). Non-finite m/z is rejected upstream in
+/// `to_mzdata` (CR-02), so this function never sees a NaN.
+fn centroid_peak_set(mz: &NumArray, intensity: &NumArray) -> mzpeaks::PeakSet {
     use mzpeaks::{CentroidPeak, peak_set::PeakSetVec};
 
-    let mzs = s.mz.as_f64();
-    let intensities = intensity_as_f32(&s.intensity);
+    let mzs = mz.as_f64();
+    let intensities = intensity_as_f32(intensity);
     let peaks: Vec<CentroidPeak> = mzs
         .iter()
         .zip(intensities.iter())
@@ -270,6 +279,39 @@ fn centroid_peak_set(s: &ImagingSpectrum) -> mzpeaks::PeakSet {
         .map(|(i, (&mz, &inten))| CentroidPeak::new(mz, inten, i as u32))
         .collect();
     PeakSetVec::wrap(peaks)
+}
+
+/// Sort the `(m/z, intensity)` pair by ascending m/z, returning owned [`NumArray`]s (dtype
+/// preserved). Returns clones unchanged — NO reorder — when m/z is already non-decreasing, which
+/// is the common case (continuous imaging shares one ascending axis; instruments emit ascending
+/// m/z), so real data is byte-identical to the pre-sort behaviour. A genuinely unsorted axis is
+/// stably reordered so the writer's `point.mz` column (`sorting_rank: 0`) is honestly ascending.
+/// Non-finite m/z (only possible on the Profile path — Centroid NaN is rejected in `to_mzdata`)
+/// orders via `partial_cmp(..).unwrap_or(Equal)`, never panicking.
+fn sort_mz_intensity(mz: &NumArray, intensity: &NumArray) -> (NumArray, NumArray) {
+    if numarray_non_decreasing(mz) {
+        return (mz.clone(), intensity.clone());
+    }
+    let mzf = mz.as_f64();
+    let mut perm: Vec<usize> = (0..mzf.len()).collect();
+    perm.sort_by(|&a, &b| mzf[a].partial_cmp(&mzf[b]).unwrap_or(std::cmp::Ordering::Equal));
+    (permute_numarray(mz, &perm), permute_numarray(intensity, &perm))
+}
+
+/// True iff the m/z axis is already non-decreasing (so no reorder is needed).
+fn numarray_non_decreasing(arr: &NumArray) -> bool {
+    match arr {
+        NumArray::F32(v) => v.is_sorted(),
+        NumArray::F64(v) => v.is_sorted(),
+    }
+}
+
+/// Reorder a [`NumArray`] by `perm` (gather: result[i] = arr[perm[i]]), preserving dtype.
+fn permute_numarray(arr: &NumArray, perm: &[usize]) -> NumArray {
+    match arr {
+        NumArray::F32(v) => NumArray::F32(perm.iter().map(|&i| v[i]).collect()),
+        NumArray::F64(v) => NumArray::F64(perm.iter().map(|&i| v[i]).collect()),
+    }
 }
 
 /// Intensity values as `f32` (the `CentroidPeak` intensity width). An `F32` axis is returned
@@ -587,17 +629,18 @@ mod tests {
     }
 
     #[test]
-    fn centroid_peak_set_preserves_source_order_when_unsorted() {
-        // CR-01 regression: an UNSORTED centroid m/z axis must NOT be reordered. The peaks
-        // facet must keep the i-th m/z paired with the i-th intensity (source order), and the
-        // authoritative raw arrays must round-trip the source values+order bit-for-bit.
+    fn unsorted_mz_is_sorted_ascending_on_write_with_intensity_carried() {
+        // SORT-ON-WRITE (HUPO-PSI/mzPeak#23): an UNSORTED source m/z axis is reordered ASCENDING
+        // before it reaches the writer, so the declared `sorting_rank: 0` is honest. The (m/z,
+        // intensity) pairing is preserved through the permutation (no data loss, just reorder) in
+        // BOTH the peaks facet and the authoritative raw data arrays.
         use mzpeaks::prelude::*;
 
         let s = sample(
             1,
             1,
             None,
-            // Deliberately descending / non-monotonic m/z — `PeakSetVec::new` would sort this.
+            // Deliberately descending / non-monotonic m/z.
             NumArray::F64(vec![300.0, 100.0, 200.0]),
             NumArray::F32(vec![9.0, 1.0, 4.0]),
             Representation::Centroid,
@@ -605,25 +648,51 @@ mod tests {
         );
         let spec = to_mzdata(&s).expect("centroid reconstruct succeeds");
 
-        // (a) The peak set keeps source order: peak[i].mz == source mz[i] (no re-sort).
+        // (a) The peak set is ascending in m/z, with each intensity carried by the permutation.
         let peaks = spec.peaks.as_ref().expect("centroid peak set attached");
         let recovered_mz: Vec<f64> = peaks.iter().map(|p| p.mz()).collect();
         assert_eq!(
             recovered_mz,
-            vec![300.0, 100.0, 200.0],
-            "centroid peak set preserves source m/z order (PeakSetVec::wrap, not ::new)"
+            vec![100.0, 200.0, 300.0],
+            "centroid peaks sorted ascending in m/z (sort-on-write)"
         );
         let recovered_inten: Vec<f32> = peaks.iter().map(|p| p.intensity()).collect();
         assert_eq!(
             recovered_inten,
-            vec![9.0_f32, 1.0, 4.0],
-            "i-th intensity stays paired with i-th m/z (no reorder)"
+            vec![1.0_f32, 4.0, 9.0],
+            "each intensity stays paired with its m/z through the sort permutation"
         );
 
-        // (b) The authoritative raw arrays carry the source values+order verbatim (L1).
+        // (b) The authoritative raw arrays carry the SAME sorted order (data ⇄ peaks consistent).
         let arrays = spec.raw_arrays().expect("raw arrays");
         let mz = arrays.get(&ArrayType::MZArray).expect("mz").to_f64().expect("decode");
-        assert_eq!(mz.as_ref(), &[300.0_f64, 100.0, 200.0], "raw m/z order preserved");
+        assert_eq!(mz.as_ref(), &[100.0_f64, 200.0, 300.0], "raw m/z sorted ascending");
+        let inten = arrays
+            .get(&ArrayType::IntensityArray)
+            .expect("intensity")
+            .to_f32()
+            .expect("decode");
+        assert_eq!(inten.as_ref(), &[1.0_f32, 4.0, 9.0], "raw intensity carried by the permutation");
+    }
+
+    #[test]
+    fn already_sorted_mz_is_not_reordered() {
+        // Fast path: an already-ascending axis must be passed through unchanged (no spurious work,
+        // byte-identical to pre-sort behaviour on real data).
+        use mzpeaks::prelude::*;
+        let s = sample(
+            1,
+            1,
+            None,
+            NumArray::F64(vec![100.0, 200.0, 300.0]),
+            NumArray::F32(vec![1.0, 4.0, 9.0]),
+            Representation::Centroid,
+            1,
+        );
+        let spec = to_mzdata(&s).expect("reconstruct succeeds");
+        let arrays = spec.raw_arrays().expect("raw arrays");
+        let mz = arrays.get(&ArrayType::MZArray).expect("mz").to_f64().expect("decode");
+        assert_eq!(mz.as_ref(), &[100.0_f64, 200.0, 300.0], "sorted axis unchanged");
     }
 
     #[test]
