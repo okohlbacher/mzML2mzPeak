@@ -69,28 +69,38 @@ file the upstream `mzpeak_prototyping` FileEntry-serde issue and drop the vendor
 
 ## Backlog
 
-### Phase 999.1: Upstream the 4 vendored mzpeak_prototyping patches (BACKLOG)
+### Phase 999.1: Drop the last vendored mzpeak_prototyping patch (#1 serde) once PR #20 merges (BACKLOG)
 
-**Goal:** Get the four robustness/correctness fixes our `vendor/mzpeak_prototyping` fork carries
-accepted upstream into `HUPO-PSI/mzPeak`, then drop the fork + the
-`[patch."https://github.com/HUPO-PSI/mzPeak"]` redirect in `Cargo.toml` and depend on the upstream crate
-again. The fork is **load-bearing** (Phase-21 reverse image read-back depends on patch #1), so the fork
-can only be dropped once (at minimum) patch #1 lands upstream.
+**Goal:** Fully de-vendor — delete `vendor/mzpeak_prototyping` + the
+`[patch."https://github.com/HUPO-PSI/mzPeak"]` redirect and depend on upstream `HUPO-PSI/mzPeak`
+directly. After the 2026-06-06 migration the fork is down to **ONE** patch (#1 serde symmetry),
+which is **load-bearing** for optical-image read-back, so the fork drops only when PR #20 merges.
 
-**STATUS — PRs FILED (2026-06-06):** all four patches are open as separate single-commit PRs against
-`HUPO-PSI/mzPeak`, pushed from fork `okohlbacher/mzPeak`:
-- #1 serde symmetry → https://github.com/HUPO-PSI/mzPeak/pull/20
-- #2 reader null-index guard → https://github.com/HUPO-PSI/mzPeak/pull/21
-- #3 ms_level-0 default → https://github.com/HUPO-PSI/mzPeak/pull/22
-- #4 data-derived `sorting_rank` → https://github.com/HUPO-PSI/mzPeak/pull/23
+**STATUS — fork reduced 4 → 1 (2026-06-06 migration, commit `f10d97f`):** base bumped
+`d1aaaf84 → 8435967` (upstream HEAD "fix compatibility with imzML core feature set"), and the
+**vendored mzdata fork was DELETED** (mzdata 0.64.0 published with `count_chromatograms` upstream).
+Per-PR outcome:
+- **#1 serde symmetry — [PR #20](https://github.com/HUPO-PSI/mzPeak/pull/20) — STILL OPEN & STILL VENDORED.**
+  8435967 keeps the asymmetric `derive(Serialize)+DeserializeFromStr`; empirically verified
+  2026-06-06 (stock file_index.rs → `non_tiff_embeds_verbatim` fails: metadata.imaging dropped).
+  This is the ONLY remaining vendored patch and the ONLY PR that still needs to merge.
+- **#2 reader null-guard — [PR #21](https://github.com/HUPO-PSI/mzPeak/pull/21) — NOW STOCK in 8435967**
+  (maintainer fixed it the same way). Vendored patch dropped. → **close PR #21 as already-fixed-upstream.**
+- **#3 ms_level-0 default — [PR #22](https://github.com/HUPO-PSI/mzPeak/pull/22) — NOW STOCK in 8435967**
+  (same fix), AND we added the converter-side fix (reverse writer emits MS1 at ms_level 0, commit
+  `47b7b49`). Vendored patch dropped. → **close PR #22 (superseded; maintainer couldn't reproduce).**
+- **#4 sorting_rank — [PR #23](https://github.com/HUPO-PSI/mzPeak/pull/23) — SUPERSEDED by sort-on-write**
+  (#23 maintainer feedback: declaring null breaks the range index + chunking). We now always sort m/z
+  ascending on write (commits `1c65250`, `472835a`), so the stock writer's `sorting_rank: 0` is honest.
+  Vendored patch dropped. → **close PR #23 in favour of the converter-side sort.**
 
-**ONGOING ACTION — poll for acceptance, then de-vendor:** check these four PRs from time to time
-(`gh pr view 20 21 22 23 --repo HUPO-PSI/mzPeak`). As each merges, drop the corresponding vendored patch
-and pull the upstream original. Once **all four** are merged (or any unmerged ones are confirmed obsolete):
-bump the `mzpeak_prototyping` git rev to the merge commit, delete `vendor/mzpeak_prototyping`, remove the
-`[patch."https://github.com/HUPO-PSI/mzPeak"]` block from `Cargo.toml`, and re-run the full test + e2e
-corpus suite to confirm the un-forked build is green. (If only a subset merges, keep a thinner fork with
-just the unmerged patches and document which remain.)
+**ONGOING ACTION:** poll PR #20 (`gh pr view 20 --repo HUPO-PSI/mzPeak`). When it merges: bump the
+`mzpeak_prototyping` rev to the merge commit, delete `vendor/mzpeak_prototyping`, remove the
+`[patch."https://github.com/HUPO-PSI/mzPeak"]` block, and re-run full test + e2e to confirm the
+fully-un-forked build is green. Also close PRs #21/#22/#23 with the notes above (or fold their notes
+into PR #20). Optionally consider the maintainer's `#[serde(untagged)]` suggestion for #20.
+
+<details><summary>Pre-migration history (4-patch fork on d1aaaf84) — superseded</summary>
 
 **State of the fork (analysed 2026-06-06):** our fork is based on upstream rev `d1aaaf84`; upstream HEAD
 `4843d88` is only ONE **docs-only** commit ahead (the `ion_mobility → ion_mobility_value` doc rename — our
@@ -132,6 +142,8 @@ distinct fixes, not one. All three are small, self-contained, well-commented (go
 default) logs the `"defaulting to MS1 spectrum (MS:1000579)"` warning **once per spectrum** — a centroid
 imzML with no spectrum-type cvParam (e.g. the Zenodo DESI sections, ~17,820 spectra each) emits ~17,820
 identical lines. Make it **log once** (rate-limit / first-occurrence flag) when upstreaming patch #3.
+
+</details>
 
 **Requirements:** TBD
 **Plans:** 0 plans
