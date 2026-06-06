@@ -90,7 +90,11 @@ Plans:
   2. A read-back/validation check proves the declared `cv_list` is consistent with the accessions actually used — no referenced CV is left undeclared and no declared CV is spurious.
   3. The change is reflected in all three places: implementation (`src/…`), `docs/mzpeak-imaging-spec-suggestions.md` (Edit 2), and the matching `schema/*.json`.
 
-**Plans**: TBD
+**Plans**: 2 plans (2 waves)
+Plans:
+
+- [ ] 17-01-PLAN.md — schema/cv_list.json + CvEntry + shared MS/IMS/UO constant + cv_list emission via add_index_metadata + spec-doc CV List subsection (CVL-01)
+- [ ] 17-02-PLAN.md — CVL-02 read-back consistency test: declared CVs == referenced CVs {MS, IMS, UO} (CVL-02)
 
 ### Phase 18: scan_settings_list authoritative geometry facet
 
