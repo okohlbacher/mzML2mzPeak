@@ -147,9 +147,47 @@
 > overlay is approximate and a writer _SHOULD_ emit a WARNING.
 >
 > **Converter behaviour.** On `imzML → mzPeak` conversion, optical TIFFs supplied to the converter
-> are imported as above. **Reverse (`mzPeak → imzML`) image export is OUT OF SCOPE for v0.5** — the
-> reverse path drops embedded optical images (a documented degrade; the spectral L1 round-trip bar is
-> unaffected).
+> are imported as above.
+>
+> **[Phase 21 / RIMG] Reverse (`mzPeak → imzML`) optical image export.** As of v0.6 the reverse path
+> NO LONGER drops embedded optical images (the v0.5 degrade is closed). On `mzPeak → imzML` conversion
+> the converter reads each embedded `images/image_NNNN.<ext>` member back out of the archive and writes
+> it as an **external file beside the produced `.imzML`**, named from the `images[]` entry's
+> `source_name` (sanitized + path-guarded — any path separator in the recorded name is rejected, so a
+> crafted `source_name` cannot escape the output directory). For each exported image the reverse writer
+> re-emits a `<sampleList>/<sample>` carrying **`IMS:1006008`** "optical image location" (value = the
+> exported file's basename) plus the descriptive cvParams recovered by **inverting the forward
+> [Phase 20] fold**: `IMS:1006015` staining (from `modality`), `IMS:1006017` alignment method (from the
+> `modality` `"aligned: <method>"` suffix), `IMS:1006011`/`IMS:1006012` subject and `IMS:1006013`
+> morphology (from `derived_subtype`). The shared IMS accession/name constants drive BOTH the forward
+> parse and the reverse emit, so the two directions cannot drift.
+>
+> **[Phase 21 / RIMG-03] Documented affine degrade.** The reverse path does **NOT** re-emit the
+> mzPeak-only `affine` display hint as any imzML CV param, because **imzML has no CV transform /
+> registration term** (`IMS:1006017` names an alignment *method* as free text only — see
+> `knowledge/cv` "NO registration transform term"). The affine is therefore **lost on reverse** by
+> design; the alignment *method* survives (free-text via `IMS:1006017`) but the numeric matrix does
+> not. This is the accepted v0.6 degrade — true co-registration round-trip is deferred (F8/F9).
+>
+> **[Phase 21 / RIMG-03] No-op + soft posture.** An archive with **no embedded images** (`images`
+> absent/empty) reverses as a **clean no-op**: NO `<sampleList>` and NO `IMS:1006008` are emitted, and
+> the spectral output is unchanged. A **missing/unreadable image member** (or a sanitize-rejected
+> `source_name`, or a corrupt-archive open) is **non-fatal**: the reverse logs a WARNING, emits no
+> `<sample>` for that image, and the **spectral reverse still succeeds** (`.imzML`/`.ibd` produced and
+> re-readable) — optical images are auxiliary and never fail the spectral L1 reverse.
+>
+> **[Phase 21 / RIMG-02] Best-effort descriptive fidelity.** The descriptive round-trip is
+> **BEST-EFFORT**, not perfectly bijective: Phase 20 folded structured CV attrs into the two free-text
+> `ImageEntry` fields (`modality`, `derived_subtype`), so an arbitrary free-text value that itself
+> contains a fold separator (`"; "`, `"aligned: "`, `"<subject>: "`) is not guaranteed to invert. Clean
+> values (e.g. `H&E` staining, `manual` alignment, `of-analysed-sample` subject, `tumor` morphology)
+> round-trip exactly; pathological values may be mis-split. Inversion never errors — an unparseable
+> field simply leaves its target attribute unset.
+>
+> **Three-places rule (reduced).** The reverse output is **imzML XML governed by the imzML spec**, not
+> a mzPeak Parquet/JSON entity — so RIMG adds **no new `schema/*.json`**. The reverse optical behaviour
+> lives in TWO places only: the implementation (`src/reverse/{convert,image_export,optical_fold,imzml_writer}.rs`
+> + the shared optical CV constants in `src/schema/optical.rs`) and this spec note.
 >
 > **[Phase 20] Auto-discovery + any-format embed.** Beyond explicit converter `--image` inputs, the
 > forward converter now **auto-discovers** optical images from the source imzML: every `IMS:1006008`
