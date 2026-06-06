@@ -71,11 +71,26 @@ file the upstream `mzpeak_prototyping` FileEntry-serde issue and drop the vendor
 
 ### Phase 999.1: Upstream the 4 vendored mzpeak_prototyping patches (BACKLOG)
 
-**Goal:** File PR(s) against `HUPO-PSI/mzPeak` for the four robustness/correctness fixes our
-`vendor/mzpeak_prototyping` fork carries, then drop the fork + the
-`[patch."https://github.com/HUPO-PSI/mzPeak"]` redirect in `Cargo.toml`. The fork is **load-bearing**
-(Phase-21 reverse image read-back depends on patch #1), so the fork can only be dropped once patch #1
-lands upstream.
+**Goal:** Get the four robustness/correctness fixes our `vendor/mzpeak_prototyping` fork carries
+accepted upstream into `HUPO-PSI/mzPeak`, then drop the fork + the
+`[patch."https://github.com/HUPO-PSI/mzPeak"]` redirect in `Cargo.toml` and depend on the upstream crate
+again. The fork is **load-bearing** (Phase-21 reverse image read-back depends on patch #1), so the fork
+can only be dropped once (at minimum) patch #1 lands upstream.
+
+**STATUS — PRs FILED (2026-06-06):** all four patches are open as separate single-commit PRs against
+`HUPO-PSI/mzPeak`, pushed from fork `okohlbacher/mzPeak`:
+- #1 serde symmetry → https://github.com/HUPO-PSI/mzPeak/pull/20
+- #2 reader null-index guard → https://github.com/HUPO-PSI/mzPeak/pull/21
+- #3 ms_level-0 default → https://github.com/HUPO-PSI/mzPeak/pull/22
+- #4 data-derived `sorting_rank` → https://github.com/HUPO-PSI/mzPeak/pull/23
+
+**ONGOING ACTION — poll for acceptance, then de-vendor:** check these four PRs from time to time
+(`gh pr view 20 21 22 23 --repo HUPO-PSI/mzPeak`). As each merges, drop the corresponding vendored patch
+and pull the upstream original. Once **all four** are merged (or any unmerged ones are confirmed obsolete):
+bump the `mzpeak_prototyping` git rev to the merge commit, delete `vendor/mzpeak_prototyping`, remove the
+`[patch."https://github.com/HUPO-PSI/mzPeak"]` block from `Cargo.toml`, and re-run the full test + e2e
+corpus suite to confirm the un-forked build is green. (If only a subset merges, keep a thinner fork with
+just the unmerged patches and document which remain.)
 
 **State of the fork (analysed 2026-06-06):** our fork is based on upstream rev `d1aaaf84`; upstream HEAD
 `4843d88` is only ONE **docs-only** commit ahead (the `ion_mobility → ion_mobility_value` doc rename — our
