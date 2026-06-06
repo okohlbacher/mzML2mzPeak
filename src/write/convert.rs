@@ -25,11 +25,41 @@ use std::path::{Path, PathBuf};
 use mzdata::prelude::SpectrumLike;
 
 use crate::read::ImagingReader;
-use crate::schema::metadata::PixelCountSource;
-use crate::write::image::{build_image_entry, full_extent_affine, read_tiff_dimensions, sha256_and_size};
+use crate::schema::metadata::{ImageEntry, PixelCountSource};
+use crate::schema::optical::OpticalImageRef;
+use crate::write::image::{
+    build_image_entry, full_extent_affine, is_tiff, media_type_for_extension, read_tiff_dimensions,
+    sha256_and_size,
+};
 use crate::write::spectrum::{to_mzdata_canonical, CastNarrowing};
 use crate::write::writer::IndexAccumulator;
 use crate::write::{ImagingWriter, WriteError, to_mzdata};
+
+use mzpeak_prototyping::archive::ZipArchiveWriter;
+use std::fs::File;
+
+/// Fail mode for the per-image embed helper ([`embed_one_image`]) — the ONLY asymmetry Phase 20
+/// introduces between an explicit `--image` and an auto-discovered `IMS:1006008` image (OPT-03).
+///
+/// The FORMAT handling is identical for both modes (TIFF → first-IFD dims; non-TIFF → verbatim
+/// bytes + media-type-by-extension). What differs is what happens on a defect (missing/unreadable
+/// file, a path-separator in the derived source_name):
+///
+///   * [`EmbedMode::Strict`] — every defect returns `Err(WriteError)`, ABORTING the conversion.
+///     This is the unchanged v0.5 `--image` contract: a user who explicitly names a path expects a
+///     hard failure if that path is bad (regardless of image format). Used for `--image` entries.
+///   * [`EmbedMode::Soft`] — every defect logs a `warn` and returns `Ok(None)` so the caller SKIPS
+///     that one image and CONTINUES; the spectral output is never aborted (OPT-03, auxiliary data).
+///     Used for auto-discovered `IMS:1006008` images. A path-escape rejection (surfaced by the
+///     caller before it reaches here) must still produce a DISTINCT warning — soft-fail never
+///     silently masks a traversal attempt (T-20-01).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EmbedMode {
+    /// Hard-fail on any defect (the v0.5 `--image` contract).
+    Strict,
+    /// Warn + skip on any defect, conversion continues (auto-discovered images, OPT-03).
+    Soft,
+}
 
 /// The outcome of a forward conversion, carrying the per-axis canonical-cast narrowing
 /// determination (Phase 16, DTY-04) so the CLI can surface a warning.
@@ -97,12 +127,24 @@ pub fn convert_with(
     input_path: Option<&Path>,
 ) -> Result<ConversionOutcome, WriteError> {
     // (0) PRE-FLIGHT image validation (WR-01): fail BEFORE any output file is created, so a
-    //     bad/missing/non-TIFF/separator-named image passed anywhere in the --image list never
-    //     strands a truncated/corrupt `.mzpeak` on disk. `ImagingWriter::new` below is the first
-    //     `File::create`; everything here runs before it, with the ZIP untouched. For each image
-    //     we (a) reject any path-separator in the derived source_name (T-15-06 / V5) and (b) read
-    //     the TIFF dimensions (IFD-only, bounded memory) to prove the file exists + is a readable
-    //     TIFF. The per-image import loop below repeats the cheap IFD read at the terminal seam.
+    //     bad/missing/separator-named --image passed anywhere in the --image list never strands a
+    //     truncated/corrupt `.mzpeak` on disk. `ImagingWriter::new` below is the first
+    //     `File::create`; everything here runs before it, with the ZIP untouched. For each --image
+    //     we (a) reject any path-separator in the derived source_name (T-15-06 / V5) and (b) prove
+    //     the file EXISTS + is READABLE.
+    //
+    //     GENERALIZED (Phase 20 / OPT-01, Option B): this loop NO LONGER TIFF-locks `--image`. The
+    //     old v0.5 code called `read_tiff_dimensions(path)?` UNCONDITIONALLY, which hard-failed any
+    //     non-TIFF the user explicitly passed (a .png/.svs/.jpg). The existence/readability proof
+    //     is now carried by `is_tiff(path)` (it opens + reads the first 4 magic bytes, returning
+    //     `Err(ImageDecode)` on a missing/unreadable file — propagated below). If `is_tiff` returns
+    //     `Ok(true)` we STILL read the first IFD via `read_tiff_dimensions` (proving the TIFF is a
+    //     well-formed, decodable TIFF, as v0.5 did); if `Ok(false)` we ACCEPT the path verbatim
+    //     (dims omitted, media_type by extension at the embed seam) — format is NOT an error. The
+    //     ONLY asymmetry the phase introduces between `--image` and auto-discovered is the FAIL
+    //     MODE (`--image` = Strict hard-fail here, auto = Soft warn+continue), NOT the format: BOTH
+    //     accept any format. This preserves `--image`'s hard-fail on missing/unreadable/separator
+    //     (CONTEXT scope fence) while lifting the v0.5 TIFF-only restriction.
     for path in image_paths {
         // The derived source_name is descriptive-only, but it is attacker-influenced — reject any
         // residual path separator here too, so the failure surfaces before output exists (matches
@@ -120,9 +162,11 @@ pub fn convert_with(
                 detail: format!("derived source_name {source_name:?} contains a path separator"),
             });
         }
-        // Prove the file is a readable TIFF (IFD-only, no pixel decode) before any output is
-        // written. A bad path fails fast with the typed WriteError::ImageDecode here.
-        let _ = read_tiff_dimensions(path)?;
+        // Existence/readability proof (is_tiff opens + reads 4 bytes → Err on missing/unreadable),
+        // then a TIFF gets its IFD validated too. A non-TIFF is accepted (format is not an error).
+        if is_tiff(path)? {
+            let _ = read_tiff_dimensions(path)?;
+        }
     }
 
     // (1) SAMPLE the data-facet dtype from the FIRST spectrum, then build the writer with a
@@ -269,55 +313,18 @@ pub fn convert_with(
         }
 
         let mut images = Vec::with_capacity(image_paths.len());
-        for (i, path) in image_paths.iter().enumerate() {
-            // The derived source_name is descriptive-only, but it is attacker-influenced — reject
-            // any residual path separator so a crafted basename can never imply a path (T-15-06 /
-            // V5). The ARCHIVE name is the fixed ordinal below, never the source name.
-            let source_name = path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .ok_or_else(|| WriteError::ImageDecode {
-                    path: path.display().to_string(),
-                    detail: "image path has no UTF-8 file name component".to_string(),
-                })?
-                .to_string();
-            if source_name.contains('/') || source_name.contains('\\') {
-                return Err(WriteError::ImageDecode {
-                    path: path.display().to_string(),
-                    detail: format!(
-                        "derived source_name {source_name:?} contains a path separator"
-                    ),
-                });
+        // A running ordinal advanced ONLY by an embed that actually wrote a member, so a skipped
+        // soft image leaves no gap (ordinals are dense + contiguous over SUCCESSFUL embeds).
+        let mut ordinal: usize = 0;
+        for path in image_paths.iter() {
+            // Explicit --image entries are STRICT (hard-fail, the v0.5 contract — CONTEXT scope
+            // fence) and carry NO descriptive attrs.
+            if let Some(entry) =
+                embed_one_image(&mut zip, path, ordinal, nx, ny, None, EmbedMode::Strict)?
+            {
+                images.push(entry);
+                ordinal += 1;
             }
-
-            // Read W/H from the first IFD only (no pixel decode — bounded memory, T-15-09).
-            let (w, h) = read_tiff_dimensions(path)?;
-
-            // Deterministic 0-based, 4-digit ordinal — NEVER attacker-controlled (T-15-06).
-            let name = format!("images/image_{i:04}.tiff");
-
-            // Stream the TIFF bytes into the ZIP as an `Other` member (64 KiB chunks inside
-            // add_file_from_read — never a whole-file load, never a raw zip write; T-15-07/09).
-            let mut f = std::fs::File::open(path)?;
-            zip.add_file_from_read(&mut f, Some(&name), None)?;
-
-            // SHA-256 + exact byte size over a SECOND bounded streamed pass (IMG-03, T-15-08).
-            let (sha256, size) = sha256_and_size(path)?;
-
-            let matrix = full_extent_affine(nx, ny, w, h);
-            // v0.5 explicit --image path is TIFF-only (read_tiff_dimensions above hard-fails on
-            // non-TIFF), so media_type stays "image/tiff" here. Plan 02 generalizes this seam to
-            // the auto-discovered, format-agnostic embed (media_type_for_extension + is_tiff).
-            images.push(build_image_entry(
-                name,
-                source_name,
-                "image/tiff".to_string(),
-                w,
-                h,
-                sha256,
-                size,
-                matrix,
-            ));
         }
 
         // Set images[] ONLY when ≥1 image was imported, so a no-image run omits the key entirely.
@@ -357,9 +364,375 @@ pub fn convert_with(
     Ok(ConversionOutcome { narrowing })
 }
 
+/// Embed ONE optical image (any format) into the open ZIP as `images/image_{ordinal:04}.<ext>`,
+/// returning its assembled [`ImageEntry`] — the single per-image seam shared by the strict
+/// `--image` loop and the soft auto-discovery loop (Phase 20 / OPT-01/02/03).
+///
+/// FORMAT (identical in both modes): branch on [`is_tiff`]. A TIFF (or TIFF-based `.svs`) gets its
+/// first-IFD `(w, h)` via [`read_tiff_dimensions`] and `media_type = "image/tiff"`; a non-TIFF is
+/// embedded VERBATIM with `(w, h) = (0, 0)` (the "dimensions omitted" sentinel — NO schema field
+/// added) and `media_type` derived from the source extension ([`media_type_for_extension`], default
+/// `"bin"`/`application/octet-stream`). The archive member preserves the SOURCE EXTENSION
+/// (`image_{ordinal:04}.<ext>`, NOT a forced `.tiff`) per OPT-01; the ordinal is the ONLY part of
+/// the name that reaches the archive (the attacker-controlled basename never does — T-20-04 /
+/// T-15-06).
+///
+/// FAIL MODE (the ONLY asymmetry — `mode`):
+///   * [`EmbedMode::Strict`] — a missing UTF-8 file name, a path-separator in the derived
+///     source_name, or an unreadable/undecodable file returns `Err(WriteError)`, aborting the
+///     conversion (the unchanged v0.5 `--image` contract).
+///   * [`EmbedMode::Soft`] — those same defects `warn` (naming the path + reason) and return
+///     `Ok(None)`, so the caller skips this image and the spectral output survives (OPT-03).
+///
+/// Bytes are streamed via `add_file_from_read` (64 KiB chunks — never a whole-file load, T-20-05),
+/// then `sha256_and_size` runs a SECOND bounded pass. For a TIFF the full-extent affine uses the
+/// real `(w, h)`; for a non-TIFF with `w == h == 0` it passes `w = h = 1` to [`full_extent_affine`]
+/// so the affine is the constant-axis full-extent identity map (0 would divide-by-zero; the helper
+/// already guards `W==1`/`H==1`). When `descriptive` is `Some`, the optical CV attrs are mapped
+/// onto the entry additively ([`map_descriptive`]); `None` (a `--image` entry) leaves
+/// `derived_subtype`/`modality` `None` and `role = Some("optical")` — v0.5-identical.
+fn embed_one_image(
+    zip: &mut ZipArchiveWriter<File>,
+    path: &Path,
+    ordinal: usize,
+    nx: i64,
+    ny: i64,
+    descriptive: Option<&OpticalImageRef>,
+    mode: EmbedMode,
+) -> Result<Option<ImageEntry>, WriteError> {
+    // A small helper that, on a defect, either returns Err (Strict) or warns + Ok(None) (Soft).
+    macro_rules! fail {
+        ($err:expr, $reason:expr) => {{
+            match mode {
+                EmbedMode::Strict => return Err($err),
+                EmbedMode::Soft => {
+                    log::warn!(
+                        "skipping auto-discovered optical image {:?}: {}",
+                        path.display(),
+                        $reason
+                    );
+                    return Ok(None);
+                }
+            }
+        }};
+    }
+
+    // The derived source_name is descriptive-only but attacker-influenced — reject any residual
+    // path separator so a crafted basename can never imply a path (T-15-06 / T-20-04). The ARCHIVE
+    // name is the fixed ordinal below, never the source name.
+    let source_name = match path.file_name().and_then(|n| n.to_str()) {
+        Some(n) => n.to_string(),
+        None => fail!(
+            WriteError::ImageDecode {
+                path: path.display().to_string(),
+                detail: "image path has no UTF-8 file name component".to_string(),
+            },
+            "image path has no UTF-8 file name component"
+        ),
+    };
+    if source_name.contains('/') || source_name.contains('\\') {
+        fail!(
+            WriteError::ImageDecode {
+                path: path.display().to_string(),
+                detail: format!("derived source_name {source_name:?} contains a path separator"),
+            },
+            format!("derived source_name {source_name:?} contains a path separator")
+        );
+    }
+
+    // Branch on TIFF-by-magic-bytes. `is_tiff` opens + reads the first 4 bytes, so its Err arm is
+    // the existence/readability proof for BOTH formats (a missing/unreadable file fails here).
+    let tiff = match is_tiff(path) {
+        Ok(b) => b,
+        Err(e) => fail!(e, "file is missing or unreadable"),
+    };
+    let (w, h, media_type) = if tiff {
+        // A well-formed TIFF: read first-IFD dims (proves it decodes); media_type image/tiff.
+        match read_tiff_dimensions(path) {
+            Ok((w, h)) => (w, h, "image/tiff".to_string()),
+            Err(e) => fail!(e, "TIFF dimensions could not be read (malformed TIFF)"),
+        }
+    } else {
+        // A non-TIFF: embed verbatim, dimensions omitted (0/0), media_type by extension.
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("bin")
+            .to_ascii_lowercase();
+        (0u32, 0u32, media_type_for_extension(&ext))
+    };
+
+    // The archive member preserves the SOURCE EXTENSION (OPT-01) — image_{ordinal:04}.<ext>, NOT a
+    // forced .tiff. Default "bin" when the source has no extension.
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .unwrap_or_else(|| "bin".to_string());
+    let name = format!("images/image_{ordinal:04}.{ext}");
+
+    // Stream the bytes into the ZIP as an `Other` member (64 KiB chunks inside add_file_from_read —
+    // never a whole-file load, T-20-05). A late open failure here is treated under `mode` too.
+    let mut f = match File::open(path) {
+        Ok(f) => f,
+        Err(e) => fail!(WriteError::Io(e), "file became unreadable before embed"),
+    };
+    if let Err(e) = zip.add_file_from_read(&mut f, Some(&name), None) {
+        fail!(WriteError::Io(e), "failed to stream image bytes into the archive");
+    }
+
+    // SHA-256 + exact byte size over a SECOND bounded streamed pass (IMG-03, T-20-05).
+    let (sha256, size) = match sha256_and_size(path) {
+        Ok(v) => v,
+        Err(e) => fail!(e, "failed to digest image bytes"),
+    };
+
+    // Full-extent affine: TIFF uses real (w,h); non-TIFF (0,0) passes (1,1) so the helper yields
+    // the constant-axis full-extent identity map (0 would divide-by-zero; W==1/H==1 is guarded).
+    let (aw, ah) = if w == 0 || h == 0 { (1, 1) } else { (w, h) };
+    let matrix = full_extent_affine(nx, ny, aw, ah);
+
+    let mut entry = build_image_entry(name, source_name, media_type, w, h, sha256, size, matrix);
+    if let Some(d) = descriptive {
+        map_descriptive(&mut entry, d);
+    }
+    Ok(Some(entry))
+}
+
+/// Map an [`OpticalImageRef`]'s descriptive CV attrs onto an [`ImageEntry`] additively and
+/// faithfully to the IMS CV semantics (Phase 20 / OPT-02). NO schema field is added — every attr
+/// folds into an EXISTING optional string field (`role` / `derived_subtype` / `modality`), so the
+/// three-places rule stays untriggered (`metadata.rs` / `schema/imaging.json` unchanged).
+///
+/// Mapping (faithful to `knowledge/cv/CV terms - optical image.md`):
+///   * `role` stays `Some("optical")` (set by `build_image_entry`) — never overwritten.
+///   * `IMS:1006015` staining method (e.g. `"H&E"`) → `modality`: a stain is the sample-prep
+///     modality of the optical image.
+///   * `IMS:1006017` alignment method → ALSO folded into `modality` as an `"; aligned: <method>"`
+///     suffix (ImageEntry has no dedicated provenance/alignment field and the schema must not gain
+///     one): the alignment method is therefore OBSERVABLE on `modality`. When no staining is
+///     present it stands alone as `"aligned: <method>"`.
+///   * subject terms (`IMS:1006011` of-analysed-sample / `IMS:1006012` adjacent-section) +
+///     `IMS:1006013` morphological classification → `derived_subtype`: a faithful subtype nuance
+///     of the optical role (`"of-analysed-sample"` / `"adjacent-section"`, optionally suffixed with
+///     the morphology, e.g. `"of-analysed-sample: tumor"`). Morphology alone (no subject term)
+///     stands as the subtype.
+///
+/// Absent attrs leave their target field `None` (a `--image` entry, mapped via `descriptive=None`,
+/// never reaches here — its fields stay `None`, v0.5-identical).
+fn map_descriptive(entry: &mut ImageEntry, d: &OpticalImageRef) {
+    // modality: staining method + alignment method (both fold here; alignment stays observable).
+    let mut modality_parts: Vec<String> = Vec::new();
+    if let Some(stain) = d.staining_method.as_deref() {
+        if !stain.is_empty() {
+            modality_parts.push(stain.to_string());
+        }
+    }
+    if let Some(align) = d.alignment_method.as_deref() {
+        if !align.is_empty() {
+            modality_parts.push(format!("aligned: {align}"));
+        }
+    }
+    if !modality_parts.is_empty() {
+        entry.modality = Some(modality_parts.join("; "));
+    }
+
+    // derived_subtype: subject term (of-analysed / adjacent) + optional morphology suffix.
+    let subject = if d.subject_of_analysed {
+        Some("of-analysed-sample")
+    } else if d.subject_adjacent {
+        Some("adjacent-section")
+    } else {
+        None
+    };
+    let morphology = d
+        .morphological_classification
+        .as_deref()
+        .filter(|m| !m.is_empty());
+    let subtype = match (subject, morphology) {
+        (Some(s), Some(m)) => Some(format!("{s}: {m}")),
+        (Some(s), None) => Some(s.to_string()),
+        (None, Some(m)) => Some(m.to_string()),
+        (None, None) => None,
+    };
+    if subtype.is_some() {
+        entry.derived_subtype = subtype;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write as _;
+
+    // ---- Task 1: embed_one_image (Strict/Soft) + non-TIFF embed + map_descriptive ----
+
+    /// Build a throwaway open ZIP via a minimal wired ImagingWriter, returning (zip, out_path).
+    /// The caller embeds into the ZIP then drops it; the out_path is removed by the caller.
+    fn throwaway_zip(tag: &str) -> (ZipArchiveWriter<File>, PathBuf) {
+        use mzdata::meta::FileMetadataConfig;
+        use crate::read::{RunProvenance, StorageMode};
+
+        let out = std::env::temp_dir()
+            .join(format!("mzml2mzpeak_embed_{tag}_{}.mzpeak", std::process::id()));
+        let _ = std::fs::remove_file(&out);
+        let mut w = ImagingWriter::new(&out, &[]).expect("build writer");
+        let prov = RunProvenance {
+            uuid: None,
+            data_mode: StorageMode::Unknown,
+            ibd_checksum: None,
+            ibd_checksum_type: None,
+        };
+        w.write_run_metadata(&FileMetadataConfig::default(), &prov, None)
+            .expect("wire metadata");
+        let zip = w.finish_parquet().expect("finish_parquet → open zip");
+        (zip, out)
+    }
+
+    /// Write `bytes` to a unique temp file with extension `ext`, return its path.
+    fn temp_file(tag: &str, ext: &str, bytes: &[u8]) -> PathBuf {
+        let p = std::env::temp_dir()
+            .join(format!("mzml2mzpeak_embed_src_{tag}_{}.{ext}", std::process::id()));
+        let mut f = File::create(&p).unwrap();
+        f.write_all(bytes).unwrap();
+        p
+    }
+
+    const TIFF_FIXTURE: &str = "tests/fixtures/imaging/optical_4x3.tiff";
+
+    /// Strict mode: a MISSING path returns Err (the --image contract).
+    #[test]
+    fn embed_one_image_strict_missing_is_err() {
+        let (mut zip, out) = throwaway_zip("strict_missing");
+        let missing = std::env::temp_dir().join("mzml2mzpeak_definitely_absent_xyz.tiff");
+        let _ = std::fs::remove_file(&missing);
+        let res = embed_one_image(&mut zip, &missing, 0, 3, 3, None, EmbedMode::Strict);
+        drop(zip);
+        let _ = std::fs::remove_file(&out);
+        match res {
+            Err(WriteError::ImageDecode { .. }) => {}
+            other => panic!("strict missing path must Err(ImageDecode), got {other:?}"),
+        }
+    }
+
+    /// Soft mode: a MISSING path returns Ok(None) (skipped) and continues.
+    #[test]
+    fn embed_one_image_soft_missing_is_ok_none() {
+        let (mut zip, out) = throwaway_zip("soft_missing");
+        let missing = std::env::temp_dir().join("mzml2mzpeak_definitely_absent_soft_xyz.tiff");
+        let _ = std::fs::remove_file(&missing);
+        let res = embed_one_image(&mut zip, &missing, 0, 3, 3, None, EmbedMode::Soft);
+        drop(zip);
+        let _ = std::fs::remove_file(&out);
+        match res {
+            Ok(None) => {}
+            other => panic!("soft missing path must be Ok(None) (warn + skip), got {other:?}"),
+        }
+    }
+
+    /// A TIFF embed yields media_type "image/tiff", width 4, height 3 (no v0.5 regression).
+    #[test]
+    fn embed_one_image_tiff_reads_dimensions() {
+        let (mut zip, out) = throwaway_zip("tiff");
+        let entry = embed_one_image(
+            &mut zip,
+            Path::new(TIFF_FIXTURE),
+            0,
+            3,
+            3,
+            None,
+            EmbedMode::Strict,
+        )
+        .expect("tiff embed ok")
+        .expect("tiff embed produced an entry");
+        drop(zip);
+        let _ = std::fs::remove_file(&out);
+        assert_eq!(entry.media_type, "image/tiff");
+        assert_eq!(entry.width, 4, "fixture TIFF width");
+        assert_eq!(entry.height, 3, "fixture TIFF height");
+        assert_eq!(entry.archive_path, "images/image_0000.tiff");
+        assert_eq!(entry.role.as_deref(), Some("optical"));
+        assert_eq!(entry.sha256.len(), 64);
+        assert!(entry.size_bytes > 0);
+    }
+
+    /// A non-TIFF (.png) embed yields media_type "image/png", width 0, height 0, valid sha/size,
+    /// and the archive member preserves the .png extension.
+    #[test]
+    fn embed_one_image_non_tiff_verbatim_png() {
+        let (mut zip, out) = throwaway_zip("png");
+        let png = temp_file("png", "png", b"\x89PNG\r\n\x1a\nfake png body bytes");
+        let entry = embed_one_image(&mut zip, &png, 0, 3, 3, None, EmbedMode::Strict)
+            .expect("png embed ok")
+            .expect("png embed produced an entry");
+        drop(zip);
+        let _ = std::fs::remove_file(&out);
+        let _ = std::fs::remove_file(&png);
+        assert_eq!(entry.media_type, "image/png");
+        assert_eq!(entry.width, 0, "non-TIFF → width 0 (omitted)");
+        assert_eq!(entry.height, 0, "non-TIFF → height 0 (omitted)");
+        assert!(entry.archive_path.ends_with(".png"), "source extension preserved");
+        assert_eq!(entry.sha256.len(), 64);
+        assert!(entry.size_bytes > 0);
+        assert_eq!(entry.role.as_deref(), Some("optical"));
+    }
+
+    /// map_descriptive: H&E staining + manual alignment → modality observable (both), role stays
+    /// optical, derived_subtype carries the subject term.
+    #[test]
+    fn map_descriptive_folds_stain_alignment_subject() {
+        let mut entry = build_image_entry(
+            "images/image_0000.svs".to_string(),
+            "he.svs".to_string(),
+            "image/tiff".to_string(),
+            10,
+            10,
+            "deadbeef".to_string(),
+            1,
+            full_extent_affine(3, 3, 10, 10),
+        );
+        let d = OpticalImageRef {
+            location: "he.svs".to_string(),
+            subject_of_analysed: true,
+            subject_adjacent: false,
+            morphological_classification: Some("tumor".to_string()),
+            staining_method: Some("H&E".to_string()),
+            alignment_method: Some("manual".to_string()),
+        };
+        map_descriptive(&mut entry, &d);
+        assert_eq!(entry.role.as_deref(), Some("optical"), "role unchanged");
+        let modality = entry.modality.as_deref().expect("modality set");
+        assert!(modality.contains("H&E"), "staining folded into modality: {modality}");
+        assert!(
+            modality.contains("aligned: manual"),
+            "IMS:1006017 alignment method observable in modality: {modality}"
+        );
+        let subtype = entry.derived_subtype.as_deref().expect("derived_subtype set");
+        assert!(subtype.contains("of-analysed-sample"), "subject term: {subtype}");
+        assert!(subtype.contains("tumor"), "morphology suffix: {subtype}");
+    }
+
+    /// A None descriptive (a --image entry) leaves derived_subtype/modality None — v0.5-identical.
+    #[test]
+    fn map_descriptive_none_leaves_entry_unchanged() {
+        let (mut zip, out) = throwaway_zip("nodesc");
+        let entry = embed_one_image(
+            &mut zip,
+            Path::new(TIFF_FIXTURE),
+            0,
+            3,
+            3,
+            None,
+            EmbedMode::Strict,
+        )
+        .expect("ok")
+        .expect("entry");
+        drop(zip);
+        let _ = std::fs::remove_file(&out);
+        assert!(entry.derived_subtype.is_none());
+        assert!(entry.modality.is_none());
+        assert_eq!(entry.role.as_deref(), Some("optical"));
+    }
 
     /// An unwritable output path makes `ImagingWriter::new` (hence `convert`'s first step)
     /// fail with `WriteError::Io(_)`. This exercises the `From<io::Error>` propagation through

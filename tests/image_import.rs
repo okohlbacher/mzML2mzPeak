@@ -160,14 +160,21 @@ fn two_images_and_duplicate_basenames_get_distinct_ordinals() {
     let _ = std::fs::remove_file(&out);
 }
 
-/// WR-01: a bad `--image` (non-existent / non-TIFF) fails fast BEFORE any output is created, so
-/// no truncated/corrupt `.mzpeak` is left on disk. Pre-flight validation runs at the very top of
+/// WR-01 (+ Phase 20 / OPT-01): a MISSING/UNREADABLE `--image` STILL fails fast BEFORE any output
+/// is created, so no truncated/corrupt `.mzpeak` is left on disk — the strict `--image` contract is
+/// unchanged by the Phase-20 format generalization. Pre-flight validation runs at the very top of
 /// `convert()` (before the first `File::create`), so the output path must NOT exist afterwards.
+///
+/// Phase 20 NOTE: the v0.5 part (b) — an existing-but-non-TIFF `--image` hard-failing on FORMAT —
+/// is intentionally REMOVED. Option B lifts the TIFF-only restriction: a user-named .png/.svs/.jpg
+/// is now embeddable (see `explicit_image_non_tiff_png_succeeds`). The ONLY asymmetry the phase
+/// introduces is the FAIL MODE (strict vs soft), NOT the format — so a non-TIFF `--image` is no
+/// longer a format error. The strict hard-fail on a MISSING/UNREADABLE path is preserved (part a).
 #[test]
 fn bad_image_fails_fast_and_leaves_no_output() {
     use mzml2mzpeak::write::WriteError;
 
-    // (a) A non-existent image path → error, no output file.
+    // A non-existent image path → error, no output file (strict --image contract, unchanged).
     let out = temp_out("badmissing");
     let _ = std::fs::remove_file(&out);
     let reader = open_fixture();
@@ -182,27 +189,44 @@ fn bad_image_fails_fast_and_leaves_no_output() {
         "no output .mzpeak must be left on disk when a --image fails pre-flight; found {}",
         out.display()
     );
+}
 
-    // (b) An existing-but-non-TIFF image path → error, no output file.
-    let out2 = temp_out("badnontiff");
-    let _ = std::fs::remove_file(&out2);
-    let not_tiff = std::env::temp_dir().join(format!(
-        "mzml2mzpeak_image_import_nontiff_{}.bin",
-        std::process::id()
-    ));
-    std::fs::write(&not_tiff, b"this is definitely not a TIFF file").unwrap();
-    let reader2 = open_fixture();
-    let res2 = convert(reader2, &out2, &[not_tiff.clone()]);
-    let _ = std::fs::remove_file(&not_tiff);
-    match res2 {
-        Err(WriteError::ImageDecode { .. }) => {}
-        other => panic!("expected WriteError::ImageDecode for a non-TIFF image, got {other:?}"),
-    }
+/// Phase 20 / OPT-01: an explicit `--image` to a NON-TIFF (.png) now succeeds (the pre-flight is
+/// no longer TIFF-locked). The produced archive carries `images/image_0000.png` with media_type
+/// `image/png`, width 0 / height 0 (dimensions omitted for a verbatim non-TIFF embed), and a valid
+/// sha256/size — proving the v0.5 TIFF-only restriction is lifted while `--image` stays strict.
+#[test]
+fn explicit_image_non_tiff_png_succeeds() {
+    const PNG_FIXTURE: &str = "tests/fixtures/imaging/optical_2x2.png";
+    assert!(Path::new(PNG_FIXTURE).exists(), "committed PNG fixture must exist at {PNG_FIXTURE}");
+
+    let out = temp_out("png");
+    let _ = std::fs::remove_file(&out);
+
+    let reader = open_fixture();
+    convert(reader, &out, &[PathBuf::from(PNG_FIXTURE)])
+        .expect("convert() with a --image=*.png succeeds (pre-flight no longer TIFF-locks)");
+
+    let mzreader = MzPeakReader::new(&out).expect("reader opens an archive with images/*.png");
+    let files = mzreader.list_all_files_in_archive();
     assert!(
-        !out2.exists(),
-        "no output .mzpeak must be left on disk when a non-TIFF --image fails pre-flight; found {}",
-        out2.display()
+        files.iter().any(|f| f == "images/image_0000.png"),
+        "images/image_0000.png must be an archive member (source extension preserved); got {files:?}"
     );
+
+    let imaging = imaging_block(&mzreader);
+    let img = &imaging["images"][0];
+    assert_eq!(img["archive_path"], Value::from("images/image_0000.png"));
+    assert_eq!(img["source_name"], Value::from("optical_2x2.png"));
+    assert_eq!(img["media_type"], Value::from("image/png"), "media_type by extension");
+    assert_eq!(img["width"].as_i64(), Some(0), "non-TIFF embed omits width (0)");
+    assert_eq!(img["height"].as_i64(), Some(0), "non-TIFF embed omits height (0)");
+    assert_eq!(img["role"], Value::from("optical"));
+    let sha = img["sha256"].as_str().expect("sha256 hex string");
+    assert_eq!(sha.len(), 64, "sha256 is a 64-hex-char digest");
+    assert!(img["size_bytes"].as_i64().unwrap() > 0, "size_bytes > 0");
+
+    let _ = std::fs::remove_file(&out);
 }
 
 /// Back-compat: no `--image` ⇒ the archive opens AND `metadata.imaging` has NO `images` key
