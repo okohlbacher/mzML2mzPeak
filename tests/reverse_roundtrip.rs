@@ -70,6 +70,7 @@ fn map_reverse_to_read(e: ReverseError) -> ReadError {
         // them to NoArrays at index 0 so the bridge is total without an unreachable panic.
         ReverseError::IbdWrite(_)
         | ReverseError::XmlEmit(_)
+        | ReverseError::ImageExport(_)
         | ReverseError::IbdOverflow { .. }
         | ReverseError::ArrayLengthMismatch { .. }
         | ReverseError::IbdPoisoned
