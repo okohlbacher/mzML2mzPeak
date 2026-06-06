@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: — Spec conformance — dtypes + CV/geometry/provenance
-status: in_progress
-stopped_at: Completed 17-01-PLAN.md (file-level cv_list MS/IMS/UO emitted from one shared constant equal to the reverse <cvList> literals; schema/cv_list.json + spec Edit 2 aligned — three places). Phase 17 plan 1 of 2 done.
-last_updated: "2026-06-06T02:07:05.315Z"
+status: verifying
+stopped_at: Completed 17-01-PLAN.md (file-level cv_list MS/IMS/UO emitted from one shared constant equal to the reverse <cvList> literals; schema/cv_list.json + spec Edit 2 aligned).
+last_updated: "2026-06-06T02:11:15.277Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
-  percent: 17
+  completed_plans: 6
+  percent: 33
 ---
 
 # Project State
@@ -33,7 +33,7 @@ fidelity contract the geometry facet (Phase 18) and the external validator depen
 
 Phase: 17 — cv_list file-level CV declaration (in progress — 1/2 plans)
 Plan: 17-01 complete (1 of 2); forward cv_list (MS/IMS/UO) emitted + schema/cv_list.json + spec Edit 2 aligned (CVL-01). Next: 17-02 read-back consistency test (CVL-02).
-Status: Phase 17 in progress
+Status: Phase complete — ready for verification
 Last activity: 2026-06-06
 
 ## v0.6 Roadmap (Phases 16–21)
@@ -93,6 +93,7 @@ matching `schema/*.json`.
 | Phase 16 P03 | 1min | 1 tasks | 1 files |
 | Phase 16 P04 | 12min | 2 tasks | 6 files |
 | Phase 17 P01 | 2min | 2 tasks | 5 files |
+| Phase 17 P02 | 3min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -143,6 +144,7 @@ Key file touchpoints for Phase 16 (from the milestone scoping):
 - [Phase ?]: Phase 16 Plan 03: reverse read path (src/reverse/source.rs) contract reframed to value-equal-at-canonical-width (DTY-06) — the stored canonical width (f64 m/z, f32 intensity) IS the roundtrip reference; no original source dtype is recovered. Pure contract/doc + test-rename change. decode_axis reject-non-float guard (UnsupportedDtype, T-07-02/T-16-05) unchanged.
 - [Phase ?]: Phase 16 Plan 04: dtype-preservation tests migrated to value-equal-at-canonical-width; mixed-/narrowing-dtype regression (F32 m/z + F64 intensity) proves lossless widening + lossy narrowing green at L1; reverse_read_spike no-widening assertion inverted (widened f32-source m/z reads back canonical f64); PXD001283 acceptance gate unchanged. DTY-07 complete.
 - [Phase 17]: Phase 17 Plan 01 (CVL-01): forward mzPeak archive now declares a file-level `cv_list` (MS/IMS/UO) via `add_index_metadata("cv_list", ..)` written alongside the imaging block before finish() (index-written-last preserved). The MS/IMS/UO id/full_name/uri facts live in ONE shared constant `src/schema/cv::cv_list()` whose literals EQUAL the reverse `imzml_writer.rs` `<cvList>` strings, so forward/reverse can't drift (T-17-02 anti-drift; asserted in cv.rs tests). schema/cv_list.json (draft-07, item required [id,full_name,uri], version string|null, additionalProperties:false) governs the block; spec Edit 2 example reconciled to the emitted strings (three places aligned). Fixed three-entry list (converter always references MS inflection + IMS coords + UO µm). IMS uri is a TODO(F9) placeholder — no CV minted, no governance block. metadata.rs untouched (cv_list is its own module). **Reuse anchor for 17-02:** `MzPeakReader.file_index().metadata["cv_list"]` is the read-back surface for the CVL-02 consistency test.
+- [Phase ?]: Phase 17 Plan 02 (CVL-02): tests/cv_list.rs converts the committed processed fixture, opens the archive via MzPeakReader, reads file_index().metadata[cv_list], and proves declared CV id set EQUALS referenced {MS,IMS,UO} (declared superset AND subset of referenced) — fails on any undeclared or spurious CV (T-17-03 gate). A second test asserts MS/IMS/UO uri read back equals src/schema/cv.rs::cv_list() (single source of truth at archive level). Fixture-only; no image/ibd/network. Phase 17 complete (2/2).
 
 ### Pending Todos
 
@@ -180,7 +182,7 @@ Items acknowledged and carried forward to v0.7+:
 
 ## Session Continuity
 
-Last session: 2026-06-06T02:07:00Z
+Last session: 2026-06-06T02:11:08.223Z
 Stopped at: Completed 17-01-PLAN.md (file-level cv_list MS/IMS/UO emitted from one shared constant equal to the reverse <cvList> literals; schema/cv_list.json + spec Edit 2 aligned).
 Resume file: None
 

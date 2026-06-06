@@ -72,7 +72,7 @@ Bring the forward converter into mzPeak spec conformance:
 - [x] **CVL-01**: The forward output declares a file-level `cv_list` enumerating every controlled
   vocabulary referenced in the archive (MS, IMS, UO), per spec Edit 2.
 
-- [ ] **CVL-02**: The declared `cv_list` is consistent with the CV accessions actually used — no
+- [x] **CVL-02**: The declared `cv_list` is consistent with the CV accessions actually used — no
   referenced CV is left undeclared (proven by a read-back/validation check).
 
 ### Authoritative geometry facet — `scan_settings_list` (GEO) — Phase 18
@@ -180,7 +180,7 @@ GEO×3, SRC×2, OPT×4, RIMG×3). No orphans, no duplicates.
 | DTY-06 | Phase 16 | Complete |
 | DTY-07 | Phase 16 | Complete |
 | CVL-01 | Phase 17 | Complete |
-| CVL-02 | Phase 17 | Pending |
+| CVL-02 | Phase 17 | Complete |
 | GEO-01 | Phase 18 | Pending |
 | GEO-02 | Phase 18 | Pending |
 | GEO-03 | Phase 18 | Pending |

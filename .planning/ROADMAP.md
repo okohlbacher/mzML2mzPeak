@@ -94,7 +94,7 @@ Plans:
 Plans:
 
 - [x] 17-01-PLAN.md — schema/cv_list.json + CvEntry + shared MS/IMS/UO constant + cv_list emission via add_index_metadata + spec-doc CV List subsection (CVL-01)
-- [ ] 17-02-PLAN.md — CVL-02 read-back consistency test: declared CVs == referenced CVs {MS, IMS, UO} (CVL-02)
+- [x] 17-02-PLAN.md — CVL-02 read-back consistency test: declared CVs == referenced CVs {MS, IMS, UO} (CVL-02)
 
 ### Phase 18: scan_settings_list authoritative geometry facet
 
@@ -162,7 +162,7 @@ Plans:
 | 14. Reverse-emit fidelity | v0.5 | 1/1 | Complete | 2026-06-05 |
 | 15. TIFF optical-image import | v0.5 | 3/3 | Complete | 2026-06-05 |
 | 16. Canonical-width dtype conformance | v0.6 | 4/4 | Complete   | 2026-06-06 |
-| 17. cv_list file-level CV declaration | v0.6 | 1/2 | In Progress|  |
+| 17. cv_list file-level CV declaration | v0.6 | 2/2 | Complete   | 2026-06-06 |
 | 18. scan_settings_list authoritative geometry facet | v0.6 | 0/? | Not started | - |
 | 19. source_files[] provenance | v0.6 | 0/? | Not started | - |
 | 20. Optical image auto-discovery & auto-embed | v0.6 | 0/? | Not started | - |
