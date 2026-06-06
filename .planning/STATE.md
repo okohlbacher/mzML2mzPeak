@@ -205,10 +205,16 @@ Items acknowledged and carried forward to v0.7+:
 | Provenance | Copy source `<sourceFileList>` into reverse `.imzML` (RSRC) | Deferred | v0.4 scoping |
 | Tech debt | Vendored mzdata fork (count_chromatograms) + vendored mzpeak_prototyping FileEntry fork | Carried | v0.3 / v0.5 |
 
+## Quick Tasks Completed
+
+| Task | Title | Date |
+|------|-------|------|
+| 260606-90y | Expose checksum-mismatch escape hatch as `--ignore-incorrect-checksum` (alias `--allow-checksum-mismatch`) | 2026-06-06 |
+
 ## Session Continuity
 
 Last session: 2026-06-06T04:28:21.600Z
-Stopped at: Completed 20-03-PLAN.md
+Stopped at: Completed quick task 260606-90y
 Resume file: None
 
 ## Operator Next Steps

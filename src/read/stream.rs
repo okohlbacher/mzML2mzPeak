@@ -121,7 +121,8 @@ impl ImagingReader {
     }
 
     /// Like [`ImagingReader::open`] but with the opt-in checksum escape hatch threaded into the
-    /// preflight (CLI `--allow-checksum-mismatch`). When `allow_checksum_mismatch` is true, a
+    /// preflight (CLI `--ignore-incorrect-checksum`, alias `--allow-checksum-mismatch`). When
+    /// `allow_checksum_mismatch` is true, a
     /// whole-file `.ibd` checksum mismatch warns instead of failing; the UUID linkage is still
     /// enforced. The reader path is otherwise identical (incl. the Latin-1 transcode shim).
     pub fn open_with(

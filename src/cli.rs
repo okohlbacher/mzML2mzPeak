@@ -92,13 +92,10 @@ pub struct ConvertCli {
     #[arg(long = "log", short = 'l', value_name = "FILE")]
     pub log: Option<PathBuf>,
 
-    /// Forward-only escape hatch: convert even when the `.ibd` fails its declared checksum
-    /// (`IMS:1000090` MD5 / `IMS:1000091` SHA-1). The UUID linkage is STILL verified; only the
-    /// whole-file checksum is downgraded from a hard error to a loud warning. WARNING: a
-    /// checksum-mismatched `.ibd` may be silently corrupt — conversion can then produce WRONG
-    /// numeric spectra without any further error. Use only for known-imperfect datasets where you
-    /// accept that risk; it works around the gate, it does not repair the data.
-    #[arg(long = "allow-checksum-mismatch")]
+    /// Proceed when the imzML's declared .ibd checksum does not match the actual .ibd (e.g. a
+    /// stale/wrong published checksum). The UUID linkage is still enforced; only the checksum
+    /// mismatch is downgraded to a warning.
+    #[arg(long = "ignore-incorrect-checksum", visible_alias = "allow-checksum-mismatch")]
     pub allow_checksum_mismatch: bool,
 
     /// Disable Numpress-linear m/z encoding (the size-reducing default) and store m/z with
@@ -560,7 +557,8 @@ fn dry_run(cli: &ConvertCli) -> anyhow::Result<()> {
     let input = &cli.input;
 
     // Integrity gate (reused verbatim — the CLI never bypasses preflight; T-6-integrity).
-    // `--allow-checksum-mismatch` relaxes ONLY the checksum (UUID linkage still enforced).
+    // `--ignore-incorrect-checksum` (alias `--allow-checksum-mismatch`) relaxes ONLY the
+    // checksum (UUID linkage still enforced).
     let report = preflight_with(input, cli.allow_checksum_mismatch)
         .with_context(|| format!("integrity preflight failed for {}", input.display()))?;
 

@@ -52,7 +52,8 @@ pub fn preflight(imzml_path: &Path) -> Result<PreflightReport, IntegrityError> {
 /// whole-file `.ibd` checksum mismatch is downgraded from a hard [`IntegrityError`] to a
 /// `log::warn` (the converted output is still produced). The UUID linkage and the
 /// `.ibd`-present checks are ALWAYS enforced — only the checksum is relaxed. Used by the CLI
-/// `--allow-checksum-mismatch` flag for known-imperfect real-world datasets.
+/// `--ignore-incorrect-checksum` flag (alias `--allow-checksum-mismatch`) for
+/// known-imperfect real-world datasets.
 pub fn preflight_with(
     imzml_path: &Path,
     allow_checksum_mismatch: bool,
@@ -106,7 +107,7 @@ pub fn preflight_with(
         if allow_checksum_mismatch {
             log::warn!(
                 "{:?} checksum mismatch for {} (declared {}, computed {}) — proceeding anyway \
-                 because --allow-checksum-mismatch was set; the .ibd may be corrupt or truncated",
+                 because --ignore-incorrect-checksum was set; the .ibd may be corrupt or truncated",
                 header.checksum_type,
                 ibd_path.display(),
                 header.checksum_hex,

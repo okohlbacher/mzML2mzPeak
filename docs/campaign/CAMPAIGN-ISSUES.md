@@ -69,6 +69,9 @@ the .ibd is corrupt, truncated, or the wrong file
 mismatched download). **The converter behaves correctly** — the integrity preflight hard-fails as
 designed (CLI exit 2). Not a code bug. Status: **DATA — re-fetch the dataset; no code change.**
 
+> Note (260606): the opt-in escape hatch is now `--ignore-incorrect-checksum` (back-compat alias
+> `--allow-checksum-mismatch`). Behavior unchanged.
+
 ## ISSUE-4 — reverse `-o <stem>` drops a dotted stem segment  [MINOR · CODE · trivial]
 
 **Symptom:** `--reverse -o out/foo.rev` writes `out/foo.imzML` (not `out/foo.rev.imzML`) because
