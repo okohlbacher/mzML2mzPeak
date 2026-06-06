@@ -1,0 +1,20 @@
+[project]
+
+name = "mzpeak"
+version = "0.2.0"
+
+dependencies = [
+    "pyarrow",
+    "pandas",
+    "numpy",
+    "scipy",
+    "psims",
+]
+
+license = "Apache-2.0"
+
+[project.optional-dependencies]
+sql = ["datafusion"]
+cli = ["click"]
+numpress = ["pynumpress"]
+upath = ["universal_pathlib"]

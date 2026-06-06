@@ -221,6 +221,20 @@ impl CustomBuilderFromParameter {
                 value: Box::new(Int64Builder::new()),
                 unit,
             },
+            DataType::UInt32 => Self {
+                accession: curie,
+                name: original_name,
+                field,
+                value: Box::new(UInt32Builder::new()),
+                unit,
+            },
+            DataType::Int32 => Self {
+                accession: curie,
+                name: original_name,
+                field,
+                value: Box::new(Int32Builder::new()),
+                unit,
+            },
             DataType::Float64 => Self {
                 accession: curie,
                 name: original_name,
@@ -276,6 +290,20 @@ impl VisitorBase for CustomBuilderFromParameter {
                     .unwrap()
                     .append_null();
             }
+            DataType::Int32 => {
+                self.value
+                    .as_any_mut()
+                    .downcast_mut::<Int32Builder>()
+                    .unwrap()
+                    .append_null();
+            }
+            DataType::UInt32 => {
+                self.value
+                    .as_any_mut()
+                    .downcast_mut::<UInt32Builder>()
+                    .unwrap()
+                    .append_null();
+            }
             DataType::Int64 => {
                 self.value
                     .as_any_mut()
@@ -323,6 +351,26 @@ where
                         .unwrap()
                         .append_option(val.to_bool().ok());
                 }
+                DataType::UInt32 => {
+                    self.value
+                        .as_any_mut()
+                        .downcast_mut::<UInt32Builder>()
+                        .unwrap()
+                        .append_option(
+                            val.to_u64()
+                            .ok()
+                            .and_then(|v| { v.try_into().ok() }));
+                }
+                DataType::Int32 => {
+                    self.value
+                        .as_any_mut()
+                        .downcast_mut::<Int32Builder>()
+                        .unwrap()
+                        .append_option(
+                            val.to_i32()
+                            .ok()
+                            .and_then(|v| { v.try_into().ok() }));
+                }
                 DataType::Int64 => {
                     self.value
                         .as_any_mut()
@@ -360,6 +408,10 @@ where
             self.append_null();
             false
         }
+    }
+
+    fn associated_curie_to_skip(&self) -> Option<CURIE> {
+        Some(self.accession)
     }
 }
 
@@ -505,6 +557,9 @@ impl StructVisitor<mzdata::params::Value> for ParamValueBuilder {
                 self.boolean.append_null();
                 true
             }
+            mzdata::params::Value::List(_values) => {
+                unimplemented!()
+            },
         }
     }
 }
@@ -1748,17 +1803,8 @@ impl SpectrumDetailsBuilder {
             v
         } else {
             match item.ms_level() {
-                // VENDORED PATCH (imzml2mzpeak v0.5 campaign ISSUE-1): real-world imzML
-                // (e.g. the canonical ms-imaging.org Example-1 3x3 pairs) declares
-                // `MS:1000511 value="0"` with no explicit spectrum-type cvParam. Upstream
-                // panicked here, crashing forward conversion of any ms_level-0 imzML. Default
-                // ms_level 0 (no explicit type) to MS1 spectrum (MS:1000579) with a warning —
-                // the safe imaging default, symmetric with the reverse emitter's ms-level rule.
                 0 => {
-                    log::warn!(
-                        "spectrum has ms_level 0 and no explicit spectrum-type cvParam; \
-                         defaulting to MS1 spectrum (MS:1000579)"
-                    );
+                    log::warn!("Couldn't infer spectrum type from MS level, no explicit type specified. Defaulting to MS1 spectrum (MS:1000579)");
                     curie!(MS:1000579)
                 }
                 1 => curie!(MS:1000579),
@@ -1951,6 +1997,14 @@ impl SpectrumBuilder {
             .extend_extra_fields(visitors.spectrum_selected_ion_fields);
         self.precursor
             .extend_extra_activation_fields(visitors.spectrum_activation_fields);
+    }
+
+    pub fn add_imaging_position_visitors(&mut self) {
+        let visitors: [Box<dyn StructVisitorBuilder<mzdata::spectrum::ScanEvent>>; _] = [
+            CustomBuilderFromParameter::from_spec(mzdata::curie!(IMS:1000050), "position x", DataType::UInt32),
+            CustomBuilderFromParameter::from_spec(mzdata::curie!(IMS:1000051), "position y", DataType::UInt32),
+        ].map(|v| Box::new(v) as Box<dyn StructVisitorBuilder<mzdata::spectrum::ScanEvent>>);
+        self.scan.extend_extra_fields(visitors);
     }
 
     pub fn append_value<

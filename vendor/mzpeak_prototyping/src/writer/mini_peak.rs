@@ -1,61 +1,14 @@
-use std::collections::HashMap;
 use std::io::{self, prelude::*};
 
 use mzdata::spectrum::RefPeakDataLevel;
-use mzpeaks::{CentroidLike, CoordinateLike, DeconvolutedCentroidLike, MZ};
+use mzpeaks::{CentroidLike, DeconvolutedCentroidLike};
 use parquet::{arrow::ArrowWriter, file::metadata::KeyValue};
-
-use mzdata::spectrum::ArrayType;
 
 use crate::{
     ToMzPeakDataSeries,
-    buffer_descriptors::{ArrayIndex, ArrayIndexEntry},
-    peak_series::array_map_to_schema_arrays_and_excess,
+    peak_series::{ArrayIndex, array_map_to_schema_arrays_and_excess},
     writer::{ArrayBufferWriter, ArrayBufferWriterVariants, base::EntryMetadataDerivedFromData},
 };
-
-// VENDORED PATCH (mzml2mzpeak): data-derived sorting_rank — see backlog 999.1 (upstream to HUPO-PSI/mzPeak)
-// Demote the m/z (MZArray) column to `sorting_rank: None` when the observed primary axis
-// was NOT non-decreasing across every spectrum. `ArrayIndex.entries` is private with no
-// `get_mut`, so we clone entries, null the MZArray entry's pub `sorting_rank`, and rebuild
-// via `ArrayIndex::new(prefix, HashMap)`. Locate the column by `ArrayType::MZArray` identity
-// (not column order). If `mz_nondecreasing` holds, the index is returned unchanged.
-pub(crate) fn demote_mz_if_unsorted(index: ArrayIndex, mz_nondecreasing: bool) -> ArrayIndex {
-    if mz_nondecreasing {
-        return index;
-    }
-    let prefix = index.prefix.clone();
-    let mut map: HashMap<ArrayType, ArrayIndexEntry> = HashMap::new();
-    for entry in index.iter() {
-        let mut cloned = entry.clone();
-        if cloned.array_type == ArrayType::MZArray {
-            cloned.sorting_rank = None;
-        }
-        map.insert(cloned.array_type.clone(), cloned);
-    }
-    ArrayIndex::new(prefix, map)
-}
-
-// VENDORED PATCH (mzml2mzpeak): data-derived sorting_rank — see backlog 999.1 (upstream to HUPO-PSI/mzPeak)
-// AND-accumulate whether a peak slice's m/z is internally non-decreasing. Empty/single-point
-// lists leave the flag unchanged (treated as sorted). Intra-spectrum check; resets per call.
-pub(crate) fn slice_mz_nondecreasing<P: CoordinateLike<MZ>>(peaks: &[P]) -> bool {
-    nondecreasing_by(peaks, |p| CoordinateLike::<MZ>::coordinate(p))
-}
-
-fn nondecreasing_by<P, F: Fn(&P) -> f64>(peaks: &[P], coord: F) -> bool {
-    let mut prev: Option<f64> = None;
-    for p in peaks {
-        let cur = coord(p);
-        if let Some(prev) = prev {
-            if cur < prev {
-                return false;
-            }
-        }
-        prev = Some(cur);
-    }
-    true
-}
 
 /// A small helper for writing peak list data to another stream with very narrow options.
 pub struct MiniPeakWriterType<W: Write + Send + Seek> {
@@ -64,10 +17,6 @@ pub struct MiniPeakWriterType<W: Write + Send + Seek> {
     buffer_size: usize,
     n_points: u64,
     n_entries: u64,
-    // VENDORED PATCH (mzml2mzpeak): data-derived sorting_rank — see backlog 999.1.
-    // AND-accumulated across every spectrum's primary m/z; demotes the MZArray column
-    // at finish() when any spectrum's m/z was not non-decreasing.
-    mz_nondecreasing: bool,
 }
 
 impl<W: Write + Send + Seek> MiniPeakWriterType<W> {
@@ -76,18 +25,19 @@ impl<W: Write + Send + Seek> MiniPeakWriterType<W> {
         buffers: ArrayBufferWriterVariants,
         buffer_size: usize,
     ) -> Self {
-        // VENDORED PATCH (mzml2mzpeak): data-derived sorting_rank — see backlog 999.1.
-        // The eager `spectrum_array_index` KV emission was REMOVED from `new`: emitting
-        // sorting_rank: 0 before any peak is observed is precisely the bug. The KV is now
-        // emitted in `finish()` once the per-file monotonicity flag is known.
-        Self {
+        let mut this = Self {
             writer,
             buffers,
             buffer_size,
             n_points: 0,
             n_entries: 0,
-            mz_nondecreasing: true,
-        }
+        };
+        let spectrum_array_index: ArrayIndex = this.buffers.as_array_index();
+        this.append_key_value_metadata(
+            "spectrum_array_index".to_string(),
+            Some(spectrum_array_index.to_json()),
+        );
+        this
     }
 
     pub fn append_key_value_metadata(
@@ -117,27 +67,15 @@ impl<W: Write + Send + Seek> MiniPeakWriterType<W> {
         log::trace!("Writing {n} peaks for {spectrum_count}");
         let (aux, n_peaks) = match peaks {
             RefPeakDataLevel::Centroid(peaks) => {
-                // VENDORED PATCH (mzml2mzpeak): data-derived sorting_rank — see backlog 999.1.
-                // Fold this spectrum's centroid m/z monotonicity into the per-file accumulator.
-                self.mz_nondecreasing &= slice_mz_nondecreasing(peaks.as_slice());
                 self.buffers
                     .add(spectrum_count, spectrum_time, peaks.as_slice())
             }
             RefPeakDataLevel::Deconvoluted(peaks) => {
-                // VENDORED PATCH (mzml2mzpeak): data-derived sorting_rank — see backlog 999.1.
-                // Deconvoluted peaks are mass-indexed; the writer's generic `D` bound does not
-                // carry `MZLocated`, so the m/z is not observable here without widening the whole
-                // writer API. Deconvoluted output is mass-sorted (m/z follows for fixed charge) —
-                // leave the accumulator unchanged (treat as sorted) rather than over-demote. The
-                // centroid-imaging case this fix targets flows through the Centroid arm above.
                 self.buffers
                     .add(spectrum_count, spectrum_time, peaks.as_slice())
             }
             RefPeakDataLevel::Missing => unimplemented!(),
             RefPeakDataLevel::RawData(arrays) => {
-                // VENDORED PATCH (mzml2mzpeak): data-derived sorting_rank — see backlog 999.1.
-                // Raw-array centroid path: fold the primary m/z array's sortedness.
-                self.mz_nondecreasing &= arrays.mzs().map(|v| v.is_sorted()).unwrap_or(true);
                 let (fields, cols, aux) = array_map_to_schema_arrays_and_excess(
                     crate::BufferContext::Spectrum,
                     arrays,
@@ -174,16 +112,6 @@ impl<W: Write + Send + Seek> MiniPeakWriterType<W> {
     }
 
     pub fn finish(mut self) -> Result<W, parquet::errors::ParquetError> {
-        // VENDORED PATCH (mzml2mzpeak): data-derived sorting_rank — see backlog 999.1.
-        // Relocated emission: emit `spectrum_array_index` HERE (not in `new`), demoting the
-        // MZArray column's sorting_rank to null if any spectrum's m/z was non-monotonic.
-        let spectrum_array_index: ArrayIndex = self.buffers.as_array_index();
-        let spectrum_array_index =
-            demote_mz_if_unsorted(spectrum_array_index, self.mz_nondecreasing);
-        self.append_key_value_metadata(
-            "spectrum_array_index".to_string(),
-            Some(spectrum_array_index.to_json()),
-        );
         self.append_key_value_metadata("spectrum_count", Some(self.n_entries.to_string()));
         self.append_key_value_metadata(
             "spectrum_data_point_count",
@@ -193,7 +121,7 @@ impl<W: Write + Send + Seek> MiniPeakWriterType<W> {
         self.writer.into_inner()
     }
 
-    pub fn n_points(&self) -> u64 {
+    pub fn point_count(&self) -> u64 {
         self.n_points
     }
 

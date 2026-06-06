@@ -1,0 +1,648 @@
+.format_array_meta <- function(array_metadata) {
+  array_metadata$entries$path
+  prefix <- paste0(array_metadata$prefix, ".")
+  array_names <- sub(
+    x = array_metadata$entries$path,
+    pattern = prefix,
+    replacement = "",
+    fixed = TRUE
+  )
+  array_metadata$entries$path_name <- array_names
+  array_metadata
+}
+
+MZPeakSpectrumMetadataFile <- R6::R6Class(
+  "MZPeakSpectrumMetadataFile",
+  public = list(
+    path = NULL,
+    meta = NULL,
+    file_description = NULL,
+    instrument_configuration_list = NULL,
+    data_processing_method_list = NULL,
+    software_list = NULL,
+    sample_list = NULL,
+    spectra = NULL,
+    scans = NULL,
+    precursors = NULL,
+    selected_ions = NULL,
+
+    #' @description
+    #' Get the number of profile data points associated with the `index`th spectrum.
+    #' @param index (`integer(1)`).
+    #' @return [`integer(1)`]
+    count_data_points = function(index) {
+      point_count <- self$spectra$GetColumnByName("MS_1003060_number_of_data_points")
+      ifelse(is.null(point_count), NULL, point_count[index]$as_vector())
+    },
+    #' @description
+    #' Get the number of centroid peaks associated with the `index`th spectrum.
+    #' @param index (`integer(1)`).
+    #' @return [`integer(1)`]
+    count_peaks = function(index) {
+      point_count <- self$spectra$GetColumnByName("MS_1003059_number_of_peaks")
+      ifelse(is.null(point_count), NULL, point_count[index]$as_vector())
+    },
+
+    initialize = function(path) {
+      logger::log_debug("Loading metadata")
+      # Read the entire table into RAM, we will decompose it next
+      data_table <- arrow::read_parquet(path, as_data_frame = FALSE)
+
+      # Store the original connection or location, we may later
+      # want it for something else.
+      self$path <- path
+
+      # Cache the entire file metadata blob, we will decompose
+      # and parse parts of it next
+      self$meta <- data_table$metadata
+
+      # Extract the JSON structures describing the MS run itself
+      self$file_description <- jsonlite::fromJSON(self$meta$file_description)
+      self$instrument_configuration_list <- jsonlite::fromJSON(self$meta$instrument_configuration_list)
+      self$data_processing_method_list <- jsonlite::fromJSON(self$meta$data_processing_method_list)
+      self$software_list <- jsonlite::fromJSON(self$meta$software_list)
+      self$sample_list <- jsonlite::fromJSON(self$meta$sample_list)
+
+      # Extract the spectrum metadata partition.
+      # Drop all rows in this table where the index
+      # column is NULL.
+      spectra <- data_table$GetColumnByName("spectrum")
+      if (!is.null(spectra)) {
+        self$spectra <- .chunks_to_table(spectra)
+      }
+
+      # Extract the scan partition.
+      # Drop all rows in this table where the parent index
+      # column is NULL.
+      scans <- data_table$GetColumnByName("scan")
+      if (!is.null(scans)) {
+        self$scans <- .chunks_to_table(scans)
+      }
+
+      # Extract the precursor partition.
+      # Drop all rows in this table where the parent index
+      # column is NULL.
+      precursors <- data_table$GetColumnByName("precursor")
+      if (!is.null(precursors)) {
+        self$precursors <- .chunks_to_table(precursors)
+      }
+
+      # Extract the selected ion partition.
+      # Drop all rows in this table where the parent index
+      # column is NULL.
+      selected_ions <- data_table$GetColumnByName("selected_ion")
+      if (!is.null(selected_ions)) {
+        self$selected_ions <- .chunks_to_table(selected_ions)
+      }
+    }
+  ),
+  private = list()
+)
+
+
+length.MZPeakSpectrumMetadataFile <- function(self) {
+  length(self$spectra)
+}
+
+
+MZPeakChromatogramMetadataFile <- R6::R6Class(
+  "MZPeakChromatogramMetadataFile",
+  public = list(
+    path = NULL,
+    meta = NULL,
+    chromatograms = NULL,
+    precursors = NULL,
+    selected_ions = NULL,
+    #' @description
+    #' Get the number of profile data points associated with the `index`th chromatogram.
+    #' @param index (`integer(1)`).
+    #' @return [`integer(1)`]
+    count_data_points = function(index) {
+      point_count <- self$spectra$GetColumnByName("MS_1003060_number_of_data_points")
+      ifelse(is.null(point_count), NULL, point_count[index]$as_vector())
+    },
+    count_peaks = function(index) {
+      point_count <- self$spectra$GetColumnByName("MS_1003059_number_of_peaks")
+      ifelse(is.null(point_count), NULL, point_count[index]$as_vector())
+    },
+    initialize = function(path) {
+      logger::log_debug("Loading chromatogram metadata")
+      # Read the entire table into RAM, we will decompose it next
+      data_table <- arrow::read_parquet(path, as_data_frame = FALSE)
+
+      # Store the original connection or location, we may later
+      # want it for something else.
+      self$path <- path
+
+      # Cache the entire file metadata blob, we will decompose
+      # and parse parts of it next
+      self$meta <- data_table$metadata
+
+      # Extract the chromatogram metadata partition.
+      # Drop all rows in this table where the index
+      # column is NULL.
+      chromatograms <- data_table$GetColumnByName("chromatogram")
+      if (!is.null(chromatograms)) {
+        self$chromatograms <- .chunks_to_table(chromatograms)
+      }
+
+      # Extract the precursor partition.
+      # Drop all rows in this table where the parent index
+      # column is NULL.
+      precursors <- data_table$GetColumnByName("precursor")
+      if (!is.null(precursors)) {
+        self$precursors <- .chunks_to_table(precursors)
+      }
+
+      # Extract the selected ion partition.
+      # Drop all rows in this table where the parent index
+      # column is NULL.
+      selected_ions <- data_table$GetColumnByName("selected_ion")
+      if (!is.null(selected_ions)) {
+        self$selected_ions <- .chunks_to_table(selected_ions)
+      }
+    }
+  ),
+  private = list()
+)
+
+
+MZPeakChromatogramDataFile <- R6::R6Class(
+  "MZPeakChromatogramDataFile",
+  public = list(
+    handle = NULL,
+    meta = NULL,
+    indices = NULL,
+    array_metadata = NULL,
+    index_bins = NULL,
+    initialize = function(path) {
+      self$handle <- arrow::ParquetFileReader$create(path)
+      # Read the file-level metadata off the first row group.
+      # The 0th column should be fast to read as it is the
+      # chromatogram index
+      self$meta <- self$handle$ReadRowGroup(0, c(0))$metadata
+      # Parse the array metadata from the JSON blob. This will
+      # help us understand what kind of data is in each array
+      # and un-mangle names, if needed.
+      self$array_metadata <- .format_array_meta(jsonlite::fromJSON(self$meta$chromatogram_array_index))
+      # Read the chromatogram index column from each row group, building
+      # up a min-max index for each row group to help reduce work to
+      # to read data later.
+      self$index_bins <- build_index_bins_direct(self$handle, 0)
+    },
+    #' @description
+    #' Read the actual signal data associated with a chromatogram
+    read_chromatogram = function(index) {
+      if (length(index) > 1) {
+        values <- lapply(index, self$read_chromatogram)
+        names(values) <- index
+        return(values)
+      }
+      index = index - 1
+      row_groups = private$row_groups_for_index(index)
+
+      if (length(row_groups) == 1) {
+        rg <- self$handle$ReadRowGroup(row_groups[1])
+        points <- rg$GetColumnByName("point")
+
+        if (!is.null(points)) {
+          points <- dplyr::bind_rows(lapply(points$chunks, function(chunk) {
+            chunk$Filter(chunk$field(0) == index)$as_vector()
+          }))
+          k <- dim(points)[2]
+          points <- points[, 2:k]
+          return(points)
+        }
+        chunks <- rg$GetColumnByName("chunk")
+        if (!is.null(chunks)) {
+          chunks <- dplyr::bind_rows(lapply(chunks$chunks, function(chunk) {
+            chunk$Filter(chunk$field(0) == index)$as_vector()
+          }))
+          values <- decode_chunks_for(chunks, NULL, self$array_metadata)
+          return(values)
+        }
+        stop(paste("Don't know how to handle schema of", rg$schema))
+      } else {
+        stop("error: not implemented")
+      }
+    }
+  ),
+  private = list(
+    # A helper method to determine which row group(s) to search
+    row_groups_for_index = function(index) {
+      self$index_bins[(self$index_bins$min_value <= index) &&
+                        (self$index_bins$max_value >= index), ]$row_group
+    }
+  )
+)
+
+
+MZPeakSpectrumDataFile <- R6::R6Class(
+  "MZPeakSpectrumDataFile",
+  public = list(
+    handle = NULL,
+    meta = NULL,
+    indices = NULL,
+    array_metadata = NULL,
+    index_bins = NULL,
+    mz_delta_models = NULL,
+    initialize = function(path, namespace) {
+      self$handle <- arrow::ParquetFileReader$create(path)
+      # Read the file-level metadata off the first row group.
+      # The 0th column should be fast to read as it is the
+      # spectrum index
+      self$meta <- self$handle$ReadRowGroup(0, c(0))$metadata
+      # Parse the array metadata from the JSON blob. This will
+      # help us understand what kind of data is in each array
+      # and un-mangle names, if needed.
+      self$array_metadata <- .format_array_meta(jsonlite::fromJSON(self$meta[[paste0(namespace, "_array_index")]]))
+      # Read the spectrum index column from each row group, building
+      # up a min-max index for each row group to help reduce work to
+      # to read data later.
+      self$index_bins <- build_index_bins_direct(self$handle, 0)
+      # If present, this will eventually be populated with the parameters
+      # fill in NULL-marked positions.
+      self$mz_delta_models <- NULL
+    },
+
+    #' @description
+    #' Read the actual signal data associated with a spectrum
+    read_spectrum = function(index) {
+      if (length(index) > 1) {
+        values <- lapply(index, self$read_spectrum)
+        names(values) <- index
+        return(values)
+      }
+
+      index = index - 1
+      row_groups = private$row_groups_for_index(index)
+
+      if (length(row_groups) == 1) {
+        rg <- self$handle$ReadRowGroup(row_groups[1])
+
+        # If this is a `point` layout data file, unpack the table directly
+        points <- rg$GetColumnByName("point")
+        if (!is.null(points)) {
+          points <- dplyr::bind_rows(lapply(points$chunks, function(chunk) {
+            chunk$Filter(chunk$field(0) == index)$as_vector()
+          }))
+          k <- dim(points)[2]
+          points <- points[, 2:k]
+          if (any(is.na(points[, 1]))) {
+            model = self$mz_delta_models[[index + 2]]
+            points[[1]] <- .fill_nulls_with_model_or_local(points[[1]], model)
+            na_mask <- is.na(points[[2]])
+            points[na_mask, 2] = 0
+          }
+          return(points)
+        }
+
+        # Otherwise, if this a `chunk` layout data file, we will need to decode
+        # the chunks
+        chunks <- rg$GetColumnByName("chunk")
+        if (!is.null(chunks)) {
+          chunks <- dplyr::bind_rows(lapply(chunks$chunks, function(chunk) {
+            chunk$Filter(chunk$field(0) == index)$as_vector()
+          }))
+          delta_model = self$mz_delta_models[[index + 1]]
+          values <- decode_chunks_for(chunks, delta_model, self$array_metadata)
+          return(values)
+        }
+
+        stop(paste("Don't know how to handle schema of", rg$schema))
+      } else {
+        stop("error: not implemented")
+      }
+    },
+
+    #' @description
+    #' Configure the m/z delta models
+    set_mz_delta_models = function(models) {
+      self$mz_delta_models = models
+    }
+  ),
+  private = list(
+    # A helper method to determine which row group(s) to search
+    row_groups_for_index = function(index) {
+      self$index_bins[(self$index_bins$min_value <= index) &&
+                        (self$index_bins$max_value >= index), ]$row_group
+    }
+  )
+)
+
+
+`[.MZPeakFile` <- function(self, index) {
+  self$read_spectrum(index + 1)
+}
+
+
+`[.MZPeakSpectrumDataFile` <- function(self, index) {
+  self$read_spectrum(index + 1)
+}
+
+
+derive_id_min_max <- function(array) {
+  min_max <- arrow::call_function("min_max", array$View(arrow::int64()))$as_vector()
+  return(min_max)
+}
+
+
+build_index_bins_direct <- function(pq_reader, column_index) {
+  n <- pq_reader$num_row_groups
+  logger::log_debug("Loading bounds for", n, "row groups")
+  bounds = lapply(seq(n), function(i) {
+    derive_id_min_max(pq_reader$ReadRowGroup(i - 1, 0)$column(0))
+  })
+
+  bounds = dplyr::bind_rows(bounds)
+  bounds$row_group <- seq(n) - 1
+  names(bounds) <- c("min_value", "max_value", "row_group")
+  bounds
+}
+
+
+MZPeakFile <- R6::R6Class(
+  "MZPeakFile",
+  public = list(
+    handle = NULL,
+    spectrum_metadata = NULL,
+    spectrum_data = NULL,
+    spectrum_peak_data = NULL,
+    chromatogram_metadata = NULL,
+    chromatogram_data = NULL,
+    wavelength_spectrum_metadata = NULL,
+    wavelength_spectrum_data = NULL,
+    file_index = NULL,
+    #' @description
+    #' Get the number of profile data points associated with the `index`th spectrum.
+    #' @param index (`integer(1)`).
+    #' @return [`integer(1)`]
+    spectrum_count_data_points = function(index) {
+      self$spectrum_metadata$count_data_points(index)
+    },
+    #' @description
+    #' Get the number of centroid peaks associated with the `index`th spectrum.
+    #' @param index (`integer(1)`).
+    #' @return [`integer(1)`]
+    spectrum_count_peaks = function(index) {
+      self$spectrum_metadata$count_peaks(index)
+    },
+    #' @description
+    #' Get the number of profile data points associated with the `index`th chromatogram.
+    #' @param index (`integer(1)`).
+    #' @return [`integer(1)`]
+    chromatogram_count_data_points = function(index) {
+      self$chromatogram_metadata$count_data_points(index)
+    },
+    #' @description
+    #' Get the number of profile data points associated with the `index`th wavelength spectrum.
+    #' @param index (`integer(1)`).
+    #' @return [`integer(1)`]
+    wavelength_spectrum_count_data_points = function(index) {
+      if (is.null(self$wavelength_spectrum_metadata)) {
+        NULL
+      } else {
+        self$wavelength_spectrum_metadata$count_data_points(index)
+      }
+    },
+    #' @description
+    #' A reader for mzPeak files.\cr
+    #'
+    #' This type will load metadata eagerly into memory, but will load signal data
+    #' only when requested.
+    #'
+    #' @param path(character(1)) \cr
+    #'   The path to where on the file system the mzPeak archive is. It may be a
+    #'   ZIP archive or an unpacked directory.
+    initialize = function(path) {
+      self$handle <- ArchiveHandle$new(path)
+
+      self$file_index <- FileIndex$new(self$handle$connect_file("mzpeak_index.json"))
+
+      self$spectrum_metadata <- NULL
+      self$chromatogram_metadata <- NULL
+      self$wavelength_spectrum_metadata <- NULL
+
+      self$spectrum_data <- NULL
+      self$chromatogram_data <- NULL
+      self$wavelength_spectrum_data <- NULL
+
+      self$spectrum_peak_data <- NULL
+
+      spectrum_data_name <- (
+        self$file_index$files |> filter(entity_type == "spectrum", data_kind == "data arrays") |> select(name) |> pull() |> first()
+      )
+      if (!is.na(spectrum_data_name) &&
+          self$handle$has_file(spectrum_data_name)) {
+        self$spectrum_data = MZPeakSpectrumDataFile$new(self$handle$connect_file(spectrum_data_name), "spectrum")
+      }
+
+      spectrum_metadata_name <- (
+        self$file_index$files |> filter(entity_type == "spectrum", data_kind == "metadata") |> select(name) |> pull() |> first()
+      )
+
+      if (!is.na(spectrum_metadata_name) &&
+          self$handle$has_file(spectrum_metadata_name)) {
+        self$spectrum_metadata = MZPeakSpectrumMetadataFile$new(self$handle$connect_file(spectrum_metadata_name))
+      }
+
+      if (any(names(self$spectrum_metadata$spectra) == "mz_delta_model")) {
+        self$spectrum_data$set_mz_delta_models(self$spectrum_metadata$spectra$mz_delta_model$as_vector())
+      }
+
+      spectrum_peak_name <- (
+        self$file_index$files |> filter(entity_type == "spectrum", data_kind == "peaks") |> select(name) |> pull() |> first()
+      )
+
+      if (!is.na(spectrum_peak_name) &&
+          self$handle$has_file(spectrum_peak_name)) {
+        self$spectrum_peak_data <- MZPeakSpectrumDataFile$new(self$handle$connect_file(spectrum_peak_name), "spectrum")
+      }
+
+      chromatogram_data_name <- (
+        self$file_index$files |> filter(entity_type == "chromatogram", data_kind == "data arrays") |> select(name) |> pull() |> first()
+      )
+      if (!is.na(chromatogram_data_name) &&
+          self$handle$has_file(chromatogram_data_name)) {
+        self$chromatogram_data = MZPeakChromatogramDataFile$new(self$handle$connect_file(chromatogram_data_name))
+      }
+
+      chromatogram_metadata_name <- (
+        self$file_index$files |> filter(entity_type == "chromatogram", data_kind == "metadata") |> select(name) |> pull() |> first()
+      )
+
+      if (!is.na(chromatogram_metadata_name) &&
+          self$handle$has_file(chromatogram_metadata_name)) {
+        self$chromatogram_metadata = MZPeakChromatogramMetadataFile$new(self$handle$connect_file(chromatogram_metadata_name))
+      }
+
+      wl_spectrum_data_name <- (
+        self$file_index$files |> filter(entity_type == "wavelength spectrum", data_kind == "data arrays") |> select(name) |> pull() |> first()
+      )
+      if (!is.na(wl_spectrum_data_name) &&
+          self$handle$has_file(wl_spectrum_data_name)) {
+        self$wavelength_spectrum_data = MZPeakSpectrumDataFile$new(self$handle$connect_file(wl_spectrum_data_name), "wavelength_spectrum")
+      }
+
+      wl_spectrum_metadata_name <- (
+        self$file_index$files |> filter(entity_type == "wavelength spectrum", data_kind == "metadata") |> select(name) |> pull() |> first()
+      )
+
+      if (!is.na(wl_spectrum_metadata_name) &&
+          self$handle$has_file(wl_spectrum_metadata_name)) {
+        self$wavelength_spectrum_metadata = MZPeakSpectrumMetadataFile$new(self$handle$connect_file(wl_spectrum_metadata_name))
+      }
+
+
+
+    },
+
+    #' @description
+    #' Read a spectrum's signal or peak data
+    #'
+    #' @param index (`integer(1)`).
+    #' @return [tibble]
+    read_spectrum = function(index) {
+      dp <- self$spectrum_count_data_points(index)
+      if (!is.na(dp)) {
+        return(self$read_spectrum_profiles(index))
+      }
+      pt <- self$spectrum_count_peaks(index)
+      if (!is.na(pt)) {
+        return(self$read_spectrum_peaks(index))
+      }
+    },
+
+    #' @description
+    #' Read a spectrum's signal data, if the profile data volume is present
+    #'
+    #' @param index (`integer(1)`).
+    #' @return [tibble]
+    read_spectrum_profiles = function(index) {
+      if(
+        is.null(self$spectrum_data)
+      ) {
+        NULL
+      } else {
+        self$spectrum_data$read_spectrum(index)
+      }
+    }
+
+    #' @description
+    #' Read a spectrum's peaks, if the peak data volume is present, and are stored separately
+    #'
+    #' @param index (`integer(1)`).
+    #' @return [tibble]
+    read_spectrum_peaks = function(index) {
+      if(
+        is.null(self$spectrum_peak_data)
+      ) {
+        NULL
+      } else {
+        self$spectrum_peak_data$read_spectrum(index)
+      }
+    },
+
+    #' @description
+    #' Read a chromatogram's signal arrays.
+    #'
+    #' @param index (`integer(1)`)
+    #' @return [tibble]
+    read_chromatogram = function(index) {
+      ifelse(
+        is.null(self$chromatogram_data),
+        NULL,
+        self$chromatogram_data$read_chromatogram(index)
+      )
+    },
+
+    #' @description
+    #' Read a wavelength spectrum's signal data, if it is present.
+    #'
+    #' @param index (`integer(1)`).
+    #' @return [tibble]
+    read_wavelength_spectrum = function(index) {
+      if (is.null(self$wavelength_spectrum_data)) {
+        return(NULL)
+      }
+      self$wavelength_spectrum_data$read_spectrum(index)
+    }
+  ),
+  active = list(
+    #' @field spectra (tibble)\cr
+    #'
+    #' The spectrum-level metadata. Information about scan acquisition, precursors
+    #' selected ions, are in other tables
+    spectra = function() {
+      self$spectrum_metadata$spectra
+    },
+    #' @field scans (tibble)\cr
+    #'
+    #' The scan acquisition metadata.
+    scans = function() {
+      self$spectrum_metadata$scans
+    },
+
+    #' @field precursors (tibble)\cr
+    #'
+    #' The precursors selection and activation metadata.
+    precursors = function() {
+      self$spectrum_metadata$precursors
+    },
+
+    #' @field selected_ions (tibble)\cr
+    #'
+    #' The selected ion metadata.
+    selected_ions = function() {
+      self$spectrum_metadata$selected_ions
+    },
+
+    #' @field chromatograms (tibble)\cr
+    #'
+    #' The chromatogram metadata.
+    chromatograms = function() {
+      self$chromatogram_metadata$chromatograms
+    },
+
+    #' @field wavelength_spectra (tibble)\cr
+    #'
+    #' The wavelength spectrum-level metadata. Information about scan
+    #' acquisition is in other tables
+    wavelength_spectra = function() {
+      if (is.null(self$wavelength_spectrum_metadata)) {
+        return(NULL)
+      }
+      self$wavelength_spectrum_metadata$spectra
+    }
+  )
+)
+
+length.MZPeakSpectrumDataFile <- function(self) {
+  as.numeric(self$meta$spectrum_count)
+}
+
+length.MZPeakFile <- function(self) {
+  length(self$spectrum_metadata$spectra)
+}
+
+dim.MZPeakFile <- function(self) {
+  dim(self$spectra)
+}
+
+#' @description
+#' Convert a `ChunkedArray` of `StructArray` into a `Table`
+#' without making copies.
+.chunks_to_table <- function(chunked_array, mask_column = 0) {
+  columns_of <- names(chunked_array$type)
+  chunks <- lapply(chunked_array$chunks, function(chunk) {
+    chunk <- if (chunk$field(mask_column)$null_count > 0) {
+      chunk$Filter(!is.na(chunk$field(mask_column)))
+    } else {
+      chunk
+    }
+    parts <- chunk$Flatten()
+    names(parts) <- columns_of
+    do.call(arrow::arrow_table, parts)
+  })
+  do.call(rbind, chunks)
+}

@@ -42,13 +42,16 @@ parquet = { version = "=57.0.0", features = ["encryption"] }
 zip = "=4.1.0"
 # imzml is the NON-default addition that makes `mzdata::io::imzml` exist; the other
 # features mirror upstream so the unioned single copy is identical to upstream + imzml.
-mzdata = { version = "=0.63.3", features = ["imzml", "serde", "bruker_tdf", "nalgebra", "zstd", "numpress"] }
+# 0.64.0: matches upstream mzpeak_prototyping@8435967's `mzdata = 0.64.0` requirement and is the
+# first published mzdata to include `ChromatogramSource::count_chromatograms` upstream — so the
+# vendored mzdata fork (which only added that method) is dropped (no [patch.crates-io] mzdata below).
+mzdata = { version = "=0.64.0", features = ["imzml", "serde", "bruker_tdf", "nalgebra", "zstd", "numpress"] }
 mzpeaks = "=1.0.9"
 
 # --- Write path: git-only reference implementation, pinned to a CONCRETE commit rev.
 # default-features = false drops the async/object_store/opendal/tokio stack
 # (STACK.md local-file-only v1 variant). ---
-mzpeak_prototyping = { git = "https://github.com/HUPO-PSI/mzPeak", rev = "d1aaaf84595202e2e7f622c576c1d6ba9154e379", default-features = false }
+mzpeak_prototyping = { git = "https://github.com/HUPO-PSI/mzPeak", rev = "8435967", default-features = false }
 
 # --- Integrity digest crates (Plan 02-02, IN-07): canonical RustCrypto LEAF crates,
 # pure-Rust with NO shared transitive types with arrow/mzdata, so they cannot fracture
@@ -112,14 +115,9 @@ env_logger = "=0.11.8"
 # CLI (Phase 06-02), never in a library module (mirrors the anyhow binary-only boundary). ---
 indicatif = "=0.17.11"
 
-# --- VENDORED PATCH (plan 00-01): the published mzdata 0.63.3 imzML reader fails to
-# compile with the `imzml` feature (E0046 — missing required `ChromatogramSource::
-# count_chromatograms`). This redirects mzdata 0.63.3 to a minimal vendored fork that
-# adds the missing method, keeping the version at 0.63.3 so the single resolved copy is
-# shared with mzpeak_prototyping's `^0.63.3` requirement. Drop once an upstream
-# 0.63.x backport ships (see deferred-items.md upstream issue draft). ---
-[patch.crates-io]
-mzdata = { path = "vendor/mzdata" }
+# --- (RESOLVED 2026-06-06) The mzdata fork is GONE. mzdata 0.64.0 upstreamed
+# `ChromatogramSource::count_chromatograms` (the fork's only patch), so we now depend on the
+# published crate directly (mzdata = 0.64.1 above) with no [patch.crates-io] mzdata redirect. ---
 
 # --- VENDORED PATCH (plan 15-03): the upstream mzpeak_prototyping FileEntry enums
 # `EntityType`/`DataKind` derive `Serialize` but deserialize via `DeserializeFromStr`;

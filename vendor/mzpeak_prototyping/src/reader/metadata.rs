@@ -461,6 +461,19 @@ impl ParquetIndexExtractor {
                         log::warn!("software list was empty");
                     }
                 }
+                "scan_settings" => {
+                    if let Some(val) = kv.value.as_ref() {
+                        let settings: crate::param::ScanSettings = serde_json::from_str(&val)?;
+                        match self.mz_metadata.scan_settings_mut() {
+                            Some(confs) => confs.push(settings.into()),
+                            None => {
+                                panic!("Cannot inject scan settings. This should never happen");
+                            }
+                        }
+                    } else {
+                        log::warn!("scan_settings was empty")
+                    }
+                }
                 "run" => {
                     if let Some(val) = kv.value.as_ref() {
                         let run: meta::MassSpectrometryRun = serde_json::from_str(&val)?;
@@ -1786,22 +1799,19 @@ impl AuxiliaryArrayCountDecoder {
             ($index_array:ident, $values_array:ident, $dtype:ty) => {
                 if let Some(values) = $values_array.as_primitive_opt::<$dtype>() {
                     for (i, c) in $index_array.iter().zip(values.iter()) {
-                        // The index column is nullable: a null row carries no bin to assign (it
-                        // arises e.g. from the empty-chromatogram placeholder a spectra-only
-                        // archive writes, surfacing as a null spectrum_index in the combined
-                        // auxiliary-array-count facet). Skip it rather than `unwrap()`-panicking —
-                        // previously any ion-mobility archive (whose aux-array facet IS read back,
-                        // unlike non-IM files) crashed the reader. [imzML2mzpeak vendored patch]
-                        let Some(idx) = i else { continue };
-                        let idx = idx as usize;
-                        if idx >= self.counts.len() {
+                        let i = if let Some(i) = i {
+                            i as usize
+                        } else {
+                            continue;
+                        };
+                        if i >= self.counts.len() {
                             panic!(
                                 "Cannot fit {} rows into {} bins",
                                 batch.num_rows(),
                                 self.counts.len()
                             );
                         }
-                        self.counts[idx] = c.unwrap_or_default() as u32;
+                        self.counts[i] = c.unwrap_or_default() as u32;
                     }
                     true
                 } else {

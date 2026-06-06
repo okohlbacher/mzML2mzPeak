@@ -1,0 +1,24 @@
+import(dplyr)
+
+# The low-level ZIP slicer
+useDynLib(mzpeak, .registration=TRUE)
+export(connection_segment)
+
+# The classes exported
+export(MZPeakFile)
+export(MZPeakSpectrumDataFile)
+export(MZPeakSpectrumMetadataFile)
+export(ArchiveHandle)
+
+export(MZPeakChromatogramDataFile)
+export(MZPeakChromatogramMetadataFile)
+
+S3method(length, MZPeakFile)
+S3method(length, MZPeakSpectrumDataFile)
+S3method(length, MZPeakSpectrumMetadataFile)
+
+S3method(`[`, MZPeakFile)
+S3method(`[`, MZPeakSpectrumDataFile)
+#S3method(`[`, MZPeaSpectrumMetadataFile)
+
+
