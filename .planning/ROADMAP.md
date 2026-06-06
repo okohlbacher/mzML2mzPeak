@@ -69,12 +69,13 @@ file the upstream `mzpeak_prototyping` FileEntry-serde issue and drop the vendor
 
 ## Backlog
 
-### Phase 999.1: Upstream the 3 vendored mzpeak_prototyping patches (BACKLOG)
+### Phase 999.1: Upstream the 4 vendored mzpeak_prototyping patches (BACKLOG)
 
-**Goal:** File PR(s) against `HUPO-PSI/mzPeak` for the three robustness fixes our `vendor/mzpeak_prototyping`
-fork carries, then drop the fork + the `[patch."https://github.com/HUPO-PSI/mzPeak"]` redirect in
-`Cargo.toml`. The fork is **load-bearing** (Phase-21 reverse image read-back depends on patch #1), so the
-fork can only be dropped once patch #1 lands upstream.
+**Goal:** File PR(s) against `HUPO-PSI/mzPeak` for the four robustness/correctness fixes our
+`vendor/mzpeak_prototyping` fork carries, then drop the fork + the
+`[patch."https://github.com/HUPO-PSI/mzPeak"]` redirect in `Cargo.toml`. The fork is **load-bearing**
+(Phase-21 reverse image read-back depends on patch #1), so the fork can only be dropped once patch #1
+lands upstream.
 
 **State of the fork (analysed 2026-06-06):** our fork is based on upstream rev `d1aaaf84`; upstream HEAD
 `4843d88` is only ONE **docs-only** commit ahead (the `ion_mobility → ion_mobility_value` doc rename — our
@@ -95,6 +96,16 @@ diverges in exactly **3 source files**, each a fix for real-world imzML the refe
    Example-1 3×3) declares `MS:1000511 value="0"` with no explicit spectrum-type cvParam; upstream
    `panic!("Couldn't infer spectrum type from MS level")` crashed forward conversion. Fix: default ms_level
    0 → MS1 (`MS:1000579`) with a `log::warn!`. Labelled "v0.5 campaign ISSUE-1".
+4. **`src/writer/mini_peak.rs` + `src/writer/base.rs` — data-derived `sorting_rank` (added 2026-06-06,
+   quick task 260606-a8f).** The writer hard-coded the primary m/z `sorting_rank: 0` (= ascending) eagerly
+   at construction, so a faithfully-preserved non-monotonic centroid m/z (real Thermo Astral: 26/307,590
+   spectra) made the file declare an order it didn't have (spec-conformance bug). Fix: a per-file
+   `note_primary_axis_sorted` accumulator (both peaks + spectra_data facets) emits the `spectrum_array_index`
+   KV at `finish`, demoting the m/z column to `sorting_rank: null` when any spectrum's m/z wasn't
+   non-decreasing. No source reorder (L1/CR-01 intact). See `docs/issue-centroid-mz-sorting-rank.md`
+   (resolved) + `docs/handoff-mzpeakvalidator-sorting-rank.md` (validator must gate `mz_monotonic_peaks` on
+   declared `sorting_rank == 0`). The converter side also added `--sort-peaks` (opt-in repair) + a counted
+   centroid-non-monotonic warning.
 
 **Notes:** only patch #1 is documented in the `Cargo.toml` `[patch]` note (+ a draft at
 `.planning/milestones/v0.5-phases/15-tiff-optical-image-import/deferred-items.md`); #2 and #3 carry inline
