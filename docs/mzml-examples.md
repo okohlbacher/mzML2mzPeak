@@ -8,6 +8,10 @@ The data lives under **`data/mzML-examples/`**, which is **git-ignored** (large 
 data). This document plus **`scripts/fetch-mzml-examples.sh`** are the tracked record that lets
 anyone rebuild that directory on demand.
 
+> **Size / compression reference:** see [`docs/compression-benchmark.md`](compression-benchmark.md)
+> for the raw → mzML → mzPeak size table across all 18 datasets (mzPeak is 0.07×–0.65× of the source
+> mzML on every one).
+
 ## Reconstruct on demand
 
 ```bash
