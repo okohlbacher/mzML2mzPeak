@@ -148,13 +148,29 @@ Bring the forward converter into mzPeak spec conformance:
 
 ## Traceability
 
-Filled by the roadmapper — maps each REQ-ID to its phase.
+Every v1 requirement maps to exactly one phase. Coverage: 21/21 requirements mapped (DTY×7, CVL×2,
+GEO×3, SRC×2, OPT×4, RIMG×3). No orphans, no duplicates.
 
-| REQ-ID | Phase |
-|--------|-------|
-| DTY-01..07 | 16 |
-| CVL-01..02 | 17 |
-| GEO-01..03 | 18 |
-| SRC-01..02 | 19 |
-| OPT-01..04 | 20 |
-| RIMG-01..03 | 21 |
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| DTY-01 | Phase 16 | Pending |
+| DTY-02 | Phase 16 | Pending |
+| DTY-03 | Phase 16 | Pending |
+| DTY-04 | Phase 16 | Pending |
+| DTY-05 | Phase 16 | Pending |
+| DTY-06 | Phase 16 | Pending |
+| DTY-07 | Phase 16 | Pending |
+| CVL-01 | Phase 17 | Pending |
+| CVL-02 | Phase 17 | Pending |
+| GEO-01 | Phase 18 | Pending |
+| GEO-02 | Phase 18 | Pending |
+| GEO-03 | Phase 18 | Pending |
+| SRC-01 | Phase 19 | Pending |
+| SRC-02 | Phase 19 | Pending |
+| OPT-01 | Phase 20 | Pending |
+| OPT-02 | Phase 20 | Pending |
+| OPT-03 | Phase 20 | Pending |
+| OPT-04 | Phase 20 | Pending |
+| RIMG-01 | Phase 21 | Pending |
+| RIMG-02 | Phase 21 | Pending |
+| RIMG-03 | Phase 21 | Pending |
