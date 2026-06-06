@@ -128,7 +128,7 @@ Bring the forward converter into mzPeak spec conformance:
   the exported file) plus any preserved descriptive attributes (subject / staining / alignment method),
   restoring forward↔reverse optical symmetry (addresses the v0.5 MAJOR-8 degrade).
 
-- [ ] **RIMG-03**: The mzPeak-only affine/registration degrades gracefully on reverse — there is **no
+- [x] **RIMG-03**: The mzPeak-only affine/registration degrades gracefully on reverse — there is **no
   imzML CV transform term** (`IMS:1006017` names an alignment *method* as free text only), so the affine
   is not re-emitted as a CV param; this loss is documented. An archive with no embedded images is a
   clean no-op (no spurious `IMS:1006008` emitted).
@@ -192,4 +192,4 @@ GEO×3, SRC×2, OPT×4, RIMG×3). No orphans, no duplicates.
 | OPT-04 | Phase 20 | Complete |
 | RIMG-01 | Phase 21 | Complete |
 | RIMG-02 | Phase 21 | Complete |
-| RIMG-03 | Phase 21 | Pending |
+| RIMG-03 | Phase 21 | Complete |

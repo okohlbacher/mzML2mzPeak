@@ -4,14 +4,14 @@ milestone: v0.6
 milestone_name: — Spec conformance — dtypes + CV/geometry/provenance
 status: verifying
 stopped_at: Completed 20-03-PLAN.md
-last_updated: "2026-06-06T04:21:12.876Z"
+last_updated: "2026-06-06T04:28:41.406Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 16
-  completed_plans: 15
-  percent: 83
+  completed_plans: 16
+  percent: 100
 ---
 
 # Project State
@@ -103,6 +103,7 @@ matching `schema/*.json`.
 | Phase 20 P03 | 12m | 2 tasks | 8 files |
 | Phase 21 P01 | 4min | 1 tasks | 4 files |
 | Phase 21 P02 | 8min | 2 tasks | 6 files |
+| Phase 21 P03 | 25 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -168,6 +169,7 @@ Key file touchpoints for Phase 16 (from the milestone scoping):
 - [Phase ?]: Plan 20-03: synthetic .ibd sidecars are byte copies of Example_Processed.ibd so UUID/SHA-1 are reused verbatim (no invented checksums) and preflight passes
 - [Phase ?]: Reverse image export: ImageExport classified as generic I/O exit code in cli.rs
 - [Phase ?]: export_image_members no-ops (no archive open) on empty images slice
+- [Phase ?]: Reverse no-op byte-equality test normalizes out the per-run UUID/MD5 (fresh Uuid::new_v4() per reverse is by design) — proves spectral output unperturbed without false determinism
 
 ### Pending Todos
 
@@ -205,7 +207,7 @@ Items acknowledged and carried forward to v0.7+:
 
 ## Session Continuity
 
-Last session: 2026-06-06T04:21:05.133Z
+Last session: 2026-06-06T04:28:21.600Z
 Stopped at: Completed 20-03-PLAN.md
 Resume file: None
 
