@@ -189,6 +189,19 @@ pub fn to_mzdata_canonical(
         },
         ..Default::default()
     };
+    // Attach an EXPLICIT spectrum-type CV term so the mzPeak writer never has to INFER it from the
+    // MS level. Without this, the writer logs "Couldn't infer spectrum type from MS level" ONCE PER
+    // SPECTRUM for imaging sources that carry `ms level = 0` with no type term (real imzML — e.g.
+    // the Zenodo DESI sections — emit hundreds of thousands of identical lines). The imaging
+    // convention pairs `MS1 spectrum` with `ms level 0` (canonical ms-imaging.org Example-1), so
+    // ms_level 0 and 1 → MS:1000579 MS1 spectrum; ms_level ≥2 → MS:1000580 MSn spectrum. This also
+    // makes the output more conformant (explicit > inferred) and mirrors the reverse writer's
+    // MS1-at-level-0 emission (HUPO-PSI/mzPeak#22).
+    descr.set_spectrum_type(if s.ms_level >= 2 {
+        mzdata::meta::SpectrumType::MSnSpectrum
+    } else {
+        mzdata::meta::SpectrumType::MS1Spectrum
+    });
 
     // (3) coordinate params on a scan event — the writer reads these by accession at write
     //     time (RESEARCH.md Pitfall 1). z is omitted entirely when absent (not null-valued).
