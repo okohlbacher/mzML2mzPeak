@@ -108,7 +108,11 @@ Plans:
   3. Read-back proves the authoritative geometry survives the roundtrip and the derived index copy is semantically consistent with the facet.
   4. The change is reflected in all three places: implementation (`src/…`), `docs/mzpeak-imaging-spec-suggestions.md` (Edit 3), and the matching `schema/*.json`.
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+- [ ] 18-01-PLAN.md — schema/scan_settings.json + ScanSettings/ScanSettingsParam types + scan_settings_list_from_geometry builder + spec Edit 3/Part B reconcile (GEO-01)
+- [ ] 18-02-PLAN.md — thread ImagingRunMetadata into the forward path; emit scan_settings_list via add_index_metadata alongside cv_list+imaging; metadata.imaging geometry becomes a derived copy of the same source; pixel_count_source declared|observed_max preserved (GEO-02)
+- [ ] 18-03-PLAN.md — read-back consistency test: scan_settings_list present; metadata.imaging geometry equals the facet; correct IMS accessions + UO:0000017 µm unit; observed_max not fabricated into the facet (GEO-03)
 
 ### Phase 19: source_files[] provenance
 
