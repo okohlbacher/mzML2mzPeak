@@ -60,73 +60,92 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 > the matching `schema/*.json`. A phase is not "done" until all three are consistent.
 
 ### Phase 16: Canonical-width dtype conformance
+
 **Goal**: The forward converter emits spec-conformant canonical mzPeak data-facet dtypes (`point.mz=f64`, `point.intensity=f32`) regardless of source binary array width, recording any narrowing as provenance, and the fidelity contract (L1 / verify / reverse roundtrip) is redefined to "value-equal at canonical width". This is the LEAD phase — it touches the core fidelity contract that the geometry facet (Phase 18) and the external validator depend on.
 **Depends on**: Nothing (first phase of v0.6; builds on shipped v0.3–v0.5)
 **Requirements**: DTY-01, DTY-02, DTY-03, DTY-04, DTY-05, DTY-06, DTY-07
 **Success Criteria** (what must be TRUE):
+
   1. Converting an imzML with 32-bit m/z and/or 64-bit intensity produces a mzPeak whose `spectra_data` facet columns are exactly `mz=f64` and `intensity=f32`, and every widened m/z value equals its source value exactly (value-equal, no perturbation).
   2. When an axis is narrowed (e.g. intensity f64→f32), the converter records a per-axis provenance note in `metadata` (a `DataProcessing`/`ProcessingMethod` entry) AND emits a CLI WARNING naming the axis and the source→target dtype; lossless-widening cases emit neither.
   3. `ConformanceLevel::L1` and the verify comparators compare values at canonical width — source-vs-output dtype divergence is no longer treated as a mismatch — and the `mzPeak → imzML → mzPeak` reverse roundtrip passes at the value-equal bar without recovering the original source dtype.
   4. The PXD001283 acceptance gate (already `f64` m/z + `f32` intensity) still passes unchanged, and a new regression test proves a mixed-/narrowing-dtype source converts and verifies green at canonical width.
+
 **Plans**: 4 plans (3 waves)
 Plans:
-- [ ] 16-01-PLAN.md — Forward canonical cast (mz=f64/intensity=f32) + narrowing provenance note + CLI warning (DTY-01..04)
+
+- [x] 16-01-PLAN.md — Forward canonical cast (mz=f64/intensity=f32) + narrowing provenance note + CLI warning (DTY-01..04)
 - [ ] 16-02-PLAN.md — Redefine ConformanceLevel::L1 to value-equal-at-canonical-width + verify comparators (DTY-05)
 - [ ] 16-03-PLAN.md — Reverse read accepts canonical width; roundtrip bar becomes value-equal (DTY-06)
 - [ ] 16-04-PLAN.md — Migrate dtype tests to canonical width + mixed-dtype regression; PXD001283 unchanged (DTY-07)
 
 ### Phase 17: cv_list file-level CV declaration
+
 **Goal**: The forward output carries a file-level `cv_list` declaring every controlled vocabulary referenced in the archive (MS, IMS, UO), per spec Edit 2 — a consumer can resolve every CV accession from a single declared list.
 **Depends on**: Phase 16 (settled canonical-width output)
 **Requirements**: CVL-01, CVL-02
 **Success Criteria** (what must be TRUE):
+
   1. The forward output declares a file-level `cv_list` enumerating each CV (MS, IMS, UO) actually referenced in the archive.
   2. A read-back/validation check proves the declared `cv_list` is consistent with the accessions actually used — no referenced CV is left undeclared and no declared CV is spurious.
   3. The change is reflected in all three places: implementation (`src/…`), `docs/mzpeak-imaging-spec-suggestions.md` (Edit 2), and the matching `schema/*.json`.
+
 **Plans**: TBD
 
 ### Phase 18: scan_settings_list authoritative geometry facet
+
 **Goal**: The forward output emits an authoritative `scan_settings_list` geometry facet (spec Edit 3) as the single source of truth for imaging geometry; the `metadata.imaging` index geometry block becomes a derived, consistent copy of it.
 **Depends on**: Phase 16 (settled fidelity contract the geometry facet depends on)
 **Requirements**: GEO-01, GEO-02, GEO-03
 **Success Criteria** (what must be TRUE):
+
   1. The forward output emits an authoritative `scan_settings_list` facet carrying per-dimension pixel counts, pixel sizes, scan pattern, and µm offsets.
   2. The `metadata.imaging` index geometry block is regenerated from the authoritative facet (single source of truth) and matches it.
   3. Read-back proves the authoritative geometry survives the roundtrip and the derived index copy is semantically consistent with the facet.
   4. The change is reflected in all three places: implementation (`src/…`), `docs/mzpeak-imaging-spec-suggestions.md` (Edit 3), and the matching `schema/*.json`.
+
 **Plans**: TBD
 
 ### Phase 19: source_files[] provenance
+
 **Goal**: The forward output records `source_files[]` provenance for the input `.imzML` + `.ibd` (name, location, media type, checksum) per spec Edit 10, reusing the integrity preflight's already-computed UUID/checksum with no second hashing pass.
 **Depends on**: Phase 16 (settled canonical-width output)
 **Requirements**: SRC-01, SRC-02
 **Success Criteria** (what must be TRUE):
+
   1. The forward output records a `source_files[]` entry for each input file (`.imzML` and `.ibd`) with name, location, media type, and checksum.
   2. The recorded checksum/UUID is the one the integrity preflight already computed — verified by no second hash pass over the input occurring during conversion.
   3. The change is reflected in all three places: implementation (`src/…`), `docs/mzpeak-imaging-spec-suggestions.md` (Edit 10), and the matching `schema/*.json`.
+
 **Plans**: TBD
 
 ### Phase 20: Optical image auto-discovery & auto-embed
+
 **Goal**: On forward conversion the converter follows the source imzML's `IMS:1006008` "optical image location" reference, resolves it relative to the input `.imzML`, and auto-embeds the referenced optical image (no manual `--image` flag), capturing the descriptive optical CV attributes — reusing the v0.5 embedding machinery and failing soft on a missing image.
 **Depends on**: Phase 16 (settled canonical-width output); operates on the v0.5 separate-TIFF-member representation
 **Requirements**: OPT-01, OPT-02, OPT-03, OPT-04
 **Success Criteria** (what must be TRUE):
+
   1. With no `--image` flag, converting an imzML that declares `IMS:1006008` embeds the referenced image as an `images/image_NNNN.<ext>` ZIP member with sha256 + size + affine recorded in `metadata.imaging.images[]` (TIFF dims via the existing first-IFD reader; other formats embedded verbatim with `media_type` by extension).
   2. Descriptive source CV attributes — `IMS:1006010/11/12` (subject / of-analysed-sample / adjacent-section), `IMS:1006013` (morphological classification), `IMS:1006015` (staining method), `IMS:1006017` (alignment method) — are captured into the image entry (mapped onto `role`/`derived_subtype`/`modality` + provenance fields).
   3. If the referenced image is missing or unreadable, the converter emits a WARNING and completes the spectral conversion successfully — conversion never fails on an absent auxiliary image.
   4. Auto-discovered and explicit `--image` images coexist without collision (deterministic `image_NNNN` ordering; the same resolved path is never embedded twice).
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 21: Reverse optical image export
+
 **Goal**: On reverse conversion the converter reads embedded optical-image members back out as external files alongside the produced `.imzML` and re-emits `IMS:1006008` + preserved descriptive attributes, restoring forward↔reverse optical symmetry (addresses the v0.5 MAJOR-8 degrade). Images are auxiliary — not part of the L1 spectral contract.
 **Depends on**: Phase 20 (forward auto-embed, for the round-trip) and the v0.5 vendored `FileEntry`-serde fix (makes `Other` members readable)
 **Requirements**: RIMG-01, RIMG-02, RIMG-03
 **Success Criteria** (what must be TRUE):
+
   1. On reverse conversion, each embedded optical-image member + its `metadata.imaging.images[]` entry is written back out as an external image file beside the produced `.imzML`.
   2. The reverse `.imzML` re-emits the `IMS:1006008` optical image location (pointing at the exported file) plus any preserved descriptive attributes (subject / staining / alignment method), restoring forward↔reverse optical symmetry.
   3. The mzPeak-only affine/registration degrades gracefully — it is NOT re-emitted as a CV param (no imzML CV transform term exists; `IMS:1006017` is free-text method only), and this loss is documented; an archive with no embedded images is a clean no-op (no spurious `IMS:1006008`).
   4. The change is reflected in all three places: implementation (`src/…`), `docs/mzpeak-imaging-spec-suggestions.md`, and the matching `schema/*.json`.
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -138,7 +157,7 @@ Plans:
 | 13. Index enrichment | v0.5 | 1/1 | Complete | 2026-06-05 |
 | 14. Reverse-emit fidelity | v0.5 | 1/1 | Complete | 2026-06-05 |
 | 15. TIFF optical-image import | v0.5 | 3/3 | Complete | 2026-06-05 |
-| 16. Canonical-width dtype conformance | v0.6 | 0/4 | Planned | - |
+| 16. Canonical-width dtype conformance | v0.6 | 1/4 | In Progress|  |
 | 17. cv_list file-level CV declaration | v0.6 | 0/? | Not started | - |
 | 18. scan_settings_list authoritative geometry facet | v0.6 | 0/? | Not started | - |
 | 19. source_files[] provenance | v0.6 | 0/? | Not started | - |

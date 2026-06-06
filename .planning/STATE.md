@@ -1,16 +1,17 @@
 ---
 gsd_state_version: 1.0
 milestone: v0.6
-milestone_name: Spec conformance — dtypes + CV/geometry/provenance
-status: roadmapped
-last_updated: "2026-06-06T00:25:11.939Z"
-last_activity: 2026-06-06
+milestone_name: — Spec conformance — dtypes + CV/geometry/provenance
+status: "In Progress — Phase 16 (1 of 4 plans complete)"
+stopped_at: Completed 16-01-PLAN.md (canonical-width dtype cast + narrowing provenance/warning).
+last_updated: "2026-06-06T01:18:38.108Z"
+last_activity: 2026-06-06 — executed Phase 16 Plan 01 (DTY-01..04: canonical f64/f32 data facet)
 progress:
   total_phases: 6
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 4
+  completed_plans: 1
+  percent: 25
 ---
 
 # Project State
@@ -30,10 +31,10 @@ fidelity contract the geometry facet (Phase 18) and the external validator depen
 
 ## Current Position
 
-Phase: Not started (roadmap created; Phase 16 is next to plan)
-Plan: —
-Status: Roadmapped — awaiting `/gsd:plan-phase 16`
-Last activity: 2026-06-06 — v0.6 roadmap created (Phases 16–21, 21/21 requirements mapped)
+Phase: 16 — Canonical-width dtype conformance (In Progress)
+Plan: 16-01 complete (1 of 4); next is 16-02 (ConformanceLevel::L1 redefinition + verify comparators)
+Status: In Progress — DTY-01..04 delivered (canonical f64/f32 data facet, narrowing provenance + CLI warning)
+Last activity: 2026-06-06 — executed Phase 16 Plan 01
 
 ## v0.6 Roadmap (Phases 16–21)
 
@@ -55,27 +56,37 @@ matching `schema/*.json`.
 - **L1 redefined:** `ConformanceLevel::L1` moves from bit-for-bit-at-source-width to
   **value-equal-at-canonical-mzPeak-width** (`mz=f64`, `intensity=f32`). The reverse-roundtrip bar
   becomes value-equal, not dtype-identical. No second strict-L1 mode (out of scope).
+
 - **Narrowing is recorded, not silent:** metadata provenance note (`DataProcessing`/`ProcessingMethod`)
   + CLI WARNING naming axis + source→target dtype, on any narrowing cast (e.g. intensity f64→f32).
   Lossless widening (m/z f32→f64) is exact and warns neither.
+
 - **Conform the converter, not the schema:** mzPeak's fixed data-facet column dtypes stay; the other
   horn of HUPO-PSI #11 (admit 32-bit m/z / 64-bit intensity into the schema) is upstream's call.
+
 - **Geometry single source of truth:** `scan_settings_list` is authoritative (Phase 18); the
   `metadata.imaging` index geometry block becomes a derived copy regenerated from it.
+
 - **source_files[] reuse:** Phase 19 reuses the integrity preflight's UUID/checksum — no second hash.
 - **Optical features operate on the v0.5 separate-TIFF-member representation.** The richer F8
   `images.parquet` blob + CV-governed registration redesign stays deferred (v0.7+).
+
 - **Affine degrades on reverse:** no imzML CV transform term exists (`IMS:1006017` is free-text method
   only); the mzPeak-only affine is not re-emitted as a CV param — documented loss.
+
 - Full design + CODEX resolutions: `.planning/NEXT-ROADMAP-DRAFT.md` (§B + "Deferred during v0.5").
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed (v0.3): 17; (v0.4): 10; (v0.5): 7.
+- Total plans completed (v0.3): 17; (v0.4): 10; (v0.5): 7; (v0.6): 1.
 - Average duration: — min
 - Total execution time: — hours
+
+| Phase | Plan | Duration | Tasks | Files |
+|-------|------|----------|-------|-------|
+| 16 | 01 | ~9 min | 2 | 6 |
 
 *Updated after each plan completion.*
 
@@ -85,24 +96,35 @@ matching `schema/*.json`.
 
 Decisions are logged in PROJECT.md Key Decisions table and the v0.6 Locked Decisions block above.
 
+Phase 16 Plan 01 decisions:
+- Canonical cast lives at the write boundary (`to_mzdata`/`to_mzdata_canonical`); read-layer `NumArray` stays dtype-preserving so narrowing is detectable. `to_mzdata` keeps its signature (delegates) so reverse-path + test callers are untouched; `to_mzdata_canonical` is the new sibling returning the per-axis `CastNarrowing`.
+- Narrowing recorded via the EXISTING `mzml2mzpeak_conversion` `DataProcessing` channel (no new `ImagingMetadata` field → `schema/imaging.json` unchanged, "three places" rule not triggered). m/z asymmetry is structural: `CastNarrowing` only carries `intensity_f64_to_f32` (m/z never narrows).
+
 Key reuse anchors carried into v0.6 (from shipped v0.3–v0.5):
 
 - `MzPeakReader` API: `new` / `len` / `get_spectrum` / `get_spectrum_arrays` /
   `get_spectrum_metadata` / `load_all_spectrum_metadata` (call once — avoid O(n²)) /
   `file_index().metadata["imaging"]`.
+
 - Coordinate read reuses `src/verify/verify.rs::build_index_coords`
   (`get_param_by_curie(IMS:1000050…)`).
+
 - `src/integrity` UUID/checksum preflight catches mismatches "for free"; checksums streamed in 64KiB
   chunks via pinned sha1/md-5/sha2. **Phase 19 (SRC-02) reuses this — no second hash pass.**
+
 - Numeric arrays carried as dtype-preserving `NumArray { F32 | F64 }`; `as_f64()` is the only
   NON-CANONICAL coercing accessor. **Phase 16 redefines the L1 bar around canonical width here.**
+
 - `src/verify::verify_streaming` at `L1` is the loop-inverted twin of `verify_against_source`.
   **Phase 16 (DTY-05/06) updates both comparators to compare at canonical width.**
+
 - CLI `classify_exit` maps typed errors to distinct exit codes (integrity=2, unsupported=3,
   coordinate=4, verify-fail=5, generic=1); anyhow+indicatif confined to cli.rs+main.rs.
+
 - v0.5 image machinery (`src/write/image.rs`: `full_extent_affine`, `sha256_and_size`,
   `build_image_entry`; `tiff` first-IFD `Decoder::dimensions()`; `ImageEntry` role/derived_subtype/
   modality). **Phase 20 reuses this for auto-embed; Phase 21 reads members back out.**
+
 - Reverse `<scanSettings>` emit (`14-01`) already writes IMS:1000044-47 + IMS:1000053/54 with the
   UO:0000017 µm unit. **Phase 18 makes scan_settings_list authoritative; Phase 21 builds on reverse
   emit.**
@@ -124,9 +146,11 @@ None yet.
   `FileIndex` deserialization silently fail. v0.5 vendored a 2nd fork to patch `FileEntry` serde —
   Phase 21 (RIMG-01) depends on that fix to read embedded image members back out. Tech debt: file the
   upstream issue and drop the vendored fork when fixed.
+
 - Phase 16 risk: the L1 redefinition touches the shared verify comparators (`verify_streaming` +
   `verify_against_source`) AND the reverse read path — must keep PXD001283 acceptance green unchanged
   while flipping the bar to value-equal.
+
 - Phase 18 (geometry) and the external validator both depend on Phase 16's settled contract → Phase 16
   MUST land first.
 
@@ -146,7 +170,7 @@ Items acknowledged and carried forward to v0.7+:
 
 ## Session Continuity
 
-Last session: 2026-06-06 — v0.6 roadmap created (Phases 16–21).
+Last session: 2026-06-06T01:18:38.105Z
 Stopped at: Roadmap written; ready to plan Phase 16.
 Resume file: None
 
