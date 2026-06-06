@@ -77,7 +77,7 @@ Bring the forward converter into mzPeak spec conformance:
 
 ### Authoritative geometry facet — `scan_settings_list` (GEO) — Phase 18
 
-- [ ] **GEO-01**: The forward output emits an authoritative `scan_settings_list` geometry facet (spec
+- [x] **GEO-01**: The forward output emits an authoritative `scan_settings_list` geometry facet (spec
   Edit 3) carrying the imaging geometry (per-dimension pixel counts, pixel sizes, scan pattern, µm
   offsets).
 
@@ -181,7 +181,7 @@ GEO×3, SRC×2, OPT×4, RIMG×3). No orphans, no duplicates.
 | DTY-07 | Phase 16 | Complete |
 | CVL-01 | Phase 17 | Complete |
 | CVL-02 | Phase 17 | Complete |
-| GEO-01 | Phase 18 | Pending |
+| GEO-01 | Phase 18 | Complete |
 | GEO-02 | Phase 18 | Pending |
 | GEO-03 | Phase 18 | Pending |
 | SRC-01 | Phase 19 | Pending |
