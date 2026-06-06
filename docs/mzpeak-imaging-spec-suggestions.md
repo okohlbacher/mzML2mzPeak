@@ -183,6 +183,18 @@
 > `optical`. An explicit `--image` entry carries no descriptive attrs (its optional fields stay
 > absent — v0.5-identical).
 >
+> **[Phase 20] No schema change (three-places rule satisfied by src + doc).** The entire
+> auto-discovery / any-format / soft-fail / dedup-order / descriptive-mapping feature reuses the
+> EXISTING optional `images[]` fields (`role`, `derived_subtype`, `modality`) introduced for IMG-05;
+> **no `ImageEntry` field was added**, so [`schema/imaging.json`](../schema/imaging.json) and the
+> `ImageEntry` struct are UNCHANGED. The non-TIFF embed reuses the same `images[]` entry shape —
+> `width`/`height` carry the `0`/`0` "dimensions omitted" sentinel for a verbatim non-TIFF, not a new
+> field. The standing three-places rule (implementation + this spec doc + `schema/imaging.json`) is
+> therefore satisfied by the source and this document alone; the schema is unchanged **by design**.
+> The end-to-end acceptance tests (`tests/optical_autodiscovery.rs`, OPT-01..04) drive the real
+> `convert_with` seam over committed synthetic `IMS:1006008` fixtures (single TIFF, multimodal
+> TIFF+PNG, missing-file) and read the produced archive back via `MzPeakReader`.
+>
 > #### Future / richer option (F8 — deferred, NOT v0.5)
 >
 > The following richer `image` entity is **deferred** to a future milestone (F8) and is **not** the
