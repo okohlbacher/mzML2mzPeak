@@ -55,7 +55,7 @@ Bring the forward converter into mzPeak spec conformance:
 - [x] **DTY-04**: The CLI emits a WARNING identifying the axis and source→target dtype whenever a
   narrowing cast occurs during conversion.
 
-- [ ] **DTY-05**: `ConformanceLevel::L1` is redefined to "value-equal at canonical mzPeak width
+- [x] **DTY-05**: `ConformanceLevel::L1` is redefined to "value-equal at canonical mzPeak width
   (`mz=f64`, `intensity=f32`)": verify comparators compare values at canonical width and no longer
   treat source-vs-output dtype divergence as a mismatch.
 
@@ -176,7 +176,7 @@ GEO×3, SRC×2, OPT×4, RIMG×3). No orphans, no duplicates.
 | DTY-02 | Phase 16 | Complete |
 | DTY-03 | Phase 16 | Complete |
 | DTY-04 | Phase 16 | Complete |
-| DTY-05 | Phase 16 | Pending |
+| DTY-05 | Phase 16 | Complete |
 | DTY-06 | Phase 16 | Pending |
 | DTY-07 | Phase 16 | Pending |
 | CVL-01 | Phase 17 | Pending |

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: — Spec conformance — dtypes + CV/geometry/provenance
-status: "In Progress — Phase 16 (1 of 4 plans complete)"
-stopped_at: Completed 16-01-PLAN.md (canonical-width dtype cast + narrowing provenance/warning).
-last_updated: "2026-06-06T01:18:38.108Z"
-last_activity: 2026-06-06 — executed Phase 16 Plan 01 (DTY-01..04: canonical f64/f32 data facet)
+status: verifying
+stopped_at: Completed 16-02-PLAN.md (L1 redefined to value-equal-at-canonical-width + canonical-width verify comparators).
+last_updated: "2026-06-06T01:27:43.693Z"
+last_activity: 2026-06-06
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
-  percent: 25
+  completed_plans: 2
+  percent: 50
 ---
 
 # Project State
@@ -32,9 +32,9 @@ fidelity contract the geometry facet (Phase 18) and the external validator depen
 ## Current Position
 
 Phase: 16 — Canonical-width dtype conformance (In Progress)
-Plan: 16-01 complete (1 of 4); next is 16-02 (ConformanceLevel::L1 redefinition + verify comparators)
-Status: In Progress — DTY-01..04 delivered (canonical f64/f32 data facet, narrowing provenance + CLI warning)
-Last activity: 2026-06-06 — executed Phase 16 Plan 01
+Plan: 16-02 complete (2 of 4); next is 16-03 (reverse read + roundtrip bar at value-equal canonical width)
+Status: In Progress — DTY-01..05 delivered (canonical f64/f32 data facet + narrowing provenance/warning, L1 redefined to value-equal-at-canonical-width, verify comparators compare at canonical width)
+Last activity: 2026-06-06 — executed Phase 16 Plan 02
 
 ## v0.6 Roadmap (Phases 16–21)
 
@@ -89,6 +89,7 @@ matching `schema/*.json`.
 | 16 | 01 | ~9 min | 2 | 6 |
 
 *Updated after each plan completion.*
+| Phase 16 P02 | 5min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -97,6 +98,7 @@ matching `schema/*.json`.
 Decisions are logged in PROJECT.md Key Decisions table and the v0.6 Locked Decisions block above.
 
 Phase 16 Plan 01 decisions:
+
 - Canonical cast lives at the write boundary (`to_mzdata`/`to_mzdata_canonical`); read-layer `NumArray` stays dtype-preserving so narrowing is detectable. `to_mzdata` keeps its signature (delegates) so reverse-path + test callers are untouched; `to_mzdata_canonical` is the new sibling returning the per-axis `CastNarrowing`.
 - Narrowing recorded via the EXISTING `mzml2mzpeak_conversion` `DataProcessing` channel (no new `ImagingMetadata` field → `schema/imaging.json` unchanged, "three places" rule not triggered). m/z asymmetry is structural: `CastNarrowing` only carries `intensity_f64_to_f32` (m/z never narrows).
 
@@ -134,6 +136,8 @@ Key file touchpoints for Phase 16 (from the milestone scoping):
 `src/write/writer.rs`, `src/schema/metadata.rs`, `src/reverse/source.rs`, `src/cli.rs`; tests in
 `tests/{acceptance,verify_roundtrip,reverse_read_spike,write_roundtrip,reverse_roundtrip}.rs`.
 
+- [Phase ?]: Phase 16 Plan 02: ConformanceLevel::L1 redefined to value-equal at canonical mzPeak width (mz=f64, intensity=f32); the relaxation is the comparison WIDTH, tolerance stays Δ=0. compare_axis + compare_profile_masked compare at the OUTPUT (canonical) width, coercing the source (widen f32→f64 m/z, narrow f64→f32 intensity); a value-equal dtype divergence is no longer a mismatch. Spec doc L1 paragraph aligned (three-places rule). Kept L1BitForBit identifier (rename optional).
+
 ### Pending Todos
 
 None yet.
@@ -170,8 +174,8 @@ Items acknowledged and carried forward to v0.7+:
 
 ## Session Continuity
 
-Last session: 2026-06-06T01:18:38.105Z
-Stopped at: Roadmap written; ready to plan Phase 16.
+Last session: 2026-06-06T01:27:43.589Z
+Stopped at: Completed 16-02-PLAN.md (L1 redefined to value-equal-at-canonical-width + canonical-width verify comparators).
 Resume file: None
 
 ## Operator Next Steps
