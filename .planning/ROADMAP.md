@@ -68,7 +68,12 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
   2. When an axis is narrowed (e.g. intensity f64→f32), the converter records a per-axis provenance note in `metadata` (a `DataProcessing`/`ProcessingMethod` entry) AND emits a CLI WARNING naming the axis and the source→target dtype; lossless-widening cases emit neither.
   3. `ConformanceLevel::L1` and the verify comparators compare values at canonical width — source-vs-output dtype divergence is no longer treated as a mismatch — and the `mzPeak → imzML → mzPeak` reverse roundtrip passes at the value-equal bar without recovering the original source dtype.
   4. The PXD001283 acceptance gate (already `f64` m/z + `f32` intensity) still passes unchanged, and a new regression test proves a mixed-/narrowing-dtype source converts and verifies green at canonical width.
-**Plans**: TBD
+**Plans**: 4 plans (3 waves)
+Plans:
+- [ ] 16-01-PLAN.md — Forward canonical cast (mz=f64/intensity=f32) + narrowing provenance note + CLI warning (DTY-01..04)
+- [ ] 16-02-PLAN.md — Redefine ConformanceLevel::L1 to value-equal-at-canonical-width + verify comparators (DTY-05)
+- [ ] 16-03-PLAN.md — Reverse read accepts canonical width; roundtrip bar becomes value-equal (DTY-06)
+- [ ] 16-04-PLAN.md — Migrate dtype tests to canonical width + mixed-dtype regression; PXD001283 unchanged (DTY-07)
 
 ### Phase 17: cv_list file-level CV declaration
 **Goal**: The forward output carries a file-level `cv_list` declaring every controlled vocabulary referenced in the archive (MS, IMS, UO), per spec Edit 2 — a consumer can resolve every CV accession from a single declared list.
@@ -133,7 +138,7 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 | 13. Index enrichment | v0.5 | 1/1 | Complete | 2026-06-05 |
 | 14. Reverse-emit fidelity | v0.5 | 1/1 | Complete | 2026-06-05 |
 | 15. TIFF optical-image import | v0.5 | 3/3 | Complete | 2026-06-05 |
-| 16. Canonical-width dtype conformance | v0.6 | 0/? | Not started | - |
+| 16. Canonical-width dtype conformance | v0.6 | 0/4 | Planned | - |
 | 17. cv_list file-level CV declaration | v0.6 | 0/? | Not started | - |
 | 18. scan_settings_list authoritative geometry facet | v0.6 | 0/? | Not started | - |
 | 19. source_files[] provenance | v0.6 | 0/? | Not started | - |
@@ -142,7 +147,7 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 
 ## Next
 
-Plan the lead phase with `/gsd:plan-phase 16` (Canonical-width dtype conformance — must land first;
+Execute the lead phase with `/gsd:execute-phase 16` (Canonical-width dtype conformance — must land first;
 it redefines the L1 / verify / reverse-roundtrip contract that Phases 18 and the external validator
 depend on). After v0.6: candidates in `NEXT-ROADMAP-DRAFT.md` §B include forward declared-geometry
 threading (GEO-F), `pixel` facet (F6), continuous-mode (F7), full `image` entity / `images.parquet`
