@@ -1,11 +1,17 @@
 //! Per-axis L1/L2 numeric comparator (VER-03; CONTEXT Area 2 — the crux).
 //!
-//! This module carries the load-bearing correctness fact of the whole verification layer:
-//! an **L1** check compares values at the SOURCE stored float width (f32-vs-f32,
-//! f64-vs-f64) with `Δ = 0`, and NEVER widens f32→f64. [`NumArray::as_f64`] is explicitly
-//! NON-CANONICAL (see `src/read/record.rs` doc) — widening for an L1 Δ=0 check would
-//! silently destroy the source dtype that L1 bit-for-bit fidelity rests on (T-05-03). The
-//! f32 comparator twin computes its relative error in f32 and compares at f32 width.
+//! This module carries the load-bearing correctness fact of the whole verification layer.
+//! Phase 16 (DTY-05) redefined **L1** from "bit-for-bit at the SOURCE stored width, no
+//! widen/narrow" to **value-equal at CANONICAL mzPeak width** (`mz=f64`, `intensity=f32`):
+//! the forward data facet now ALWAYS emits canonical dtypes (see
+//! `src/write/spectrum.rs::to_mzdata_canonical`), so the comparator compares the source
+//! against the output AT CANONICAL WIDTH — coercing the source to the OUTPUT's width (widen
+//! source f32→f64 when the output is f64; narrow source f64→f32 when the output is f32). A
+//! source/output dtype DIVERGENCE is NO LONGER a mismatch; only a VALUE difference is. The
+//! relaxation is the comparison WIDTH, not the tolerance — under L1 `Δ` is still EXACTLY 0.
+//! m/z widening (`f32→f64`) is lossless (every f32 exactly representable in f64), so a
+//! value-equal source compares clean; intensity narrowing (`f64→f32`) is the only real
+//! precision loss and is recorded as provenance + a CLI warning at the write boundary.
 //!
 //! Tolerance numbers are IMPORTED from the Phase-3 [`ToleranceContract`] — NEVER re-encoded
 //! locally (CONTEXT Area 1; T-05-02). L1 = `mz_rel_err = 0.0` / `intensity_rel_err = 0.0`;
@@ -13,10 +19,7 @@
 //!
 //! Per-axis: the comparator takes an ALREADY-SELECTED per-axis tolerance. The m/z-vs-
 //! intensity split (m/z uses `mz_rel_err`, intensity uses `intensity_rel_err`) lives at the
-//! call site (the orchestrator in a later plan; CONTEXT Area 2, criterion 3).
-//!
-//! Note: `as_f64()` is reserved for the informational / L2 centroid-m/z path ONLY
-//! (RESEARCH Pitfall 2) — it MUST NOT appear in an L1 Δ=0 check.
+//! call site (the orchestrator; CONTEXT Area 2, criterion 3).
 
 use crate::read::record::NumArray;
 use crate::schema::{ConformanceLevel, ToleranceContract};
@@ -78,13 +81,18 @@ pub fn first_mismatch_f32(
     })
 }
 
-/// Dispatch the per-axis comparison on the SOURCE [`NumArray`] variant, comparing at the
-/// source's stored width.
+/// Dispatch the per-axis comparison at CANONICAL width, coercing the SOURCE to the OUTPUT's
+/// stored width (DTY-05). A source/output dtype DIVERGENCE is NO LONGER a mismatch — only a
+/// VALUE difference is.
 ///
-/// `F64` source → [`first_mismatch_f64`] (the output is read as f64). `F32` source →
-/// [`first_mismatch_f32`] (the output is read as f32, the rel-err cast to f32). The output
-/// arrays MUST already be materialized at the matching width by the caller (the
-/// `MzPeakReader` read-back preserves source dtype — RESEARCH Crux).
+/// The OUTPUT [`NumArray`] variant fixes the comparison width (the forward facet emits the
+/// canonical dtype: f64 m/z, f32 intensity). The source is coerced to match:
+///   - output `F64` → compare at f64; the source is WIDENED f32→f64 (exact / lossless) when
+///     needed and run through [`first_mismatch_f64`].
+///   - output `F32` → compare at f32; the source is NARROWED f64→f32 when needed and run
+///     through [`first_mismatch_f32`] (the rel-err cast to f32).
+/// This NEVER widens the OUTPUT to f64 to mask a difference — it coerces the SOURCE to the
+/// output's (canonical) width, so the comparison happens at the stored output width.
 ///
 /// `rel_err_f64` is the already-selected per-axis tolerance from a [`ToleranceContract`]
 /// (`mz_rel_err` for the m/z axis, `intensity_rel_err` for intensity). The m/z-vs-intensity
@@ -96,17 +104,24 @@ pub fn compare_axis(
     level: ConformanceLevel,
 ) -> Option<usize> {
     match (source, out) {
+        // Output is f64 (canonical m/z): compare at f64, widening the source if it is f32.
+        // f32→f64 widening is exact, so a value-equal source produces no mismatch.
         (NumArray::F64(src_v), NumArray::F64(out_v)) => {
             first_mismatch_f64(src_v, out_v, rel_err_f64, level)
         }
+        (NumArray::F32(src_v), NumArray::F64(out_v)) => {
+            let src_widened: Vec<f64> = src_v.iter().map(|&x| x as f64).collect();
+            first_mismatch_f64(&src_widened, out_v, rel_err_f64, level)
+        }
+        // Output is f32 (canonical intensity): compare at f32, narrowing the source if it is
+        // f64. A value-equal narrowed source produces no mismatch.
         (NumArray::F32(src_v), NumArray::F32(out_v)) => {
             first_mismatch_f32(src_v, out_v, rel_err_f64 as f32, level)
         }
-        // A dtype divergence between source and output is itself a mismatch: under L1 the
-        // stored widths MUST match (no widen/narrow). Report at the first element of the
-        // shorter view so the caller surfaces it rather than silently widening.
-        (NumArray::F64(src_v), NumArray::F32(out_v)) => Some(src_v.len().min(out_v.len())),
-        (NumArray::F32(src_v), NumArray::F64(out_v)) => Some(src_v.len().min(out_v.len())),
+        (NumArray::F64(src_v), NumArray::F32(out_v)) => {
+            let src_narrowed: Vec<f32> = src_v.iter().map(|&x| x as f32).collect();
+            first_mismatch_f32(&src_narrowed, out_v, rel_err_f64 as f32, level)
+        }
     }
 }
 
@@ -379,11 +394,42 @@ mod tests {
     }
 
     #[test]
-    fn compare_axis_dtype_divergence_is_mismatch() {
-        // A source/output stored-width divergence is itself a mismatch (no silent widening).
-        let src = NumArray::F32(vec![1.0, 2.0]);
-        let out = NumArray::F64(vec![1.0, 2.0]);
-        assert!(compare_axis(&src, &out, 0.0, ConformanceLevel::L1BitForBit).is_some());
+    fn compare_axis_value_equal_dtype_divergence_is_not_a_mismatch() {
+        // DTY-05: a source/output dtype DIVERGENCE is no longer a mismatch — only a VALUE
+        // difference is. Compare at canonical (output) width, coercing the source.
+
+        // m/z axis: F32 source vs the canonical f64 output, value-equal after widening → None
+        // (f32→f64 is exact / lossless).
+        let src32 = NumArray::F32(vec![1.5, 2.5]);
+        let out64 = NumArray::F64(vec![1.5, 2.5]);
+        assert_eq!(
+            compare_axis(&src32, &out64, 0.0, ConformanceLevel::L1BitForBit),
+            None,
+            "a value-equal widened m/z is not an L1 mismatch"
+        );
+
+        // intensity axis: F64 source vs the canonical f32 output, value-equal after narrowing
+        // → None.
+        let src64 = NumArray::F64(vec![10.0, 20.0]);
+        let out32 = NumArray::F32(vec![10.0, 20.0]);
+        assert_eq!(
+            compare_axis(&src64, &out32, 0.0, ConformanceLevel::L1BitForBit),
+            None,
+            "a value-equal narrowed intensity is not an L1 mismatch"
+        );
+
+        // A GENUINE value difference across a dtype divergence is still a mismatch.
+        let bad_out64 = NumArray::F64(vec![1.5, 9.9]);
+        assert_eq!(
+            compare_axis(&src32, &bad_out64, 0.0, ConformanceLevel::L1BitForBit),
+            Some(1),
+            "a real value difference is still flagged"
+        );
+        let bad_out32 = NumArray::F32(vec![10.0, 99.0]);
+        assert_eq!(
+            compare_axis(&src64, &bad_out32, 0.0, ConformanceLevel::L1BitForBit),
+            Some(1)
+        );
     }
 
     // --- merge_masked: the masking-aware L1 contract (subset + zero-drop invariant). ---------

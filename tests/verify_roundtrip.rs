@@ -738,14 +738,16 @@ fn source_side_duplicate_coordinate_fails_coordinates() {
     let _ = std::fs::remove_file(&out);
 }
 
-/// WR-04 (F64-source centroid intensity vs the f32 peaks facet): a stored-width DIVERGENCE is
-/// reported as an L1 mismatch via the explicit divergence rule (no f32→f64 widening). The fixture
-/// pixel below is a centroid whose intensity is `F64` (the upstream peaks facet stores intensity
-/// f32), so under L1 the intensity axis must report a mismatch at the centroid pixel.
+/// DTY-05 (F64-source centroid intensity vs the f32 peaks facet): under the redefined L1
+/// (value-equal at canonical width) a source/output dtype DIVERGENCE is NO LONGER a mismatch —
+/// the F64 source intensity is NARROWED to the canonical f32 and compared value-equal. The
+/// fixture intensities below (55.0, 3.0) are exactly representable in f32, so the narrowed
+/// comparison is value-equal and the intensity axis PASSES at L1. (This is the inverse of the
+/// pre-Phase-16 WR-04 "divergence is a mismatch" assertion.)
 #[test]
-fn centroid_f64_intensity_is_stored_width_divergence_under_l1() {
+fn centroid_f64_intensity_value_equal_narrowed_passes_l1() {
     let out = temp_out("centf64int");
-    // Single centroid pixel with an F64 SOURCE intensity (diverges from the f32 peaks facet).
+    // Single centroid pixel with an F64 SOURCE intensity narrowing value-equal to f32.
     let fx = vec![ImagingSpectrum {
         x: 1,
         y: 1,
@@ -761,23 +763,17 @@ fn centroid_f64_intensity_is_stored_width_divergence_under_l1() {
     let report = verify_against_source(&fx, &out, ConformanceLevel::L1BitForBit)
         .expect("verify returns a report");
 
-    // The peaks facet is f32; an F64 source intensity is a stored-width divergence, reported as a
-    // mismatch under L1 (WR-04) rather than silently widened.
+    // The peaks facet is f32; the F64 source intensity is narrowed to f32 and compared
+    // value-equal (DTY-05) — no divergence-mismatch under L1.
     assert!(
-        !report.intensity.passed,
-        "F64-source centroid intensity vs f32 peaks facet is an L1 divergence: {:?}",
+        report.intensity.passed,
+        "a value-equal narrowed F64 centroid intensity passes L1 (DTY-05): {:?}",
         report.intensity
     );
-    assert!(
-        report.intensity.mismatch_count >= 1,
-        "the divergence surfaces as at least one intensity mismatch (WR-04)"
+    assert_eq!(
+        report.intensity.mismatch_count, 0,
+        "no intensity mismatch when the narrowed values are value-equal at f32"
     );
-    let int_mismatches = report
-        .mismatches
-        .iter()
-        .filter(|m| matches!(m.axis, mzml2mzpeak::verify::MismatchAxis::Intensity))
-        .count();
-    assert!(int_mismatches >= 1, "an intensity Mismatch record is retained for the divergence");
 
     let _ = std::fs::remove_file(&out);
 }

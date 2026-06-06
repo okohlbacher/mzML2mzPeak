@@ -502,18 +502,20 @@ fn compare_paired_pixel(
         // grouped with `Centroid` below. (A prior comment here claimed `Unknown` lands in
         // `spectra_data`; that was masked by auxiliary-array fallback before DAT-01 and is wrong.)
         Representation::Profile => {
-            // Profile -> spectra_data facet; the L1 reference, compared at SOURCE width.
+            // Profile -> spectra_data facet; the L1 reference, compared at CANONICAL width
+            // (f64 m/z, f32 intensity) per DTY-05.
             //
             // MASKING-AWARE L1 (the adapted contract): the writer keeps
             // `mask_zero_intensity_runs = true` (src/write/writer.rs), so the output point
             // arrays are a zero-suppressed SUBSET of the source, NOT an element-for-element
             // copy. A strict equal-length element-wise compare would FALSELY FAIL on real
             // profile data. Instead we run a two-pointer MERGE over source vs output points in
-            // ascending m/z order (`merge_masked`): surviving points are checked bit-for-bit at
-            // the SOURCE width (no f32→f64 widening), and every DROPPED source point must have
-            // had intensity == 0 (the writer only ever drops zero-intensity points — see the
-            // `merge_masked` doc + vendored `filter.rs:623`). A dropped NON-ZERO point is real
-            // signal loss → an L1 intensity FAILURE.
+            // ascending m/z order (`merge_masked`): surviving points are checked value-equal at
+            // CANONICAL width (source m/z widened f32→f64 exactly; source intensity narrowed
+            // f64→f32), and every DROPPED source point must have had intensity == 0 (the writer
+            // only ever drops zero-intensity points — see the `merge_masked` doc + vendored
+            // `filter.rs:623`). A dropped NON-ZERO point is real signal loss → an L1 intensity
+            // FAILURE.
             let arrays = reader
                 .get_spectrum_arrays(out_idx)
                 .map_err(VerifyError::OpenOutput)?
@@ -591,42 +593,22 @@ fn compare_paired_pixel(
                 });
             }
 
-            // intensity: source f32 vs peaks-facet f32 — L1-checkable at f32 width.
+            // intensity: compare at CANONICAL width (the peaks facet stores f32) per DTY-05.
+            // An F32 source compares directly; an F64 source is NARROWED to f32 and compared
+            // value-equal at f32 — a width divergence is NO LONGER a mismatch (only a VALUE
+            // difference is). Both L1 and L2 compare at the OUTPUT (f32) width, never widening
+            // the f32 output to f64.
             let int_first = match &s.intensity {
                 NumArray::F32(src_i) => {
                     first_mismatch_f32(src_i, &out_int, tol.intensity_rel_err as f32, level)
                 }
-                // An F64-source intensity vs the f32 peaks facet is a stored-width DIVERGENCE
-                // (the peaks facet is f32 by upstream schema). This mirrors `compare_axis`'s
-                // dtype-divergence rule (compare.rs:108-109): under L1 the stored widths MUST
-                // match, so the divergence is itself a mismatch — reported at the first element
-                // WITHOUT widening the f32 output to f64 (the module-wide no-widen rule, WR-04).
-                // Under L2 the relaxed bound still applies AFTER the source is narrowed to the
-                // peaks-facet f32 width: compare f32-vs-f32 so the comparison happens at the
-                // OUTPUT stored width, never by widening f32→f64.
-                NumArray::F64(src_i) => match level {
-                    ConformanceLevel::L1BitForBit => {
-                        // Empty arrays trivially agree; any non-empty F64-vs-f32 is a divergence.
-                        if src_i.is_empty() && out_int.is_empty() {
-                            None
-                        } else if src_i.len() != out_int.len() {
-                            Some(src_i.len().min(out_int.len()))
-                        } else {
-                            Some(0)
-                        }
-                    }
-                    ConformanceLevel::L2Transformed => {
-                        // L2 narrows the source to the output stored width (f32) and applies
-                        // the relative-error bound at f32 — never widening the output to f64.
-                        let src_i_f32: Vec<f32> = src_i.iter().map(|&x| x as f32).collect();
-                        first_mismatch_f32(
-                            &src_i_f32,
-                            &out_int,
-                            tol.intensity_rel_err as f32,
-                            level,
-                        )
-                    }
-                },
+                NumArray::F64(src_i) => {
+                    // Narrow the source to the canonical f32 width, then compare value-equal at
+                    // f32 under the active level. Under L1 a value-equal narrowed intensity is
+                    // NOT a failure; a genuine difference still fails.
+                    let src_i_f32: Vec<f32> = src_i.iter().map(|&x| x as f32).collect();
+                    first_mismatch_f32(&src_i_f32, &out_int, tol.intensity_rel_err as f32, level)
+                }
             };
             if let Some(elem) = int_first {
                 *int_mismatch_pixels += 1;
@@ -647,16 +629,21 @@ fn compare_paired_pixel(
     }
 }
 
-/// Run the MASKING-AWARE per-pixel merge for a PROFILE pixel: decode the output `spectra_data`
-/// m/z + intensity arrays at the SOURCE stored width (the read-back preserves source dtype —
-/// RESEARCH Crux; never widen for L1) and validate the adapted L1 contract directly via
-/// [`merge_masked`] — surviving points bit-for-bit at source width, dropped points must be
-/// zero-intensity. Returns the per-axis [`MergeOutcome`].
+/// Run the MASKING-AWARE per-pixel merge for a PROFILE pixel at CANONICAL width (DTY-05):
+/// decode the output `spectra_data` m/z + intensity arrays at the CANONICAL mzPeak width
+/// (f64 m/z, f32 intensity — the forward facet now ALWAYS emits those), coerce the SOURCE to
+/// canonical (widen source m/z f32→f64 exactly; narrow source intensity f64→f32), and validate
+/// the adapted L1 contract directly via [`merge_masked`] — surviving points value-equal at
+/// canonical width, dropped points must be zero-intensity. Returns the per-axis [`MergeOutcome`].
 ///
-/// Because m/z and intensity can have INDEPENDENT source widths (e.g. F64 m/z + F32 intensity —
-/// the PXD001283 profile), this dispatches on BOTH axes' source variants and instantiates the
-/// generic [`merge_masked`] at the matching element types so the comparison happens at the
-/// stored width on each axis with NO widening (the load-bearing no-widen rule, T-05-03 / WR-04).
+/// Phase 16 flipped this from the old SOURCE-width dispatch (a `run_merge!` over all four
+/// (F64/F32)×(F64/F32) source combos, decoding the output at the source element type and
+/// treating a width divergence as a mismatch) to a SINGLE canonical instantiation
+/// `merge_masked::<f64 /*mz*/, f32 /*intensity*/>`. m/z widening f32→f64 is exact, so a
+/// value-equal source still yields zero mismatches; intensity narrowing f64→f32 is compared
+/// value-equal at f32. The masking-aware two-pointer merge, the strictly-ascending precondition
+/// (`first_non_ascending`), and the equal-length source-axis guard are UNCHANGED — only the
+/// comparison WIDTH moved to canonical.
 fn compare_profile_masked(
     s: &ImagingSpectrum,
     mz_da: &mzdata::spectrum::bindata::DataArray,
@@ -705,85 +692,76 @@ fn compare_profile_masked(
         });
     }
 
-    // Per-axis L1/L2 predicates, specialized to the stored width. L1 → exact `!=`; L2 → the
+    // CANONICAL-WIDTH coercion of the SOURCE (DTY-05): the forward facet emits f64 m/z + f32
+    // intensity, so we widen the source m/z to f64 (EXACT — every f32 is exactly representable
+    // in f64, so a value-equal source compares clean) and narrow the source intensity to f32.
+    // The output is decoded at the SAME canonical widths below. This is a strict superset of the
+    // old all-canonical (PXD001283: f64 m/z + f32 intensity) path: there the widen/narrow are
+    // no-ops and the comparison reduces to the prior exact compare.
+    let src_mz: Vec<f64> = match &s.mz {
+        NumArray::F64(v) => v.clone(),
+        NumArray::F32(v) => v.iter().map(|&x| x as f64).collect(),
+    };
+    let src_int: Vec<f32> = match &s.intensity {
+        NumArray::F32(v) => v.clone(),
+        NumArray::F64(v) => v.iter().map(|&x| x as f32).collect(),
+    };
+
+    // Decode the OUTPUT at canonical width: f64 m/z, f32 intensity.
+    let out_mz = decode_at::<f64>(mz_da, index, "m/z")?;
+    let out_int = decode_at::<f32>(int_da, index, "intensity")?;
+
+    // Per-axis L1/L2 predicates at canonical width. L1 → exact `!=` / `==`; L2 → the
     // relative-error bound `|a-b|/|b| > rel_err` with a `b==0` exact-inequality guard (mirrors
     // `first_mismatch_*`).
-    macro_rules! mismatch_pred {
-        ($ty:ty, $rel:expr) => {{
-            let rel = $rel as $ty;
-            move |a: $ty, b: $ty| match level {
-                ConformanceLevel::L1BitForBit => a != b,
-                ConformanceLevel::L2Transformed => {
-                    if b == (0.0 as $ty) {
-                        a != b
-                    } else {
-                        ((a - b).abs() / b.abs()) > rel
-                    }
-                }
-            }
-        }};
-    }
+    let mz_rel = tol.mz_rel_err;
+    let int_rel = tol.intensity_rel_err as f32;
 
+    let mz_mismatch = move |a: f64, b: f64| match level {
+        ConformanceLevel::L1BitForBit => a != b,
+        ConformanceLevel::L2Transformed => {
+            if b == 0.0 {
+                a != b
+            } else {
+                ((a - b).abs() / b.abs()) > mz_rel
+            }
+        }
+    };
     // m/z point IDENTITY at the merge boundary. WR-05: this MUST track the same level-aware
-    // tolerance as the m/z *mismatch* predicate, otherwise the boundary is inconsistent. Under
-    // L1 identity is exact (`==`, the bit-for-bit key). Under L2 two m/z that differ by less
-    // than `mz_rel_err` are the SAME surviving point (`mz_mismatch` would NOT flag them), so the
-    // identity tie must also accept them — exactly the NEGATION of the L2 mismatch predicate.
-    // Using exact `==` under L2 would push such a within-tolerance pair down the
-    // `smz < omz` / `out < src` branches and raise a SPURIOUS m/z failure / dropped-point check
-    // for points L2 is supposed to accept. (`a == b` already implies within-tolerance, so this
-    // is strictly more permissive than `==` and never narrows L1 behavior.)
-    macro_rules! eq_pred {
-        ($ty:ty, $rel:expr) => {{
-            let rel = $rel as $ty;
-            move |a: $ty, b: $ty| match level {
-                ConformanceLevel::L1BitForBit => a == b,
-                ConformanceLevel::L2Transformed => {
-                    if b == (0.0 as $ty) {
-                        a == b
-                    } else {
-                        ((a - b).abs() / b.abs()) <= rel
-                    }
-                }
+    // tolerance as the m/z *mismatch* predicate. Under L1 identity is exact (`==`). Under L2 two
+    // m/z within `mz_rel_err` are the SAME surviving point — the NEGATION of the L2 mismatch
+    // predicate — so the identity tie accepts them too.
+    let mz_eq = move |a: f64, b: f64| match level {
+        ConformanceLevel::L1BitForBit => a == b,
+        ConformanceLevel::L2Transformed => {
+            if b == 0.0 {
+                a == b
+            } else {
+                ((a - b).abs() / b.abs()) <= mz_rel
             }
-        }};
-    }
+        }
+    };
+    let int_mismatch = move |a: f32, b: f32| match level {
+        ConformanceLevel::L1BitForBit => a != b,
+        ConformanceLevel::L2Transformed => {
+            if b == 0.0_f32 {
+                a != b
+            } else {
+                ((a - b).abs() / b.abs()) > int_rel
+            }
+        }
+    };
 
-    macro_rules! run_merge {
-        ($mz_ty:ty, $src_mz:expr, $int_ty:ty, $src_int:expr) => {{
-            let out_mz = decode_at::<$mz_ty>(mz_da, index, "m/z")?;
-            let out_int = decode_at::<$int_ty>(int_da, index, "intensity")?;
-            let mz_eq = eq_pred!($mz_ty, tol.mz_rel_err);
-            let mz_mismatch = mismatch_pred!($mz_ty, tol.mz_rel_err);
-            let int_mismatch = mismatch_pred!($int_ty, tol.intensity_rel_err);
-            Ok(merge_masked(
-                $src_mz,
-                $src_int,
-                &out_mz,
-                &out_int,
-                // m/z point identity at the merge boundary: level-aware (WR-05).
-                mz_eq,
-                mz_mismatch,
-                int_mismatch,
-                |v: $int_ty| v == (0.0 as $int_ty),
-            ))
-        }};
-    }
-
-    match (&s.mz, &s.intensity) {
-        (NumArray::F64(src_mz), NumArray::F64(src_int)) => {
-            run_merge!(f64, src_mz, f64, src_int)
-        }
-        (NumArray::F64(src_mz), NumArray::F32(src_int)) => {
-            run_merge!(f64, src_mz, f32, src_int)
-        }
-        (NumArray::F32(src_mz), NumArray::F64(src_int)) => {
-            run_merge!(f32, src_mz, f64, src_int)
-        }
-        (NumArray::F32(src_mz), NumArray::F32(src_int)) => {
-            run_merge!(f32, src_mz, f32, src_int)
-        }
-    }
+    Ok(merge_masked(
+        &src_mz,
+        &src_int,
+        &out_mz,
+        &out_int,
+        mz_eq,
+        mz_mismatch,
+        int_mismatch,
+        |v: f32| v == 0.0_f32,
+    ))
 }
 
 /// Decode an output [`DataArray`] at the requested element width (`f32` or `f64`) WITHOUT
@@ -991,6 +969,84 @@ mod tests {
             crate::verify::compare::MergeOutcome::default(),
             "ascending source with only zero-intensity drops is lossless"
         );
+    }
+
+    /// DTY-05: a profile pixel whose SOURCE m/z is F32 verifies GREEN at L1 against the
+    /// canonical f64 output facet when the values are value-equal after widening (f32→f64 is
+    /// exact). The old contract treated the F32-source-vs-f64-output divergence as a mismatch;
+    /// the canonical-width comparison no longer does.
+    #[test]
+    fn dty05_f32_source_mz_vs_f64_output_passes_l1() {
+        // F32 source m/z (round, exactly representable) + F32 intensity; output is canonical
+        // f64 m/z + f32 intensity with value-equal data.
+        let s = profile_spectrum(
+            NumArray::F32(vec![100.0, 200.0, 300.0]),
+            NumArray::F32(vec![10.0, 20.0, 30.0]),
+        );
+        let (mz_da, int_da) = out_arrays(&[100.0, 200.0, 300.0], &[10.0, 20.0, 30.0]);
+        let outcome = compare_profile_masked(
+            &s,
+            &mz_da,
+            &int_da,
+            ConformanceLevel::L1BitForBit,
+            &ToleranceContract::L1,
+            0,
+            (1, 1, None),
+        )
+        .expect("canonical-width compare must run");
+        assert_eq!(
+            outcome,
+            crate::verify::compare::MergeOutcome::default(),
+            "a value-equal widened F32 source m/z is not an L1 failure"
+        );
+    }
+
+    /// DTY-05: a profile pixel whose SOURCE intensity is F64 verifies GREEN at L1 against the
+    /// canonical f32 output facet when the narrowed values are value-equal — but a genuinely
+    /// perturbed value still FAILS on the intensity axis.
+    #[test]
+    fn dty05_f64_source_intensity_vs_f32_output_value_equal_passes_perturbed_fails() {
+        // Value-equal narrowed case: F64 source intensity whose values are exactly
+        // representable in f32 → green at L1.
+        let s = profile_spectrum(
+            NumArray::F64(vec![100.0, 200.0, 300.0]),
+            NumArray::F64(vec![10.0, 20.0, 30.0]),
+        );
+        let (mz_da, int_da) = out_arrays(&[100.0, 200.0, 300.0], &[10.0, 20.0, 30.0]);
+        let outcome = compare_profile_masked(
+            &s,
+            &mz_da,
+            &int_da,
+            ConformanceLevel::L1BitForBit,
+            &ToleranceContract::L1,
+            0,
+            (1, 1, None),
+        )
+        .expect("canonical-width compare must run");
+        assert_eq!(
+            outcome,
+            crate::verify::compare::MergeOutcome::default(),
+            "a value-equal narrowed F64 source intensity is not an L1 failure"
+        );
+
+        // Perturbed case: the output intensity at index 1 differs → an intensity-axis failure.
+        let (mz_da2, int_da2) = out_arrays(&[100.0, 200.0, 300.0], &[10.0, 99.0, 30.0]);
+        let outcome2 = compare_profile_masked(
+            &s,
+            &mz_da2,
+            &int_da2,
+            ConformanceLevel::L1BitForBit,
+            &ToleranceContract::L1,
+            0,
+            (1, 1, None),
+        )
+        .expect("canonical-width compare must run");
+        assert_eq!(
+            outcome2.intensity,
+            Some(crate::verify::compare::AxisMismatch { src_element: 1 }),
+            "a genuinely perturbed narrowed intensity still fails L1"
+        );
+        assert_eq!(outcome2.mz, None, "m/z was value-equal");
     }
 
     /// WR-01 regression (iteration 2): a profile pixel whose SOURCE m/z and intensity axes
