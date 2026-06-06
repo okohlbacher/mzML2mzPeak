@@ -63,7 +63,7 @@ Bring the forward converter into mzPeak spec conformance:
   (no longer dtype-identical); the reverse read path accepts canonical-width data without recovering the
   original source dtype.
 
-- [ ] **DTY-07**: All dtype-preservation tests are updated to the new bar, and a regression test proves
+- [x] **DTY-07**: All dtype-preservation tests are updated to the new bar, and a regression test proves
   a mixed-/narrowing-dtype source converts + verifies at canonical width. PXD001283 acceptance (already
   `f64` m/z + `f32` intensity, hence conformant) still passes **unchanged**.
 
@@ -178,7 +178,7 @@ GEO×3, SRC×2, OPT×4, RIMG×3). No orphans, no duplicates.
 | DTY-04 | Phase 16 | Complete |
 | DTY-05 | Phase 16 | Complete |
 | DTY-06 | Phase 16 | Complete |
-| DTY-07 | Phase 16 | Pending |
+| DTY-07 | Phase 16 | Complete |
 | CVL-01 | Phase 17 | Pending |
 | CVL-02 | Phase 17 | Pending |
 | GEO-01 | Phase 18 | Pending |
