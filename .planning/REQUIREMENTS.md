@@ -85,7 +85,7 @@ Bring the forward converter into mzPeak spec conformance:
   authoritative `scan_settings_list` (single source of truth; the index value is regenerated from, and
   matches, the facet).
 
-- [ ] **GEO-03**: Read-back proves the authoritative geometry survives and the derived index copy is
+- [x] **GEO-03**: Read-back proves the authoritative geometry survives and the derived index copy is
   byte/semantically consistent with the facet.
 
 ### Source-file provenance — `source_files[]` (SRC) — Phase 19
@@ -183,7 +183,7 @@ GEO×3, SRC×2, OPT×4, RIMG×3). No orphans, no duplicates.
 | CVL-02 | Phase 17 | Complete |
 | GEO-01 | Phase 18 | Complete |
 | GEO-02 | Phase 18 | Complete |
-| GEO-03 | Phase 18 | Pending |
+| GEO-03 | Phase 18 | Complete |
 | SRC-01 | Phase 19 | Pending |
 | SRC-02 | Phase 19 | Pending |
 | OPT-01 | Phase 20 | Pending |

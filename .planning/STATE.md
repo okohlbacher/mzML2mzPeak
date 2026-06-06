@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: — Spec conformance — dtypes + CV/geometry/provenance
 status: verifying
-stopped_at: Completed 17-01-PLAN.md (file-level cv_list MS/IMS/UO emitted from one shared constant equal to the reverse <cvList> literals; schema/cv_list.json + spec Edit 2 aligned).
-last_updated: "2026-06-06T02:40:17.021Z"
+stopped_at: Completed 18-03-PLAN.md (GEO-03 two-level consistency proof — tests/scan_settings.rs: Level 1 projection derived-copy over declared 3×3/100µm/300µm geometry, Level 2 convert_with(Some) public-seam scan_settings_list emission). Phase 18 complete (3/3).
+last_updated: "2026-06-06T02:47:00.000Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 9
-  completed_plans: 8
-  percent: 33
+  completed_plans: 9
+  percent: 38
 ---
 
 # Project State
@@ -31,8 +31,8 @@ fidelity contract the geometry facet (Phase 18) and the external validator depen
 
 ## Current Position
 
-Phase: 17 — cv_list file-level CV declaration (in progress — 1/2 plans)
-Plan: 17-01 complete (1 of 2); forward cv_list (MS/IMS/UO) emitted + schema/cv_list.json + spec Edit 2 aligned (CVL-01). Next: 17-02 read-back consistency test (CVL-02).
+Phase: 18 — scan_settings_list authoritative geometry facet (complete — 3/3 plans)
+Plan: 18-03 complete (3 of 3); GEO-03 two-level consistency proof in tests/scan_settings.rs (Level 1 declared-geometry projection derived-copy, Level 2 convert_with(Some) public-seam emission). GEO-01/02/03 all complete.
 Status: Phase complete — ready for verification
 Last activity: 2026-06-06
 
@@ -80,7 +80,7 @@ matching `schema/*.json`.
 
 **Velocity:**
 
-- Total plans completed (v0.3): 17; (v0.4): 10; (v0.5): 7; (v0.6): 1.
+- Total plans completed (v0.3): 17; (v0.4): 10; (v0.5): 7; (v0.6): 9.
 - Average duration: — min
 - Total execution time: — hours
 
@@ -96,6 +96,7 @@ matching `schema/*.json`.
 | Phase 17 P02 | 3min | 1 tasks | 1 files |
 | Phase 18 P01 | 12min | 2 tasks | 4 files |
 | Phase 18 P02 | 10min | 2 tasks | 3 files |
+| Phase 18 P03 | 6min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -150,6 +151,7 @@ Key file touchpoints for Phase 16 (from the milestone scoping):
 - [Phase ?]: Plan 18-01: scan_settings_list facet — inline CV-param shape (param.json absent), one settings entry even for all-None geometry, grid_z never emitted, CV names/units copied from reverse emitter (three-places rule)
 - [Phase 18]: Plan 18-02: convert_with gains geometry: Option<&ImagingRunMetadata>; back-compat convert wrapper passes None so existing callers stay byte-identical
 - [Phase 18]: Plan 18-02: metadata.imaging geometry (incl. absolute_offset_um) is a derived copy of the same ImagingRunMetadata that builds scan_settings_list (GEO-02 single source of truth)
+- [Phase 18]: Plan 18-03 (GEO-03): tests/scan_settings.rs locks the two-level proof. Level 1 (non-vacuous) parses Synthetic_FullGeometry (declared 3×3/100µm/300µm + IMS:1000413) into BOTH scan_settings_list_from_geometry AND the derived imaging block (reached via the PUBLIC ImagingWriter::write_run_metadata + imaging_metadata() seam, since assemble_imaging_metadata is pub(crate)) and asserts geometry equality + correct IMS accessions + UO:0000017 µm unit (µm terms unit-bearing; grid + scan-pattern unitless). Level 2 converts Example_Processed via convert_with(Some(&geom)) (NOT the convert() wrapper, which passes None and omits the key) and asserts a well-formed scan_settings_list (id + parameters[]) in MzPeakReader.file_index().metadata. Two-fixture split documented (no fixture pairs a declared grid with an .ibd). Phase 18 complete (3/3).
 
 ### Pending Todos
 
@@ -187,10 +189,10 @@ Items acknowledged and carried forward to v0.7+:
 
 ## Session Continuity
 
-Last session: 2026-06-06T02:38:24.235Z
-Stopped at: Completed 17-01-PLAN.md (file-level cv_list MS/IMS/UO emitted from one shared constant equal to the reverse <cvList> literals; schema/cv_list.json + spec Edit 2 aligned).
+Last session: 2026-06-06T02:47:00.000Z
+Stopped at: Completed 18-03-PLAN.md (GEO-03 two-level consistency proof — Phase 18 complete 3/3).
 Resume file: None
 
 ## Operator Next Steps
 
-- Execute 17-02 (CVL-02): read-back consistency test asserting every referenced CV is in cv_list and none is spurious, via `MzPeakReader.file_index().metadata["cv_list"]`.
+- Phase 18 complete (GEO-01/02/03). Next milestone phase: Phase 19 (source_files[] provenance, SRC-01/02) — reuse the integrity preflight's UUID/checksum, no second hash.

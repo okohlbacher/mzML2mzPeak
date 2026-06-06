@@ -22,7 +22,7 @@
 
 - [x] **Phase 16: Canonical-width dtype conformance** — forward casts the data facet to `mz=f64`/`intensity=f32`, records narrowing provenance + CLI warning, redefines L1 to value-equal-at-canonical-width.
 - [ ] **Phase 17: cv_list file-level CV declaration** — forward declares every CV (MS/IMS/UO) referenced in the archive (spec Edit 2).
-- [ ] **Phase 18: scan_settings_list authoritative geometry facet** — forward emits the authoritative geometry facet; the index geometry block becomes a derived copy (spec Edit 3).
+- [x] **Phase 18: scan_settings_list authoritative geometry facet** — forward emits the authoritative geometry facet; the index geometry block becomes a derived copy (spec Edit 3).
 - [ ] **Phase 19: source_files[] provenance** — forward records input `.imzML`/`.ibd` provenance reusing the integrity preflight's UUID/checksum (spec Edit 10).
 - [ ] **Phase 20: Optical image auto-discovery & auto-embed** — forward follows the source imzML's `IMS:1006008` reference and auto-embeds the optical image, capturing descriptive CV attrs.
 - [ ] **Phase 21: Reverse optical image export** — reverse writes embedded image members back out + re-emits `IMS:1006008`, restoring forward↔reverse optical symmetry.
@@ -112,7 +112,7 @@ Plans:
 
 - [x] 18-01-PLAN.md — schema/scan_settings.json + ScanSettings/ScanSettingsParam types + scan_settings_list_from_geometry builder + spec Edit 3/Part B reconcile (GEO-01)
 - [x] 18-02-PLAN.md — thread ImagingRunMetadata into the forward path; emit scan_settings_list via add_index_metadata alongside cv_list+imaging; metadata.imaging geometry becomes a derived copy of the same source; pixel_count_source declared|observed_max preserved (GEO-02)
-- [ ] 18-03-PLAN.md — read-back consistency test: scan_settings_list present; metadata.imaging geometry equals the facet; correct IMS accessions + UO:0000017 µm unit; observed_max not fabricated into the facet (GEO-03)
+- [x] 18-03-PLAN.md — read-back consistency test: scan_settings_list present; metadata.imaging geometry equals the facet; correct IMS accessions + UO:0000017 µm unit; observed_max not fabricated into the facet (GEO-03)
 
 ### Phase 19: source_files[] provenance
 
@@ -167,7 +167,7 @@ Plans:
 | 15. TIFF optical-image import | v0.5 | 3/3 | Complete | 2026-06-05 |
 | 16. Canonical-width dtype conformance | v0.6 | 4/4 | Complete   | 2026-06-06 |
 | 17. cv_list file-level CV declaration | v0.6 | 2/2 | Complete   | 2026-06-06 |
-| 18. scan_settings_list authoritative geometry facet | v0.6 | 2/3 | In Progress|  |
+| 18. scan_settings_list authoritative geometry facet | v0.6 | 3/3 | Complete |  |
 | 19. source_files[] provenance | v0.6 | 0/? | Not started | - |
 | 20. Optical image auto-discovery & auto-embed | v0.6 | 0/? | Not started | - |
 | 21. Reverse optical image export | v0.6 | 0/? | Not started | - |
