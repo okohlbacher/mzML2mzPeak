@@ -321,7 +321,9 @@ fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
         .with_context(|| format!("failed to parse scan settings for {}", cli.input.display()))?;
     let reader = ImagingReader::open_with(&cli.input, cli.allow_checksum_mismatch)
         .with_context(|| format!("failed to open imzML reader for {}", cli.input.display()))?;
-    let outcome = convert_with(reader, out, &cli.images, &enc, Some(&geom))
+    // SRC-01: thread the input `.imzML` path so convert_with records file_description.source_files
+    // provenance (.imzML + sibling .ibd; the .ibd carrying the reused UUID/checksum CURIE params).
+    let outcome = convert_with(reader, out, &cli.images, &enc, Some(&geom), Some(&cli.input))
         .context("conversion failed")?;
 
     // DTY-04 (Phase 16): if the canonical data-facet cast NARROWED an axis (lossy), warn —

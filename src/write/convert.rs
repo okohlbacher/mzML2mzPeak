@@ -79,6 +79,7 @@ pub fn convert(
         image_paths,
         &crate::write::EncodingOptions::legacy(),
         None,
+        None,
     )
     .map(|_outcome| ())
 }
@@ -93,6 +94,7 @@ pub fn convert_with(
     image_paths: &[PathBuf],
     opts: &crate::write::EncodingOptions,
     geometry: Option<&crate::schema::ImagingRunMetadata>,
+    input_path: Option<&Path>,
 ) -> Result<ConversionOutcome, WriteError> {
     // (0) PRE-FLIGHT image validation (WR-01): fail BEFORE any output file is created, so a
     //     bad/missing/non-TIFF/separator-named image passed anywhere in the --image list never
@@ -173,8 +175,12 @@ pub fn convert_with(
     //     terms) FROM the SAME ImagingRunMetadata that builds scan_settings_list below — one
     //     source of truth (GEO-02). With `geometry = None` the block still carries is_imaging +
     //     coordinate_base (OUT-03) and all geometry stays None.
+    //     SRC-01: the input `.imzML` path is threaded in via `input_path` (RunProvenance carries
+    //     none) so write_run_metadata_from can push `file_description.source_files[]` (.imzML +
+    //     sibling .ibd, the .ibd carrying the reused UUID/checksum CURIE params). `None` (the
+    //     back-compat convert() wrapper) emits no source_files — byte-behaviour-identical.
     let provenance = reader.provenance().clone();
-    writer.write_run_metadata(reader.source_metadata(), &provenance, geometry)?;
+    writer.write_run_metadata_from(reader.source_metadata(), &provenance, geometry, input_path)?;
 
     // (2b) PROVENANCE (Phase 16, DTY-03): if the canonical cast narrowed intensity
     //      (Float64 → Float32, lossy), record a per-axis provenance note on the conversion

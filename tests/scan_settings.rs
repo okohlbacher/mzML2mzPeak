@@ -235,6 +235,9 @@ fn convert_path_emits_scan_settings_list() {
         &image_paths,
         &EncodingOptions::legacy(),
         Some(&geom),
+        // No input path threaded here: this test asserts scan_settings_list, not source_files —
+        // None keeps source_files unemitted (the source_files contract is tested in source_files.rs).
+        None,
     )
     .expect("convert_with(Some(&geom)) succeeds and EMITS scan_settings_list");
 

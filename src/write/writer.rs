@@ -273,11 +273,46 @@ impl ImagingWriter {
         prov: &RunProvenance,
         geom: Option<&ImagingRunMetadata>,
     ) -> Result<(), WriteError> {
+        // Back-compat entry point: no threaded input path ⇒ no source_files pushed (existing
+        // library/test callers stay byte-behaviour-identical). The path-threaded forward path
+        // calls `write_run_metadata_from` with `Some(input)` (SRC-01).
+        self.write_run_metadata_from(source, prov, geom, None)
+    }
+
+    /// Like [`ImagingWriter::write_run_metadata`] but ALSO records `file_description.source_files`
+    /// provenance for the input `.imzML` and its sibling `.ibd` (SRC-01 / SRC-02), when an input
+    /// path is supplied.
+    ///
+    /// `input_path` is the source `.imzML` path threaded from the CLI ([`RunProvenance`] carries
+    /// no path). When `Some`, two [`mzdata::meta::SourceFile`] entries are pushed into
+    /// `file_description.source_files`:
+    ///   * the `.imzML` (name = basename, location = parent dir `file://` URI, id `"imzml"`); and
+    ///   * its sibling `.ibd` (same stem + `.ibd`, id `"ibd"`), whose `params` carry the source
+    ///     UUID (`IMS:1000080`) and the declared checksum CURIE (`IMS:1000090` MD5 / `IMS:1000091`
+    ///     SHA-1 / `IMS:1000092` SHA-256), REUSED verbatim from `prov` — NO re-hash (SRC-02).
+    ///
+    /// When `input_path` is `None`, NO source_files are pushed (the back-compat path). In every
+    /// case `file_description.contents` still carries the existing UUID/checksum/mode mapping —
+    /// source_files is the ADDITIONAL list, not a replacement.
+    pub fn write_run_metadata_from(
+        &mut self,
+        source: &impl MSDataFileMetadata,
+        prov: &RunProvenance,
+        geom: Option<&ImagingRunMetadata>,
+        input_path: Option<&Path>,
+    ) -> Result<(), WriteError> {
         // (a) Copy all source PSI-MS + IMS metadata verbatim, then (b)+(c) record mzml2mzpeak
         //     conversion provenance + map RunProvenance into file_description (in
         //     `wire_metadata_into`, shared so the logic has one home).
         self.inner.copy_metadata_from(source);
         wire_metadata_into(&mut self.inner, prov);
+
+        // (c2) SRC-01/SRC-02: push the .imzML + .ibd source_files when the input path is threaded
+        //      in. ADDITIVE — the contents mapping above is untouched. Values are REUSED from
+        //      `prov`; no compute_digest is called here (no second hashing pass).
+        if let Some(path) = input_path {
+            push_source_files(&mut self.inner, path, prov);
+        }
 
         // (d) Assemble + store the metadata.imaging block from geometry + provenance. The
         //     typed block is passed through to Plan 03's add_index_metadata, which serializes
@@ -482,27 +517,13 @@ fn wire_metadata_into(target: &mut impl MSDataFileMetadata, prov: &RunProvenance
                 .build(),
         );
     }
-    if let Some(checksum) = prov.ibd_checksum.as_deref() {
-        // Key the checksum accession on the declared algorithm: SHA-1 → IMS:1000091,
-        // MD5 → IMS:1000090. An unrecognized/absent type is not hand-invented (skip).
-        let kind = prov.ibd_checksum_type.as_deref().unwrap_or("");
-        if kind.eq_ignore_ascii_case("SHA-1") || kind.eq_ignore_ascii_case("SHA1") {
-            fd.add_param(
-                Param::builder()
-                    .name("ibd SHA-1")
-                    .curie(curie!(IMS:1000091))
-                    .value(checksum)
-                    .build(),
-            );
-        } else if kind.eq_ignore_ascii_case("MD5") {
-            fd.add_param(
-                Param::builder()
-                    .name("ibd MD5")
-                    .curie(curie!(IMS:1000090))
-                    .value(checksum)
-                    .build(),
-            );
-        }
+    // Key the checksum accession on the declared algorithm via the SHARED helper, so the
+    // contents mapping and the source_files .ibd params (pushed in `push_source_files`) can
+    // NEVER drift. An unrecognized/absent type is not hand-invented (the helper returns None).
+    if let Some(param) =
+        checksum_curie_param(prov.ibd_checksum.as_deref(), prov.ibd_checksum_type.as_deref())
+    {
+        fd.add_param(param);
     }
     match prov.data_mode {
         // Mode is a presence-only CV term (no value): processed → IMS:1000031,
@@ -521,6 +542,121 @@ fn wire_metadata_into(target: &mut impl MSDataFileMetadata, prov: &RunProvenance
         ),
         StorageMode::Unknown => {}
     }
+}
+
+/// Build the `.ibd` checksum CV [`Param`] keyed on the declared algorithm, the SINGLE source of
+/// the checksum-accession keying shared by the `file_description.contents` mapping
+/// ([`wire_metadata_into`]) and the `file_description.source_files` `.ibd` params
+/// ([`push_source_files`]). Keeping one keying function is what prevents the two from drifting.
+///
+/// `MD5 → IMS:1000090`, `SHA-1 → IMS:1000091`, `SHA-256 → IMS:1000092` (the algorithm name is
+/// matched case-insensitively in BOTH the dashed (`"SHA-1"`) and un-dashed (`"SHA1"`, the form
+/// mzdata's imzML reader produces) spellings). Returns `None` — i.e. NO param is hand-invented —
+/// when the checksum or its type is absent or unrecognized (same discipline as the contents
+/// mapping). The checksum value is taken VERBATIM from the caller (the preflight-computed
+/// `RunProvenance.ibd_checksum`); this function performs NO hashing (SRC-02).
+fn checksum_curie_param(checksum: Option<&str>, kind: Option<&str>) -> Option<Param> {
+    let checksum = checksum?;
+    let kind = kind?;
+    if kind.eq_ignore_ascii_case("SHA-1") || kind.eq_ignore_ascii_case("SHA1") {
+        Some(
+            Param::builder()
+                .name("ibd SHA-1")
+                .curie(curie!(IMS:1000091))
+                .value(checksum)
+                .build(),
+        )
+    } else if kind.eq_ignore_ascii_case("MD5") {
+        Some(
+            Param::builder()
+                .name("ibd MD5")
+                .curie(curie!(IMS:1000090))
+                .value(checksum)
+                .build(),
+        )
+    } else if kind.eq_ignore_ascii_case("SHA-256") || kind.eq_ignore_ascii_case("SHA256") {
+        Some(
+            Param::builder()
+                .name("ibd SHA-256")
+                .curie(curie!(IMS:1000092))
+                .value(checksum)
+                .build(),
+        )
+    } else {
+        None
+    }
+}
+
+/// Push the `.imzML` + `.ibd` [`mzdata::meta::SourceFile`] provenance entries into
+/// `file_description.source_files` (SRC-01 / SRC-02).
+///
+/// Two entries are emitted, the latter carrying the REUSED UUID + checksum CURIE params:
+///   * `.imzML`: `name` = the input basename, `location` = the parent dir as a `file://` URI,
+///     `id` = `"imzml"`, no UUID/checksum params.
+///   * `.ibd`: derived from the input STEM + `.ibd` (mirroring `preflight::resolve_ibd_for`'s
+///     sibling-stem derivation — but we need only the path strings here, NOT a file open / hash);
+///     `id` = `"ibd"`; its `params` carry the source UUID (`IMS:1000080`, only when
+///     `prov.uuid` is `Some`) and the checksum CURIE from [`checksum_curie_param`] (only when both
+///     the checksum and its type are present + recognized). The vendor raw file is a SHOULD that is
+///     unavailable to the converter, so it is omitted (documented in 19-CONTEXT / Deferred).
+///
+/// All param values are taken VERBATIM from `prov` — NO `compute_digest` / `Digest` call runs on
+/// this write path (SRC-02): the recorded checksum is the integrity preflight's already-verified
+/// value, not a second independently-computed one.
+fn push_source_files(target: &mut impl MSDataFileMetadata, input_path: &Path, prov: &RunProvenance) {
+    // Parent dir as a file:// location URI (descriptive provenance, T-19-02 accepted). An empty
+    // parent (a bare filename) yields "file://".
+    let parent = input_path.parent().filter(|p| !p.as_os_str().is_empty());
+    let location = match parent {
+        Some(p) => format!("file://{}", p.display()),
+        None => "file://".to_string(),
+    };
+
+    // .imzML basename (verbatim from the input path's final component).
+    let imzml_name = input_path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    // .ibd sibling: same STEM + ".ibd" (mirrors preflight::resolve_ibd_path's sibling derivation,
+    // APPENDING to the full stem so a dotted stem like "a.rev.imzML" → "a.rev.ibd"). Path strings
+    // only — no file open, no re-hash.
+    let mut ibd_os = input_path.file_stem().unwrap_or_default().to_os_string();
+    ibd_os.push(".ibd");
+    let ibd_name = ibd_os.to_string_lossy().to_string();
+
+    let fd = target.file_description_mut();
+
+    fd.source_files.push(mzdata::meta::SourceFile {
+        name: imzml_name,
+        location: location.clone(),
+        id: "imzml".to_string(),
+        ..Default::default()
+    });
+
+    // The .ibd entry carries the reused UUID + checksum params (SRC-02).
+    let mut ibd_params = Vec::new();
+    if let Some(uuid) = prov.uuid.as_deref() {
+        ibd_params.push(
+            Param::builder()
+                .name("universally unique identifier")
+                .curie(curie!(IMS:1000080))
+                .value(uuid)
+                .build(),
+        );
+    }
+    if let Some(param) =
+        checksum_curie_param(prov.ibd_checksum.as_deref(), prov.ibd_checksum_type.as_deref())
+    {
+        ibd_params.push(param);
+    }
+    fd.source_files.push(mzdata::meta::SourceFile {
+        name: ibd_name,
+        location,
+        id: "ibd".to_string(),
+        params: ibd_params,
+        ..Default::default()
+    });
 }
 
 /// Assemble the `metadata.imaging` discovery block from parsed run geometry.
@@ -963,6 +1099,161 @@ mod tests {
         // pixel_size omitted (only one... actually neither axis present) → None.
         assert!(block.pixel_size_um.is_none(), "no pixel size → omitted");
 
+        let _ = std::fs::remove_file(&out);
+    }
+
+    /// SRC-01/SRC-02 (Phase 19): `write_run_metadata` with a threaded input `.imzML` path pushes
+    /// exactly two `SourceFile` entries (.imzML + .ibd) into `file_description.source_files`,
+    /// the `.ibd` entry carrying the UUID (IMS:1000080) + checksum CURIE params REUSED verbatim
+    /// from `RunProvenance` (no re-hash), while `file_description.contents` still carries the
+    /// existing UUID/checksum/mode mapping (additive, not a replacement).
+    #[test]
+    fn write_run_metadata_pushes_source_files_from_input_path() {
+        use mzdata::meta::FileMetadataConfig;
+        use std::path::Path;
+
+        let mut out = std::env::temp_dir();
+        out.push(format!("mzml2mzpeak_writer_srcfiles_{}.mzpeak", std::process::id()));
+        let mut w = ImagingWriter::new(&out, &[]).expect("build writer");
+
+        let prov = RunProvenance {
+            uuid: Some("0a1b2c3d-4e5f-6071-8293-a4b5c6d7e8f9".to_string()),
+            data_mode: StorageMode::Processed,
+            ibd_checksum: Some("5c8b11f393cb8ffb745e73ca611b4b8932fd9e07".to_string()),
+            // mzdata surfaces SHA-1 as the un-dashed "SHA1" — the keying must accept it.
+            ibd_checksum_type: Some("SHA1".to_string()),
+        };
+        let source = FileMetadataConfig::default();
+        let input = Path::new("/tmp/datasets/Run01.imzML");
+
+        w.write_run_metadata_from(&source, &prov, None, Some(input))
+            .expect("metadata wiring with source path succeeds");
+
+        let fd = w.inner.file_description_mut();
+
+        // (1) source_files lists exactly the .imzML + the sibling .ibd.
+        let sf = &fd.source_files;
+        assert_eq!(sf.len(), 2, "exactly two source files (.imzML + .ibd)");
+        let imzml = sf
+            .iter()
+            .find(|s| s.name.ends_with(".imzML"))
+            .expect("an .imzML source file entry");
+        let ibd = sf
+            .iter()
+            .find(|s| s.name.ends_with(".ibd"))
+            .expect("an .ibd source file entry");
+        assert_eq!(imzml.name, "Run01.imzML", "imzML basename");
+        assert_eq!(imzml.id, "imzml", "imzML id");
+        assert_eq!(ibd.name, "Run01.ibd", "ibd sibling basename (same stem)");
+        assert_eq!(ibd.id, "ibd", "ibd id");
+        assert!(imzml.location.contains("datasets"), "location carries the parent dir");
+
+        // (2) the .ibd entry carries the REUSED UUID + checksum CURIE params.
+        let ibd_uuid = ibd
+            .params
+            .iter()
+            .find(|p| p.curie() == Some(curie!(IMS:1000080)))
+            .expect("ibd entry carries IMS:1000080 UUID");
+        assert_eq!(ibd_uuid.value.to_string(), "0a1b2c3d-4e5f-6071-8293-a4b5c6d7e8f9");
+        let ibd_ck = ibd
+            .params
+            .iter()
+            .find(|p| p.curie() == Some(curie!(IMS:1000091)))
+            .expect("ibd entry carries IMS:1000091 (SHA-1) checksum");
+        assert_eq!(
+            ibd_ck.value.to_string(),
+            "5c8b11f393cb8ffb745e73ca611b4b8932fd9e07",
+            "checksum value reused verbatim from RunProvenance"
+        );
+        // The .imzML entry carries NO checksum/UUID params (only the .ibd does).
+        assert!(
+            imzml.params.iter().all(|p| {
+                p.curie() != Some(curie!(IMS:1000080)) && p.curie() != Some(curie!(IMS:1000091))
+            }),
+            "the .imzML entry carries no UUID/checksum params"
+        );
+
+        // (3) file_description.contents STILL carries the existing UUID/checksum/mode mapping
+        //     (additive — source_files does not replace it).
+        assert!(
+            fd.get_param_by_curie(&curie!(IMS:1000080)).is_some(),
+            "contents still carries IMS:1000080 UUID"
+        );
+        assert!(
+            fd.get_param_by_curie(&curie!(IMS:1000091)).is_some(),
+            "contents still carries IMS:1000091 SHA-1 checksum"
+        );
+        assert!(
+            fd.get_param_by_curie(&curie!(IMS:1000031)).is_some(),
+            "contents still carries IMS:1000031 processed mode"
+        );
+
+        let _ = std::fs::remove_file(&out);
+    }
+
+    /// SRC-01 back-compat: `write_run_metadata` (the no-path entry point used by the back-compat
+    /// `convert()` wrapper) emits NO source_files, so existing callers stay behaviour-identical.
+    #[test]
+    fn write_run_metadata_without_path_emits_no_source_files() {
+        use mzdata::meta::FileMetadataConfig;
+
+        let mut out = std::env::temp_dir();
+        out.push(format!("mzml2mzpeak_writer_nosrc_{}.mzpeak", std::process::id()));
+        let mut w = ImagingWriter::new(&out, &[]).expect("build writer");
+
+        let prov = RunProvenance {
+            uuid: Some("0a1b2c3d-4e5f-6071-8293-a4b5c6d7e8f9".to_string()),
+            data_mode: StorageMode::Processed,
+            ibd_checksum: Some("5c8b11f393cb8ffb745e73ca611b4b8932fd9e07".to_string()),
+            ibd_checksum_type: Some("SHA1".to_string()),
+        };
+        let source = FileMetadataConfig::default();
+        w.write_run_metadata(&source, &prov, None)
+            .expect("no-path metadata wiring succeeds");
+
+        assert!(
+            w.inner.file_description_mut().source_files.is_empty(),
+            "no input path threaded ⇒ no source_files (back-compat byte-behaviour)"
+        );
+        let _ = std::fs::remove_file(&out);
+    }
+
+    /// SRC-02 (SHA-256): the unified checksum keying maps an un-dashed mzdata "SHA256" type to
+    /// IMS:1000092 in BOTH the .ibd source-file params and (regression) the contents mapping.
+    #[test]
+    fn source_files_checksum_keys_sha256_to_ims_1000092() {
+        use mzdata::meta::FileMetadataConfig;
+        use std::path::Path;
+
+        let mut out = std::env::temp_dir();
+        out.push(format!("mzml2mzpeak_writer_sha256_{}.mzpeak", std::process::id()));
+        let mut w = ImagingWriter::new(&out, &[]).expect("build writer");
+
+        let prov = RunProvenance {
+            uuid: None,
+            data_mode: StorageMode::Unknown,
+            ibd_checksum: Some("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string()),
+            ibd_checksum_type: Some("SHA256".to_string()),
+        };
+        let source = FileMetadataConfig::default();
+        w.write_run_metadata_from(&source, &prov, None, Some(Path::new("run.imzML")))
+            .expect("metadata wiring succeeds");
+
+        let fd = w.inner.file_description_mut();
+        let ibd = fd
+            .source_files
+            .iter()
+            .find(|s| s.name.ends_with(".ibd"))
+            .expect("ibd entry");
+        assert!(
+            ibd.params.iter().any(|p| p.curie() == Some(curie!(IMS:1000092))),
+            "SHA256 keys to IMS:1000092 in the ibd source-file params"
+        );
+        // Regression: the contents mapping keys the same SHA-256 to IMS:1000092 too.
+        assert!(
+            fd.get_param_by_curie(&curie!(IMS:1000092)).is_some(),
+            "contents carries IMS:1000092 (SHA-256) — shared keying, no drift"
+        );
         let _ = std::fs::remove_file(&out);
     }
 

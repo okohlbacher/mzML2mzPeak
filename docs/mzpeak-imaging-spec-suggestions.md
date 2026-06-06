@@ -236,7 +236,7 @@
 **Location:** existing `file_description` usage.
 **Action:** clarifying note.
 
-> <a name="imaging-provenance"></a>For imaging sources, `file_description.contents` _MUST_ carry the source `IMS:1000080` UUID, the `.ibd` checksum term present (`IMS:1000090` MD5 / `IMS:1000091` SHA-1 / `IMS:1000092` SHA-256), and the storage-mode term (`IMS:1000030`/`IMS:1000031`). `file_description.source_files[]` _SHOULD_ list the original `.imzML`, `.ibd`, and the vendor raw file. The converter _MUST_ verify the UUID and declared `.ibd` checksum before conversion and hard-fail on mismatch.
+> <a name="imaging-provenance"></a>For imaging sources, `file_description.contents` _MUST_ carry the source `IMS:1000080` UUID, the `.ibd` checksum term present (`IMS:1000090` MD5 / `IMS:1000091` SHA-1 / `IMS:1000092` SHA-256), and the storage-mode term (`IMS:1000030`/`IMS:1000031`). `file_description.source_files[]` _SHOULD_ list the original `.imzML`, `.ibd`, and the vendor raw file. The `.ibd` entry's params _SHOULD_ carry the same source `IMS:1000080` UUID and `.ibd` checksum term (`IMS:1000090`/`IMS:1000091`/`IMS:1000092`) as `contents`, drawn from the same already-verified values (no second hash). The converter _MUST_ verify the UUID and declared `.ibd` checksum before conversion and hard-fail on mismatch. (This converter lists the `.imzML` + `.ibd`; the vendor raw file is omitted as it is unavailable to the converter.)
 
 ---
 
