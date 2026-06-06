@@ -43,6 +43,38 @@ use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
 use thiserror::Error;
 
+// =================================================================================================
+// Shared IMS optical-image CV constants (anti-drift — T-21-06).
+//
+// Each `(accession, name)` pair is the SINGLE source of truth for one optical-image descriptive
+// term, quoted verbatim from `knowledge/cv/CV terms - optical image.md` lines 14-22. The FORWARD
+// parser [`apply_cv_param`] (below) matches on these accessions; the REVERSE emitter
+// (`src/reverse/imzml_writer.rs::write_sample_list_to`) and the inverse fold
+// (`src/reverse/optical_fold.rs`) emit them — so a single edit here moves both directions in
+// lockstep and the parse/emit can never diverge (the fold is only invertible if both halves agree
+// on the exact accession/name strings).
+// =================================================================================================
+
+/// `IMS:1006008` — "optical image location" (the URI/path of the external optical image).
+pub const OPTICAL_LOCATION: (&str, &str) = ("IMS:1006008", "optical image location");
+/// `IMS:1006011` — "optical image of analysed sample" (subject is the EXACT analysed sample).
+pub const OPTICAL_OF_ANALYSED: (&str, &str) =
+    ("IMS:1006011", "optical image of analysed sample");
+/// `IMS:1006012` — "optical image of adjacent section of analysed sample" (subject is an adjacent section).
+pub const OPTICAL_ADJACENT_SECTION: (&str, &str) = (
+    "IMS:1006012",
+    "optical image of adjacent section of analysed sample",
+);
+/// `IMS:1006013` — "sample morphological classification" (morphological classification value).
+pub const OPTICAL_MORPHOLOGY: (&str, &str) =
+    ("IMS:1006013", "sample morphological classification");
+/// `IMS:1006015` — "staining method used for optical image" (staining method value, e.g. `"H&E"`).
+pub const OPTICAL_STAINING: (&str, &str) =
+    ("IMS:1006015", "staining method used for optical image");
+/// `IMS:1006017` — "method used to align optical image" (alignment-method value).
+pub const OPTICAL_ALIGNMENT: (&str, &str) =
+    ("IMS:1006017", "method used to align optical image");
+
 /// Typed optical-parse / path-resolution failures. Genuine errors ONLY (I/O, malformed XML,
 /// path-escape) — missing optical terms are captured as absence (empty `Vec` / `None`
 /// fields), never raised as errors (mirrors [`crate::schema::GeometryParseError`]).
@@ -175,44 +207,39 @@ fn apply_cv_param(
 
     let Some(acc) = accession else { return };
 
-    match acc.as_str() {
+    // Match on the SHARED accession constants (anti-drift — T-21-06): the same `(accession, name)`
+    // pairs the reverse emitter uses. `.0` is the accession string of each pair.
+    let acc = acc.as_str();
+    if acc == OPTICAL_LOCATION.0 {
         // A new optical-image location: flush the previous pending ref, open a new one.
-        "IMS:1006008" => {
-            if let Some(prev) = pending.take() {
-                out.push(prev);
-            }
-            *pending = Some(OpticalImageRef {
-                location: value.unwrap_or_default(),
-                ..OpticalImageRef::default()
-            });
+        if let Some(prev) = pending.take() {
+            out.push(prev);
         }
+        *pending = Some(OpticalImageRef {
+            location: value.unwrap_or_default(),
+            ..OpticalImageRef::default()
+        });
+    } else if acc == OPTICAL_OF_ANALYSED.0 {
         // Descriptive siblings: attach to the CURRENT pending ref only.
-        "IMS:1006011" => {
-            if let Some(r) = pending.as_mut() {
-                r.subject_of_analysed = true;
-            }
+        if let Some(r) = pending.as_mut() {
+            r.subject_of_analysed = true;
         }
-        "IMS:1006012" => {
-            if let Some(r) = pending.as_mut() {
-                r.subject_adjacent = true;
-            }
+    } else if acc == OPTICAL_ADJACENT_SECTION.0 {
+        if let Some(r) = pending.as_mut() {
+            r.subject_adjacent = true;
         }
-        "IMS:1006013" => {
-            if let Some(r) = pending.as_mut() {
-                r.morphological_classification = value;
-            }
+    } else if acc == OPTICAL_MORPHOLOGY.0 {
+        if let Some(r) = pending.as_mut() {
+            r.morphological_classification = value;
         }
-        "IMS:1006015" => {
-            if let Some(r) = pending.as_mut() {
-                r.staining_method = value;
-            }
+    } else if acc == OPTICAL_STAINING.0 {
+        if let Some(r) = pending.as_mut() {
+            r.staining_method = value;
         }
-        "IMS:1006017" => {
-            if let Some(r) = pending.as_mut() {
-                r.alignment_method = value;
-            }
+    } else if acc == OPTICAL_ALIGNMENT.0 {
+        if let Some(r) = pending.as_mut() {
+            r.alignment_method = value;
         }
-        _ => {}
     }
 }
 

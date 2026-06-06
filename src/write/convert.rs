@@ -617,7 +617,7 @@ fn embed_one_image(
 ///
 /// Absent attrs leave their target field `None` (a `--image` entry, mapped via `descriptive=None`,
 /// never reaches here — its fields stay `None`, v0.5-identical).
-fn map_descriptive(entry: &mut ImageEntry, d: &OpticalImageRef) {
+pub(crate) fn map_descriptive(entry: &mut ImageEntry, d: &OpticalImageRef) {
     // modality: staining method + alignment method (both fold here; alignment stays observable).
     let mut modality_parts: Vec<String> = Vec::new();
     if let Some(stain) = d.staining_method.as_deref() {
