@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "scan_settings_list",
+  "description": "Run-level acquisition settings, mirroring mzML scanSettingsList. Stored in the file-level metadata of the mzPeak archive (FileIndex.metadata.scan_settings_list). This is the authoritative home for run-constant imaging geometry CV params: grid size (IMS:1000042/43), pixel size (IMS:1000046/47), max physical dimensions (IMS:1000044/45, unit µm UO:0000017), absolute position offsets (IMS:1000053/54), and acquisition-geometry child terms (e.g. IMS:1000413 flyback). Only geometry the source actually declared is emitted; absent terms are omitted, never fabricated (spec Edit 3, GEO-01). NOTE: schema/param.json does not exist in this repo, so the parameters item shape is INLINED here to match how the metadata.imaging block and the reverse imzML emitter encode cvParams.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string", "description": "scan_settings identity, e.g. scansettings1" },
+      "parameters": {
+        "type": "array",
+        "description": "CV params carrying the run-constant geometry. Each item is an inlined CV-param object (param.json not present in this repo).",
+        "items": {
+          "type": "object",
+          "properties": {
+            "cv_ref": { "type": "string", "description": "CV code, e.g. IMS, UO" },
+            "accession": { "type": "string", "description": "CV accession CURIE, e.g. IMS:1000042" },
+            "name": { "type": "string", "description": "CV term name" },
+            "value": { "type": ["string", "null"], "description": "term value; absent for presence-only terms" },
+            "unit_cv_ref": { "type": ["string", "null"], "description": "unit CV code, e.g. UO" },
+            "unit_accession": { "type": ["string", "null"], "description": "unit accession, e.g. UO:0000017 micrometer" }
+          },
+          "required": ["cv_ref", "accession", "name"],
+          "additionalProperties": false
+        }
+      },
+      "targets": {
+        "type": "array",
+        "items": { "type": "object" },
+        "description": "optional acquisition targets; unused by the imaging-geometry facet"
+      }
+    },
+    "required": ["id", "parameters"],
+    "additionalProperties": false
+  }
+}
