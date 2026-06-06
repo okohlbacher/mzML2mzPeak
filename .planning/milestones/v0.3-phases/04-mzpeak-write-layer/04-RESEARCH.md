@@ -185,7 +185,7 @@ use arrow::datatypes::DataType;
 use mzdata::curie;
 
 let mut builder = MzPeakWriterType::<std::fs::File>::builder();
-for spec in imzml2mzpeak::schema::imaging_scan_fields() {
+for spec in mzml2mzpeak::schema::imaging_scan_fields() {
     // spec.dtype is DataType::Int64; from_spec panics on any other dtype (visitor.rs:238)
     builder = builder.add_spectrum_scan_field(
         CustomBuilderFromParameter::from_spec(spec.curie, spec.name, spec.dtype.clone()),
@@ -207,7 +207,7 @@ use mzdata::spectrum::bindata::{ArrayType, BinaryArrayMap, DataArray, BinaryData
 use mzdata::params::Param;
 use mzdata::prelude::ParamDescribed; // for add_param
 use mzdata::curie;
-use imzml2mzpeak::read::{ImagingSpectrum, NumArray, Representation};
+use mzml2mzpeak::read::{ImagingSpectrum, NumArray, Representation};
 
 fn to_mzdata(s: &ImagingSpectrum) -> MultiLayerSpectrum {
     // (1) dtype-preserving arrays — DataArray::wrap with the SOURCE dtype, raw LE bytes.
@@ -262,7 +262,7 @@ fn num_to_dataarray(name: ArrayType, arr: &NumArray) -> DataArray {
 // Source: examples/convert.rs (copy_metadata_from, softwares_mut, data_processings_mut)
 // writer is MzPeakWriterType<File>; copy_metadata_from takes &impl MSDataFileMetadata.
 writer.copy_metadata_from(&source_metadata_holder);
-writer.softwares_mut().push(/* imzml2mzpeak Software entry */);
+writer.softwares_mut().push(/* mzml2mzpeak Software entry */);
 writer.data_processings_mut().push(/* conversion DataProcessing */);
 ```
 For OUT-03/SPA-04, the `RunProvenance` → `file_description` mapping (UUID→`IMS:1000080`, checksum→`IMS:1000091/90`, mode→`IMS:1000031/30`) is documented in `src/schema/metadata.rs`; attach those params via `writer.file_description_mut().add_param(...)` — `file_description_mut()` is confirmed on `MSDataFileMetadata` (mzdata `meta/traits.rs:46`) and `FileDescription` is `ParamDescribed` (`meta/file_description.rs:113`), so `.add_param()` is valid (Open Questions Q2, RESOLVED).
@@ -345,7 +345,7 @@ use arrow::datatypes::DataType;
 pub fn convert(reader: ImagingReader, out_path: &std::path::Path) -> Result<(), WriteError> {
     let handle = File::create(out_path)?;
     let mut builder = MzPeakWriterType::<File>::builder();
-    for spec in imzml2mzpeak::schema::imaging_scan_fields() {
+    for spec in mzml2mzpeak::schema::imaging_scan_fields() {
         builder = builder.add_spectrum_scan_field(
             CustomBuilderFromParameter::from_spec(spec.curie, spec.name, spec.dtype.clone()));
     }

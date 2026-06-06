@@ -57,7 +57,7 @@ crates and the shipped positional forward invocation still byte-compatible.
 
 ### Task 1 — Extension dispatch + -o stem derivation + --reverse (commit cae2f52)
 Added `output_stem` (`-o`/`--output-stem`) and `reverse` (`--reverse`) fields to the flat
-`ConvertCli` (no Subcommand enum, so `imzml2mzpeak <in.imzML> <out.mzpeak>` parses byte-identically).
+`ConvertCli` (no Subcommand enum, so `mzml2mzpeak <in.imzML> <out.mzpeak>` parses byte-identically).
 `run()` now computes direction first — `--reverse` override, else `.imzML`/`.imzml` → forward,
 `.mzpeak` → reverse, anything else → an actionable error naming `--reverse` as the escape hatch
 ("cannot infer direction from …"). The shipped forward body was extracted verbatim into `run_forward`
@@ -98,7 +98,7 @@ real fields. Not a behavior deviation — a test-fixture spelling against the ac
 
 ## Acceptance Notes
 
-- Backward compatibility (T-10-COMPAT): `ConvertCli::try_parse_from(["imzml2mzpeak","in.imzML","out.mzpeak"])` is Ok with `reverse == false` — the v0.3 acceptance harness is untouched.
+- Backward compatibility (T-10-COMPAT): `ConvertCli::try_parse_from(["mzml2mzpeak","in.imzML","out.mzpeak"])` is Ok with `reverse == false` — the v0.3 acceptance harness is untouched.
 - T-10-DISP: unrecognized extension errors actionably and names `--reverse`; no silent mis-direction.
 - T-10-EXIT: every ReverseError variant maps to a distinct documented code; Integrity delegates to the shared classifier (no duplicate logic).
 - T-10-FLAGS: reverse rejects `--verify`/`--dry-run` rather than silently running forward-only logic.

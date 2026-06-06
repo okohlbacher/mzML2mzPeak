@@ -8,7 +8,7 @@
 ## Phase Boundary
 
 Compose the Phase 7 read → Phase 8 `.ibd`-append → Phase 9 `<spectrum>`-emit steps into ONE
-bounded-memory **streaming pipeline**, exposed on the existing `imzml2mzpeak` binary. Delivers
+bounded-memory **streaming pipeline**, exposed on the existing `mzml2mzpeak` binary. Delivers
 RCLI-01, RCLI-02.
 
 This phase wires the three shipped halves into `src/reverse/convert.rs` (or equivalent) +
@@ -23,7 +23,7 @@ XML emitter (Phase 9), and does NOT do the full roundtrip/PXD001283 acceptance (
 - **Infer the conversion direction from the INPUT file extension**, not from a typed verb:
   - input ends `.imzML` / `.imzml` → **forward** (imzML → imaging mzPeak), the existing v0.3 path.
   - input ends `.mzpeak` → **reverse** (imaging mzPeak → `.imzML` + `.ibd`), the new path.
-- This keeps the shipped forward invocation **backward-compatible** (`imzml2mzpeak <in.imzML>
+- This keeps the shipped forward invocation **backward-compatible** (`mzml2mzpeak <in.imzML>
   <out.mzpeak>` is unchanged — no `convert` verb introduced, no break to scripts or the v0.3
   acceptance harness).
 - **RCLI-01 traceability:** the requirement names a `reverse` subcommand. Reconcile by ALSO
@@ -99,8 +99,8 @@ XML emitter (Phase 9), and does NOT do the full roundtrip/PXD001283 acceptance (
 
 <specifics>
 ## Specific Ideas
-- The headline UX: `imzml2mzpeak <in.mzpeak> -o <out>` produces `<out>.imzML` + `<out>.ibd`
-  with shared stem + shared UUID; `imzml2mzpeak <in.imzML> <out.mzpeak>` still does forward.
+- The headline UX: `mzml2mzpeak <in.mzpeak> -o <out>` produces `<out>.imzML` + `<out>.ibd`
+  with shared stem + shared UUID; `mzml2mzpeak <in.imzML> <out.mzpeak>` still does forward.
 - Bounded memory on the 34,840-spectrum input is the load-bearing non-functional requirement —
   the pipeline must not collect all pixels.
 - The `.ibd` MD5 is only known after the full `.ibd` is written; sequence the XML emit so its

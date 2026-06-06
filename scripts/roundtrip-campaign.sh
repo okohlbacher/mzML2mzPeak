@@ -4,7 +4,7 @@
 # Records exit codes, timings, sizes, and dry-run metrics. Continues on failure.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/target/release/imzml2mzpeak"
+BIN="$ROOT/target/release/mzml2mzpeak"
 OUT="$ROOT/out/campaign"
 RES="$OUT/RESULTS.tsv"
 LOG="$OUT/logs"

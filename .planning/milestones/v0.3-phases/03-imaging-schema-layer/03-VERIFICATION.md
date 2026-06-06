@@ -80,7 +80,7 @@ This phase is a types/schema layer, not a data-rendering component — no runtim
 | Full test suite green (no regressions) | `cargo test` | 21+13+4+4 passed, 1 ignored (local data gate) | PASS |
 | Library clippy clean | `cargo clippy --lib -- -D warnings` | clean (pre-existing vendored-mzdata warning only) | PASS |
 
-Note: `cargo clippy -p imzml2mzpeak -- -D warnings` (all targets) fails on `src/bin/spike_coords.rs` doc indentation — this is a pre-existing issue in a spike binary not part of the Phase 3 deliverables. Library code is clean.
+Note: `cargo clippy -p mzml2mzpeak -- -D warnings` (all targets) fails on `src/bin/spike_coords.rs` doc indentation — this is a pre-existing issue in a spike binary not part of the Phase 3 deliverables. Library code is clean.
 
 ---
 

@@ -1,5 +1,5 @@
 [package]
-name = "imzml2mzpeak"
+name = "mzml2mzpeak"
 version = "0.1.0"
 edition = "2024"
 # True MSRV floor: mzpeak_prototyping@d1aaaf84 uses stdlib APIs stabilized in 1.87
@@ -10,7 +10,7 @@ rust-version = "1.87"
 # The crate is now a LIBRARY consumed by the bins (spike_coords, verify_ibd) and the
 # Phase 4 writer. The [[bin]] targets and src/main.rs remain; this only adds the lib face.
 [lib]
-name = "imzml2mzpeak"
+name = "mzml2mzpeak"
 path = "src/lib.rs"
 
 # The other bins (spike_coords, verify_ibd) are auto-discovered under src/bin/; declare
@@ -20,10 +20,10 @@ path = "src/lib.rs"
 name = "preflight"
 path = "src/bin/preflight.rs"
 
-# The converter CLI (Plan 06-02). Declared explicitly so CARGO_BIN_EXE_imzml2mzpeak is
+# The converter CLI (Plan 06-02). Declared explicitly so CARGO_BIN_EXE_mzml2mzpeak is
 # unambiguous for the spawned-process integration tests (mirrors the preflight bin block).
 [[bin]]
-name = "imzml2mzpeak"
+name = "mzml2mzpeak"
 path = "src/main.rs"
 
 # Phase-7 THROWAWAY read-spike (Plan 07-02): the reverse (mzPeak -> imzML) read-path GATE

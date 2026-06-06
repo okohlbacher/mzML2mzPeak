@@ -63,7 +63,7 @@ completed: 2026-06-03
 
 ## Accomplishments
 
-- Added the `[lib]` target (`imzml2mzpeak`) consumed by the bins and the future Phase 4 writer, with `read` and `integrity` module seams — and NO new dependencies (Cargo.toml diff is a `[lib]` block only).
+- Added the `[lib]` target (`mzml2mzpeak`) consumed by the bins and the future Phase 4 writer, with `read` and `integrity` module seams — and NO new dependencies (Cargo.toml diff is a `[lib]` block only).
 - Defined the central IN-04 contract: `NumArray { F32(Vec<f32>) | F64(Vec<f64>) }` carrying each axis's imzML-declared source dtype, with `source_dtype()` reporting it verbatim and a single doc-labeled NON-CANONICAL `as_f64()` convenience accessor (no lossy `as_f32()`).
 - Defined `ImagingSpectrum` (dtype-preserving `mz`/`intensity` axes, 1-based `(x,y,z)` coords with documented no-axis-flip SPA-02 semantics, `ms_level` carried unchanged including 0, `native_id`) and `RunProvenance` (uuid as normalized lowercase `String` — no `uuid::Uuid`).
 - 6 unit tests green: dtype preservation, `as_f64` convenience semantics, `Representation`/`StorageMode` conversions, and `ms_level=0` carried.
@@ -79,7 +79,7 @@ _Note: Task 2 is a `tdd="true"` task. The type definitions + methods were commit
 
 ## Files Created/Modified
 
-- `Cargo.toml` — Added a `[lib] name = "imzml2mzpeak", path = "src/lib.rs"` block; bins and dependency set untouched.
+- `Cargo.toml` — Added a `[lib] name = "mzml2mzpeak", path = "src/lib.rs"` block; bins and dependency set untouched.
 - `src/lib.rs` — Crate root: `pub mod read; pub mod integrity;` with read-layer job doc.
 - `src/read/mod.rs` — Re-exports the five record types; `// Plan 02-03: pub mod stream;` seam.
 - `src/read/record.rs` — `NumArray`, `ImagingSpectrum`, `RunProvenance`, `Representation`, `StorageMode` + From impls + 6 unit tests.

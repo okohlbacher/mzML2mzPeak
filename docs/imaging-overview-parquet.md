@@ -85,7 +85,7 @@ so viewers can allocate the grid before reading any Parquet.
 | Time to first image (browser, localhost) | 2–5 min | <10 s |
 | Time to first image (browser, remote URL) | Hours | Seconds |
 
-## Implementation notes for imzML2mzPeak
+## Implementation notes for mzML2mzPeak
 
 The converter already reads and writes TIC and base_peak_mz per spectrum (they appear
 in the `spectra_metadata.parquet` output). The additional cost of writing

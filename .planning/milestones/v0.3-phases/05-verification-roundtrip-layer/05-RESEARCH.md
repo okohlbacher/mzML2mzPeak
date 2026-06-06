@@ -90,8 +90,8 @@ All dependencies are ALREADY PINNED in `Cargo.toml` and present in `Cargo.lock`.
 | `mzpeak_prototyping` | git `d1aaaf8` (vendored) | Output reader (`MzPeakReader`) | The reference reader; round-trip target. [VERIFIED: vendored source + probe] |
 | `mzdata` | `=0.63.3` (vendored patch) | `BinaryArrayMap`, `DataArray`, `PeakDataLevel`, `ArrayType`, `get_param_by_curie`, `curie!` | The shared types `get_spectrum_arrays`/`get_spectrum_peaks_for`/`get_spectrum_metadata` return. [VERIFIED: probe] |
 | `mzpeaks` | `=1.0.9` | `CentroidPeak` (`.mz` f64, `.intensity` f32) inside `PeakDataLevel` | The peak type the peaks facet yields; needed to read centroid m/z/intensity. [VERIFIED: peak_series.rs] |
-| `imzml2mzpeak::read` | in-tree | `ImagingReader`, `ImagingSpectrum`, `NumArray`, `Representation` | Source re-read at source dtype (the L1 reference). [VERIFIED: src/read] |
-| `imzml2mzpeak::schema` | in-tree | `ToleranceContract`, `ConformanceLevel`, `ImagingMetadata`, `ImagingRunMetadata` | Tolerances + grid dims. [VERIFIED: src/schema] |
+| `mzml2mzpeak::read` | in-tree | `ImagingReader`, `ImagingSpectrum`, `NumArray`, `Representation` | Source re-read at source dtype (the L1 reference). [VERIFIED: src/read] |
+| `mzml2mzpeak::schema` | in-tree | `ToleranceContract`, `ConformanceLevel`, `ImagingMetadata`, `ImagingRunMetadata` | Tolerances + grid dims. [VERIFIED: src/schema] |
 
 ### Supporting
 | Library | Version | Purpose | When to Use |
@@ -300,7 +300,7 @@ present[(y - 1) as usize][(x - 1) as usize] = true;
 | Decode mzPeak Parquet/ZIP arrays | A Parquet/Arrow reader | `MzPeakReader::get_spectrum_arrays` / `get_spectrum_peaks_for` | The reference reader owns column decoding, dtype reconstruction, delta-model fill, ZIP membership. [VERIFIED: reader.rs] |
 | Re-parse the source imzML | A second imzML parser | `ImagingReader::open` | Phase-2 reader already streams dtype-preserving `ImagingSpectrum` with verified coords (CONTEXT Area 1). |
 | Recover output coordinates | Parse Parquet scan columns by hand | `get_spectrum_metadata(i)?.acquisition.first_scan().get_param_by_curie(IMS:1000050/51/52)` | Reader recovers accession→param round-trip; proven in `write_roundtrip.rs:229-255`. |
-| Tolerance constants | Local `const MZ_TOL = 1e-7` | `imzml2mzpeak::schema::ToleranceContract::{L1,L2}` | Single source of truth (D-07; STATE Phase-03). |
+| Tolerance constants | Local `const MZ_TOL = 1e-7` | `mzml2mzpeak::schema::ToleranceContract::{L1,L2}` | Single source of truth (D-07; STATE Phase-03). |
 | Grid dimensions | Hard-code 260×134 | `metadata.imaging.pixel_count` when present, else max observed coords | Spec §5.1 grid extent; metadata may be absent under Phase-4 geom=None (probe). |
 | Spectrum count (output) | Count Parquet rows | `MzPeakReader::len()` | reader.rs:752 returns `metadata.spectra.id_index.len()`. [VERIFIED] |
 
@@ -354,7 +354,7 @@ present[(y - 1) as usize][(x - 1) as usize] = true;
 ```rust
 // Consumes ToleranceContract (schema/tolerance.rs): L1 mz_rel_err=0.0 / intensity_rel_err=0.0;
 // L2 mz_rel_err=1e-7 / intensity_rel_err=1e-3. Per-axis (m/z vs intensity) separate calls.
-use imzml2mzpeak::schema::{ConformanceLevel, ToleranceContract};
+use mzml2mzpeak::schema::{ConformanceLevel, ToleranceContract};
 
 /// Returns Some(first-differing-index) on mismatch, None if the axis matches under `level`.
 fn first_mismatch_f64(src: &[f64], out: &[f64], rel_err: f64, level: ConformanceLevel) -> Option<usize> {

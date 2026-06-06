@@ -201,7 +201,7 @@ mod tests {
             .unwrap()
             .as_nanos();
         p.push(format!(
-            "imzml2mzpeak-ibd-test-{}-{:?}",
+            "mzml2mzpeak-ibd-test-{}-{:?}",
             nanos,
             std::thread::current().id()
         ));

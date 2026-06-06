@@ -23,37 +23,37 @@ dependency graph, so the emit phase adds **zero new crates**? A live `cargo tree
 ```
 $ cargo tree -i sha1
 sha1 v0.10.6
-├── imzml2mzpeak v0.1.0 (/Users/kohlbach/Claude/imzML2mzPeak)          # <-- DIRECT dep
+├── mzml2mzpeak v0.1.0 (/Users/kohlbach/Claude/mzML2mzPeak)          # <-- DIRECT dep
 ├── mzdata v0.63.3 (.../vendor/mzdata)
-│   ├── imzml2mzpeak v0.1.0
+│   ├── mzml2mzpeak v0.1.0
 │   └── mzpeak_prototyping v0.1.0 (HUPO-PSI/mzPeak rev d1aaaf84)
-│       └── imzml2mzpeak v0.1.0
+│       └── mzml2mzpeak v0.1.0
 └── zip v4.1.0
-    ├── imzml2mzpeak v0.1.0
+    ├── mzml2mzpeak v0.1.0
     └── mzpeak_prototyping v0.1.0 (HUPO-PSI/mzPeak rev d1aaaf84) (*)
 
 $ cargo tree -i md-5
 md-5 v0.10.6
-└── imzml2mzpeak v0.1.0 (/Users/kohlbach/Claude/imzML2mzPeak)          # <-- DIRECT dep (imported `as md5`)
+└── mzml2mzpeak v0.1.0 (/Users/kohlbach/Claude/mzML2mzPeak)          # <-- DIRECT dep (imported `as md5`)
 
 $ cargo tree -i md5
 md5 v0.7.0
 └── mzdata v0.63.3 (.../vendor/mzdata)                                  # transitive (mzdata's own mzML writer)
-    ├── imzml2mzpeak v0.1.0
+    ├── mzml2mzpeak v0.1.0
     └── mzpeak_prototyping v0.1.0 (HUPO-PSI/mzPeak rev d1aaaf84)
-        └── imzml2mzpeak v0.1.0
+        └── mzml2mzpeak v0.1.0
 ```
 
 ### Audit verdict
 
-| Crate | Version | Relationship to `imzml2mzpeak` | Added by |
+| Crate | Version | Relationship to `mzml2mzpeak` | Added by |
 |-------|---------|--------------------------------|----------|
 | `sha1` | 0.10.6 | **DIRECT dependency** (also reachable via mzdata + zip) | v0.3 integrity preflight (`Cargo.toml:49`) |
 | `md-5` | 0.10.6 | **DIRECT dependency** (RustCrypto leaf, imported `as md5`) | v0.3 integrity preflight (`Cargo.toml:50`) |
 | `sha2` | 0.10.9 | DIRECT dependency (SHA-256 + re-exports the `Digest` trait) | v0.3 integrity preflight (`Cargo.toml:51`) |
 | `md5` | 0.7.0 | TRANSITIVE only, via `mzdata`'s mzML writer | mzdata (not ours) |
 
-**Both SHA-1 and MD5 are already pinned direct dependencies** of `imzml2mzpeak` (added by the v0.3
+**Both SHA-1 and MD5 are already pinned direct dependencies** of `mzml2mzpeak` (added by the v0.3
 integrity preflight, `src/integrity/preflight.rs`). The "zero new crates" rule is therefore
 satisfied for **either** algorithm. The decision turns on spec/interop intent, not the dep graph.
 Confirmed read-only: `git diff --stat Cargo.toml` is empty — no `cargo add` was run.

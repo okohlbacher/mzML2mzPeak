@@ -1,7 +1,7 @@
 //! Numerical-fidelity tolerance contract (SCH-04, D-07).
 //!
 //! The single source of truth for the spec v0.3 §8 conformance bounds. The Phase 5
-//! verifier imports [`ToleranceContract`] (via `imzml2mzpeak::schema::ToleranceContract`)
+//! verifier imports [`ToleranceContract`] (via `mzml2mzpeak::schema::ToleranceContract`)
 //! rather than re-encoding the numbers, so the fidelity targets live in exactly one place.
 //! The constants are NORMATIVE per spec v0.3 §8 ("Lossless conformance levels (numeric)").
 

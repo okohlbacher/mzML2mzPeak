@@ -41,11 +41,11 @@ use std::process::ExitCode;
 
 use mzpeak_prototyping::MzPeakReader;
 
-use imzml2mzpeak::read::record::{NumArray, Representation};
+use mzml2mzpeak::read::record::{NumArray, Representation};
 // read_pixel / decode_axis / ReversePixel now live in the LIBRARY (src/reverse/source.rs) —
 // the spike imports the single implementation rather than carrying a duplicate (Plan 10-01 Task 2).
-use imzml2mzpeak::reverse::{ReverseError, read_pixel};
-use imzml2mzpeak::verify::ion_image::grid_dims_from_metadata;
+use mzml2mzpeak::reverse::{ReverseError, read_pixel};
+use mzml2mzpeak::verify::ion_image::grid_dims_from_metadata;
 
 const ARCHIVE_PATH: &str = "out/HR2MSI.mzpeak"; // v0.3 forward output, 34,840 pixels
 const HEAD_SAMPLE: usize = 5;

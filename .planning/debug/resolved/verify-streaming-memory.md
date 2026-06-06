@@ -25,7 +25,7 @@ DATA_START
   reasonable time). Only non-fatal `mzdata ... dateTime ISO 8601` log warnings (one per source open).
 - **Timeline:** First surfaced now, on the first real-data acceptance attempt (Phase 6). Synthetic-only
   tests through Phase 5 never ran at 34k scale.
-- **Reproduction:** `RUST_LOG=warn target/release/imzml2mzpeak data/HR2MSImouseurinarybladderS096.imzML out/x.mzpeak --verify`
+- **Reproduction:** `RUST_LOG=warn target/release/mzml2mzpeak data/HR2MSImouseurinarybladderS096.imzML out/x.mzpeak --verify`
   (CLI --verify calls verify_streaming at src/cli.rs:149 with ConformanceLevel::L1BitForBit).
 DATA_END
 

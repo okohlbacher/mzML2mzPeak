@@ -5,7 +5,7 @@
 # Output: out/validate/RESULTS.tsv + per-file logs. Continues on failure.
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BIN="$ROOT/target/release/imzml2mzpeak"
+BIN="$ROOT/target/release/mzml2mzpeak"
 OUT="$ROOT/out/validate"; LOG="$OUT/logs"; RES="$OUT/RESULTS.tsv"
 mkdir -p "$OUT" "$LOG"
 : > "$RES"

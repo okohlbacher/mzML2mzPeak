@@ -32,7 +32,7 @@ use mzdata::prelude::{ParamDescribed, ParamValue, SpectrumLike};
 use mzdata::spectrum::MultiLayerSpectrum;
 use mzdata::spectrum::bindata::{ArrayType, ByteArrayView};
 
-use imzml2mzpeak::reverse::convert::convert;
+use mzml2mzpeak::reverse::convert::convert;
 
 use mzpeak_prototyping::MzPeakReader;
 
@@ -50,7 +50,7 @@ fn tempdir(tag: &str) -> PathBuf {
         .unwrap_or(0);
     let mut p = std::env::temp_dir();
     p.push(format!(
-        "imzml2mzpeak_reverse_convert_{tag}_{}_{nanos}_{n}",
+        "mzml2mzpeak_reverse_convert_{tag}_{}_{nanos}_{n}",
         std::process::id()
     ));
     std::fs::create_dir_all(&p).unwrap();
@@ -266,12 +266,12 @@ fn non_imaging_cli_fails_fast() {
     let archive = reverse_fixtures::non_imaging_archive();
     let stem = dir.join("out");
 
-    let out = Command::new(env!("CARGO_BIN_EXE_imzml2mzpeak"))
+    let out = Command::new(env!("CARGO_BIN_EXE_mzml2mzpeak"))
         .arg(&archive)
         .arg("-o")
         .arg(&stem)
         .output()
-        .expect("spawn imzml2mzpeak binary");
+        .expect("spawn mzml2mzpeak binary");
 
     assert_eq!(
         out.status.code(),

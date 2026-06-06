@@ -150,7 +150,7 @@ warn for the empty case. Out of scope; noted for fork-maintenance awareness.
 ### IN-04: Reverse `--image` rejection is a runtime guard, not a clap-parse rejection
 
 **File:** `src/cli.rs:85-86, 235-239`
-**Issue:** `--image` is declared on the single flat `ConvertCli`, so `imzml2mzpeak in.mzpeak -o out
+**Issue:** `--image` is declared on the single flat `ConvertCli`, so `mzml2mzpeak in.mzpeak -o out
 --image a.tiff` PARSES successfully and is only rejected at runtime in `run_reverse` (line 235).
 The error message is clear and the test `reverse_with_image_is_rejected` covers it, so behavior is
 correct. This is an inherent consequence of the flat-CLI design (also true of `--verify`/`--dry-run`),

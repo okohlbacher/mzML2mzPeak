@@ -855,7 +855,7 @@ mod tests {
     /// source slice so no live `.ibd` is needed.
     #[test]
     fn verify_against_source_on_missing_output_is_verify_error() {
-        let bad = Path::new("/nonexistent-dir-xyz-imzml2mzpeak/out.mzpeak");
+        let bad = Path::new("/nonexistent-dir-xyz-mzml2mzpeak/out.mzpeak");
         let result = verify_against_source(&[], bad, ConformanceLevel::L1BitForBit);
         match result {
             Ok(_) => panic!("verifying a non-existent output archive must fail"),
@@ -1039,8 +1039,8 @@ mod tests {
     /// open fails before the output is even touched), not a panic.
     #[test]
     fn verify_roundtrip_on_missing_source_is_read_error() {
-        let bad_src = Path::new("/nonexistent-dir-xyz-imzml2mzpeak/src.imzML");
-        let bad_out = Path::new("/nonexistent-dir-xyz-imzml2mzpeak/out.mzpeak");
+        let bad_src = Path::new("/nonexistent-dir-xyz-mzml2mzpeak/src.imzML");
+        let bad_out = Path::new("/nonexistent-dir-xyz-mzml2mzpeak/out.mzpeak");
         let result = verify_roundtrip(bad_src, bad_out, ConformanceLevel::L1BitForBit);
         match result {
             Ok(_) => panic!("verifying a non-existent source must fail"),

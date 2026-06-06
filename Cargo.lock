@@ -1096,32 +1096,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfdd7caa900436d8f13b2346fe10257e0c05c1f1f9e351f4f5d57c03bd5f45da"
 
 [[package]]
-name = "imzml2mzpeak"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arrow",
- "clap",
- "encoding_rs",
- "env_logger",
- "indicatif",
- "log",
- "md-5",
- "mzdata",
- "mzpeak_prototyping",
- "mzpeaks",
- "parquet",
- "quick-xml",
- "serde",
- "serde_json",
- "sha1",
- "sha2",
- "thiserror 2.0.18",
- "tiff",
- "zip",
-]
-
-[[package]]
 name = "indexmap"
 version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1481,6 +1455,32 @@ dependencies = [
  "timsrust",
  "uuid",
  "zstd",
+]
+
+[[package]]
+name = "mzml2mzpeak"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow",
+ "clap",
+ "encoding_rs",
+ "env_logger",
+ "indicatif",
+ "log",
+ "md-5",
+ "mzdata",
+ "mzpeak_prototyping",
+ "mzpeaks",
+ "parquet",
+ "quick-xml",
+ "serde",
+ "serde_json",
+ "sha1",
+ "sha2",
+ "thiserror 2.0.18",
+ "tiff",
+ "zip",
 ]
 
 [[package]]

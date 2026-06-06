@@ -32,10 +32,10 @@
 
 use std::path::Path;
 
-use imzml2mzpeak::read::ImagingReader;
-use imzml2mzpeak::schema::ConformanceLevel;
-use imzml2mzpeak::verify::verify_streaming;
-use imzml2mzpeak::write::convert;
+use mzml2mzpeak::read::ImagingReader;
+use mzml2mzpeak::schema::ConformanceLevel;
+use mzml2mzpeak::verify::verify_streaming;
+use mzml2mzpeak::write::convert;
 
 /// The full real PXD001283 dataset has exactly this many pixels (verified at source level — also
 /// `<spectrumList count>` parses to `Some(34840)`, Plan 06-01).

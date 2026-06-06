@@ -4,9 +4,9 @@ plan: 02
 subsystem: reverse
 tags: [reverse, read-spike, rmz-01, rmz-02, rmz-03, rmz-04, gate, mzpeak-reader]
 requires:
-  - "imzml2mzpeak::reverse::ReverseError (Plan 07-01)"
+  - "mzml2mzpeak::reverse::ReverseError (Plan 07-01)"
   - "tests/fixtures/reverse/mod.rs::{imaging_archive, non_imaging_archive} (Plan 07-01)"
-  - "imzml2mzpeak::verify::ion_image::grid_dims_from_metadata (v0.3)"
+  - "mzml2mzpeak::verify::ion_image::grid_dims_from_metadata (v0.3)"
   - "mzpeak_prototyping::MzPeakReader (len/load_all_spectrum_metadata/get_spectrum_metadata/get_spectrum_arrays/get_spectrum_peaks_for/file_index)"
 provides:
   - "tests/reverse_read_spike.rs::read_pixel (the Phase-8 src/reverse/source.rs read shape, single-index, dtype-preserving)"

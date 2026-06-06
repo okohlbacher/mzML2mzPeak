@@ -66,7 +66,7 @@ If a future mzPeak file stores a pre-rendered TIC or base-peak image as a blob i
 
 **Effort:** S–M (fast-path branch in worker + float TIFF decoder from ADD-01)
 
-**Note for imzML2mzPeak:** the converter should write this blob. The format spec
+**Note for mzML2mzPeak:** the converter should write this blob. The format spec
 says it MAY be stored; the viewer fast-path gives it concrete value.
 
 ---

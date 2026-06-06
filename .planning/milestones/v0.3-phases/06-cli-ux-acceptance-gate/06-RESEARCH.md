@@ -99,7 +99,7 @@ indicatif = "=0.17.11"
 ```
 
 **Version verification:**
-- `indicatif` resolved at `0.17.11` `[VERIFIED: Cargo.lock]`; `cargo tree -i indicatif` shows the single path is `mzpeak_prototyping → imzml2mzpeak` `[VERIFIED: cargo tree]`. Pinning `=0.17.11` (not `=0.17.10` as CLAUDE.md's table loosely says) matches the actual resolved copy and avoids forcing a second copy. **Flag for planner:** CLAUDE.md says "0.17.10"; the lockfile is 0.17.11. Pin to 0.17.11 to match the existing single copy — pinning 0.17.10 would either downgrade the shared copy or fail to resolve.
+- `indicatif` resolved at `0.17.11` `[VERIFIED: Cargo.lock]`; `cargo tree -i indicatif` shows the single path is `mzpeak_prototyping → mzml2mzpeak` `[VERIFIED: cargo tree]`. Pinning `=0.17.11` (not `=0.17.10` as CLAUDE.md's table loosely says) matches the actual resolved copy and avoids forcing a second copy. **Flag for planner:** CLAUDE.md says "0.17.10"; the lockfile is 0.17.11. Pin to 0.17.11 to match the existing single copy — pinning 0.17.10 would either downgrade the shared copy or fail to resolve.
 - `clap 4.5.38`, `anyhow 1.0.102`, `log 0.4.27`, `env_logger 0.11.8` all already direct-pinned `[VERIFIED: Cargo.toml]`.
 
 ## Package Legitimacy Audit
@@ -379,10 +379,10 @@ CONTEXT locks "the progress total comes from the preflight/header count obtained
 // tests/acceptance.rs  — #[ignore]-gated; run with: cargo test --release -- --ignored acceptance
 // Source pattern: tests/verify_roundtrip.rs (finish-seam) + src/write/convert.rs + a fresh verify pass.
 use std::path::Path;
-use imzml2mzpeak::read::ImagingReader;
-use imzml2mzpeak::schema::ConformanceLevel;
-use imzml2mzpeak::write::convert;
-// use imzml2mzpeak::verify::verify_streaming;  // the NEW bounded core
+use mzml2mzpeak::read::ImagingReader;
+use mzml2mzpeak::schema::ConformanceLevel;
+use mzml2mzpeak::write::convert;
+// use mzml2mzpeak::verify::verify_streaming;  // the NEW bounded core
 
 #[test]
 #[ignore = "heavy: converts the full 34,840-spectrum PXD001283 dataset; run explicitly with --release"]
@@ -411,7 +411,7 @@ fn acceptance_pxd001283_full_roundtrip() {
 ### Dry-run plan emission (CLI-03)
 ```rust
 // In cli.rs, when cli.dry_run: run preflight + header + storage mode, print a table, exit 0, write NOTHING.
-let report = imzml2mzpeak::integrity::preflight::preflight(&cli.input)?;   // PreflightReport: uuid, checksum_type, checksum_hex
+let report = mzml2mzpeak::integrity::preflight::preflight(&cli.input)?;   // PreflightReport: uuid, checksum_type, checksum_hex
 let reader = ImagingReader::open(&cli.input)?;                              // gives storage_mode()
 println!("Conversion plan for {}", cli.input.display());
 println!("  integrity:   OK (uuid={}, {}={})", report.uuid, report.checksum_type, report.checksum_hex);
@@ -531,12 +531,12 @@ return Ok(());   // → ExitCode::SUCCESS
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/kohlbach/Claude/imzML2mzPeak/src/verify/verify.rs` (lines 66-78 collect-all site; 124-147 pairing; 159-300 representation branch; 308-325 ion-image; 334-365 streaming `build_coord_index`) — the crux refactor
-- `/Users/kohlbach/Claude/imzML2mzPeak/src/write/convert.rs` (38-83) — the streaming convert entry the CLI drives
-- `/Users/kohlbach/Claude/imzML2mzPeak/src/read/stream.rs` (96-292) — `ImagingReader` iterator, `open`, `storage_mode`, one-shot consumption
-- `/Users/kohlbach/Claude/imzML2mzPeak/src/integrity/preflight.rs` + `src/bin/preflight.rs` — `PreflightReport`, the streaming digest, the `ExitCode` mapping pattern
-- `/Users/kohlbach/Claude/imzML2mzPeak/src/integrity/header.rs` — bounded header parse; `IntegrityError` variants; `parse_value_attr` (count-attr extraction pattern)
-- `/Users/kohlbach/Claude/imzML2mzPeak/src/verify/report.rs` — `VerificationReport` (`PartialEq`), `VerifyError` variants, `MAX_REPORTED_MISMATCHES`
+- `/Users/kohlbach/Claude/mzML2mzPeak/src/verify/verify.rs` (lines 66-78 collect-all site; 124-147 pairing; 159-300 representation branch; 308-325 ion-image; 334-365 streaming `build_coord_index`) — the crux refactor
+- `/Users/kohlbach/Claude/mzML2mzPeak/src/write/convert.rs` (38-83) — the streaming convert entry the CLI drives
+- `/Users/kohlbach/Claude/mzML2mzPeak/src/read/stream.rs` (96-292) — `ImagingReader` iterator, `open`, `storage_mode`, one-shot consumption
+- `/Users/kohlbach/Claude/mzML2mzPeak/src/integrity/preflight.rs` + `src/bin/preflight.rs` — `PreflightReport`, the streaming digest, the `ExitCode` mapping pattern
+- `/Users/kohlbach/Claude/mzML2mzPeak/src/integrity/header.rs` — bounded header parse; `IntegrityError` variants; `parse_value_attr` (count-attr extraction pattern)
+- `/Users/kohlbach/Claude/mzML2mzPeak/src/verify/report.rs` — `VerificationReport` (`PartialEq`), `VerifyError` variants, `MAX_REPORTED_MISMATCHES`
 - `/Users/kohlbach/.cargo/git/checkouts/mzpeak-cd0ccbb7d90f04e9/d1aaaf8/examples/convert.rs` (36-50 clap derive; 366 `reader.len()`; 480-485 `i % 5000` log cadence) — the CLI idiom to mirror
 - `/Users/kohlbach/.cargo/git/checkouts/mzpeak-cd0ccbb7d90f04e9/d1aaaf8/src/reader.rs` (307 `new`; 461 `get_spectrum_arrays`; 752 `len`; 818 `get_spectrum_peaks_for`; 920 `get_spectrum_metadata`) — `MzPeakReader` API
 - `Cargo.toml` + `Cargo.lock` (+ `cargo tree -i indicatif`) — pinned versions; indicatif 0.17.11 transitive

@@ -335,7 +335,7 @@ impl ImzmlWriter {
         emit_raw(
             sink,
             "<sourceFileList count=\"1\">\
-             <sourceFile id=\"sf_reverse\" name=\"imzml2mzpeak\" location=\"file://\">\
+             <sourceFile id=\"sf_reverse\" name=\"mzml2mzpeak\" location=\"file://\">\
              <cvParam cvRef=\"MS\" accession=\"MS:1000824\" name=\"no nativeID format\" value=\"\"/>\
              </sourceFile></sourceFileList>",
         )?;
@@ -345,12 +345,12 @@ impl ImzmlWriter {
         // literal that silently lies when the crate bumps (IN-03). The value is static (from
         // CARGO_PKG_VERSION) but routed through the escape path for consistency with the single
         // value-write entry point.
-        emit_raw(sink, "<softwareList count=\"1\"><software id=\"sw_imzml2mzpeak\" version=\"")?;
+        emit_raw(sink, "<softwareList count=\"1\"><software id=\"sw_mzml2mzpeak\" version=\"")?;
         emit_escaped(sink, env!("CARGO_PKG_VERSION"))?;
         emit_raw(
             sink,
             "\">\
-             <cvParam cvRef=\"MS\" accession=\"MS:1000799\" name=\"custom unreleased software tool\" value=\"imzml2mzpeak\"/>\
+             <cvParam cvRef=\"MS\" accession=\"MS:1000799\" name=\"custom unreleased software tool\" value=\"mzml2mzpeak\"/>\
              </software></softwareList>\n",
         )?;
 
@@ -371,7 +371,7 @@ impl ImzmlWriter {
             sink,
             "<dataProcessingList count=\"1\">\
              <dataProcessing id=\"dp_reverse\">\
-             <processingMethod order=\"0\" softwareRef=\"sw_imzml2mzpeak\">\
+             <processingMethod order=\"0\" softwareRef=\"sw_mzml2mzpeak\">\
              <cvParam cvRef=\"MS\" accession=\"MS:1000544\" name=\"Conversion to mzML\" value=\"\"/>\
              </processingMethod></dataProcessing></dataProcessingList>\n",
         )?;
@@ -666,7 +666,7 @@ mod tests {
             .unwrap()
             .as_nanos();
         p.push(format!(
-            "imzml2mzpeak-imzml-test-{}-{:?}",
+            "mzml2mzpeak-imzml-test-{}-{:?}",
             nanos,
             std::thread::current().id()
         ));

@@ -31,7 +31,7 @@
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │                              CLI (clap)                                │
-│   imzml2mzpeak convert <input.imzML> [-o out.mzpeak] [options]         │
+│   mzml2mzpeak convert <input.imzML> [-o out.mzpeak] [options]         │
 │   (mirrors mzpeak_prototyping ConvertCli/run_convert; imzML exposed)   │
 └───────────────────────────────┬──────────────────────────────────────┘
                                  │

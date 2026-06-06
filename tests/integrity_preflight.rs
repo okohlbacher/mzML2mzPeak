@@ -12,8 +12,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use imzml2mzpeak::integrity::header::{self, ChecksumType, IntegrityError};
-use imzml2mzpeak::integrity::preflight::preflight;
+use mzml2mzpeak::integrity::header::{self, ChecksumType, IntegrityError};
+use mzml2mzpeak::integrity::preflight::preflight;
 
 const CONTINUOUS_IMZML: &str = "tests/fixtures/imaging/Example_Continuous.imzML";
 const BAD_CHECKSUM_IMZML: &str = "tests/fixtures/imaging/Corrupt_BadChecksum.imzML";
@@ -272,7 +272,7 @@ fn tempdir() -> PathBuf {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    p.push(format!("imzml2mzpeak-test-{}-{:?}", nanos, std::thread::current().id()));
+    p.push(format!("mzml2mzpeak-test-{}-{:?}", nanos, std::thread::current().id()));
     fs::create_dir_all(&p).unwrap();
     p
 }

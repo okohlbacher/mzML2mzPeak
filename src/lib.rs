@@ -1,4 +1,4 @@
-//! imzml2mzpeak — imaging mass-spectrometry converter library.
+//! mzml2mzpeak — imaging mass-spectrometry converter library.
 //!
 //! This crate turns an imzML/.ibd file pair into a stream of imaging spectra and (in
 //! later phases) writes them as an imaging mzPeak file without losing spatial or spectral

@@ -429,7 +429,7 @@ m/z f64, intensity f32 — they differ). `load_ibd_arrays` sizes `read_exact` as
 doesn't exist, or `<spectrumList defaultDataProcessingRef>` points at a missing id.
 **Why it happens:** Spec-rich scaffolding with mismatched id attributes.
 **How to avoid:** Every `ref=` attribute must name an id actually declared earlier. Keep ids
-simple and constant (`IC1`, `dp_reverse`, `sw_imzml2mzpeak`). The inner mzML builder resolves
+simple and constant (`IC1`, `dp_reverse`, `sw_mzml2mzpeak`). The inner mzML builder resolves
 these; a dangling ref can surface as a parse error.
 **Warning signs:** `parse_metadata` sets an error mentioning an unresolved reference.
 

@@ -37,7 +37,7 @@ metrics:
 
 Settled Phase 7's one true "audit" deliverable: ran a live `cargo tree -i` dependency audit
 confirming that **both** SHA-1 (`sha1 v0.10.6`) and MD5 (`md-5 v0.10.6`) are already pinned direct
-dependencies of `imzml2mzpeak` (so "zero new crates" holds for either), decided the milestone
+dependencies of `mzml2mzpeak` (so "zero new crates" holds for either), decided the milestone
 checksum term — **MD5 `IMS:1000090`** as the default with **SHA-1 `IMS:1000091`** recorded as an
 equally-zero-cost alternative — and authored `07-FINDINGS.md`, the phase's durable artifact that
 folds in the Plan-02 real-archive `GATE: PASS` read-spike evidence and the open/close adversarial
@@ -48,12 +48,12 @@ review. No crate was added; `Cargo.toml` is unchanged.
 **Task 1 — live cargo tree checksum audit (no file artifacts; evidence embedded in Task 2):**
 - Re-ran `cargo tree -i sha1`, `cargo tree -i md-5`, `cargo tree -i md5` on the current
   `Cargo.toml`. Confirmed the RESEARCH finding still holds:
-  - `sha1 v0.10.6` — DIRECT dep of `imzml2mzpeak` (also via mzdata + zip).
+  - `sha1 v0.10.6` — DIRECT dep of `mzml2mzpeak` (also via mzdata + zip).
   - `md-5 v0.10.6` — DIRECT dep (RustCrypto leaf, imported `as md5`).
   - `md5 v0.7.0` — TRANSITIVE only, via mzdata's mzML writer (NOT ours).
 - Verified read-only: `git diff --stat Cargo.toml` empty — no `cargo add` was run.
-- Acceptance verify (`cargo tree -i md-5 | grep imzml2mzpeak && cargo tree -i sha1 | grep
-  imzml2mzpeak`) → `OK`.
+- Acceptance verify (`cargo tree -i md-5 | grep mzml2mzpeak && cargo tree -i sha1 | grep
+  mzml2mzpeak`) → `OK`.
 
 **Task 2 — `07-FINDINGS.md` (commit `b108288`):**
 - Authored the phase's durable deliverable with four sections, mirroring the `01-FINDINGS.md`
@@ -82,7 +82,7 @@ a one-line `ChecksumType` switch and no dependency change.
 
 ## Verification
 
-- `cargo tree -i sha1` / `-i md-5` confirm both are direct deps of `imzml2mzpeak`; `-i md5` shows
+- `cargo tree -i sha1` / `-i md-5` confirm both are direct deps of `mzml2mzpeak`; `-i md5` shows
   `md5 v0.7.0` is transitive via mzdata only.
 - `git diff --stat Cargo.toml` empty — no crate added (audit is read-only on the dep graph).
 - `07-FINDINGS.md` exists and contains all four required sections; acceptance greps

@@ -33,9 +33,9 @@
 #[path = "fixtures/reverse/mod.rs"]
 mod reverse_fixtures;
 
-use imzml2mzpeak::read::record::{NumArray, Representation};
-use imzml2mzpeak::reverse::ReverseError;
-use imzml2mzpeak::verify::ion_image::grid_dims_from_metadata;
+use mzml2mzpeak::read::record::{NumArray, Representation};
+use mzml2mzpeak::reverse::ReverseError;
+use mzml2mzpeak::verify::ion_image::grid_dims_from_metadata;
 
 use mzdata::curie;
 use mzdata::prelude::{ParamDescribed, ParamValue};

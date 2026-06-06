@@ -64,7 +64,7 @@ and reverse paths. Info items cover minor robustness/consistency nits.
 `ibd.append`, or `write_spectrum` *panics* (e.g. an upstream `mzdata` bug, or a
 `debug_assert!` in `write_binary_data_array` firing — imzml_writer.rs:483), the function
 unwinds without running the `remove_file` arm, leaving the temp body
-(`imzml2mzpeak_body_*.imzML.body`) in the OS temp dir. The `.ibd` is also left because the
+(`mzml2mzpeak_body_*.imzML.body`) in the OS temp dir. The `.ibd` is also left because the
 poison/cleanup is delegated to this orchestrator (ibd.rs:76). The temp dir accumulates
 orphans across panicking runs. This is a robustness/leak concern, not corruption, hence
 Warning. (The error-return paths ARE handled correctly.)
@@ -89,7 +89,7 @@ that is `mem::forget`-ed (or has a `disarm()` flag set) only on success.
 user-supplied stem and `convert` then `File::create`s them (truncating). Nothing checks
 that the derived `.imzML`/`.ibd` does not equal the input `.mzpeak` archive, nor that the
 two outputs do not already exist. With `-o foo` on an input named `foo.mzpeak`, the outputs
-are `foo.imzML`/`foo.ibd` (no collision) — but `imzml2mzpeak in.mzpeak -o in.mzpeak` derives
+are `foo.imzML`/`foo.ibd` (no collision) — but `mzml2mzpeak in.mzpeak -o in.mzpeak` derives
 `in.imzML`/`in.ibd` AND, if a user passes `-o in` while the archive is `in` (no ext), the
 `.ibd` derivation `out.with_extension("ibd")` could in pathological cases clobber a
 sibling. More importantly there is no clobber confirmation at all: an existing

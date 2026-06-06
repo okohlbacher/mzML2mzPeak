@@ -1,6 +1,6 @@
 //! End-to-end optical-TIFF import tests (Phase 15, Plan 03 — IMG-01..IMG-05).
 //!
-//! These tests drive the REAL production seam: `imzml2mzpeak::write::convert(reader, out, images)`
+//! These tests drive the REAL production seam: `mzml2mzpeak::write::convert(reader, out, images)`
 //! on the committed processed imzML/.ibd fixture (a 3×3 MS1 grid → `pixel_count` is populated as
 //! `observed_max`, so Nx=Ny=3), then re-open the produced archive with the reference
 //! [`MzPeakReader`] and assert against `metadata.imaging.images[]`.
@@ -14,8 +14,8 @@
 
 use std::path::{Path, PathBuf};
 
-use imzml2mzpeak::read::ImagingReader;
-use imzml2mzpeak::write::convert;
+use mzml2mzpeak::read::ImagingReader;
+use mzml2mzpeak::write::convert;
 
 use mzpeak_prototyping::MzPeakReader;
 use serde_json::Value;
@@ -35,7 +35,7 @@ const EPS: f64 = 1e-9;
 
 /// A per-test unique temp output path under the OS temp dir.
 fn temp_out(tag: &str) -> PathBuf {
-    std::env::temp_dir().join(format!("imzml2mzpeak_image_import_{tag}_{}.mzpeak", std::process::id()))
+    std::env::temp_dir().join(format!("mzml2mzpeak_image_import_{tag}_{}.mzpeak", std::process::id()))
 }
 
 /// Open the committed processed fixture as an [`ImagingReader`] (panics if absent — the fixture
@@ -165,7 +165,7 @@ fn two_images_and_duplicate_basenames_get_distinct_ordinals() {
 /// `convert()` (before the first `File::create`), so the output path must NOT exist afterwards.
 #[test]
 fn bad_image_fails_fast_and_leaves_no_output() {
-    use imzml2mzpeak::write::WriteError;
+    use mzml2mzpeak::write::WriteError;
 
     // (a) A non-existent image path → error, no output file.
     let out = temp_out("badmissing");
@@ -187,7 +187,7 @@ fn bad_image_fails_fast_and_leaves_no_output() {
     let out2 = temp_out("badnontiff");
     let _ = std::fs::remove_file(&out2);
     let not_tiff = std::env::temp_dir().join(format!(
-        "imzml2mzpeak_image_import_nontiff_{}.bin",
+        "mzml2mzpeak_image_import_nontiff_{}.bin",
         std::process::id()
     ));
     std::fs::write(&not_tiff, b"this is definitely not a TIFF file").unwrap();

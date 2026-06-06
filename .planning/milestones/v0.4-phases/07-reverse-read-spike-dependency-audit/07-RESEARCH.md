@@ -41,7 +41,7 @@ None recorded as hard user locks. CONTEXT.md marks this an auto-generated spike 
 
 Phase 7 is a **read-capability confirmation + one dependency decision**, not new production machinery. Almost everything the reverse path needs from `MzPeakReader` is already exercised verbatim by the shipped v0.3 verify layer (`src/verify/verify.rs`), which opens a real imaging mzPeak archive, reads its count, primes the metadata cache once, reads per-pixel `(x,y,z)` by IMS accession, and reads back per-pixel m/z+intensity arrays *at the source stored width without widening*. The reverse reader (`src/reverse/source.rs`, Phase 8+) is a near-clone of that read half, minus the comparison logic. So the spike's job is to prove those calls compose into the exact records the emit phases will consume — and to settle SHA-1-vs-MD5.
 
-The **dependency audit is already decisive**. A live `cargo tree -i` shows BOTH `sha1 v0.10.6` AND `md-5 v0.10.6` (RustCrypto) are *already pinned direct dependencies* of `imzml2mzpeak` — they were added by the v0.3 integrity preflight (`src/integrity/preflight.rs` streams `md5`/`sha1`/`sha2` over the `.ibd`). So "zero new crates" is satisfied for **either** algorithm. The decision therefore turns on spec/interop intent, not the dep graph. **Recommendation: emit MD5 (`IMS:1000090`)** as the default (it is what the canonical imzML community files and HR2MSI use, and what the existing preflight already handles), while noting SHA-1 (`IMS:1000091`) is equally zero-cost should Phase-8 interop testing prefer it. Either way, the emit phase reuses the existing `compute_digest` / `stream_digest` machinery — it does not write a new hasher.
+The **dependency audit is already decisive**. A live `cargo tree -i` shows BOTH `sha1 v0.10.6` AND `md-5 v0.10.6` (RustCrypto) are *already pinned direct dependencies* of `mzml2mzpeak` — they were added by the v0.3 integrity preflight (`src/integrity/preflight.rs` streams `md5`/`sha1`/`sha2` over the `.ibd`). So "zero new crates" is satisfied for **either** algorithm. The decision therefore turns on spec/interop intent, not the dep graph. **Recommendation: emit MD5 (`IMS:1000090`)** as the default (it is what the canonical imzML community files and HR2MSI use, and what the existing preflight already handles), while noting SHA-1 (`IMS:1000091`) is equally zero-cost should Phase-8 interop testing prefer it. Either way, the emit phase reuses the existing `compute_digest` / `stream_digest` machinery — it does not write a new hasher.
 
 **Primary recommendation:** Build the spike as a throwaway `src/bin/` harness (mirroring the existing `src/bin/spike_coords.rs`) that opens the v0.3-produced `out/HR2MSI.mzpeak` via `MzPeakReader`, calls `load_all_spectrum_metadata()` once, then for a bounded head-sample proves count + dtype-preserving arrays + IMS coords + `metadata.imaging` shape, and hard-fails a synthetic non-imaging archive. Capture findings into `07-FINDINGS.md`; do NOT yet create `src/reverse/`.
 
@@ -295,7 +295,7 @@ use mzpeak_prototyping::MzPeakReader;
 use mzdata::curie;
 use mzdata::prelude::{ParamDescribed, ParamValue};
 use mzdata::spectrum::bindata::{ArrayType, BinaryDataArrayType, ByteArrayView};
-use imzml2mzpeak::read::record::{ImagingSpectrum, NumArray, Representation};
+use mzml2mzpeak::read::record::{ImagingSpectrum, NumArray, Representation};
 
 let mut r = MzPeakReader::new(path)?;          // io::Result
 let n = r.len();
@@ -322,13 +322,13 @@ for i in 0..n as u64 {
 ```bash
 $ cargo tree -i sha1
 sha1 v0.10.6
-├── imzml2mzpeak v0.1.0            # <-- DIRECT dep (integrity preflight)
+├── mzml2mzpeak v0.1.0            # <-- DIRECT dep (integrity preflight)
 ├── mzdata v0.63.3
 └── zip v4.1.0
 
 $ cargo tree -i md-5
 md-5 v0.10.6
-└── imzml2mzpeak v0.1.0            # <-- DIRECT dep (integrity preflight, imported as md5)
+└── mzml2mzpeak v0.1.0            # <-- DIRECT dep (integrity preflight, imported as md5)
 
 $ cargo tree -i md5
 md5 v0.7.0
@@ -387,7 +387,7 @@ md5 v0.7.0
 |----------|-------|
 | Framework | Rust built-in `#[test]` + `tests/*.rs` integration harness (cargo nextest optional per CLAUDE.md) |
 | Config file | `Cargo.toml` (no separate test config) |
-| Quick run command | `cargo test --bin imzml2mzpeak reverse` (unit) or `cargo test reverse_read` |
+| Quick run command | `cargo test --bin mzml2mzpeak reverse` (unit) or `cargo test reverse_read` |
 | Full suite command | `cargo test` (all unit + integration) |
 
 ### Phase Requirements → Test Map

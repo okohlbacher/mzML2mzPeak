@@ -89,7 +89,7 @@ For `VerifyError`, the RESEARCH/orchestration skeleton (RESEARCH lines 387-388) 
 **Source:** `src/schema/tolerance.rs:9-49`
 **Apply to:** `src/verify/compare.rs` and `src/verify/verify.rs`
 
-`ConformanceLevel` (L1BitForBit / L2Transformed) and `ToleranceContract::{L1, L2}` (`mz_rel_err`, `intensity_rel_err`) are the single source of truth, re-exported as `imzml2mzpeak::schema::{ConformanceLevel, ToleranceContract}` (`src/schema/mod.rs:30`). The comparator selects the contract by level exactly as the RESEARCH skeleton shows:
+`ConformanceLevel` (L1BitForBit / L2Transformed) and `ToleranceContract::{L1, L2}` (`mz_rel_err`, `intensity_rel_err`) are the single source of truth, re-exported as `mzml2mzpeak::schema::{ConformanceLevel, ToleranceContract}` (`src/schema/mod.rs:30`). The comparator selects the contract by level exactly as the RESEARCH skeleton shows:
 
 ```rust
 // RESEARCH lines 383-386 (consuming src/schema/tolerance.rs:36,44)
@@ -140,7 +140,7 @@ The verify orchestrator follows the same per-spectrum loop for the source side (
 ```rust
 #[test]
 fn imaging_writer_new_on_unwritable_path_is_io_error() {
-    let bad = Path::new("/nonexistent-dir-xyz-imzml2mzpeak/out.mzpeak");
+    let bad = Path::new("/nonexistent-dir-xyz-mzml2mzpeak/out.mzpeak");
     match ImagingWriter::new(bad) {
         Ok(_) => panic!("..."),
         Err(err) => assert!(matches!(err, WriteError::Io(_)), "..."),

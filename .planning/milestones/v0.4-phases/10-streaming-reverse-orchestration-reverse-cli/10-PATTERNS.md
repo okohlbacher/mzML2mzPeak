@@ -177,7 +177,7 @@ pub fn new(path, uuid, ibd_md5_hex, count, imaging) -> Result<Self, ReverseError
 #[arg(long)] pub reverse: bool,
 ```
 RESEARCH §clap Restructuring: **flat struct + dispatch-in-`run()`** is the recommended shape
-(NOT a Subcommand enum) — it keeps `imzml2mzpeak <in.imzML> <out.mzpeak>` byte-identical. The
+(NOT a Subcommand enum) — it keeps `mzml2mzpeak <in.imzML> <out.mzpeak>` byte-identical. The
 existing CLI already flat-dispatches in `run()` (the `dry_run` branch, `cli.rs:72`).
 
 **2. `run()` dispatch** (the existing `run` at `cli.rs:71-165` is the forward body; wrap it):

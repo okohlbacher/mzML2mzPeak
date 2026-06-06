@@ -27,11 +27,11 @@
 
 use std::path::{Path, PathBuf};
 
-use imzml2mzpeak::read::record::{ImagingSpectrum, NumArray, Representation};
-use imzml2mzpeak::read::{ImagingReader, RunProvenance, StorageMode};
-use imzml2mzpeak::schema::{ImagingRunMetadata, parse_scan_settings};
-use imzml2mzpeak::write::writer::IndexAccumulator;
-use imzml2mzpeak::write::{ImagingWriter, WriteError, convert, to_mzdata};
+use mzml2mzpeak::read::record::{ImagingSpectrum, NumArray, Representation};
+use mzml2mzpeak::read::{ImagingReader, RunProvenance, StorageMode};
+use mzml2mzpeak::schema::{ImagingRunMetadata, parse_scan_settings};
+use mzml2mzpeak::write::writer::IndexAccumulator;
+use mzml2mzpeak::write::{ImagingWriter, WriteError, convert, to_mzdata};
 
 use mzdata::curie;
 use mzdata::meta::FileMetadataConfig;
@@ -144,7 +144,7 @@ fn write_spectra(
 /// A unique temp output path per test (process id + tag), removed by the caller.
 fn temp_out(tag: &str) -> PathBuf {
     let mut p = std::env::temp_dir();
-    p.push(format!("imzml2mzpeak_roundtrip_{tag}_{}.mzpeak", std::process::id()));
+    p.push(format!("mzml2mzpeak_roundtrip_{tag}_{}.mzpeak", std::process::id()));
     p
 }
 

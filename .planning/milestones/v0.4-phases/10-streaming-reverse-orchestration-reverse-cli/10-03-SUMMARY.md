@@ -87,7 +87,7 @@ Created `tests/reverse_convert.rs` (four load-bearing tests, fixtures included v
   interior pixel (index 1234) round-reads the expected grid coord + 3-element m/z array. Tiny
   arrays keep the run sub-second.
 - **`non_imaging_cli_fails_fast` (RCLI-01 / T-10-PART, Pitfall 4):** runs the BUILT binary
-  (`env!("CARGO_BIN_EXE_imzml2mzpeak")`) on `non_imaging_archive()` with `-o <tmp_stem>`; asserts
+  (`env!("CARGO_BIN_EXE_mzml2mzpeak")`) on `non_imaging_archive()` with `-o <tmp_stem>`; asserts
   exit code `4` (EXIT_COORDINATE, where NotImaging maps), stderr contains "not an imaging mzpeak",
   and NEITHER `<stem>.imzML` NOR `<stem>.ibd` exists afterward.
 
@@ -106,7 +106,7 @@ commits. No behavior or scope deviation.
 - `cargo test --test reverse_convert` — 5 passed (builds_n_pixel_fixture, oracle_roundreads_coords_and_shapes, uuid_and_stem_linkage, bounded_memory_at_scale, non_imaging_cli_fails_fast); 1.19s total (5k-pixel scale test well under the sub-second-per-array CI target).
 - `cargo test` — full suite: 124 lib tests + all integration tests, 0 failures, no Phase 7/8/9/10 regression.
 - `git diff --quiet Cargo.toml Cargo.lock` — CLEAN (zero new crates; no `tempfile`).
-- Acceptance greps: `pub fn imaging_archive_n` present; `pub fn imaging_archive(` still present (2-pixel builder intact); `ImzMLReader` + `Command::new` (`CARGO_BIN_EXE_imzml2mzpeak`) present in tests/reverse_convert.rs.
+- Acceptance greps: `pub fn imaging_archive_n` present; `pub fn imaging_archive(` still present (2-pixel builder intact); `ImzMLReader` + `Command::new` (`CARGO_BIN_EXE_mzml2mzpeak`) present in tests/reverse_convert.rs.
 
 ## Acceptance Notes
 

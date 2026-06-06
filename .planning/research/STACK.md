@@ -96,7 +96,7 @@ let y = scan.get_param_by_curie(&curie!(IMS:1000051)).and_then(|p| p.to_i64().ok
 
 ```toml
 [package]
-name = "imzml2mzpeak"
+name = "mzml2mzpeak"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"

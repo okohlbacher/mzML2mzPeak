@@ -151,7 +151,7 @@ formality rather than a genuine slop risk.*
 ### System Architecture Diagram
 
 ```
-  imzml2mzpeak convert in.imzML out.mzpeak --image a.tiff --image b.tiff
+  mzml2mzpeak convert in.imzML out.mzpeak --image a.tiff --image b.tiff
                           │
                           ▼
            ┌──────────────────────────────┐

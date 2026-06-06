@@ -34,12 +34,12 @@
 
 use std::path::{Path, PathBuf};
 
-use imzml2mzpeak::read::ReadError;
-use imzml2mzpeak::read::record::{ImagingSpectrum, NumArray, Representation};
-use imzml2mzpeak::read::{RunProvenance, StorageMode};
-use imzml2mzpeak::schema::ConformanceLevel;
-use imzml2mzpeak::verify::{verify_against_source, verify_streaming};
-use imzml2mzpeak::write::{ImagingWriter, WriteError, to_mzdata};
+use mzml2mzpeak::read::ReadError;
+use mzml2mzpeak::read::record::{ImagingSpectrum, NumArray, Representation};
+use mzml2mzpeak::read::{RunProvenance, StorageMode};
+use mzml2mzpeak::schema::ConformanceLevel;
+use mzml2mzpeak::verify::{verify_against_source, verify_streaming};
+use mzml2mzpeak::write::{ImagingWriter, WriteError, to_mzdata};
 
 use mzdata::curie;
 use mzdata::meta::FileMetadataConfig;
@@ -152,7 +152,7 @@ fn write_fixture(out: &Path, spectra: &[ImagingSpectrum]) -> Result<(), WriteErr
 /// A unique temp output path per test (process id + tag), removed by the caller.
 fn temp_out(tag: &str) -> PathBuf {
     let mut p = std::env::temp_dir();
-    p.push(format!("imzml2mzpeak_verify_{tag}_{}.mzpeak", std::process::id()));
+    p.push(format!("mzml2mzpeak_verify_{tag}_{}.mzpeak", std::process::id()));
     p
 }
 
@@ -770,7 +770,7 @@ fn centroid_f64_intensity_is_stored_width_divergence_under_l1() {
     let int_mismatches = report
         .mismatches
         .iter()
-        .filter(|m| matches!(m.axis, imzml2mzpeak::verify::MismatchAxis::Intensity))
+        .filter(|m| matches!(m.axis, mzml2mzpeak::verify::MismatchAxis::Intensity))
         .count();
     assert!(int_mismatches >= 1, "an intensity Mismatch record is retained for the divergence");
 

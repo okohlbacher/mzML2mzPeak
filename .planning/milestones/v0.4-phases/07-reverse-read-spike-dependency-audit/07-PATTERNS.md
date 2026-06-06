@@ -42,7 +42,7 @@ use mzdata::curie;
 use mzdata::prelude::{ParamDescribed, ParamValue};
 use mzdata::spectrum::bindata::{ArrayType, BinaryDataArrayType, ByteArrayView};
 use mzpeak_prototyping::MzPeakReader;          // reader for the OUTPUT archive (not ImzMLReader)
-use imzml2mzpeak::read::record::{ImagingSpectrum, NumArray, Representation};
+use mzml2mzpeak::read::record::{ImagingSpectrum, NumArray, Representation};
 ```
 > Note the difference vs `spike_coords.rs`: that spike reads the SOURCE imzML via `ImzMLReader`;
 > the reverse spike reads the OUTPUT mzPeak archive via `MzPeakReader` (the verify.rs reader, not
@@ -207,8 +207,8 @@ replicate the terminal `finish_parquet → add_index_metadata("imaging", &block)
 
 **Imports** (write_roundtrip.rs:28-38):
 ```rust
-use imzml2mzpeak::read::record::{ImagingSpectrum, NumArray, Representation};
-use imzml2mzpeak::write::{ImagingWriter, to_mzdata};
+use mzml2mzpeak::read::record::{ImagingSpectrum, NumArray, Representation};
+use mzml2mzpeak::write::{ImagingWriter, to_mzdata};
 use mzdata::curie;
 use mzdata::prelude::{ParamDescribed, ParamValue};
 use mzpeak_prototyping::MzPeakReader;

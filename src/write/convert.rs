@@ -283,7 +283,7 @@ mod tests {
     #[test]
     fn imaging_writer_new_on_unwritable_path_is_io_error() {
         // A path under a non-existent directory cannot be created (ENOENT → io::Error).
-        let bad = Path::new("/nonexistent-dir-xyz-imzml2mzpeak/out.mzpeak");
+        let bad = Path::new("/nonexistent-dir-xyz-mzml2mzpeak/out.mzpeak");
         // `ImagingWriter` is not `Debug`, so match on the Result rather than `expect_err`.
         match ImagingWriter::new(bad, &[]) {
             Ok(_) => panic!("creating under a missing dir must fail"),

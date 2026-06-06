@@ -15,8 +15,8 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use imzml2mzpeak::read::record::{NumArray, StorageMode};
-use imzml2mzpeak::read::stream::{ImagingReader, ReadError};
+use mzml2mzpeak::read::record::{NumArray, StorageMode};
+use mzml2mzpeak::read::stream::{ImagingReader, ReadError};
 use mzdata::spectrum::bindata::BinaryDataArrayType;
 
 const CONTINUOUS: &str = "tests/fixtures/imaging/Example_Continuous.imzML";

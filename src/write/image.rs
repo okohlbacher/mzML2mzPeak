@@ -195,7 +195,7 @@ mod tests {
     fn read_dimensions_on_non_tiff_errors_typed() {
         // A non-TIFF byte file must surface WriteError::ImageDecode (NOT a panic).
         let mut tmp = std::env::temp_dir();
-        tmp.push(format!("imzml2mzpeak_not_a_tiff_{}.bin", std::process::id()));
+        tmp.push(format!("mzml2mzpeak_not_a_tiff_{}.bin", std::process::id()));
         {
             let mut f = File::create(&tmp).unwrap();
             f.write_all(b"this is definitely not a TIFF file").unwrap();
@@ -204,7 +204,7 @@ mod tests {
         let _ = std::fs::remove_file(&tmp);
         match res {
             Err(WriteError::ImageDecode { path, .. }) => {
-                assert!(path.contains("imzml2mzpeak_not_a_tiff_"), "path carried in error");
+                assert!(path.contains("mzml2mzpeak_not_a_tiff_"), "path carried in error");
             }
             other => panic!("expected WriteError::ImageDecode, got {other:?}"),
         }
@@ -212,10 +212,10 @@ mod tests {
 
     #[test]
     fn sha256_and_size_streamed_against_known_digest() {
-        // Precomputed: sha256("hello imzml2mzpeak") = 835b9d...75118, len = 18.
-        let payload = b"hello imzml2mzpeak";
+        // Precomputed: sha256("hello mzml2mzpeak") = e62b8c...d841b, len = 17.
+        let payload = b"hello mzml2mzpeak";
         let mut tmp = std::env::temp_dir();
-        tmp.push(format!("imzml2mzpeak_sha_{}.bin", std::process::id()));
+        tmp.push(format!("mzml2mzpeak_sha_{}.bin", std::process::id()));
         {
             let mut f = File::create(&tmp).unwrap();
             f.write_all(payload).unwrap();
@@ -224,9 +224,9 @@ mod tests {
         let _ = std::fs::remove_file(&tmp);
         assert_eq!(
             hex,
-            "835b9d23fddbb48a38d28fa3de08caccc081a2dc013da8661f557ef7c9175118"
+            "e62b8c0e21fdf74bc00ea8b1d6fa563768c75ea98589b8283184e5ef985d841b"
         );
-        assert_eq!(size, 18);
+        assert_eq!(size, 17);
     }
 
     #[test]

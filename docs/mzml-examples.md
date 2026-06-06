@@ -1,7 +1,7 @@
 # mzML example datasets — provenance & reconstruction
 
 Public **non-imaging** mzML datasets spanning a broad variety of instruments, used by
-`imzML2mzPeak` to exercise the plain-`.mzML` → mzPeak conversion path (the imaging corpus lives in
+`mzML2mzPeak` to exercise the plain-`.mzML` → mzPeak conversion path (the imaging corpus lives in
 [`docs/imzml-examples.md`](imzml-examples.md)).
 
 The data lives under **`data/mzML-examples/`**, which is **git-ignored** (large binary research
@@ -60,9 +60,9 @@ dataset description.
 
 ```bash
 # plain mzML → mzPeak (non-imaging path), with read-back verification
-imzml2mzpeak data/mzML-examples/waters-xevo-g2s-qtof/QC01.mzML out.mzpeak --verify
+mzml2mzpeak data/mzML-examples/waters-xevo-g2s-qtof/QC01.mzML out.mzpeak --verify
 # inspect without writing
-imzml2mzpeak data/mzML-examples/thermo-qexactive-plus/160920_SM-AKTWT_509.mzML --dry-run
+mzml2mzpeak data/mzML-examples/thermo-qexactive-plus/160920_SM-AKTWT_509.mzML --dry-run
 ```
 
 ## Notes

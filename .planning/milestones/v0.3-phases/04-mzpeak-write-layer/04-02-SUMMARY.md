@@ -13,7 +13,7 @@ requires:
 provides:
   - "ImagingWriter::new — owns MzPeakWriterType<File>, registers IMS:1000050/51/52 via add_spectrum_scan_field/from_spec (OUT-02, zero core-struct edits)"
   - "ImagingWriter::write_spectrum — delegates to inner writer (auto-routes by signal_continuity)"
-  - "ImagingWriter::write_run_metadata — copy_metadata_from + imzml2mzpeak provenance + RunProvenance->file_description by IMS accession + assemble metadata.imaging block (OUT-03/SPA-04)"
+  - "ImagingWriter::write_run_metadata — copy_metadata_from + mzml2mzpeak provenance + RunProvenance->file_description by IMS accession + assemble metadata.imaging block (OUT-03/SPA-04)"
   - "ImagingWriter::imaging_metadata — accessor returning the assembled ImagingMetadata for Plan 03 to insert at finish"
   - "ImagingWriter::finish_parquet — hands the open ZipArchiveWriter to Plan 03 (no plain index-writing finish())"
   - "WriteError — typed enum with #[from] arms for io::Error / ParquetError / read::ReadError / serde_json::Error"
@@ -73,7 +73,7 @@ replaced the Plan-01 `WriteError::Unimplemented` placeholder with the real four-
 
 **Task 2 — Metadata mapping + assemble/expose metadata.imaging (OUT-03) (commit 7ee63b2):**
 - `write_run_metadata(&mut self, source: &impl MSDataFileMetadata, prov: &RunProvenance, geom: Option<&ImagingRunMetadata>) -> Result<(), WriteError>`:
-  (a) `copy_metadata_from(source)`; (b) pushes an `imzml2mzpeak` `Software` (version from
+  (a) `copy_metadata_from(source)`; (b) pushes an `mzml2mzpeak` `Software` (version from
   `CARGO_PKG_VERSION`) + a conversion `DataProcessing`/`ProcessingMethod`; (c) maps
   `RunProvenance` into `file_description_mut().add_param(...)` by IMS accession —
   UUID→`IMS:1000080`, checksum→`IMS:1000091` (SHA-1) / `IMS:1000090` (MD5) keyed on
@@ -158,7 +158,7 @@ replaced the Plan-01 `WriteError::Unimplemented` placeholder with the real four-
 ## must_haves Truths
 
 - [x] `ImagingWriter::new` registers the three IMS coordinate columns solely via `add_spectrum_scan_field(CustomBuilderFromParameter::from_spec(...))` with zero core-struct edits.
-- [x] The writer copies source PSI-MS + IMS metadata via `copy_metadata_from` and records `imzml2mzpeak` conversion provenance (software + data_processing).
+- [x] The writer copies source PSI-MS + IMS metadata via `copy_metadata_from` and records `mzml2mzpeak` conversion provenance (software + data_processing).
 - [x] `RunProvenance` maps into `file_description` via `file_description_mut().add_param(...)`: UUID→IMS:1000080, SHA-1→IMS:1000091/MD5→IMS:1000090, mode→IMS:1000031(processed)/IMS:1000030(continuous).
 - [x] `ImagingWriter` assembles the `ImagingMetadata` block and exposes it via an accessor; it does NOT insert the block during writer configuration.
 - [x] `WriteError` wraps `std::io::Error`, `parquet::errors::ParquetError`, `crate::read::ReadError`, and `serde_json::Error` as distinct typed arms.
@@ -173,7 +173,7 @@ replaced the Plan-01 `WriteError::Unimplemented` placeholder with the real four-
   `ZipArchiveWriter::finish(self)` returns `ZipResult<()>`, NOT a `WriteError` arm — map the zip
   error (or rely on `Drop` per the `finish_parquet` doc, which states the caller must drop the
   returned writer to finalize the ZIP).
-- The conversion provenance uses fixed ids `imzml2mzpeak` (software) / `imzml2mzpeak_conversion`
+- The conversion provenance uses fixed ids `mzml2mzpeak` (software) / `mzml2mzpeak_conversion`
   (data_processing); Plan 03 may extend the `ProcessingMethod.params` with actual CLI args once
   the binary exists (Phase 7).
 - No imaging-specific serialization divergence was discovered during this plan, so

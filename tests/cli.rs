@@ -1,7 +1,7 @@
-//! Spawned-process integration tests for the `imzml2mzpeak` converter binary (CLI-01,
+//! Spawned-process integration tests for the `mzml2mzpeak` converter binary (CLI-01,
 //! CLI-03, CLI-04; Plan 06-02).
 //!
-//! These drive the REAL binary via `env!("CARGO_BIN_EXE_imzml2mzpeak")` (mirroring
+//! These drive the REAL binary via `env!("CARGO_BIN_EXE_mzml2mzpeak")` (mirroring
 //! `tests/integrity_preflight.rs`'s spawned-`preflight` proofs) and assert the user-visible
 //! contracts a library `Result` cannot prove:
 //!   - CLI-01: `--help` exits 0 and names the args.
@@ -22,10 +22,10 @@ const BAD_UUID_IMZML: &str = "tests/fixtures/imaging/Corrupt_BadUuid.imzML";
 
 /// Run the converter binary with the given args (no env logging output assertions).
 fn run_cli(args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_imzml2mzpeak"))
+    Command::new(env!("CARGO_BIN_EXE_mzml2mzpeak"))
         .args(args)
         .output()
-        .expect("spawn imzml2mzpeak binary")
+        .expect("spawn mzml2mzpeak binary")
 }
 
 /// CLI-01: `--help` exits 0 and the usage names the binary + the args/flags.
@@ -38,7 +38,7 @@ fn help_and_arg_parse() {
         String::from_utf8_lossy(&out.stderr)
     );
     let stdout = String::from_utf8_lossy(&out.stdout).to_lowercase();
-    assert!(stdout.contains("imzml2mzpeak"), "usage names the binary: {stdout}");
+    assert!(stdout.contains("mzml2mzpeak"), "usage names the binary: {stdout}");
     assert!(stdout.contains("input"), "usage names the input arg: {stdout}");
     assert!(stdout.contains("output"), "usage names the output arg: {stdout}");
     assert!(stdout.contains("--dry-run"), "usage names --dry-run: {stdout}");
@@ -182,7 +182,7 @@ fn tempdir() -> PathBuf {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    p.push(format!("imzml2mzpeak-cli-test-{}-{:?}", nanos, std::thread::current().id()));
+    p.push(format!("mzml2mzpeak-cli-test-{}-{:?}", nanos, std::thread::current().id()));
     fs::create_dir_all(&p).unwrap();
     p
 }

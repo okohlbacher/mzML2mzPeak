@@ -1,7 +1,7 @@
 Reading prompt from stdin...
 OpenAI Codex v0.128.0 (research preview)
 --------
-workdir: /Users/kohlbach/Claude/imzML2mzPeak
+workdir: /Users/kohlbach/Claude/mzML2mzPeak
 model: gpt-5.5
 provider: openai
 approval: never
@@ -41,9 +41,9 @@ Keep under ~400 words. End with: SHIP IT / FIX FIRST: <one line>.
 codex
 I’ll inspect the requested diff and source paths directly, then answer in review mode with only concrete blockers or residual risks.
 exec
-/bin/zsh -lc "sed -n '1,240p' docs/campaign/issue2-3-fixes.diff" in /Users/kohlbach/Claude/imzML2mzPeak
+/bin/zsh -lc "sed -n '1,240p' docs/campaign/issue2-3-fixes.diff" in /Users/kohlbach/Claude/mzML2mzPeak
 exec
-/bin/zsh -lc "nl -ba src/integrity/preflight.rs | sed -n '1,280p'" in /Users/kohlbach/Claude/imzML2mzPeak
+/bin/zsh -lc "nl -ba src/integrity/preflight.rs | sed -n '1,280p'" in /Users/kohlbach/Claude/mzML2mzPeak
  succeeded in 0ms:
 diff --git a/src/cli.rs b/src/cli.rs
 index 2f14973..b2f355f 100644
@@ -569,9 +569,9 @@ index 323dcc3..a7eb482 100644
    280	            </mzML>\n";
 
 exec
-/bin/zsh -lc "nl -ba src/read/transcode.rs | sed -n '1,260p'" in /Users/kohlbach/Claude/imzML2mzPeak
+/bin/zsh -lc "nl -ba src/read/transcode.rs | sed -n '1,260p'" in /Users/kohlbach/Claude/mzML2mzPeak
 exec
-/bin/zsh -lc "nl -ba src/read/stream.rs | sed -n '1,260p'" in /Users/kohlbach/Claude/imzML2mzPeak
+/bin/zsh -lc "nl -ba src/read/stream.rs | sed -n '1,260p'" in /Users/kohlbach/Claude/mzML2mzPeak
  succeeded in 0ms:
      1	//! Latin-1 → UTF-8 imzML transcode shim (campaign ISSUE-2).
      2	//!
@@ -713,7 +713,7 @@ exec
    138	        .unwrap_or_else(|| "input.imzML".to_string());
    139	    let seq = SEQ.fetch_add(1, Ordering::Relaxed);
    140	    let dst = std::env::temp_dir().join(format!(
-   141	        "imzml2mzpeak-utf8-{}-{}-{}",
+   141	        "mzml2mzpeak-utf8-{}-{}-{}",
    142	        std::process::id(),
    143	        seq,
    144	        stem
@@ -1099,7 +1099,7 @@ exec
 codex
 I’ve confirmed the project-side wiring. I’m now comparing the vendored `open_path` and `new` paths because that’s the main place a correctness regression could hide.
 exec
-/bin/zsh -lc "nl -ba vendor/mzdata/src/io/imzml/reader.rs | sed -n '520,790p'" in /Users/kohlbach/Claude/imzML2mzPeak
+/bin/zsh -lc "nl -ba vendor/mzdata/src/io/imzml/reader.rs | sed -n '520,790p'" in /Users/kohlbach/Claude/mzML2mzPeak
  succeeded in 0ms:
    520	    num_spectra: Option<u64>,
    521	
@@ -1374,9 +1374,9 @@ exec
    790	        if self.state == MzMLParserState::EOF {
 
 exec
-/bin/zsh -lc "nl -ba vendor/mzdata/src/io/imzml/reader.rs | sed -n '1360,1435p'" in /Users/kohlbach/Claude/imzML2mzPeak
+/bin/zsh -lc "nl -ba vendor/mzdata/src/io/imzml/reader.rs | sed -n '1360,1435p'" in /Users/kohlbach/Claude/mzML2mzPeak
 exec
-/bin/zsh -lc "nl -ba src/read/transcode.rs | sed -n '260,420p'" in /Users/kohlbach/Claude/imzML2mzPeak
+/bin/zsh -lc "nl -ba src/read/transcode.rs | sed -n '260,420p'" in /Users/kohlbach/Claude/mzML2mzPeak
  succeeded in 0ms:
   1360	    pub fn new(reader: &'a mut ImzMLReaderType<R, S, C, D>) -> Self {
   1361	        Self { reader, index: 0 }
@@ -1505,7 +1505,7 @@ exec
    306	}
 
 exec
-/bin/zsh -lc 'rg -n "check_ibd_file|open_path|fn new|read_external_array|SeekFrom::Start|external" vendor/mzdata/src/io/imzml/reader.rs' in /Users/kohlbach/Claude/imzML2mzPeak
+/bin/zsh -lc 'rg -n "check_ibd_file|open_path|fn new|read_external_array|SeekFrom::Start|external" vendor/mzdata/src/io/imzml/reader.rs' in /Users/kohlbach/Claude/mzML2mzPeak
  succeeded in 0ms:
 243:    pub fn new() -> Self {
 309:    fn new_precursor_mut(&mut self) -> &mut Precursor {
@@ -1543,9 +1543,9 @@ exec
 1431:    fn open_path<P>(path: P) -> io::Result<Self>
 
 exec
-/bin/zsh -lc "nl -ba vendor/mzdata/src/io/imzml/reader.rs | sed -n '940,1010p'" in /Users/kohlbach/Claude/imzML2mzPeak
+/bin/zsh -lc "nl -ba vendor/mzdata/src/io/imzml/reader.rs | sed -n '940,1010p'" in /Users/kohlbach/Claude/mzML2mzPeak
 exec
-/bin/zsh -lc "nl -ba vendor/mzdata/src/io/imzml/reader.rs | sed -n '1430,1495p'" in /Users/kohlbach/Claude/imzML2mzPeak
+/bin/zsh -lc "nl -ba vendor/mzdata/src/io/imzml/reader.rs | sed -n '1430,1495p'" in /Users/kohlbach/Claude/mzML2mzPeak
  succeeded in 0ms:
    940	            _ => {}
    941	        }
@@ -1677,7 +1677,7 @@ exec
   1484	pub type ImzMLReader<R, S> = ImzMLReaderType<R, S, CentroidPeak, DeconvolutedPeak>;
 
 exec
-/bin/zsh -lc "nl -ba vendor/mzdata/src/io/imzml/reader.rs | sed -n '340,430p'" in /Users/kohlbach/Claude/imzML2mzPeak
+/bin/zsh -lc "nl -ba vendor/mzdata/src/io/imzml/reader.rs | sed -n '340,430p'" in /Users/kohlbach/Claude/mzML2mzPeak
  succeeded in 0ms:
    340	
    341	    fn empty_element(
@@ -1772,7 +1772,7 @@ exec
    430	                // Store IBD info as parameters in the array with proper IMS CV tagging
 
 exec
-/bin/zsh -lc "nl -ba src/read/stream.rs | sed -n '280,380p'" in /Users/kohlbach/Claude/imzML2mzPeak
+/bin/zsh -lc "nl -ba src/read/stream.rs | sed -n '280,380p'" in /Users/kohlbach/Claude/mzML2mzPeak
  succeeded in 0ms:
    280	                    source: MzMLParserError::ArrayDecodingError(
    281	                        MzMLParserState::BinaryDataArray,
@@ -1826,30 +1826,30 @@ exec
 
 codex
 1. **TRANSCODE CORRECTNESS: VERDICT PASS WITH EDGE**
-ISO-8859-1 byte to Unicode scalar U+00xx to UTF-8 is lossless; ASCII decimal offsets/lengths survive byte-for-byte as characters, and `.ibd` bytes are untouched, so spectral payload offsets are not shifted. Edge: a non-UTF-8 declaration found within 512 bytes but whose closing `?>` lands after the 512-byte head will transcode but not rewrite the prolog, because `rewrite_prolog` treats the whole head as body. I would not block for normal XML declarations, but the bounded assumption is real: [src/read/transcode.rs](/Users/kohlbach/Claude/imzML2mzPeak/src/read/transcode.rs:36), [src/read/transcode.rs](/Users/kohlbach/Claude/imzML2mzPeak/src/read/transcode.rs:178).
+ISO-8859-1 byte to Unicode scalar U+00xx to UTF-8 is lossless; ASCII decimal offsets/lengths survive byte-for-byte as characters, and `.ibd` bytes are untouched, so spectral payload offsets are not shifted. Edge: a non-UTF-8 declaration found within 512 bytes but whose closing `?>` lands after the 512-byte head will transcode but not rewrite the prolog, because `rewrite_prolog` treats the whole head as body. I would not block for normal XML declarations, but the bounded assumption is real: [src/read/transcode.rs](/Users/kohlbach/Claude/mzML2mzPeak/src/read/transcode.rs:36), [src/read/transcode.rs](/Users/kohlbach/Claude/mzML2mzPeak/src/read/transcode.rs:178).
 
 2. **READER SEAM: VERDICT PASS**
-`open_path` just opens XML plus derived `.ibd`, then calls `new`; `new` does `parse_metadata`, `check_ibd_file`, and `build_index`, so the transcode path is not skipping reader initialization that `open_path` performs. Consuming the first 16 `.ibd` bytes in `check_ibd_file` is safe because actual array reads seek absolute offsets before reading: [vendor/mzdata/src/io/imzml/reader.rs](/Users/kohlbach/Claude/imzML2mzPeak/vendor/mzdata/src/io/imzml/reader.rs:583), [vendor/mzdata/src/io/imzml/reader.rs](/Users/kohlbach/Claude/imzML2mzPeak/vendor/mzdata/src/io/imzml/reader.rs:987).
+`open_path` just opens XML plus derived `.ibd`, then calls `new`; `new` does `parse_metadata`, `check_ibd_file`, and `build_index`, so the transcode path is not skipping reader initialization that `open_path` performs. Consuming the first 16 `.ibd` bytes in `check_ibd_file` is safe because actual array reads seek absolute offsets before reading: [vendor/mzdata/src/io/imzml/reader.rs](/Users/kohlbach/Claude/mzML2mzPeak/vendor/mzdata/src/io/imzml/reader.rs:583), [vendor/mzdata/src/io/imzml/reader.rs](/Users/kohlbach/Claude/mzML2mzPeak/vendor/mzdata/src/io/imzml/reader.rs:987).
 
 3. **ESCAPE HATCH: VERDICT PASS WITH INTEGRITY CAVEAT**
-UUID is still enforced before checksum relaxation; the allow path only changes the branch after `computed != declared`, so a UUID mismatch returns before the warning path. A corrupt `.ibd` that preserves UUID and has in-range bytes can absolutely produce silently wrong numeric spectra; decode errors only catch truncation/out-of-range/unsupported compression, not semantically wrong floats. Strict-by-default is therefore correct: [src/integrity/preflight.rs](/Users/kohlbach/Claude/imzML2mzPeak/src/integrity/preflight.rs:89), [src/integrity/preflight.rs](/Users/kohlbach/Claude/imzML2mzPeak/src/integrity/preflight.rs:105).
+UUID is still enforced before checksum relaxation; the allow path only changes the branch after `computed != declared`, so a UUID mismatch returns before the warning path. A corrupt `.ibd` that preserves UUID and has in-range bytes can absolutely produce silently wrong numeric spectra; decode errors only catch truncation/out-of-range/unsupported compression, not semantically wrong floats. Strict-by-default is therefore correct: [src/integrity/preflight.rs](/Users/kohlbach/Claude/mzML2mzPeak/src/integrity/preflight.rs:89), [src/integrity/preflight.rs](/Users/kohlbach/Claude/mzML2mzPeak/src/integrity/preflight.rs:105).
 
 4. **BLOCKERS: VERDICT NO BLOCKER**
-No commit-blocking data-integrity regression found in these fixes. Residual panic risk remains in vendored parsing for nonnumeric external offset/length via `expect`, but that is pre-existing malformed-input behavior, not introduced by the transcode or checksum escape hatch: [vendor/mzdata/src/io/imzml/reader.rs](/Users/kohlbach/Claude/imzML2mzPeak/vendor/mzdata/src/io/imzml/reader.rs:368).
+No commit-blocking data-integrity regression found in these fixes. Residual panic risk remains in vendored parsing for nonnumeric external offset/length via `expect`, but that is pre-existing malformed-input behavior, not introduced by the transcode or checksum escape hatch: [vendor/mzdata/src/io/imzml/reader.rs](/Users/kohlbach/Claude/mzML2mzPeak/vendor/mzdata/src/io/imzml/reader.rs:368).
 
 SHIP IT: fixes are sound for the stated datasets; document the checksum escape hatch as “may produce wrong spectra” if not already prominent.
 tokens used
 43.645
 1. **TRANSCODE CORRECTNESS: VERDICT PASS WITH EDGE**
-ISO-8859-1 byte to Unicode scalar U+00xx to UTF-8 is lossless; ASCII decimal offsets/lengths survive byte-for-byte as characters, and `.ibd` bytes are untouched, so spectral payload offsets are not shifted. Edge: a non-UTF-8 declaration found within 512 bytes but whose closing `?>` lands after the 512-byte head will transcode but not rewrite the prolog, because `rewrite_prolog` treats the whole head as body. I would not block for normal XML declarations, but the bounded assumption is real: [src/read/transcode.rs](/Users/kohlbach/Claude/imzML2mzPeak/src/read/transcode.rs:36), [src/read/transcode.rs](/Users/kohlbach/Claude/imzML2mzPeak/src/read/transcode.rs:178).
+ISO-8859-1 byte to Unicode scalar U+00xx to UTF-8 is lossless; ASCII decimal offsets/lengths survive byte-for-byte as characters, and `.ibd` bytes are untouched, so spectral payload offsets are not shifted. Edge: a non-UTF-8 declaration found within 512 bytes but whose closing `?>` lands after the 512-byte head will transcode but not rewrite the prolog, because `rewrite_prolog` treats the whole head as body. I would not block for normal XML declarations, but the bounded assumption is real: [src/read/transcode.rs](/Users/kohlbach/Claude/mzML2mzPeak/src/read/transcode.rs:36), [src/read/transcode.rs](/Users/kohlbach/Claude/mzML2mzPeak/src/read/transcode.rs:178).
 
 2. **READER SEAM: VERDICT PASS**
-`open_path` just opens XML plus derived `.ibd`, then calls `new`; `new` does `parse_metadata`, `check_ibd_file`, and `build_index`, so the transcode path is not skipping reader initialization that `open_path` performs. Consuming the first 16 `.ibd` bytes in `check_ibd_file` is safe because actual array reads seek absolute offsets before reading: [vendor/mzdata/src/io/imzml/reader.rs](/Users/kohlbach/Claude/imzML2mzPeak/vendor/mzdata/src/io/imzml/reader.rs:583), [vendor/mzdata/src/io/imzml/reader.rs](/Users/kohlbach/Claude/imzML2mzPeak/vendor/mzdata/src/io/imzml/reader.rs:987).
+`open_path` just opens XML plus derived `.ibd`, then calls `new`; `new` does `parse_metadata`, `check_ibd_file`, and `build_index`, so the transcode path is not skipping reader initialization that `open_path` performs. Consuming the first 16 `.ibd` bytes in `check_ibd_file` is safe because actual array reads seek absolute offsets before reading: [vendor/mzdata/src/io/imzml/reader.rs](/Users/kohlbach/Claude/mzML2mzPeak/vendor/mzdata/src/io/imzml/reader.rs:583), [vendor/mzdata/src/io/imzml/reader.rs](/Users/kohlbach/Claude/mzML2mzPeak/vendor/mzdata/src/io/imzml/reader.rs:987).
 
 3. **ESCAPE HATCH: VERDICT PASS WITH INTEGRITY CAVEAT**
-UUID is still enforced before checksum relaxation; the allow path only changes the branch after `computed != declared`, so a UUID mismatch returns before the warning path. A corrupt `.ibd` that preserves UUID and has in-range bytes can absolutely produce silently wrong numeric spectra; decode errors only catch truncation/out-of-range/unsupported compression, not semantically wrong floats. Strict-by-default is therefore correct: [src/integrity/preflight.rs](/Users/kohlbach/Claude/imzML2mzPeak/src/integrity/preflight.rs:89), [src/integrity/preflight.rs](/Users/kohlbach/Claude/imzML2mzPeak/src/integrity/preflight.rs:105).
+UUID is still enforced before checksum relaxation; the allow path only changes the branch after `computed != declared`, so a UUID mismatch returns before the warning path. A corrupt `.ibd` that preserves UUID and has in-range bytes can absolutely produce silently wrong numeric spectra; decode errors only catch truncation/out-of-range/unsupported compression, not semantically wrong floats. Strict-by-default is therefore correct: [src/integrity/preflight.rs](/Users/kohlbach/Claude/mzML2mzPeak/src/integrity/preflight.rs:89), [src/integrity/preflight.rs](/Users/kohlbach/Claude/mzML2mzPeak/src/integrity/preflight.rs:105).
 
 4. **BLOCKERS: VERDICT NO BLOCKER**
-No commit-blocking data-integrity regression found in these fixes. Residual panic risk remains in vendored parsing for nonnumeric external offset/length via `expect`, but that is pre-existing malformed-input behavior, not introduced by the transcode or checksum escape hatch: [vendor/mzdata/src/io/imzml/reader.rs](/Users/kohlbach/Claude/imzML2mzPeak/vendor/mzdata/src/io/imzml/reader.rs:368).
+No commit-blocking data-integrity regression found in these fixes. Residual panic risk remains in vendored parsing for nonnumeric external offset/length via `expect`, but that is pre-existing malformed-input behavior, not introduced by the transcode or checksum escape hatch: [vendor/mzdata/src/io/imzml/reader.rs](/Users/kohlbach/Claude/mzML2mzPeak/vendor/mzdata/src/io/imzml/reader.rs:368).
 
 SHIP IT: fixes are sound for the stated datasets; document the checksum escape hatch as “may produce wrong spectra” if not already prominent.

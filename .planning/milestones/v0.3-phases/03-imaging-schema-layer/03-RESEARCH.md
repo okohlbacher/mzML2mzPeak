@@ -455,7 +455,7 @@ IMS:1000031 processed / IMS:1000030 continuous  (storage mode)
 
 2. **Where exactly does the `ToleranceContract` live — `src/schema/tolerance.rs` or a shared `src/fidelity/`?**
    - What we know: D-07 leaves placement to the planner; Phase 5 is the consumer.
-   - Recommendation: `src/schema/tolerance.rs`, re-exported from `schema::mod`, so the contract sits with the rest of the spec-encoding layer and Phase 5 imports `imzml2mzpeak::schema::ToleranceContract`.
+   - Recommendation: `src/schema/tolerance.rs`, re-exported from `schema::mod`, so the contract sits with the rest of the spec-encoding layer and Phase 5 imports `mzml2mzpeak::schema::ToleranceContract`.
    - **RESOLVED:** `src/schema/tolerance.rs`, re-exported from `schema::mod` — adopted in plan 03-01 Task 3.
 
 ## Environment Availability

@@ -17,7 +17,7 @@ provides:
   - "ConvertCli: clap-derive `convert <in> [out]` + --dry-run + --verify (CLI-01)"
   - "cli::run: dry-run plan report (no output) OR convert + optional verify with TTY progress bar / non-TTY log fallback (CLI-02/CLI-03)"
   - "cli::classify_exit: anyhow downcast → distinct non-zero ExitCode per failure class (integrity=2, unsupported=3, coordinate=4, verify-fail=5, generic=1) (CLI-04)"
-  - "imzml2mzpeak [[bin]] declared → CARGO_BIN_EXE_imzml2mzpeak resolves for spawned tests"
+  - "mzml2mzpeak [[bin]] declared → CARGO_BIN_EXE_mzml2mzpeak resolves for spawned tests"
 affects: [06-03-acceptance-gate]
 
 # Tech tracking
@@ -26,7 +26,7 @@ tech-stack:
   patterns:
     - "Binary-only boundary: anyhow + indicatif confined to src/cli.rs + src/main.rs; read/write/verify/schema/integrity stay free of both (grep-gated)"
     - "Typed-error → distinct-exit-code classifier via anyhow downcast_ref, walking both direct and wrapped (WriteError::Read / VerifyError::Read) chains through ONE shared classify_read_error/classify_integrity_error"
-    - "Spawned-process integration tests via env!(CARGO_BIN_EXE_imzml2mzpeak) asserting exit code + stderr substring + output-file absence (mirrors the preflight-bin proofs)"
+    - "Spawned-process integration tests via env!(CARGO_BIN_EXE_mzml2mzpeak) asserting exit code + stderr substring + output-file absence (mirrors the preflight-bin proofs)"
 
 key-files:
   created:
@@ -35,7 +35,7 @@ key-files:
   modified:
     - "src/main.rs (rewritten: thin main() -> ExitCode; env_logger first; parse → run → classify_exit; prints {e:#})"
     - "src/lib.rs (pub mod cli)"
-    - "Cargo.toml ([[bin]] name = imzml2mzpeak path = src/main.rs)"
+    - "Cargo.toml ([[bin]] name = mzml2mzpeak path = src/main.rs)"
 
 key-decisions:
   - "classify_exit walks the anyhow chain most-specific-first (VerifyFailed → unsupported → integrity → coordinate → wrapped), with shared classify_read_error/classify_integrity_error helpers so a ReadError reached directly, through WriteError::Read, or through VerifyError::Read maps identically."
@@ -55,7 +55,7 @@ completed: 2026-06-04
 
 # Phase 6 Plan 02: CLI Front-End (convert / --dry-run / --verify + exit codes) Summary
 
-**A clap-derive `imzml2mzpeak convert <in> [out]` binary that drives the preflight→read→convert→(verify) pipeline behind `--dry-run` (plan report, no output, exit 0) and `--verify` (re-stream the source against the written archive, exit 5 on a fidelity failure), reports a TTY progress bar sized to the Wave-1 `spectrum_count` with a non-TTY log fallback, and maps every typed library failure class to a DISTINCT non-zero exit code (integrity=2, unsupported=3, coordinate=4, verify-fail=5, generic=1) with the full anyhow context printed — all proven by spawned-process integration tests, with anyhow/indicatif confined to the binary boundary.**
+**A clap-derive `mzml2mzpeak convert <in> [out]` binary that drives the preflight→read→convert→(verify) pipeline behind `--dry-run` (plan report, no output, exit 0) and `--verify` (re-stream the source against the written archive, exit 5 on a fidelity failure), reports a TTY progress bar sized to the Wave-1 `spectrum_count` with a non-TTY log fallback, and maps every typed library failure class to a DISTINCT non-zero exit code (integrity=2, unsupported=3, coordinate=4, verify-fail=5, generic=1) with the full anyhow context printed — all proven by spawned-process integration tests, with anyhow/indicatif confined to the binary boundary.**
 
 ## Performance
 
@@ -73,7 +73,7 @@ completed: 2026-06-04
   - **convert:** sizes a TTY `indicatif` bar to `spectrum_count` (spinner when `None`); off-TTY emits start + completion `log::info!` lines; opens the reader (preflight-gated), calls `convert(reader, out)` with anyhow context; on `--verify` opens a SECOND reader (the first was consumed — Pitfall 2) and runs `verify_streaming(.., L1BitForBit)`.
 - **`cli::classify_exit` (CLI-04 / T-6-exit):** anyhow `downcast_ref` walk → integrity=2, unsupported=3, coordinate=4, verify-fail=5, generic=1. Handles the typed error reached directly OR wrapped in `WriteError::Read` / `VerifyError::Read` via shared `classify_read_error` / `classify_integrity_error` helpers.
 - **`main() -> ExitCode`:** `env_logger::init()` first, `ConvertCli::parse()`, `cli::run`, prints `{e:#}` (full anyhow chain), returns the per-class `classify_exit` code. No raw panic on fallible paths (T-6-panic).
-- **`[[bin]] imzml2mzpeak`** declared in Cargo.toml so `CARGO_BIN_EXE_imzml2mzpeak` is unambiguous for the spawned tests.
+- **`[[bin]] mzml2mzpeak`** declared in Cargo.toml so `CARGO_BIN_EXE_mzml2mzpeak` is unambiguous for the spawned tests.
 - **Binary-only boundary holds:** `anyhow`/`indicatif` appear ONLY in `src/cli.rs` + `src/main.rs`; the read/write/verify/schema/integrity modules contain no anyhow/indicatif usage (grep-gated; the only matches in lib modules are doc comments stating their deliberate absence).
 
 ## Task Commits
@@ -87,7 +87,7 @@ completed: 2026-06-04
 - `tests/cli.rs` (created) — 4 spawned-process tests (help/dry-run/bad-integrity-exit-2/distinct-class-codes), dep-free `tempdir()` copied from `integrity_preflight.rs`
 - `src/main.rs` (rewritten) — thin `main() -> ExitCode`
 - `src/lib.rs` — `pub mod cli`
-- `Cargo.toml` — `[[bin]] name = "imzml2mzpeak"`
+- `Cargo.toml` — `[[bin]] name = "mzml2mzpeak"`
 
 ## Decisions Made
 
@@ -127,7 +127,7 @@ None beyond the deviations above.
 ## Acceptance Criteria Verification
 
 **Task 1:**
-- `cargo build` produces `target/debug/imzml2mzpeak` (68 MB) — PASS.
+- `cargo build` produces `target/debug/mzml2mzpeak` (68 MB) — PASS.
 - `ConvertCli` has `input: PathBuf`, `output: Option<PathBuf>`, `--dry-run`, `--verify` — PASS.
 - `grep -rn "anyhow|indicatif" src/{read,write,verify,schema,integrity}` shows only doc-comment mentions of their deliberate absence — no imports/usage — PASS.
 - `classify_exit` maps integrity=2 / unsupported=3 / coordinate=4 / verify-fail=5 / generic=1 (8 unit tests) — PASS.
@@ -136,7 +136,7 @@ None beyond the deviations above.
 - `cargo test --test cli` passes (4 tests, ~1s, no 815 MB run) — PASS.
 - dry-run test asserts `status.success()`, output file absent, plan names storage mode + count + grid dims — PASS.
 - `bad_integrity_exits_distinct_code` asserts `status.code() == Some(2)` + actionable "checksum"/"integrity" stderr; distinct classes asserted distinct (generic ≠ 2) — PASS.
-- `grep -c "CARGO_BIN_EXE_imzml2mzpeak" tests/cli.rs` = 2 (≥ 1) — PASS.
+- `grep -c "CARGO_BIN_EXE_mzml2mzpeak" tests/cli.rs` = 2 (≥ 1) — PASS.
 
 **Plan-level verification:**
 - `cargo build` green (only pre-existing vendored-mzdata unused-import warning).
@@ -146,13 +146,13 @@ None beyond the deviations above.
 
 ## Next Phase Readiness
 
-- **06-03 (acceptance gate):** the `imzml2mzpeak` binary is the user-facing surface the Wave-3 `#[ignore]` 34,840-spectrum acceptance test drives end-to-end (convert + `--verify` → `verify_streaming` L1 over PXD001283). `classify_exit`'s integrity=2 path is the integrity-gate proof; `--dry-run` is the no-output inspection path.
+- **06-03 (acceptance gate):** the `mzml2mzpeak` binary is the user-facing surface the Wave-3 `#[ignore]` 34,840-spectrum acceptance test drives end-to-end (convert + `--verify` → `verify_streaming` L1 over PXD001283). `classify_exit`'s integrity=2 path is the integrity-gate proof; `--dry-run` is the no-output inspection path.
 
 ## Self-Check: PASSED
 
 - SUMMARY.md exists.
 - Task commits present: `7aae054`, `538f1aa`.
-- `src/cli.rs`, `tests/cli.rs` created; `src/main.rs`/`src/lib.rs`/`Cargo.toml` modified; `target/debug/imzml2mzpeak` builds.
+- `src/cli.rs`, `tests/cli.rs` created; `src/main.rs`/`src/lib.rs`/`Cargo.toml` modified; `target/debug/mzml2mzpeak` builds.
 
 ---
 *Phase: 06-cli-ux-acceptance-gate*

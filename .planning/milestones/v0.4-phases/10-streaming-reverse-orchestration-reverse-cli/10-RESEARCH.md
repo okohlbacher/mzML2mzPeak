@@ -11,7 +11,7 @@
 - **CLI direction inference (OVERRIDES roadmap's literal "reverse subcommand verb"):** infer direction from the INPUT file extension —
   - `.imzML` / `.imzml` → **forward** (existing v0.3 path, unchanged)
   - `.mzpeak` → **reverse** (new path)
-  - Keep the shipped forward invocation backward-compatible: `imzml2mzpeak <in.imzML> <out.mzpeak>` must still work with no `convert` verb introduced.
+  - Keep the shipped forward invocation backward-compatible: `mzml2mzpeak <in.imzML> <out.mzpeak>` must still work with no `convert` verb introduced.
   - **RCLI-01 traceability:** ALSO accept an explicit `reverse` form (subcommand or `--reverse`/direction flag) as an override/disambiguator so RCLI-01's "reverse subcommand" stays satisfied. Extension inference is the headline default. Unrecognized/ambiguous extension → actionable error; the explicit form is the escape hatch. Planner picks the exact clap shape.
 - **Output `-o <OUT>` semantics:** `-o <OUT>` is a stem/path; derive BOTH extensions from it. Write `OUT.imzML` + `OUT.ibd` sharing the same stem. If `OUT` already ends `.imzML`/`.imzml`, write that file and swap the extension to `.ibd` for the sidecar. The two files always share a stem and the SAME minted UUID (Phase 8/9 linkage → SC-4). The forward path keeps its existing positional `<out.mzpeak>` semantics unchanged.
 - **Streaming pipeline (ROADMAP SC-2 / RCLI-02):** ONE spectrum at a time end to end — read pixel (Phase 7 reader) → append its m/z + intensity arrays to the `.ibd` (Phase 8 `IbdWriter`, get back `(offset,count,encoded_len)`) → emit its `<spectrum>` (Phase 9 `ImzmlWriter::write_spectrum`) → drop the pixel. NEVER materialize the full 34,840-spectrum dataset.
@@ -103,7 +103,7 @@ No new crates. Phase 10 is composition over already-pinned dependencies. **CLAUD
 ### System Architecture Diagram
 
 ```
-                         imzml2mzpeak <input> [args]
+                         mzml2mzpeak <input> [args]
                                    │
                                    ▼
                         ┌──────────────────────┐
@@ -330,8 +330,8 @@ std::fs::remove_file(&body_tmp).ok();     // best-effort cleanup
 ## clap Restructuring (RCLI-01 — extension dispatch + explicit `--reverse`)
 
 ### Constraint recap
-- Forward `imzml2mzpeak <in.imzML> <out.mzpeak>` must stay byte-compatible (no `convert` verb, no positional break).
-- Reverse headline UX: `imzml2mzpeak <in.mzpeak> -o <out>`.
+- Forward `mzml2mzpeak <in.imzML> <out.mzpeak>` must stay byte-compatible (no `convert` verb, no positional break).
+- Reverse headline UX: `mzml2mzpeak <in.mzpeak> -o <out>`.
 - RCLI-01 names a "reverse subcommand" → ALSO accept an explicit reverse form as override.
 
 ### Recommended shape: keep `ConvertCli` flat + dispatch on extension in `run()`
@@ -371,7 +371,7 @@ match direction {
 
 **Why flat-over-Subcommand:** A `Subcommand` enum (`Args::Convert` / `Args::Reverse`) would either require a verb (breaking the bare-positional forward invocation) or a `#[command(subcommand)]` with a default — clap 4.5 has no first-class "default subcommand", needing the `args_conflicts_with_subcommands` + optional-subcommand workaround, which is more fragile than the flat-dispatch above. The flat struct keeps the v0.3 acceptance harness invocation byte-identical (CONTEXT priority) while `--reverse` provides RCLI-01's explicit reverse form. The existing CLI is already flat-dispatched in `run()` (dry_run branch, cli.rs:72) — extending that dispatch is idiomatic for this codebase. `[CITED: docs.rs/clap/4.5 derive — Arg short/long, Option<T> optional positionals]`
 
-**Discretion note:** CONTEXT explicitly leaves "default-subcommand vs Option<Subcommand> vs flag" to the planner. The recommendation is the flat `--reverse` flag for minimal diff + guaranteed backward compat; a `reverse` subcommand is acceptable if the planner prefers a literal verb, PROVIDED bare `imzml2mzpeak <in.imzML> <out.mzpeak>` still parses (requires the default-subcommand workaround).
+**Discretion note:** CONTEXT explicitly leaves "default-subcommand vs Option<Subcommand> vs flag" to the planner. The recommendation is the flat `--reverse` flag for minimal diff + guaranteed backward compat; a `reverse` subcommand is acceptable if the planner prefers a literal verb, PROVIDED bare `mzml2mzpeak <in.imzML> <out.mzpeak>` still parses (requires the default-subcommand workaround).
 
 ## classify_exit Extension (RCLI-01 — every ReverseError → a distinct code)
 
@@ -575,7 +575,7 @@ The 432 MB real PXD001283 archive must NOT be a CI dependency (the Phase 7 fixtu
 
 2. **How the forward `convert()` streams — RESOLVED:** `src/write/convert.rs:40-117`: sample first → build writer → wire metadata once → `for item in reader { writer.write_spectrum(&to_mzdata(&item?)?)? }` (NO collect, WR-03 emission-order contract) → owned terminal finalize. Reverse mirrors this but is index-driven (`for index in 0..count` + `read_pixel(reader, index)`) since `MzPeakReader` is random-access, not a one-shot iterator. Progress total = `reader.len()`, ticked from the CLI (indicatif binary-only). (§Pattern 1)
 
-3. **clap restructuring — RESOLVED:** keep `ConvertCli` flat; add `-o/--output-stem`, `--reverse`; dispatch on input extension in `run()` (forward for `.imzML`/`.imzml`, reverse for `.mzpeak`, `--reverse` overrides, ambiguous → actionable error). Backward-compatible (bare `imzml2mzpeak <in.imzML> <out.mzpeak>` unchanged); `--reverse` satisfies RCLI-01's "reverse subcommand" requirement as the explicit form. Subcommand-enum is acceptable but needs the default-subcommand workaround to keep the bare positional invocation — flat is the lower-risk choice. (§"clap Restructuring")
+3. **clap restructuring — RESOLVED:** keep `ConvertCli` flat; add `-o/--output-stem`, `--reverse`; dispatch on input extension in `run()` (forward for `.imzML`/`.imzml`, reverse for `.mzpeak`, `--reverse` overrides, ambiguous → actionable error). Backward-compatible (bare `mzml2mzpeak <in.imzML> <out.mzpeak>` unchanged); `--reverse` satisfies RCLI-01's "reverse subcommand" requirement as the explicit form. Subcommand-enum is acceptable but needs the default-subcommand workaround to keep the bare positional invocation — flat is the lower-risk choice. (§"clap Restructuring")
 
 4. **Reverse reader open + bounded iteration — RESOLVED:** `MzPeakReader::new(archive)` → `len()` (count) → `load_all_spectrum_metadata()` ONCE → loop `read_pixel(reader, index)` yielding `(x,y,z, mz:NumArray, int:NumArray)` at source dtype. Non-imaging detected early via `read_pixel(reader, 0)` → `Err(NotImaging)` before any output file is created. Imaging block for `<scanSettings>` via `serde_json::from_value::<ImagingMetadata>(file_index().metadata["imaging"].clone())` (None degrades). (§"Reverse Reader Open")
 
@@ -644,7 +644,7 @@ The 432 MB real PXD001283 archive must NOT be a CI dependency (the Phase 7 fixtu
 |---|-------|---------|---------------|
 | A1 | `serde_json::from_value::<ImagingMetadata>(block.clone())` reconstructs the writer's `Option<&ImagingMetadata>` from `file_index().metadata["imaging"]` | Reverse Reader Open / Code Examples | If the JSON shape differs from `ImagingMetadata`'s derive, `<scanSettings>` silently degrades to empty (`None`) — non-fatal (graceful per imzml_writer.rs:275) but loses geometry. Phase 7 spike used `grid_dims_from_metadata` (dims only), so the full-struct deserialize is unverified. |
 | A2 | The `tests/fixtures/reverse` builder scales to ~5,000 pixels in sub-second CI time | Bounded-Memory Proof Strategy | If slow, the bounded-memory test bloats CI; mitigate by lowering N (e.g. 1,000) or gating the large case behind `--ignored`. |
-| A3 | The flat `ConvertCli` + `--reverse` shape parses the bare `imzml2mzpeak <in.imzML> <out.mzpeak>` invocation unchanged | clap Restructuring | If a clap derive interaction breaks the bare positional, the v0.3 acceptance harness breaks (CONTEXT priority). Mitigate with a regression test asserting the bare forward invocation still parses. |
+| A3 | The flat `ConvertCli` + `--reverse` shape parses the bare `mzml2mzpeak <in.imzML> <out.mzpeak>` invocation unchanged | clap Restructuring | If a clap derive interaction breaks the bare positional, the v0.3 acceptance harness breaks (CONTEXT priority). Mitigate with a regression test asserting the bare forward invocation still parses. |
 
 **Note:** A1–A3 are LOW-risk and verifiable within Phase 10's own tests; none block planning. All other claims are VERIFIED against shipped source this session.
 

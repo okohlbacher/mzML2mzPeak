@@ -37,7 +37,7 @@ pub use header::{ChecksumType, ImzmlHeader, IntegrityError};
 pub use preflight::PreflightReport;
 ```
 
-**For `schema/mod.rs`:** declare `pub mod columns; pub mod geometry; pub mod metadata; pub mod tolerance;` then re-export the public surface (`imaging_scan_fields`, `ImagingColumnSpec`, `ImagingRunMetadata`, `GeometryParseError`, `ImagingMetadata`, `ToleranceContract`, `ConformanceLevel`). Per Open Question 2 in RESEARCH.md, `ToleranceContract` is re-exported here so Phase 5 imports `imzml2mzpeak::schema::ToleranceContract`.
+**For `schema/mod.rs`:** declare `pub mod columns; pub mod geometry; pub mod metadata; pub mod tolerance;` then re-export the public surface (`imaging_scan_fields`, `ImagingColumnSpec`, `ImagingRunMetadata`, `GeometryParseError`, `ImagingMetadata`, `ToleranceContract`, `ConformanceLevel`). Per Open Question 2 in RESEARCH.md, `ToleranceContract` is re-exported here so Phase 5 imports `mzml2mzpeak::schema::ToleranceContract`.
 
 **lib.rs edit:** `src/lib.rs` currently ends at line 17 with `pub mod read;` / `pub mod integrity;` (lines 16-17). Add `pub mod schema;` alongside — additive, no other change.
 

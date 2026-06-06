@@ -117,7 +117,7 @@ Per the plan's `<fixture_ground_truth>`: the committed `Example_Continuous.imzML
 - `cargo test --lib schema::geometry` — 1 passed (malformed-value → None).
 - `cargo test --test geometry_parse` — 4 passed (hr2msi_ground_truth, full_geometry, lenient_missing_grid, latin1_prolog).
 - `cargo test` (full suite) — all green, no Phase-2 regression.
-- `cargo clippy -p imzml2mzpeak -- -D warnings` — clean (the lone `unused_imports` warning is pre-existing in the vendored mzdata crate, out of scope).
+- `cargo clippy -p mzml2mzpeak -- -D warnings` — clean (the lone `unused_imports` warning is pre-existing in the vendored mzdata crate, out of scope).
 
 ## Known Stubs
 

@@ -14,14 +14,14 @@
 
 use std::path::{Path, PathBuf};
 
-use imzml2mzpeak::read::record::ImagingSpectrum;
-use imzml2mzpeak::read::{ImagingReader, ReadError};
-use imzml2mzpeak::reverse::convert as reverse_convert; // pub use reverse::convert::convert (mod.rs:20)
-use imzml2mzpeak::reverse::source::{ReversePixel, read_pixel};
-use imzml2mzpeak::reverse::ReverseError;
-use imzml2mzpeak::schema::ConformanceLevel;
-use imzml2mzpeak::verify::verify_streaming;
-use imzml2mzpeak::write::convert as forward_convert;
+use mzml2mzpeak::read::record::ImagingSpectrum;
+use mzml2mzpeak::read::{ImagingReader, ReadError};
+use mzml2mzpeak::reverse::convert as reverse_convert; // pub use reverse::convert::convert (mod.rs:20)
+use mzml2mzpeak::reverse::source::{ReversePixel, read_pixel};
+use mzml2mzpeak::reverse::ReverseError;
+use mzml2mzpeak::schema::ConformanceLevel;
+use mzml2mzpeak::verify::verify_streaming;
+use mzml2mzpeak::write::convert as forward_convert;
 use mzpeak_prototyping::MzPeakReader;
 
 #[path = "fixtures/reverse/mod.rs"]
@@ -144,7 +144,7 @@ fn tempdir(tag: &str) -> PathBuf {
     static SEQ: AtomicU64 = AtomicU64::new(0);
     let n = SEQ.fetch_add(1, Ordering::Relaxed);
     let mut p = std::env::temp_dir();
-    p.push(format!("imzml2mzpeak_rt_{tag}_{}_{n}", std::process::id()));
+    p.push(format!("mzml2mzpeak_rt_{tag}_{}_{n}", std::process::id()));
     std::fs::create_dir_all(&p).expect("create temp work dir");
     p
 }

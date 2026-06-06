@@ -184,7 +184,7 @@ mod tests {
         let n = SEQ.fetch_add(1, Ordering::Relaxed);
         let mut p = std::env::temp_dir();
         p.push(format!(
-            "imzml2mzpeak_source_{tag}_{}_{n}.mzpeak",
+            "mzml2mzpeak_source_{tag}_{}_{n}.mzpeak",
             std::process::id()
         ));
         p

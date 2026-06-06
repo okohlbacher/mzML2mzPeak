@@ -33,10 +33,10 @@
 
 use std::path::{Path, PathBuf};
 
-use imzml2mzpeak::read::record::{ImagingSpectrum, NumArray, Representation};
-use imzml2mzpeak::read::{RunProvenance, StorageMode};
-use imzml2mzpeak::schema::ImagingRunMetadata;
-use imzml2mzpeak::write::{ImagingWriter, WriteError, to_mzdata};
+use mzml2mzpeak::read::record::{ImagingSpectrum, NumArray, Representation};
+use mzml2mzpeak::read::{RunProvenance, StorageMode};
+use mzml2mzpeak::schema::ImagingRunMetadata;
+use mzml2mzpeak::write::{ImagingWriter, WriteError, to_mzdata};
 
 use mzdata::params::Unit;
 use mzdata::spectrum::bindata::{ArrayType, BinaryArrayMap, BinaryDataArrayType, DataArray};
@@ -64,7 +64,7 @@ fn temp_out(tag: &str) -> PathBuf {
     let n = SEQ.fetch_add(1, Ordering::Relaxed);
     let mut p = std::env::temp_dir();
     p.push(format!(
-        "imzml2mzpeak_reverse_{tag}_{}_{n}.mzpeak",
+        "mzml2mzpeak_reverse_{tag}_{}_{n}.mzpeak",
         std::process::id()
     ));
     p

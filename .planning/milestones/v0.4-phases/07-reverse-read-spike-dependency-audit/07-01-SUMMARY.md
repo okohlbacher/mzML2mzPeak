@@ -8,7 +8,7 @@ requires:
   - "src/write::{ImagingWriter, to_mzdata} (fixture write seam)"
   - "src/read::record::{ImagingSpectrum, NumArray, Representation}"
 provides:
-  - "imzml2mzpeak::reverse::ReverseError (typed reverse-read error contract)"
+  - "mzml2mzpeak::reverse::ReverseError (typed reverse-read error contract)"
   - "ReverseError::NotImaging (RMZ-04 fail-closed guard)"
   - "ReverseError::UnsupportedDtype (Security-V5 reject-not-cast guard)"
   - "tests/fixtures/reverse/mod.rs::imaging_archive (RMZ-01/02/03 positive fixture)"
@@ -65,7 +65,7 @@ Established the `ReverseError` typed-error contract (the one genuinely-new code 
 ## Verification
 
 - `cargo build --lib --tests` — clean (no errors).
-- `ReverseError` reachable as `imzml2mzpeak::reverse::ReverseError`; all nine arms present.
+- `ReverseError` reachable as `mzml2mzpeak::reverse::ReverseError`; all nine arms present.
 - Out-of-band smoke test (added, run, then removed — not committed) confirmed:
   - `non_imaging_archive` read-back: `first_scan() == None`, `IMS:1000050` absent.
   - `imaging_archive` read-back: `IMS:1000050` resolves (positive control).
@@ -90,7 +90,7 @@ None. This plan deliberately defines contracts only; the read LOGIC is the Plan-
 
 ## Notes for Plan 02
 
-- Import: `use imzml2mzpeak::reverse::ReverseError;`
+- Import: `use mzml2mzpeak::reverse::ReverseError;`
 - Include fixtures: `#[path = "fixtures/reverse/mod.rs"] mod reverse_fixtures;`
 - Both fixture builders return a `PathBuf`; the test must `std::fs::remove_file` it when done.
 - Reader priming: call `load_all_spectrum_metadata()` ONCE before per-spectrum `get_spectrum_metadata` (RESEARCH Pitfall 1 — avoids O(n²)).

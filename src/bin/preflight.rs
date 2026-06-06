@@ -2,7 +2,7 @@
 //!
 //! Usage: `preflight <path-to.imzML>`
 //!
-//! Calls [`imzml2mzpeak::integrity::preflight::preflight`] and maps the result to a
+//! Calls [`mzml2mzpeak::integrity::preflight::preflight`] and maps the result to a
 //! process exit code: 0 on a verified imzML↔.ibd pair, NON-ZERO (with a clear stderr
 //! message) on any UUID mismatch, checksum mismatch, or missing `.ibd`. This non-zero exit
 //! is the ROADMAP-criterion-3 proof — a mere library `Err` is not sufficient; the real
@@ -11,7 +11,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use imzml2mzpeak::integrity::preflight::preflight;
+use mzml2mzpeak::integrity::preflight::preflight;
 
 fn main() -> ExitCode {
     env_logger::init();

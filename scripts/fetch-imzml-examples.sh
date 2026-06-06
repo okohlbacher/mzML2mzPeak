@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Reconstruct data/imzml-examples/ — public imzML example datasets for imzML2mzPeak.
+# Reconstruct data/imzml-examples/ — public imzML example datasets for mzML2mzPeak.
 # See docs/imzml-examples.md for the full inventory, URLs, sizes, and provenance.
 #
 # Idempotent: files already present are skipped; Zenodo collections already

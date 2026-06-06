@@ -190,7 +190,7 @@ indicatif = "=0.17.11"
 ```rust
 use std::process::Command;
 fn run_preflight_bin(imzml: &Path) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_preflight"))   // ◄── use CARGO_BIN_EXE_imzml2mzpeak (the main bin)
+    Command::new(env!("CARGO_BIN_EXE_preflight"))   // ◄── use CARGO_BIN_EXE_mzml2mzpeak (the main bin)
         .arg(imzml)
         .output()
         .expect("spawn preflight binary")

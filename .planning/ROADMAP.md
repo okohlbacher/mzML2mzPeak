@@ -1,4 +1,4 @@
-# Roadmap: imzML2mzPeak
+# Roadmap: mzML2mzPeak
 
 > **Between milestones.** v0.3 (forward), v0.4 (reverse), and v0.5 (index enrichment + optical-image
 > import) are shipped. Start the next cycle with `/gsd:new-milestone`. Candidate v0.6+ features live in

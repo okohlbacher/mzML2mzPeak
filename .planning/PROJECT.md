@@ -1,4 +1,4 @@
-# imzML2mzPeak
+# mzML2mzPeak
 
 ## What This Is
 

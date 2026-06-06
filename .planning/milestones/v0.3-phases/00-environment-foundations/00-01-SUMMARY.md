@@ -114,19 +114,19 @@ to avoid lock churn; Cargo.lock is unchanged by the toolchain bump.
 
 **Single mzdata copy** — `cargo tree -i mzdata` (count of `^mzdata v` nodes = 1):
 ```
-mzdata v0.63.3 (/Users/kohlbach/Claude/imzML2mzPeak/vendor/mzdata)
-├── imzml2mzpeak v0.1.0 (/Users/kohlbach/Claude/imzML2mzPeak)
+mzdata v0.63.3 (/Users/kohlbach/Claude/mzML2mzPeak/vendor/mzdata)
+├── mzml2mzpeak v0.1.0 (/Users/kohlbach/Claude/mzML2mzPeak)
 └── mzpeak_prototyping v0.1.0 (https://github.com/HUPO-PSI/mzPeak?rev=d1aaaf84595202e2e7f622c576c1d6ba9154e379#d1aaaf84)
-    └── imzml2mzpeak v0.1.0 (/Users/kohlbach/Claude/imzML2mzPeak)
+    └── mzml2mzpeak v0.1.0 (/Users/kohlbach/Claude/mzML2mzPeak)
 ```
 (unified across BOTH our crate and the writer — exactly one copy.)
 
 **Single arrow copy** — `cargo tree -i arrow` (count of `^arrow v` nodes = 1):
 ```
 arrow v57.0.0
-├── imzml2mzpeak v0.1.0 (/Users/kohlbach/Claude/imzML2mzPeak)
+├── mzml2mzpeak v0.1.0 (/Users/kohlbach/Claude/mzML2mzPeak)
 └── mzpeak_prototyping v0.1.0 (https://github.com/HUPO-PSI/mzPeak?rev=d1aaaf84595202e2e7f622c576c1d6ba9154e379#d1aaaf84)
-    └── imzml2mzpeak v0.1.0 (/Users/kohlbach/Claude/imzML2mzPeak)
+    └── mzml2mzpeak v0.1.0 (/Users/kohlbach/Claude/mzML2mzPeak)
 ```
 
 **imzml feature unified ON** — `cargo tree -e features -i mzdata | rg imzml` shows the feature edge:

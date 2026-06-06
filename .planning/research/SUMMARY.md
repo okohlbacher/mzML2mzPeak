@@ -1,13 +1,13 @@
 # Project Research Summary
 
-**Project:** imzML2mzPeak
+**Project:** mzML2mzPeak
 **Domain:** All-Rust CLI format converter — MSI imzML → imaging mzPeak (Parquet/ZIP)
 **Researched:** 2026-06-03
 **Confidence:** HIGH
 
 ## Executive Summary
 
-imzML2mzPeak is a one-way, lossless, batch format converter for mass spectrometry imaging (MSI) data. It reads imzML (`.imzML` + `.ibd` sidecar) in both continuous and processed storage modes and writes imaging mzPeak archives — ZIP files of Apache Parquet tables — extending the mzPeak reference implementation (`mzpeak_prototyping`, now `HUPO-PSI/mzPeak`) with a spatial/imaging schema that does not yet exist upstream. The project is narrow and well-scoped: pure Rust, no Python/R writing, no analysis, no GUI. The recommended approach is a thin adapter between two crates by the same author (Joshua Klein / mobiusklein): read via `mzdata` (with its non-default `imzml` feature enabled), write by calling the public `add_spectrum_scan_field` extension API on `MzPeakWriterType`. The shared `mzdata` spectrum model on both sides means there is no impedance-mismatch translation layer.
+mzML2mzPeak is a one-way, lossless, batch format converter for mass spectrometry imaging (MSI) data. It reads imzML (`.imzML` + `.ibd` sidecar) in both continuous and processed storage modes and writes imaging mzPeak archives — ZIP files of Apache Parquet tables — extending the mzPeak reference implementation (`mzpeak_prototyping`, now `HUPO-PSI/mzPeak`) with a spatial/imaging schema that does not yet exist upstream. The project is narrow and well-scoped: pure Rust, no Python/R writing, no analysis, no GUI. The recommended approach is a thin adapter between two crates by the same author (Joshua Klein / mobiusklein): read via `mzdata` (with its non-default `imzml` feature enabled), write by calling the public `add_spectrum_scan_field` extension API on `MzPeakWriterType`. The shared `mzdata` spectrum model on both sides means there is no impedance-mismatch translation layer.
 
 The central project risk — whether `mzdata` exposes per-spectrum spatial coordinates or silently treats imzML as plain mzML — is **resolved by source inspection**. `mzdata`'s `src/io/imzml/` module (gated behind the `imzml` Cargo feature) parses IMS scan-position CV params and surfaces them as scan-level `Param`s reachable via `spec.acquisition().scans[0].get_param_by_curie(&curie!(IMS:1000050))`, with passing integration tests for both continuous and processed modes. The concrete extension point in `mzpeak_prototyping` is equally clear: `MzPeakWriterBuilder::add_spectrum_scan_field(CustomBuilderFromParameter::from_spec(curie, name, DataType::Int64))` adds a typed Parquet column to `spectra_metadata.parquet` with zero edits to core writer structs. These two findings remove the two biggest architectural unknowns.
 

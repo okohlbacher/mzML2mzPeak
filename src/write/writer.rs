@@ -25,7 +25,7 @@
 //!      `array_buffer.rs:356` with mismatched record-batch column lengths) — so we register only
 //!      widths present in the sampled spectra. See [`data_facet_fields_from_samples`].
 //!   2. **Metadata mapping (OUT-03).** `write_run_metadata` copies source PSI-MS + IMS
-//!      metadata, records `imzml2mzpeak` conversion provenance, and maps [`RunProvenance`]
+//!      metadata, records `mzml2mzpeak` conversion provenance, and maps [`RunProvenance`]
 //!      into `file_description` by IMS accession (SPA-04). It ALSO assembles + stores the
 //!      `metadata.imaging` block (exposed via [`ImagingWriter::imaging_metadata`]) — but does
 //!      NOT insert it into the archive index. (See module note on the finish seam.)
@@ -254,7 +254,7 @@ impl ImagingWriter {
     ///
     /// In order:
     ///   (a) copies all source PSI-MS + IMS metadata from `source` (`copy_metadata_from`);
-    ///   (b) records `imzml2mzpeak` conversion provenance — a [`Software`] entry plus a
+    ///   (b) records `mzml2mzpeak` conversion provenance — a [`Software`] entry plus a
     ///       conversion [`DataProcessing`] / [`ProcessingMethod`];
     ///   (c) maps [`RunProvenance`] into `file_description` by IMS accession (SPA-04, per
     ///       `src/schema/metadata.rs`): UUID→`IMS:1000080`, checksum→`IMS:1000091` (SHA-1) /
@@ -273,7 +273,7 @@ impl ImagingWriter {
         prov: &RunProvenance,
         geom: Option<&ImagingRunMetadata>,
     ) -> Result<(), WriteError> {
-        // (a) Copy all source PSI-MS + IMS metadata verbatim, then (b)+(c) record imzml2mzpeak
+        // (a) Copy all source PSI-MS + IMS metadata verbatim, then (b)+(c) record mzml2mzpeak
         //     conversion provenance + map RunProvenance into file_description (in
         //     `wire_metadata_into`, shared so the logic has one home).
         self.inner.copy_metadata_from(source);
@@ -423,23 +423,23 @@ fn data_facet_fields_from_samples(
     fields
 }
 
-/// Wire imzml2mzpeak conversion provenance into a metadata target (steps (b)+(c) of
+/// Wire mzml2mzpeak conversion provenance into a metadata target (steps (b)+(c) of
 /// [`ImagingWriter::write_run_metadata`]): a [`Software`] entry, a conversion
 /// [`DataProcessing`], and the [`RunProvenance`] → `file_description` IMS-accession mapping
 /// (SPA-04). Generic over `impl MSDataFileMetadata` so the wiring logic has one home,
 /// independent of the concrete writer type.
 fn wire_metadata_into(target: &mut impl MSDataFileMetadata, prov: &RunProvenance) {
-    // (b) Record imzml2mzpeak conversion provenance (software + data_processing).
+    // (b) Record mzml2mzpeak conversion provenance (software + data_processing).
     target.softwares_mut().push(Software::new(
-        "imzml2mzpeak".into(),
+        "mzml2mzpeak".into(),
         env!("CARGO_PKG_VERSION").into(),
-        vec![custom_software_name("imzml2mzpeak")],
+        vec![custom_software_name("mzml2mzpeak")],
     ));
     target.data_processings_mut().push(DataProcessing {
-        id: "imzml2mzpeak_conversion".to_string(),
+        id: "mzml2mzpeak_conversion".to_string(),
         methods: vec![ProcessingMethod {
             order: 1,
-            software_reference: "imzml2mzpeak".to_string(),
+            software_reference: "mzml2mzpeak".to_string(),
             params: vec![Param::new_key_value("conversion", "imzML to imaging mzPeak")],
         }],
     });
@@ -825,7 +825,7 @@ mod tests {
     #[test]
     fn new_builds_writer_at_temp_path() {
         let mut out = std::env::temp_dir();
-        out.push(format!("imzml2mzpeak_writer_new_{}.mzpeak", std::process::id()));
+        out.push(format!("mzml2mzpeak_writer_new_{}.mzpeak", std::process::id()));
         let w = ImagingWriter::new(&out, &[]).expect("ImagingWriter::new builds with column registration");
         // The imaging block is not yet assembled (that is write_run_metadata's job, Task 2).
         assert!(w.imaging_block.is_none(), "imaging block unset until metadata is wired");
@@ -848,7 +848,7 @@ mod tests {
         use mzdata::prelude::ParamDescribed;
 
         let mut out = std::env::temp_dir();
-        out.push(format!("imzml2mzpeak_writer_meta_{}.mzpeak", std::process::id()));
+        out.push(format!("mzml2mzpeak_writer_meta_{}.mzpeak", std::process::id()));
         let mut w = ImagingWriter::new(&out, &[]).expect("build writer");
 
         let prov = RunProvenance {
@@ -907,7 +907,7 @@ mod tests {
         use mzdata::meta::FileMetadataConfig;
 
         let mut out = std::env::temp_dir();
-        out.push(format!("imzml2mzpeak_writer_min_{}.mzpeak", std::process::id()));
+        out.push(format!("mzml2mzpeak_writer_min_{}.mzpeak", std::process::id()));
         let mut w = ImagingWriter::new(&out, &[]).expect("build writer");
 
         let prov = RunProvenance {
@@ -939,7 +939,7 @@ mod tests {
         use mzdata::meta::FileMetadataConfig;
 
         let mut out = std::env::temp_dir();
-        out.push(format!("imzml2mzpeak_writer_chrom_{}.mzpeak", std::process::id()));
+        out.push(format!("mzml2mzpeak_writer_chrom_{}.mzpeak", std::process::id()));
         let mut w = ImagingWriter::new(&out, &[]).expect("build writer");
 
         let prov = RunProvenance {

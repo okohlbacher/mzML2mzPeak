@@ -1,6 +1,6 @@
 # imzML example datasets — provenance & reconstruction
 
-Public MS-imaging example datasets used by `imzML2mzPeak` as conversion / round-trip test inputs.
+Public MS-imaging example datasets used by `mzML2mzPeak` as conversion / round-trip test inputs.
 
 The data lives under **`data/imzml-examples/`**, which is **git-ignored** (large binary research data). This document plus **`scripts/fetch-imzml-examples.sh`** are the tracked record that lets anyone rebuild that directory on demand.
 

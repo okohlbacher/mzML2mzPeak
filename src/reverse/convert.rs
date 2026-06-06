@@ -86,7 +86,7 @@ pub fn convert(imzml_path: &Path, ibd_path: &Path, archive: &Path) -> Result<(),
     // RAII cleanup (WR-01): tie partial-output removal to scope exit, not just the explicit error
     // branch. If `run_pipeline` returns Err OR *panics* (an upstream `mzdata` bug, a `debug_assert!`
     // in the XML emitter firing, etc.) the guard's Drop best-effort removes ALL partial outputs
-    // (.ibd, .imzML, temp body) while unwinding — no orphaned `imzml2mzpeak_body_*` temp accumulates
+    // (.ibd, .imzML, temp body) while unwinding — no orphaned `mzml2mzpeak_body_*` temp accumulates
     // in the OS temp dir across panicking runs (Pitfall 4 / threat T-10-PART). On success the guard
     // is disarmed so the committed outputs survive (the temp body is removed inside run_pipeline,
     // and the guard's later remove of an already-gone temp is a harmless no-op).
@@ -215,7 +215,7 @@ fn body_temp_path(imzml_path: &Path) -> PathBuf {
         .unwrap_or("reverse");
     let mut p = std::env::temp_dir();
     p.push(format!(
-        "imzml2mzpeak_body_{stem}_{}_{nanos}_{n}.imzML.body",
+        "mzml2mzpeak_body_{stem}_{}_{nanos}_{n}.imzML.body",
         std::process::id()
     ));
     p
@@ -242,7 +242,7 @@ mod tests {
         let n = SEQ.fetch_add(1, Ordering::Relaxed);
         let mut p = std::env::temp_dir();
         p.push(format!(
-            "imzml2mzpeak_convert_test_{}_{n}",
+            "mzml2mzpeak_convert_test_{}_{n}",
             std::process::id()
         ));
         std::fs::create_dir_all(&p).unwrap();

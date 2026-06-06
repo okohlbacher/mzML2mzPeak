@@ -161,7 +161,7 @@ add_processing_metadata(&mut writer);        // softwares_mut().push(..) + data_
 (`writer.rs:596-599`), so `copy_metadata_from`, `softwares_mut`, `data_processings_mut`, and
 the file-description accessor are all available. `add_processing_metadata` (lines 321-340)
 shows the exact `Software::new(..)` + `DataProcessing { id, methods: vec![ProcessingMethod {..}] }`
-shape — adapt the names to `imzml2mzpeak`. For the SPA-04 provenance mapping
+shape — adapt the names to `mzml2mzpeak`. For the SPA-04 provenance mapping
 (UUID→`IMS:1000080`, checksum→`IMS:1000090/91`, mode→`IMS:1000030/31`) attach params via the
 file-description accessor; the destination split is fully documented in
 `src/schema/metadata.rs` lines 18-37 (Provenance→`file_description`, Geometry→`metadata.imaging`).

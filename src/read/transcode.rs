@@ -144,7 +144,7 @@ pub fn transcode_latin1_to_utf8(src: &Path, declared: &str) -> io::Result<Transc
         .unwrap_or_else(|| "input.imzML".to_string());
     let seq = SEQ.fetch_add(1, Ordering::Relaxed);
     let dst = std::env::temp_dir().join(format!(
-        "imzml2mzpeak-utf8-{}-{}-{}",
+        "mzml2mzpeak-utf8-{}-{}-{}",
         std::process::id(),
         seq,
         stem

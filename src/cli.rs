@@ -44,8 +44,8 @@ const EXIT_GENERIC: u8 = 1; // anything else
 /// re-streams the source after conversion and checks the written archive bit-for-bit.
 #[derive(Parser, Debug)]
 #[command(
-    name = "imzml2mzpeak",
-    about = "Convert an imzML imaging file into an imaging mzPeak file",
+    name = "mzml2mzpeak",
+    about = "Convert imzML (imaging) or plain mzML mass-spectrometry files to mzPeak (and back)",
     long_about = None
 )]
 pub struct ConvertCli {
@@ -194,7 +194,7 @@ fn run_forward_mzml(cli: ConvertCli) -> anyhow::Result<()> {
 
     let out = cli.output.as_deref().ok_or_else(|| {
         anyhow!(
-            "no output path given — `imzml2mzpeak <input.mzML> <output.mzpeak>` (or pass --dry-run \
+            "no output path given — `mzml2mzpeak <input.mzML> <output.mzpeak>` (or pass --dry-run \
              to inspect the input without writing)"
         )
     })?;
@@ -235,7 +235,7 @@ fn run_forward_mzml(cli: ConvertCli) -> anyhow::Result<()> {
 }
 
 /// Forward path (imzML → imaging mzPeak) — the SHIPPED v0.3 dispatch, unchanged. Extracted
-/// verbatim into a branch so the bare `imzml2mzpeak <in.imzML> <out.mzpeak>` invocation parses
+/// verbatim into a branch so the bare `mzml2mzpeak <in.imzML> <out.mzpeak>` invocation parses
 /// and behaves byte-identically (T-10-COMPAT).
 fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
     if cli.dry_run {
@@ -385,14 +385,14 @@ fn run_reverse(cli: &ConvertCli) -> anyhow::Result<()> {
     }
 
     // Resolve the output stem: `--output-stem` wins, else the positional output, so both
-    // `imzml2mzpeak in.mzpeak -o out` and `imzml2mzpeak in.mzpeak out` work.
+    // `mzml2mzpeak in.mzpeak -o out` and `mzml2mzpeak in.mzpeak out` work.
     let stem = cli
         .output_stem
         .as_deref()
         .or(cli.output.as_deref())
         .ok_or_else(|| {
             anyhow!(
-                "no output stem given — `imzml2mzpeak <input.mzpeak> -o <out>` (derives \
+                "no output stem given — `mzml2mzpeak <input.mzpeak> -o <out>` (derives \
                  out.imzML + out.ibd)"
             )
         })?;
@@ -736,10 +736,10 @@ mod tests {
 
     #[test]
     fn bare_forward_invocation_still_parses() {
-        // A3 / T-10-COMPAT regression guard: the shipped `imzml2mzpeak <in.imzML> <out.mzpeak>`
+        // A3 / T-10-COMPAT regression guard: the shipped `mzml2mzpeak <in.imzML> <out.mzpeak>`
         // invocation must keep parsing with `reverse == false` so the v0.3 acceptance harness
         // is untouched.
-        let cli = ConvertCli::try_parse_from(["imzml2mzpeak", "in.imzML", "out.mzpeak"])
+        let cli = ConvertCli::try_parse_from(["mzml2mzpeak", "in.imzML", "out.mzpeak"])
             .expect("bare forward invocation must still parse");
         assert_eq!(cli.input, PathBuf::from("in.imzML"));
         assert_eq!(cli.output, Some(PathBuf::from("out.mzpeak")));
@@ -750,13 +750,13 @@ mod tests {
 
     #[test]
     fn log_flag_parses_long_and_short() {
-        let long = ConvertCli::try_parse_from(["imzml2mzpeak", "in.imzML", "out.mzpeak", "--log", "run.log"])
+        let long = ConvertCli::try_parse_from(["mzml2mzpeak", "in.imzML", "out.mzpeak", "--log", "run.log"])
             .expect("--log <FILE> must parse");
         assert_eq!(long.log, Some(PathBuf::from("run.log")));
-        let short = ConvertCli::try_parse_from(["imzml2mzpeak", "in.imzML", "out.mzpeak", "-l", "r.log"])
+        let short = ConvertCli::try_parse_from(["mzml2mzpeak", "in.imzML", "out.mzpeak", "-l", "r.log"])
             .expect("-l <FILE> must parse");
         assert_eq!(short.log, Some(PathBuf::from("r.log")));
-        let absent = ConvertCli::try_parse_from(["imzml2mzpeak", "in.imzML", "out.mzpeak"]).unwrap();
+        let absent = ConvertCli::try_parse_from(["mzml2mzpeak", "in.imzML", "out.mzpeak"]).unwrap();
         assert_eq!(absent.log, None, "absent --log ⇒ None (logs to stderr)");
     }
 
@@ -781,7 +781,7 @@ mod tests {
     fn image_flag_repeatable_collects_all() {
         // IMG-01: `--image a --image b` (ArgAction::Append) collects BOTH paths, in order.
         let cli = ConvertCli::try_parse_from([
-            "imzml2mzpeak",
+            "mzml2mzpeak",
             "in.imzML",
             "out.mzpeak",
             "--image",
@@ -800,7 +800,7 @@ mod tests {
     #[test]
     fn image_flag_absent_is_empty() {
         // IMG-01: no --image ⇒ an empty Vec (the forward path threads &[] into convert()).
-        let cli = ConvertCli::try_parse_from(["imzml2mzpeak", "in.imzML", "out.mzpeak"])
+        let cli = ConvertCli::try_parse_from(["mzml2mzpeak", "in.imzML", "out.mzpeak"])
             .expect("bare invocation parses");
         assert!(cli.images.is_empty(), "absent --image is an empty Vec");
     }
@@ -810,7 +810,7 @@ mod tests {
         // IMG-01 / T-15-10: the reverse path REJECTS --image with a clear forward-only error,
         // and adds NO reverse image logic. Construct a reverse-direction CLI carrying an image.
         let cli = ConvertCli::try_parse_from([
-            "imzml2mzpeak",
+            "mzml2mzpeak",
             "in.mzpeak",
             "-o",
             "out",
@@ -877,7 +877,7 @@ mod tests {
     fn reject_output_collision_errors_on_self_overwrite() {
         // A derived output that resolves to the same file as the input must be rejected.
         let dir = std::env::temp_dir().join(format!(
-            "imzml2mzpeak_collision_test_{}",
+            "mzml2mzpeak_collision_test_{}",
             std::process::id()
         ));
         std::fs::create_dir_all(&dir).unwrap();

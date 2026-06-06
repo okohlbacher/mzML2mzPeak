@@ -2,7 +2,7 @@
 
 **Status:** DRAFT v0.3 — revised after two adversarial-review rounds (Codex/gpt-5.5); see [imaging-mzpeak-spec-review-codex.md](./imaging-mzpeak-spec-review-codex.md)
 **Date:** 2026-06-03
-**Authors:** imzML2mzPeak project (for the HUPO-PSI mzPeak committee)
+**Authors:** mzML2mzPeak project (for the HUPO-PSI mzPeak committee)
 **Scope:** Defines how mass-spectrometry **imaging** (MSI) data — as represented in imzML — is stored in an mzPeak archive, closing the gaps in the current mzPeak draft spec (`doc/index.md` @ HUPO-PSI/mzPeak).
 
 > Slots into the existing mzPeak spec and reuses its mechanisms (packed parallel metadata tables, CV-as-column inflection, the `parameters` list, file-level JSON metadata). Aligns with the 2026-05-07 HUPO-PSI session: *"Imaging MS is handled via pixel coordinates in the metadata table … Regions of interest can be stored as spatial annotation polygons on top."*

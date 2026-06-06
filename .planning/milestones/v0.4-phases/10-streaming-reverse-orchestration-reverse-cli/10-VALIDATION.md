@@ -59,7 +59,7 @@ created: 2026-06-04
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| Bounded memory on the real 432MB / 34,840-pixel archive | RCLI-02 | Real file is too large/slow for CI | Out-of-`cargo test` spike: run `imzml2mzpeak out/HR2MSI.mzpeak -o /tmp/rev` and observe RSS stays bounded (covered end-to-end in Phase 11 acceptance) |
+| Bounded memory on the real 432MB / 34,840-pixel archive | RCLI-02 | Real file is too large/slow for CI | Out-of-`cargo test` spike: run `mzml2mzpeak out/HR2MSI.mzpeak -o /tmp/rev` and observe RSS stays bounded (covered end-to-end in Phase 11 acceptance) |
 
 ---
 

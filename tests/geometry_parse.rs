@@ -17,7 +17,7 @@
 
 use std::path::Path;
 
-use imzml2mzpeak::schema::{ImagingRunMetadata, parse_scan_settings};
+use mzml2mzpeak::schema::{ImagingRunMetadata, parse_scan_settings};
 
 const HR2MSI: &str = "data/HR2MSImouseurinarybladderS096.imzML";
 const FULL: &str = "tests/fixtures/imaging/Synthetic_FullGeometry.imzML";

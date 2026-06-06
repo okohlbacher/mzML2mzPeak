@@ -73,7 +73,7 @@ fn tempdir() -> PathBuf {
     let mut p = std::env::temp_dir();
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    p.push(format!("imzml2mzpeak-imzml-test-{}-{:?}", nanos, std::thread::current().id()));
+    p.push(format!("mzml2mzpeak-imzml-test-{}-{:?}", nanos, std::thread::current().id()));
     fs::create_dir_all(&p).unwrap();
     p
 }

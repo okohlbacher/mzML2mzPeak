@@ -25,7 +25,7 @@ human_verification:
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | CLI accepts `<in.imzML> <out.mzpeak>` and drives full pipeline (CLI-01) with progress bar sized to spectrum count (CLI-02) | VERIFIED | `src/cli.rs` `ConvertCli` has positional `input`/`output`, `--dry-run`, `--verify`; `run()` calls `parse_imzml_header` for `spectrum_count`, creates a `ProgressBar::new(n as u64)` sized to that count; non-TTY fallback emits `log::info!` start + completion lines. `cargo test --test cli help_and_arg_parse` PASSES. Real dry-run: `imzml2mzpeak data/HR2MSI…imzML /tmp/x.mzpeak --dry-run` exits 0, names 34840 spectra. |
+| 1 | CLI accepts `<in.imzML> <out.mzpeak>` and drives full pipeline (CLI-01) with progress bar sized to spectrum count (CLI-02) | VERIFIED | `src/cli.rs` `ConvertCli` has positional `input`/`output`, `--dry-run`, `--verify`; `run()` calls `parse_imzml_header` for `spectrum_count`, creates a `ProgressBar::new(n as u64)` sized to that count; non-TTY fallback emits `log::info!` start + completion lines. `cargo test --test cli help_and_arg_parse` PASSES. Real dry-run: `mzml2mzpeak data/HR2MSI…imzML /tmp/x.mzpeak --dry-run` exits 0, names 34840 spectra. |
 | 2 | `--dry-run` reports storage mode, spectrum count, grid dims, integrity status — writes no output, exits 0 (CLI-03) | VERIFIED | `dry_run()` in `src/cli.rs`: calls `preflight`, `parse_imzml_header`, `ImagingReader::open().storage_mode()`, `parse_scan_settings`; prints table with integrity/mode/count/grid; writes nothing. `cargo test --test cli dry_run_writes_no_output_and_exits_zero` PASSES. Live test: exit code 0, `data/HR2MSI…` prints `spectrum count: 34840`, `grid dims: 260 x 134`, output absent. |
 | 3 | Integrity, unsupported-input, and coordinate-extraction failures each produce a distinct non-zero exit code with an actionable message (CLI-04) | VERIFIED | `classify_exit()` in `src/cli.rs` maps: `IntegrityError` (UUID/checksum/.ibd) → 2; `UnsupportedCompression`/`UnsupportedDtype` → 3; `NoScan`/`CoordMissing`/`DuplicateCoordinate` → 4; `VerifyFailed` → 5; generic → 1. `IntegrityError::Io` correctly maps to 1 (not 2). Eight unit tests + 4 spawned-process tests all pass. Live: `Corrupt_BadChecksum` exits 2 with "checksum" in stderr; `Corrupt_BadUuid` exits 2 with "uuid"; missing file exits 1; missing output arg exits 1. `cargo test --test cli` — 4 tests PASS. |
 | 4 | The full 34,840-spectrum PXD001283 dataset converts end-to-end with bounded memory and passes VER-01..04 at L1 (DAT-01) | VERIFIED | `tests/acceptance.rs` `acceptance_pxd001283_full_roundtrip` (`#[ignore]`) calls `convert(reader, &out)` then `verify_streaming(reader2, &out, L1BitForBit)` and asserts `report.count.source_count == 34_840` and `report.passed()`. Per `06-03-SUMMARY.md` (committed `793a5f6`): test PASSED in 7.11 s, peak memory 366 MB. The acceptance test uses `verify_streaming` (bounded — never `verify_roundtrip`). `tests/acceptance.rs` confirmed: imports `verify_streaming`, calls it directly, `grep verify_roundtrip` = 0 matches. Default `cargo test` compiles but skips the `#[ignore]` test (1 ignored — confirmed). |
@@ -47,11 +47,11 @@ None.
 |----------|----------|--------|---------|
 | `src/cli.rs` | `ConvertCli` struct + `run()` + `classify_exit()` + progress (CLI-01/02/03/04) | VERIFIED | 395-line file with `pub struct ConvertCli`, `pub fn run`, `pub fn classify_exit`, 8 unit tests, TTY/non-TTY progress, `VerifyFailed` marker |
 | `src/main.rs` | `main() -> ExitCode` dispatching to `cli::run` + `classify_exit` | VERIFIED | 29-line file; `env_logger::init()` first; `match cli::run(ConvertCli::parse())` dispatches to `classify_exit` on error |
-| `tests/cli.rs` | Spawned-process tests for convert/dry-run/exit-codes | VERIFIED | 4 tests using `env!("CARGO_BIN_EXE_imzml2mzpeak")`; all PASS in ~0.94s |
+| `tests/cli.rs` | Spawned-process tests for convert/dry-run/exit-codes | VERIFIED | 4 tests using `env!("CARGO_BIN_EXE_mzml2mzpeak")`; all PASS in ~0.94s |
 | `tests/acceptance.rs` | `#[ignore]` DAT-01 full-dataset roundtrip acceptance test | VERIFIED | `acceptance_pxd001283_full_roundtrip` uses `verify_streaming`, asserts 34,840 spectra + `report.passed()` |
 | `src/verify/verify.rs` | `verify_streaming` bounded-memory core | VERIFIED | `pub fn verify_streaming<I>` (generic over IntoIterator); never collects source; re-exported from `src/verify/mod.rs` |
 | `src/integrity/header.rs` | `ImzmlHeader.spectrum_count: Option<usize>` | VERIFIED | Field present at line 63; `parse_count_attr` helper extracts from `<spectrumList count="N">`; `spectrum_count_real_file_is_34840` unit test confirms `Some(34840)` |
-| `Cargo.toml` | `indicatif = "=0.17.11"` direct dep + `[[bin]] name = "imzml2mzpeak"` | VERIFIED | Line 97: `indicatif = "=0.17.11"`; lines 13/26: `name = "imzml2mzpeak"`; `cargo tree -i indicatif` → single copy at 0.17.11 |
+| `Cargo.toml` | `indicatif = "=0.17.11"` direct dep + `[[bin]] name = "mzml2mzpeak"` | VERIFIED | Line 97: `indicatif = "=0.17.11"`; lines 13/26: `name = "mzml2mzpeak"`; `cargo tree -i indicatif` → single copy at 0.17.11 |
 
 ---
 
@@ -82,11 +82,11 @@ None.
 
 | Behavior | Command | Result | Status |
 |----------|---------|--------|--------|
-| `--help` exits 0 and names all args/flags | `target/release/imzml2mzpeak --help` | Exit 0; stdout contains `imzml2mzpeak`, `input`, `output`, `--dry-run`, `--verify` | PASS |
-| `--dry-run` on real file exits 0, prints plan, writes no output | `target/release/imzml2mzpeak data/HR2MSI…imzML /tmp/x.mzpeak --dry-run` | Exit 0; prints integrity OK + storage mode Processed + spectrum count 34840 + grid dims 260 x 134; `/tmp/x.mzpeak` absent | PASS |
-| Integrity failure exits code 2 with actionable message | `target/release/imzml2mzpeak tests/fixtures/imaging/Corrupt_BadChecksum.imzML /tmp/bad.mzpeak` | Exit 2; stderr contains "SHA-1 checksum mismatch" | PASS |
-| Missing input file exits code 1 (not 2) | `target/release/imzml2mzpeak /nonexistent/file.imzML /tmp/out.mzpeak` | Exit 1; stderr contains "No such file or directory" | PASS |
-| UUID mismatch exits code 2 with actionable message | `target/release/imzml2mzpeak tests/fixtures/imaging/Corrupt_BadUuid.imzML /tmp/bad.mzpeak` | Exit 2; stderr contains "UUID mismatch" | PASS |
+| `--help` exits 0 and names all args/flags | `target/release/mzml2mzpeak --help` | Exit 0; stdout contains `mzml2mzpeak`, `input`, `output`, `--dry-run`, `--verify` | PASS |
+| `--dry-run` on real file exits 0, prints plan, writes no output | `target/release/mzml2mzpeak data/HR2MSI…imzML /tmp/x.mzpeak --dry-run` | Exit 0; prints integrity OK + storage mode Processed + spectrum count 34840 + grid dims 260 x 134; `/tmp/x.mzpeak` absent | PASS |
+| Integrity failure exits code 2 with actionable message | `target/release/mzml2mzpeak tests/fixtures/imaging/Corrupt_BadChecksum.imzML /tmp/bad.mzpeak` | Exit 2; stderr contains "SHA-1 checksum mismatch" | PASS |
+| Missing input file exits code 1 (not 2) | `target/release/mzml2mzpeak /nonexistent/file.imzML /tmp/out.mzpeak` | Exit 1; stderr contains "No such file or directory" | PASS |
+| UUID mismatch exits code 2 with actionable message | `target/release/mzml2mzpeak tests/fixtures/imaging/Corrupt_BadUuid.imzML /tmp/bad.mzpeak` | Exit 2; stderr contains "UUID mismatch" | PASS |
 | Default `cargo test` all pass (84 lib + integration) | `cargo test` | 84 passed; 0 failed; 0 ignored in default suite (acceptance `#[ignore]` skipped) | PASS |
 
 ---
