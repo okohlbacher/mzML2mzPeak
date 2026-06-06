@@ -305,7 +305,19 @@ pub fn convert_with(
             let (sha256, size) = sha256_and_size(path)?;
 
             let matrix = full_extent_affine(nx, ny, w, h);
-            images.push(build_image_entry(name, source_name, w, h, sha256, size, matrix));
+            // v0.5 explicit --image path is TIFF-only (read_tiff_dimensions above hard-fails on
+            // non-TIFF), so media_type stays "image/tiff" here. Plan 02 generalizes this seam to
+            // the auto-discovered, format-agnostic embed (media_type_for_extension + is_tiff).
+            images.push(build_image_entry(
+                name,
+                source_name,
+                "image/tiff".to_string(),
+                w,
+                h,
+                sha256,
+                size,
+                matrix,
+            ));
         }
 
         // Set images[] ONLY when ≥1 image was imported, so a no-image run omits the key entirely.

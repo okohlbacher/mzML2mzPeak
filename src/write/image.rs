@@ -107,16 +107,21 @@ fn hex_lower(bytes: &[u8]) -> String {
     s
 }
 
-/// Assemble an [`ImageEntry`] for one imported optical TIFF (IMG-03 + IMG-05).
+/// Assemble an [`ImageEntry`] for one imported optical image of ANY format (IMG-03 + IMG-05,
+/// generalized in Phase 20 / OPT-01).
 ///
-/// Stamps `media_type="image/tiff"`, builds the full-extent `affine` via
-/// [`ImageAffine::new`], and sets `role=Some("optical")` (IMG-05); `derived_subtype` and
-/// `modality` are `None` for an imported optical image. `archive_path` is the deterministic
-/// ordinal member name (`images/image_NNNN.tiff`) and `source_name` the original basename —
-/// both supplied by Plan 03's import loop.
+/// The caller supplies `media_type` (no longer hardcoded `"image/tiff"`): a TIFF/.svs import
+/// passes `"image/tiff"` with real first-IFD `w`/`h`; a non-TIFF verbatim embed passes its
+/// extension-derived media type (see [`media_type_for_extension`]) with `w == 0, h == 0` to
+/// mean "dimensions omitted". `width`/`height` are `i64` (not `Option`) on [`ImageEntry`], so
+/// `0` is the sentinel for "unknown" — this does NOT add a schema field (the three-places rule
+/// is not triggered; `metadata.rs` / `schema/imaging.json` are unchanged). Builds the
+/// full-extent `affine` via [`ImageAffine::new`] and sets `role=Some("optical")`;
+/// `derived_subtype`/`modality` stay `None` here (Plan 02 maps the descriptive attrs).
 pub(crate) fn build_image_entry(
     archive_path: String,
     source_name: String,
+    media_type: String,
     w: u32,
     h: u32,
     sha256: String,
@@ -126,7 +131,7 @@ pub(crate) fn build_image_entry(
     ImageEntry {
         archive_path,
         source_name,
-        media_type: "image/tiff".to_string(),
+        media_type,
         width: w as i64,
         height: h as i64,
         sha256,
@@ -136,6 +141,53 @@ pub(crate) fn build_image_entry(
         derived_subtype: None,
         modality: None,
     }
+}
+
+/// Detect a TIFF (including TIFF-based formats like Aperio `.svs`) by its MAGIC BYTES — NOT by
+/// file extension (Phase 20 / OPT-01).
+///
+/// Reads only the FIRST 4 bytes and returns `Ok(true)` for the TIFF magic `II\x2A\x00`
+/// (little-endian) or `MM\x00\x2A` (big-endian), `Ok(false)` for anything else. Detection is
+/// by magic bytes so a `.svs` (Aperio is TIFF-based) is recognized as a TIFF and gets its
+/// first-IFD dimensions via [`read_tiff_dimensions`], while a mislabeled `.tif` that is not a
+/// TIFF is treated as a verbatim embed.
+///
+/// A read error (file missing/unreadable, or fewer than 4 bytes) surfaces as
+/// [`WriteError::ImageDecode`] so the soft-fail caller in Plan 02 can distinguish "not a TIFF"
+/// (`Ok(false)`) from "could not read" (`Err`).
+// Consumed by Plan 02's convert.rs auto-discovery seam; only this module's tests call it now.
+#[allow(dead_code)]
+pub(crate) fn is_tiff(path: &Path) -> Result<bool, WriteError> {
+    let display = path.display().to_string();
+    let mut f = File::open(path).map_err(|e| WriteError::ImageDecode {
+        path: display.clone(),
+        detail: e.to_string(),
+    })?;
+    let mut magic = [0u8; 4];
+    f.read_exact(&mut magic).map_err(|e| WriteError::ImageDecode {
+        path: display,
+        detail: e.to_string(),
+    })?;
+    Ok(matches!(&magic, b"II\x2A\x00" | b"MM\x00\x2A"))
+}
+
+/// Map a file extension (case-insensitive, no leading dot) to an IANA media type for the
+/// verbatim-embed path (Phase 20 / OPT-01).
+///
+/// `"tif"`/`"tiff"` → `"image/tiff"`; `"svs"` → `"image/tiff"` (Aperio is TIFF-based);
+/// `"png"` → `"image/png"`; `"jpg"`/`"jpeg"` → `"image/jpeg"`; anything else →
+/// `"application/octet-stream"` (the safe default for an unknown verbatim blob).
+// Consumed by Plan 02's convert.rs auto-discovery seam; only this module's tests call it now.
+#[allow(dead_code)]
+pub(crate) fn media_type_for_extension(ext: &str) -> String {
+    match ext.to_ascii_lowercase().as_str() {
+        "tif" | "tiff" => "image/tiff",
+        "svs" => "image/tiff",
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        _ => "application/octet-stream",
+    }
+    .to_string()
 }
 
 #[cfg(test)]
@@ -235,6 +287,7 @@ mod tests {
         let e = build_image_entry(
             "images/image_0000.tiff".to_string(),
             "scan.tiff".to_string(),
+            "image/tiff".to_string(),
             5,
             8,
             "deadbeef".to_string(),
@@ -251,5 +304,84 @@ mod tests {
         assert!(e.derived_subtype.is_none());
         assert!(e.modality.is_none());
         assert!((e.affine.matrix[0] - 2.25).abs() < EPS);
+    }
+
+    /// A non-TIFF embed: caller passes a non-TIFF media_type with w=0,h=0 (dimensions omitted).
+    /// The entry carries that media_type, width 0, height 0, and still role=Some("optical").
+    #[test]
+    fn build_image_entry_non_tiff_omits_dimensions() {
+        // PNG embed: dimensions not read (0/0), media_type from the caller.
+        let m = full_extent_affine(10, 20, 1, 1);
+        let e = build_image_entry(
+            "images/image_0001.png".to_string(),
+            "overview.png".to_string(),
+            "image/png".to_string(),
+            0,
+            0,
+            "cafebabe".to_string(),
+            456,
+            m,
+        );
+        assert_eq!(e.media_type, "image/png");
+        assert_eq!(e.width, 0, "non-TIFF embed → width 0 (omitted)");
+        assert_eq!(e.height, 0, "non-TIFF embed → height 0 (omitted)");
+        assert_eq!(e.role.as_deref(), Some("optical"));
+    }
+
+    /// is_tiff: true for BOTH TIFF byte orders, false for PNG magic.
+    #[test]
+    fn is_tiff_detects_both_byte_orders_and_rejects_png() {
+        fn write_magic(name: &str, bytes: &[u8]) -> std::path::PathBuf {
+            let mut tmp = std::env::temp_dir();
+            tmp.push(format!("mzml2mzpeak_istiff_{}_{}.bin", std::process::id(), name));
+            let mut f = File::create(&tmp).unwrap();
+            f.write_all(bytes).unwrap();
+            tmp
+        }
+
+        // Little-endian "II\x2A\x00" → true.
+        let le = write_magic("le", b"II\x2A\x00rest of file");
+        assert!(is_tiff(&le).unwrap(), "little-endian TIFF magic → true");
+        std::fs::remove_file(&le).ok();
+
+        // Big-endian "MM\x00\x2A" → true.
+        let be = write_magic("be", b"MM\x00\x2Arest of file");
+        assert!(is_tiff(&be).unwrap(), "big-endian TIFF magic → true");
+        std::fs::remove_file(&be).ok();
+
+        // PNG magic "\x89PNG" → false.
+        let png = write_magic("png", b"\x89PNG\r\n\x1a\n");
+        assert!(!is_tiff(&png).unwrap(), "PNG magic → false");
+        std::fs::remove_file(&png).ok();
+    }
+
+    /// is_tiff: a missing/unreadable file surfaces WriteError::ImageDecode (Err), distinct from
+    /// "not a TIFF" (Ok(false)) — the distinction the soft-fail caller in Plan 02 needs.
+    #[test]
+    fn is_tiff_missing_file_errors() {
+        let mut tmp = std::env::temp_dir();
+        tmp.push(format!("mzml2mzpeak_istiff_missing_{}.bin", std::process::id()));
+        std::fs::remove_file(&tmp).ok(); // ensure absent
+        match is_tiff(&tmp) {
+            Err(WriteError::ImageDecode { .. }) => {}
+            other => panic!("expected WriteError::ImageDecode for a missing file, got {other:?}"),
+        }
+    }
+
+    /// media_type_for_extension: tif/tiff/svs → image/tiff; png/jpg/jpeg mapped; unknown →
+    /// application/octet-stream; case-insensitive.
+    #[test]
+    fn media_type_for_extension_maps_known_and_defaults_unknown() {
+        assert_eq!(media_type_for_extension("tif"), "image/tiff");
+        assert_eq!(media_type_for_extension("tiff"), "image/tiff");
+        assert_eq!(media_type_for_extension("svs"), "image/tiff", "Aperio is TIFF-based");
+        assert_eq!(media_type_for_extension("PNG"), "image/png", "case-insensitive");
+        assert_eq!(media_type_for_extension("jpg"), "image/jpeg");
+        assert_eq!(media_type_for_extension("jpeg"), "image/jpeg");
+        assert_eq!(
+            media_type_for_extension("xyz"),
+            "application/octet-stream",
+            "unknown extension → octet-stream"
+        );
     }
 }
