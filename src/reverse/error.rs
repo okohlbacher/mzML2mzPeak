@@ -121,6 +121,18 @@ pub enum ReverseError {
     #[error(".ibd writer is poisoned: a prior append failed mid-array; discard the partial file")]
     IbdPoisoned,
 
+    /// Exporting an embedded optical-image ZIP member back out as an external file beside the
+    /// produced `.imzML` failed for a genuine I/O / corrupt-archive reason (opening the `.mzpeak`
+    /// as a ZIP, reading a member's bytes, or creating/streaming the external file). Uses
+    /// `#[source]` rather than `#[from]` — consistent with the module's io-not-`#[from]` rule (see
+    /// the `OpenArchive`/`ArrayDecode`/`IbdWrite`/`XmlEmit` arms) — so the multiple io-carrying arms
+    /// never generate conflicting `From<io::Error>` impls. Distinct from the spectral arms: an image
+    /// is AUXILIARY, so an *absent/unreadable* member is a soft skip (`Ok(None)`, logged) handled in
+    /// [`crate::reverse::image_export`] and NEVER reaches this arm — only a corrupt archive or a
+    /// real write failure does (threats T-21-01..03, RIMG-01). Phase 21.
+    #[error("failed to export optical image member: {0}")]
+    ImageExport(#[source] std::io::Error),
+
     /// Computing the streamed MD5 (`IMS:1000090`) checksum of the finished `.ibd` failed.
     /// Composes [`crate::integrity::header::IntegrityError`] via `#[from]` so
     /// [`crate::reverse::ibd::IbdWriter::finish`] can `?`-propagate the digest error. This is

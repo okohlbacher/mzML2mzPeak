@@ -727,7 +727,7 @@ fn classify_integrity_error(ie: &IntegrityError) -> ExitCode {
 ///   - `Integrity` delegates to [`classify_integrity_error`] (same UUID/checksum class, no
 ///     duplicate logic — proves the .ibd-digest path shares the forward integrity codes);
 ///   - genuine I/O / transport / internal failures, NOT a property of the input's shape
-///     (`IbdWrite`, `XmlEmit`, `IbdOverflow`, `IbdPoisoned`, `OpenArchive`) → the generic code 1,
+///     (`IbdWrite`, `XmlEmit`, `IbdOverflow`, `IbdPoisoned`, `ImageExport`, `OpenArchive`) → the generic code 1,
 ///     mirroring `IntegrityError::Io` on the forward path.
 fn classify_reverse_error(re: &crate::reverse::ReverseError) -> ExitCode {
     use crate::reverse::ReverseError as R;
@@ -748,6 +748,7 @@ fn classify_reverse_error(re: &crate::reverse::ReverseError) -> ExitCode {
         | R::XmlEmit(_)
         | R::IbdOverflow { .. }
         | R::IbdPoisoned
+        | R::ImageExport(_)
         | R::OpenArchive(_) => ExitCode::from(EXIT_GENERIC),
     }
 }

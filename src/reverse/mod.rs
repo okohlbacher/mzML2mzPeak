@@ -14,11 +14,13 @@
 pub mod convert;
 pub mod error;
 pub mod ibd;
+pub mod image_export;
 pub mod imzml_writer;
 pub mod source;
 
 pub use convert::convert;
 pub use error::ReverseError;
 pub use ibd::{ArrayRef, IbdWriter};
+pub use image_export::export_image_members;
 pub use imzml_writer::ImzmlWriter;
 pub use source::{ReversePixel, decode_axis, read_pixel};
