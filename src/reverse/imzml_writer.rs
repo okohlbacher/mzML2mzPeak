@@ -40,7 +40,12 @@ use quick_xml::escape::escape;
 
 use crate::read::record::Representation;
 use crate::reverse::error::ReverseError;
+use crate::reverse::optical_fold::RecoveredOptical;
 use crate::schema::metadata::ImagingMetadata;
+use crate::schema::optical::{
+    OPTICAL_ADJACENT_SECTION, OPTICAL_ALIGNMENT, OPTICAL_LOCATION, OPTICAL_MORPHOLOGY,
+    OPTICAL_OF_ANALYSED, OPTICAL_STAINING,
+};
 
 /// The XML prolog — declares `encoding="UTF-8"` (threat T-09-ENC). The on-disk bytes are genuine
 /// UTF-8 (Rust `String`), so the declaration and the bytes never disagree.
@@ -210,6 +215,10 @@ impl ImzmlWriter {
     /// - `imaging` — optional run geometry; when `Some`, only the `Some` fields are emitted under
     ///   their documented accessions; when `None`, an empty `<scanSettingsList count="0"/>` is
     ///   emitted and NO geometry is fabricated (threat T-09-FAB).
+    ///
+    /// The eager-header lifecycle emits NO optical `<sampleList>` — it passes an empty samples
+    /// slice to [`Self::write_header_to`], so every existing `new`-based caller/test stays
+    /// byte-identical (the optical block is emitted only via the split-phase orchestrator path).
     pub fn new(
         path: impl AsRef<Path>,
         uuid: Uuid,
@@ -219,7 +228,7 @@ impl ImzmlWriter {
     ) -> Result<Self, ReverseError> {
         let sink = BufWriter::new(File::create(path.as_ref()).map_err(ReverseError::XmlEmit)?);
         let mut w = Self { sink };
-        Self::write_header_to(&mut w.sink, uuid, ibd_md5_hex, count, imaging)?;
+        Self::write_header_to(&mut w.sink, uuid, ibd_md5_hex, count, imaging, &[])?;
         Ok(w)
     }
 
@@ -279,12 +288,21 @@ impl ImzmlWriter {
     /// AFTER the body) — to the real `.imzML` sink AFTER the spectra body has been streamed to a
     /// temp file. The bytes are byte-identical to the eager-header lifecycle (both route through the
     /// same free emit helpers); [`Self::new`] is now a thin wrapper that calls this.
+    ///
+    /// `samples` (Phase 21 — RIMG-02) is the per-image `(exported_filename, RecoveredOptical)` list
+    /// the reverse `convert` orchestrator threads in from `export_image_members` + the inverse fold.
+    /// When NON-empty, a `<sampleList count="1"><sample>` carrying one `IMS:1006008` (location =
+    /// the exported filename) per image plus the recovered descriptive cvParams is emitted AFTER
+    /// `</fileDescription>` and BEFORE `<softwareList>` (imzML/mzML element order). When EMPTY, NO
+    /// `<sampleList>` element is emitted at all (clean no-op — RIMG-03's no-op surface; the header
+    /// is byte-identical to the pre-Phase-21 output).
     pub fn write_header_to(
         sink: &mut impl Write,
         uuid: Uuid,
         ibd_md5_hex: &str,
         count: u64,
         imaging: Option<&ImagingMetadata>,
+        samples: &[(String, RecoveredOptical)],
     ) -> Result<(), ReverseError> {
         emit_raw(sink, PROLOG)?;
         emit_raw(
@@ -340,6 +358,11 @@ impl ImzmlWriter {
              </sourceFile></sourceFileList>",
         )?;
         emit_raw(sink, "</fileDescription>\n")?;
+
+        // sampleList — the embedded optical images re-exported on the reverse path (RIMG-02). Emits
+        // NOTHING when `samples` is empty (the no-op surface — RIMG-03); imzML/mzML order places
+        // <sampleList> after </fileDescription> and before <softwareList>.
+        Self::write_sample_list_to(sink, samples)?;
 
         // softwareList — this converter. The version tracks the crate (env!) rather than a magic
         // literal that silently lies when the crate bumps (IN-03). The value is static (from
@@ -449,6 +472,68 @@ impl ImzmlWriter {
             )?;
         }
         emit_raw(sink, "</scanSettings></scanSettingsList>\n")?;
+        Ok(())
+    }
+
+    /// Emit the optical `<sampleList>/<sample>` (RIMG-02) to an arbitrary sink. `samples` pairs each
+    /// EXPORTED external filename (the Plan-01 `export_image_members` result) with the
+    /// [`RecoveredOptical`] inverse-fold recovery for that image.
+    ///
+    /// When `samples` is EMPTY, emit NOTHING — no `<sampleList>` element at all (the no-op surface,
+    /// RIMG-03: the header stays byte-identical to the pre-Phase-21 output). When NON-empty, emit a
+    /// single `<sampleList count="1"><sample id="sample1" name="sample1">` whose body carries, per
+    /// image: `IMS:1006008` (value = exported filename) followed by the recovered descriptive
+    /// cvParams — `IMS:1006015` staining (valued), `IMS:1006017` alignment (valued),
+    /// `IMS:1006011`/`IMS:1006012` subject (presence-only, mirroring the forward fixture's empty
+    /// value), `IMS:1006013` morphology (valued). EVERY dynamic value (the filename + each free-text
+    /// descriptive value) routes through [`emit_escaped`] via [`emit_cv_param`] so `H&E` →
+    /// `H&amp;E` and no raw metacharacter reaches the document (threat T-21-04). The accession/name
+    /// strings come from the SHARED `optical.rs` constants so they cannot drift from the forward
+    /// parser (threat T-21-06).
+    ///
+    /// All images live under ONE `<sample>` (mirrors the forward multimodal `<sample>` that carries
+    /// multiple `IMS:1006008` references — `src/schema/optical.rs` parses exactly that shape).
+    fn write_sample_list_to(
+        sink: &mut impl Write,
+        samples: &[(String, RecoveredOptical)],
+    ) -> Result<(), ReverseError> {
+        // No-op surface (RIMG-03): an archive with no images emits no <sampleList> at all.
+        if samples.is_empty() {
+            return Ok(());
+        }
+
+        emit_raw(
+            sink,
+            "<sampleList count=\"1\"><sample id=\"sample1\" name=\"sample1\">",
+        )?;
+        for (filename, rec) in samples {
+            // IMS:1006008 — optical image location = the exported external filename (escaped).
+            emit_cv_param(sink, "IMS", OPTICAL_LOCATION.0, OPTICAL_LOCATION.1, filename)?;
+            // Recovered descriptive params (only those actually recovered — never fabricated).
+            if let Some(stain) = rec.staining_method.as_deref() {
+                emit_cv_param(sink, "IMS", OPTICAL_STAINING.0, OPTICAL_STAINING.1, stain)?;
+            }
+            if let Some(align) = rec.alignment_method.as_deref() {
+                emit_cv_param(sink, "IMS", OPTICAL_ALIGNMENT.0, OPTICAL_ALIGNMENT.1, align)?;
+            }
+            // Subject terms are presence-only flags (the forward parser sets a bool; the forward
+            // fixture emits them with an empty value — mirror that with the flag emitter).
+            if rec.subject_of_analysed {
+                emit_cv_param_flag(sink, "IMS", OPTICAL_OF_ANALYSED.0, OPTICAL_OF_ANALYSED.1)?;
+            }
+            if rec.subject_adjacent {
+                emit_cv_param_flag(
+                    sink,
+                    "IMS",
+                    OPTICAL_ADJACENT_SECTION.0,
+                    OPTICAL_ADJACENT_SECTION.1,
+                )?;
+            }
+            if let Some(morph) = rec.morphological_classification.as_deref() {
+                emit_cv_param(sink, "IMS", OPTICAL_MORPHOLOGY.0, OPTICAL_MORPHOLOGY.1, morph)?;
+            }
+        }
+        emit_raw(sink, "</sample></sampleList>\n")?;
         Ok(())
     }
 
@@ -1603,6 +1688,96 @@ mod tests {
         reader
             .read_into(&mut spec)
             .expect("unit+offset-bearing scanSettings fixture re-reads without error");
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    // ---- Phase 21 (RIMG-02): optical <sampleList>/<sample> emit ----
+
+    use crate::reverse::optical_fold::RecoveredOptical;
+
+    /// Emit a header to an in-memory buffer with the given samples and return it as a UTF-8 string.
+    fn header_string(samples: &[(String, RecoveredOptical)]) -> String {
+        let mut buf: Vec<u8> = Vec::new();
+        ImzmlWriter::write_header_to(&mut buf, Uuid::nil(), "deadbeef", 0, None, samples)
+            .expect("header emits");
+        String::from_utf8(buf).expect("header is valid UTF-8")
+    }
+
+    /// One exported image (H&E staining, manual-landmark alignment, of-analysed subject, tumor
+    /// morphology) emits a `<sampleList count="1"><sample>` carrying IMS:1006008 (the exported
+    /// filename) + IMS:1006015 (H&amp;E escaped) + IMS:1006017 + IMS:1006011 + IMS:1006013 (tumor).
+    #[test]
+    fn one_sample_emits_location_and_recovered_params() {
+        let rec = RecoveredOptical {
+            subject_of_analysed: true,
+            subject_adjacent: false,
+            morphological_classification: Some("tumor".to_string()),
+            staining_method: Some("H&E".to_string()),
+            alignment_method: Some("manual landmark".to_string()),
+        };
+        let samples = vec![("optical_4x3.tiff".to_string(), rec)];
+        let text = header_string(&samples);
+
+        assert!(text.contains("<sampleList"), "sampleList element emitted");
+        assert!(
+            text.contains("accession=\"IMS:1006008\""),
+            "IMS:1006008 location accession present"
+        );
+        assert!(
+            text.contains("value=\"optical_4x3.tiff\""),
+            "IMS:1006008 value is the exported filename"
+        );
+        // Staining: H&E must be ENTITY-ESCAPED in the value (threat T-21-04).
+        assert!(text.contains("accession=\"IMS:1006015\""), "IMS:1006015 staining present");
+        assert!(
+            text.contains("value=\"H&amp;E\""),
+            "H&E staining value is escaped to H&amp;E"
+        );
+        assert!(!text.contains("value=\"H&E\""), "raw unescaped H&E must NOT appear");
+        // Alignment (valued).
+        assert!(text.contains("accession=\"IMS:1006017\""), "IMS:1006017 alignment present");
+        assert!(text.contains("value=\"manual landmark\""), "alignment value present");
+        // Subject (presence-only flag) + morphology (valued).
+        assert!(text.contains("accession=\"IMS:1006011\""), "IMS:1006011 subject present");
+        assert!(
+            !text.contains("accession=\"IMS:1006012\""),
+            "adjacent-section subject NOT emitted (subject is of-analysed)"
+        );
+        assert!(text.contains("accession=\"IMS:1006013\""), "IMS:1006013 morphology present");
+        assert!(text.contains("value=\"tumor\""), "morphology value present");
+    }
+
+    /// No-op (RIMG-03): an empty samples slice emits NO `<sampleList>`/`IMS:1006008`, AND the header
+    /// bytes are byte-identical to the pre-Phase-21 no-sample header (the optical block is the ONLY
+    /// difference an image introduces; with zero images the surface is unchanged).
+    #[test]
+    fn empty_samples_emits_no_samplelist_byte_identical() {
+        let with_empty = header_string(&[]);
+
+        // The empty-samples header carries no optical surface at all.
+        assert!(!with_empty.contains("<sampleList"), "no <sampleList> for zero images");
+        assert!(!with_empty.contains("IMS:1006008"), "no IMS:1006008 for zero images");
+
+        // Byte-identity: a header built via the eager `new(...)` path (which also passes an empty
+        // slice) writes the SAME header bytes up to <spectrumList>. Build that reference and compare
+        // the header prefix (everything the eager `new` writes before any <spectrum>).
+        let dir = tempdir();
+        let path = dir.join("ref.imzML");
+        // `new` eagerly writes the header (with samples=&[]) and nothing else until write_spectrum.
+        let w = ImzmlWriter::new(&path, Uuid::nil(), "deadbeef", 0, None).unwrap();
+        // finish() appends only the trailer; capture the file and strip the trailer to get the header.
+        w.finish().unwrap();
+        let eager = read_text(&path);
+        let trailer = "</spectrumList>\n</run>\n</mzML>\n";
+        let eager_header = eager
+            .strip_suffix(trailer)
+            .expect("eager output ends with the trailer");
+
+        assert_eq!(
+            with_empty, eager_header,
+            "empty-samples write_header_to is byte-identical to the eager new(...) header (no-op)"
+        );
 
         fs::remove_dir_all(&dir).ok();
     }

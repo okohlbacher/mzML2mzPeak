@@ -40,7 +40,9 @@ use mzpeak_prototyping::MzPeakReader;
 
 use crate::reverse::error::ReverseError;
 use crate::reverse::ibd::IbdWriter;
+use crate::reverse::image_export::export_image_members;
 use crate::reverse::imzml_writer::ImzmlWriter;
+use crate::reverse::optical_fold::{RecoveredOptical, recover_descriptive};
 use crate::reverse::source::read_pixel;
 use crate::schema::metadata::ImagingMetadata;
 
@@ -91,7 +93,16 @@ pub fn convert(imzml_path: &Path, ibd_path: &Path, archive: &Path) -> Result<(),
     // is disarmed so the committed outputs survive (the temp body is removed inside run_pipeline,
     // and the guard's later remove of an already-gone temp is a harmless no-op).
     let guard = PartialOutputGuard::new(imzml_path, ibd_path, &body_tmp);
-    let result = run_pipeline(&mut reader, count, uuid, imzml_path, ibd_path, &body_tmp, imaging);
+    let result = run_pipeline(
+        &mut reader,
+        count,
+        uuid,
+        imzml_path,
+        ibd_path,
+        &body_tmp,
+        imaging,
+        archive,
+    );
     if result.is_ok() {
         // Committed: keep the .imzML/.ibd, do NOT let the guard delete them on drop.
         guard.disarm();
@@ -141,6 +152,7 @@ impl Drop for PartialOutputGuard {
 
 /// The bounded-memory streaming + Option-C finalize body. Split out so [`convert`] can wrap it in
 /// one cleanup-on-error arm.
+#[allow(clippy::too_many_arguments)]
 fn run_pipeline(
     reader: &mut MzPeakReader,
     count: u64,
@@ -149,6 +161,7 @@ fn run_pipeline(
     ibd_path: &Path,
     body_tmp: &Path,
     imaging: Option<ImagingMetadata>,
+    archive: &Path,
 ) -> Result<(), ReverseError> {
     // Phase 8: open the .ibd (writes the 16-byte UUID header, cursor at 16).
     let mut ibd = IbdWriter::new(ibd_path, uuid)?;
@@ -181,9 +194,17 @@ fn run_pipeline(
     body.flush_body()?;
     let md5 = ibd.finish()?;
 
+    // Optical images (RIMG-02): export each embedded image member beside the `.imzML` and recover
+    // its descriptive attributes (inverse fold) for the `<sampleList>/<sample>` emit. SOFT posture
+    // (threat T-21-05 / CONTEXT): the WHOLE optical-export step is wrapped so any `Err` (a corrupt
+    // archive open, etc.) degrades to a `log::warn!` + an EMPTY samples slice — an auxiliary image
+    // must NEVER fail the spectral reverse (the `.imzML`/`.ibd` are already produced). A `None`/empty
+    // `images` block is a clean no-op (no `<sampleList>` is emitted — RIMG-03).
+    let samples = export_samples(archive, imzml_path, imaging.as_ref());
+
     // Assemble the real .imzML: header (with MD5 + UUID, structurally first) → body → trailer.
     let mut out = BufWriter::new(File::create(imzml_path).map_err(ReverseError::XmlEmit)?);
-    ImzmlWriter::write_header_to(&mut out, uuid, &md5, count, imaging.as_ref())?;
+    ImzmlWriter::write_header_to(&mut out, uuid, &md5, count, imaging.as_ref(), &samples)?;
     let mut body_rd = File::open(body_tmp).map_err(ReverseError::XmlEmit)?;
     // Bounded file→file copy (fixed stack buffer) — never buffers the whole body in RAM.
     std::io::copy(&mut body_rd, &mut out).map_err(ReverseError::XmlEmit)?;
@@ -219,6 +240,57 @@ fn body_temp_path(imzml_path: &Path) -> PathBuf {
         std::process::id()
     ));
     p
+}
+
+/// Export every embedded optical image beside the `.imzML` and recover its descriptive attributes
+/// for the `<sampleList>/<sample>` emit (RIMG-02), returning the `(exported_filename,
+/// RecoveredOptical)` list `write_header_to` consumes.
+///
+/// SOFT posture (threat T-21-05 / CONTEXT): images are AUXILIARY — this NEVER fails the spectral
+/// reverse. The whole step is fallible internally, but any failure (corrupt-archive open, no parent
+/// dir for the `.imzML`) degrades to a `log::warn!` + an EMPTY slice rather than propagating. An
+/// absent/empty `images` block, or a sanitize-rejected / missing individual member, simply
+/// contributes no sample (the per-member soft skip already happens inside `export_image_members`).
+fn export_samples(
+    archive: &Path,
+    imzml_path: &Path,
+    imaging: Option<&ImagingMetadata>,
+) -> Vec<(String, RecoveredOptical)> {
+    // No images → clean no-op (no <sampleList> will be emitted — RIMG-03).
+    let Some(images) = imaging.and_then(|m| m.images.as_deref()) else {
+        return Vec::new();
+    };
+    if images.is_empty() {
+        return Vec::new();
+    }
+
+    // Export beside the produced `.imzML`. A pathless `.imzML` (no parent) degrades to "." so the
+    // export still lands in the working dir rather than aborting.
+    let out_dir = imzml_path.parent().unwrap_or_else(|| Path::new("."));
+
+    match export_image_members(archive, out_dir, images) {
+        Ok(exported) => exported
+            .into_iter()
+            .filter_map(|(path, entry)| {
+                // The emitted IMS:1006008 value is the exported external FILENAME (the sample lives
+                // beside the `.imzML`); fall back to the whole path string if it has no file name.
+                let filename = path
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .map(str::to_string)
+                    .unwrap_or_else(|| path.to_string_lossy().into_owned());
+                Some((filename, recover_descriptive(entry)))
+            })
+            .collect(),
+        Err(e) => {
+            // Soft posture: a hard export error NEVER fails the spectral reverse (T-21-05).
+            log::warn!(
+                "reverse: optical image export failed; emitting no <sampleList> (spectral output \
+                 unaffected): {e}"
+            );
+            Vec::new()
+        }
+    }
 }
 
 #[cfg(test)]
@@ -459,6 +531,136 @@ mod tests {
                 "intensity element count round-reads"
             );
         }
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Build a 1-pixel imaging `.mzpeak` that ALSO embeds one optical-image ZIP member
+    /// (`images/image_0000.tiff`) and records a matching descriptive [`ImageEntry`] in
+    /// `metadata.imaging.images[]` (H&E staining, manual-landmark alignment, of-analysed subject,
+    /// tumor morphology — clean values that invert exactly). Returns `(archive_path, image_bytes)`.
+    fn imaging_archive_with_image(dir: &Path) -> (PathBuf, Vec<u8>) {
+        use crate::schema::metadata::{ImageAffine, ImageEntry};
+
+        let pixels = vec![ImagingSpectrum {
+            x: 2,
+            y: 4,
+            z: None,
+            mz: NumArray::F64(vec![100.0, 200.5]),
+            intensity: NumArray::F32(vec![10.0, 42.0]),
+            representation: Representation::Centroid,
+            ms_level: 1,
+            native_id: "spectrum=1".to_string(),
+        }];
+        let specs: Vec<MultiLayerSpectrum> = pixels
+            .iter()
+            .map(to_mzdata)
+            .collect::<Result<_, _>>()
+            .expect("reconstruct fixture spectra");
+        let geom = ImagingRunMetadata {
+            grid_x: Some(4),
+            grid_y: Some(3),
+            ..Default::default()
+        };
+
+        // Fake optical-image payload + its descriptive entry (folded as the forward path would).
+        let image_bytes: Vec<u8> = (0u32..4096).map(|i| (i % 251) as u8).collect();
+        let entry = ImageEntry {
+            archive_path: "images/image_0000.tiff".to_string(),
+            source_name: "optical_4x3.tiff".to_string(),
+            media_type: "image/tiff".to_string(),
+            width: 4,
+            height: 3,
+            sha256: String::new(),
+            size_bytes: image_bytes.len() as i64,
+            affine: ImageAffine::new([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]),
+            role: Some("optical".to_string()),
+            // Folded free-text (exactly what write::convert::map_descriptive produces).
+            derived_subtype: Some("of-analysed-sample: tumor".to_string()),
+            modality: Some("H&E; aligned: manual landmark".to_string()),
+        };
+
+        let out = dir.join("with_image.mzpeak");
+        write_seam_with_image(&out, &specs, Some(&geom), &image_bytes, entry);
+        (out, image_bytes)
+    }
+
+    /// Like [`write_seam`] but embeds one optical-image member into the ZIP and records its
+    /// [`ImageEntry`] on the `imaging` block before serializing the index.
+    fn write_seam_with_image(
+        out: &Path,
+        specs: &[MultiLayerSpectrum],
+        geom: Option<&ImagingRunMetadata>,
+        image_bytes: &[u8],
+        entry: crate::schema::metadata::ImageEntry,
+    ) {
+        use mzdata::meta::FileMetadataConfig;
+        use mzdata::prelude::SpectrumLike;
+
+        let sample_maps: Vec<&_> = specs.iter().filter_map(|s| s.raw_arrays()).collect();
+        let mut writer = ImagingWriter::new(out, &sample_maps).expect("open writer");
+        let source = FileMetadataConfig::default();
+        let prov = provenance();
+        writer
+            .write_run_metadata(&source, &prov, geom)
+            .expect("wire run metadata");
+        for mz_spec in specs {
+            writer.write_spectrum(mz_spec).expect("write spectrum");
+        }
+        writer
+            .ensure_chromatogram_facet()
+            .expect("ensure chromatogram facet");
+        let mut block = writer.imaging_metadata().expect("imaging block").clone();
+        // Record the embedded image in the index block (what the reverse path reads back).
+        block.images = Some(vec![entry.clone()]);
+        let mut zip = writer.finish_parquet().expect("finish parquet");
+        // Embed the raw image member at the entry's archive_path.
+        let mut rd = std::io::Cursor::new(image_bytes.to_vec());
+        zip.add_file_from_read(&mut rd, Some(&entry.archive_path), None)
+            .expect("embed optical image member");
+        zip.add_index_metadata("imaging", &block)
+            .expect("add imaging index metadata");
+        zip.finish().expect("finish zip");
+    }
+
+    /// RIMG-02 end-to-end: a reverse convert of an archive WITH one embedded optical image exports
+    /// the image beside the `.imzML` AND emits a `<sampleList>/<sample>` carrying IMS:1006008 (the
+    /// exported filename) + the recovered descriptive params (IMS:1006015 escaped H&amp;E,
+    /// IMS:1006017, IMS:1006011, IMS:1006013 tumor). Proves `run_pipeline` wires
+    /// `export_image_members` + the inverse fold into `write_header_to`.
+    #[test]
+    fn reverse_emits_optical_sample_list() {
+        let dir = tempdir();
+        let (archive, image_bytes) = imaging_archive_with_image(&dir);
+        let imzml = dir.join("out.imzML");
+        let ibd = dir.join("out.ibd");
+
+        convert(&imzml, &ibd, &archive).expect("reverse convert with image succeeds");
+
+        // The external image file was exported beside the `.imzML` with byte-identical content.
+        let exported = dir.join("optical_4x3.tiff");
+        assert!(exported.exists(), "the optical image was exported beside the .imzML");
+        assert_eq!(
+            std::fs::read(&exported).unwrap(),
+            image_bytes,
+            "exported image bytes equal the embedded member bytes"
+        );
+
+        // The `<sampleList>` re-emits IMS:1006008 + the recovered descriptive params.
+        let text = std::fs::read_to_string(&imzml).unwrap();
+        assert!(text.contains("<sampleList"), "sampleList emitted for an embedded image");
+        assert!(
+            text.contains("accession=\"IMS:1006008\"") && text.contains("value=\"optical_4x3.tiff\""),
+            "IMS:1006008 location = exported filename"
+        );
+        assert!(text.contains("value=\"H&amp;E\""), "staining escaped to H&amp;E");
+        assert!(text.contains("accession=\"IMS:1006017\""), "alignment re-emitted");
+        assert!(text.contains("value=\"manual landmark\""), "alignment value re-emitted");
+        assert!(text.contains("accession=\"IMS:1006011\""), "of-analysed subject re-emitted");
+        assert!(
+            text.contains("accession=\"IMS:1006013\"") && text.contains("value=\"tumor\""),
+            "morphology re-emitted"
+        );
 
         std::fs::remove_dir_all(&dir).ok();
     }
