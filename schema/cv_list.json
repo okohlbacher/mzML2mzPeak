@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "cv_list",
+  "description": "Controlled vocabularies referenced by the archive. Stored in the file-level metadata of the mzPeak archive (FileIndex.metadata.cv_list), analogous to mzML's <cvList>. Every CV code referenced by any column name or parameters entry MUST be declared here so a reader can resolve every accession to a declared, versioned ontology URI (spec Edit 2, CVL-01).",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string", "description": "CV code, e.g. MS, UO, IMS" },
+      "full_name": { "type": "string" },
+      "uri": { "type": "string", "format": "uri" },
+      "version": { "type": ["string", "null"] }
+    },
+    "required": ["id", "full_name", "uri"],
+    "additionalProperties": false
+  }
+}

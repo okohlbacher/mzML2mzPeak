@@ -20,11 +20,13 @@
 //! (metadata) fill their submodule bodies WITHOUT ever editing this file.
 
 pub mod columns;
+pub mod cv;
 pub mod geometry;
 pub mod metadata;
 pub mod tolerance;
 
 pub use columns::{ImagingColumnSpec, imaging_scan_fields};
+pub use cv::{CvEntry, cv_list};
 pub use geometry::{GeometryParseError, ImagingRunMetadata, parse_scan_settings};
 pub use metadata::ImagingMetadata;
 pub use tolerance::{ConformanceLevel, ToleranceContract};
