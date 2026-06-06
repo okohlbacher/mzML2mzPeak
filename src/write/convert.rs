@@ -394,7 +394,7 @@ pub fn convert_with(
 
                 for (path, mode, descriptive) in embed_list.iter() {
                     let key = canonical_key(path);
-                    if seen.iter().any(|k| *k == key) {
+                    if seen.contains(&key) {
                         // Already embedded this resolved file (e.g. --image X + imzML also → X) —
                         // embed once (OPT-04). A soft duplicate is silently skipped (not warned:
                         // it is intentional coexistence, not a defect).

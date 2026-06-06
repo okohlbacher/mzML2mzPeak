@@ -21,6 +21,9 @@
 pub mod report;
 pub mod compare;
 pub mod ion_image;
+// `verify::verify` holds the top-level orchestrator; the repeated name is intentional and the
+// public items are re-exported flat below.
+#[allow(clippy::module_inception)]
 pub mod verify;
 
 pub use ion_image::IonImage;

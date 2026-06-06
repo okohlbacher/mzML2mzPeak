@@ -165,13 +165,15 @@ pub fn to_mzdata_canonical(
 
     // (2) description: id + ms_level carried verbatim; signal_continuity from Representation
     //     (drives the writer's profile/centroid routing — never inferred from data shape).
-    let mut descr = SpectrumDescription::default();
-    descr.id = s.native_id.clone();
-    descr.ms_level = s.ms_level;
-    descr.signal_continuity = match s.representation {
-        Representation::Profile => SignalContinuity::Profile,
-        Representation::Centroid => SignalContinuity::Centroid,
-        Representation::Unknown => SignalContinuity::Unknown,
+    let mut descr = SpectrumDescription {
+        id: s.native_id.clone(),
+        ms_level: s.ms_level,
+        signal_continuity: match s.representation {
+            Representation::Profile => SignalContinuity::Profile,
+            Representation::Centroid => SignalContinuity::Centroid,
+            Representation::Unknown => SignalContinuity::Unknown,
+        },
+        ..Default::default()
     };
 
     // (3) coordinate params on a scan event — the writer reads these by accession at write
@@ -280,53 +282,6 @@ fn intensity_as_f32(arr: &NumArray) -> Vec<f32> {
     }
 }
 
-/// Re-encode one [`NumArray`] into a dtype-PRESERVING [`DataArray`]. `F32 → Float32`,
-/// `F64 → Float64`. `update_buffer` asserts the dtype size matches the element size, so no
-/// widening/narrowing can occur. NEVER calls `as_f64()` (lossy for F32).
-///
-/// Phase 16 (DTY-01): the forward profile `spectra_data` facet no longer uses this — it emits
-/// canonical widths via [`num_to_dataarray_f64`] / [`num_to_dataarray_f32`]. This preserving
-/// form is retained for any FUTURE non-data-facet caller that needs a source-width array (e.g.
-/// a strict-width auxiliary array). `#[allow(dead_code)]` while no such caller exists.
-///
-/// `update_buffer`'s dtype/size invariant is statically guaranteed at BOTH call sites
-/// (F32→Float32, F64→Float64), so the encode is unreachable-failure today. But because it could
-/// run in a per-spectrum write hot loop and depends on an UPSTREAM `update_buffer` contract we
-/// do not own (a future rev could add an alignment/capacity check), we surface a typed
-/// [`WriteError::Io`] rather than `expect`-panicking — consistent with the module's
-/// "always surface a typed `WriteError`" discipline.
-#[allow(dead_code)]
-fn num_to_dataarray(
-    name: ArrayType,
-    unit: Unit,
-    arr: &NumArray,
-) -> Result<DataArray, WriteError> {
-    let mut da = match arr {
-        NumArray::F32(v) => {
-            let mut da = DataArray::wrap(&name, BinaryDataArrayType::Float32, Vec::new());
-            da.update_buffer(v.as_slice()).map_err(|e| {
-                WriteError::Io(std::io::Error::other(format!(
-                    "encoding {name:?} (Float32) array failed: {e}"
-                )))
-            })?;
-            da
-        }
-        NumArray::F64(v) => {
-            let mut da = DataArray::wrap(&name, BinaryDataArrayType::Float64, Vec::new());
-            da.update_buffer(v.as_slice()).map_err(|e| {
-                WriteError::Io(std::io::Error::other(format!(
-                    "encoding {name:?} (Float64) array failed: {e}"
-                )))
-            })?;
-            da
-        }
-    };
-    // Tag the canonical unit so the writer's column matching (which keys on array_type + dtype
-    // + unit) routes the array into the POINT columns rather than auxiliary storage.
-    da.unit = unit;
-    Ok(da)
-}
-
 /// Encode a [`NumArray`] into a canonical **Float64** [`DataArray`] for the m/z data facet
 /// (Phase 16, DTY-01/DTY-02). An `F64` source is emitted verbatim; an `F32` source is WIDENED
 /// via [`NumArray::as_f64`] — exact / value-equal (every f32 is representable in f64, no
@@ -334,7 +289,7 @@ fn num_to_dataarray(
 /// is uniform regardless of source width (no per-spectrum derived width).
 ///
 /// Surfaces a typed [`WriteError::Io`] (not a panic) on the unreachable `update_buffer` failure,
-/// matching `num_to_dataarray`'s discipline.
+/// consistent with the module's "always surface a typed `WriteError`" discipline.
 fn num_to_dataarray_f64(
     name: ArrayType,
     unit: Unit,

@@ -118,6 +118,9 @@ fn hex_lower(bytes: &[u8]) -> String {
 /// is not triggered; `metadata.rs` / `schema/imaging.json` are unchanged). Builds the
 /// full-extent `affine` via [`ImageAffine::new`] and sets `role=Some("optical")`;
 /// `derived_subtype`/`modality` stay `None` here (Plan 02 maps the descriptive attrs).
+// A flat field-by-field constructor for `ImageEntry`; grouping args into a struct would just
+// duplicate `ImageEntry`'s own shape, so the parameter count is intentional.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn build_image_entry(
     archive_path: String,
     source_name: String,
@@ -281,6 +284,14 @@ pub(crate) fn read_jpeg_dimensions(path: &Path) -> Result<(u32, u32), WriteError
             && marker != 0xC8
             && marker != 0xCC;
         if is_sof {
+            // A real SOF payload is precision(1) + height(2) + width(2) + … so `len` (which counts
+            // its own 2 bytes) must be ≥ 7. Without this guard a crafted short SOF (e.g. len=4)
+            // would read precision/H/W from the FOLLOWING segment's bytes and return fabricated
+            // dimensions — a silently misregistered affine. Reject it; the caller's best-effort
+            // path then falls back to the honest dimensionless (0/0) embed.
+            if len < 7 {
+                return Err(err(format!("JPEG SOF segment too short: len {len}")));
+            }
             let _precision = byte(&mut r)?;
             let h = u16::from_be_bytes([byte(&mut r)?, byte(&mut r)?]) as u32;
             let w = u16::from_be_bytes([byte(&mut r)?, byte(&mut r)?]) as u32;
@@ -295,11 +306,11 @@ pub(crate) fn read_jpeg_dimensions(path: &Path) -> Result<(u32, u32), WriteError
 /// Map a file extension (case-insensitive, no leading dot) to an IANA media type for the
 /// verbatim-embed path (Phase 20 / OPT-01).
 ///
-/// `"tif"`/`"tiff"` → `"image/tiff"`; `"svs"` → `"image/tiff"` (Aperio is TIFF-based);
-/// `"png"` → `"image/png"`; `"jpg"`/`"jpeg"` → `"image/jpeg"`; anything else →
-/// `"application/octet-stream"` (the safe default for an unknown verbatim blob).
-// Consumed by Plan 02's convert.rs auto-discovery seam; only this module's tests call it now.
-#[allow(dead_code)]
+/// Live fallback for the `ImageFormat::Other` embed arm in `convert.rs` (TIFF/PNG/JPEG get their
+/// media type straight from [`detect_format`]; this covers everything else). `"tif"`/`"tiff"`/`"svs"`
+/// → `"image/tiff"`, `"png"` → `"image/png"`, `"jpg"`/`"jpeg"` → `"image/jpeg"` are retained so an
+/// extension still resolves sensibly; anything else → `"application/octet-stream"` (the safe default
+/// for an unknown verbatim blob).
 pub(crate) fn media_type_for_extension(ext: &str) -> String {
     match ext.to_ascii_lowercase().as_str() {
         "tif" | "tiff" => "image/tiff",
@@ -537,6 +548,17 @@ mod tests {
     fn read_jpeg_dimensions_no_sof_errors() {
         // SOI then immediate EOI — no frame header.
         let p = write_tmp("jpeg_nosof", &[0xFF, 0xD8, 0xFF, 0xD9]);
+        assert!(matches!(read_jpeg_dimensions(&p), Err(WriteError::ImageDecode { .. })));
+        std::fs::remove_file(&p).ok();
+    }
+
+    /// read_jpeg_dimensions: a SOF marker with an under-length segment (len < 7) must ERROR rather
+    /// than fabricating dimensions from the following segment's bytes (review finding #1).
+    #[test]
+    fn read_jpeg_dimensions_short_sof_errors() {
+        // SOI, then SOF0 declaring len=4 (too short for precision+H+W), then trailing bytes that a
+        // buggy parser would misread as height/width.
+        let p = write_tmp("jpeg_shortsof", &[0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x04, 0xFF, 0xC0, 0x01, 0x90]);
         assert!(matches!(read_jpeg_dimensions(&p), Err(WriteError::ImageDecode { .. })));
         std::fs::remove_file(&p).ok();
     }

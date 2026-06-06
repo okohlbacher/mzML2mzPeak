@@ -148,7 +148,7 @@ fn permute_arrays(arrays: &mut BinaryArrayMap, perm: &[usize]) -> Result<(), Mzm
         let decoded = da
             .decode()
             .map_err(|e| MzmlConvertError::SortPeaks(format!("decode failed: {e}")))?;
-        let n = if width == 0 { 0 } else { decoded.len() / width };
+        let n = decoded.len().checked_div(width).unwrap_or(0);
         if n != perm.len() || width == 0 {
             // Not a parallel column of the primary axis — keep verbatim.
             rebuilt.push(DataArray::wrap(&da.name, da.dtype, decoded.to_vec()));
@@ -199,9 +199,9 @@ pub fn convert_mzml_with(
     let mut builder = MzPeakWriterType::<File>::builder();
     // Output-size encoding knobs (chunked m/z, zstd level, row groups). Compression is always set
     // (legacy → writer-default zstd, unchanged); chunking/row-group only when requested.
-    if let Some(chunk) = opts.mz_chunking.clone() {
+    if let Some(chunk) = opts.mz_chunking {
         builder = builder
-            .chunked_encoding(Some(chunk.clone()))
+            .chunked_encoding(Some(chunk))
             .chromatogram_chunked_encoding(Some(chunk));
     }
     builder = builder.compression(opts.compression());
@@ -243,7 +243,7 @@ pub fn convert_mzml_with(
                 Some(peaks) => Some(
                     peaks
                         .iter()
-                        .map(|p| mzpeaks::CoordinateLike::<mzpeaks::MZ>::coordinate(p))
+                        .map(mzpeaks::CoordinateLike::<mzpeaks::MZ>::coordinate)
                         .collect(),
                 ),
                 None => entry.arrays.as_ref().and_then(|a| a.mzs().ok().map(|c| c.to_vec())),

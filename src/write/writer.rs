@@ -9,7 +9,7 @@
 //!      `add_spectrum_scan_field(CustomBuilderFromParameter::from_spec(..))`, with ZERO edits
 //!      to any core `mzpeak_prototyping` struct (CONTEXT Area 1, OUT-02). `from_spec` only
 //!      accepts `Int64` for these; all three specs already declare `DataType::Int64`.
-//!   1b. **Data-column registration (DAT-01).** At `new`, the spectra_data POINT columns are
+//!   2. **Data-column registration (DAT-01).** At `new`, the spectra_data POINT columns are
 //!      DERIVED FROM SAMPLE SPECTRA — exactly as the reference converter does
 //!      (`examples/convert.rs:414` → `sample_array_types_from_spectrum_source` →
 //!      `array_map_to_schema_arrays`, writer.rs:130). We feed the reconstructed first
@@ -24,12 +24,12 @@
 //!      zero-intensity-run masking on `build(_, true)`, panicking
 //!      `array_buffer.rs:356` with mismatched record-batch column lengths) — so we register only
 //!      widths present in the sampled spectra. See [`data_facet_fields_from_samples`].
-//!   2. **Metadata mapping (OUT-03).** `write_run_metadata` copies source PSI-MS + IMS
+//!   3. **Metadata mapping (OUT-03).** `write_run_metadata` copies source PSI-MS + IMS
 //!      metadata, records `mzml2mzpeak` conversion provenance, and maps [`RunProvenance`]
 //!      into `file_description` by IMS accession (SPA-04). It ALSO assembles + stores the
 //!      `metadata.imaging` block (exposed via [`ImagingWriter::imaging_metadata`]) — but does
 //!      NOT insert it into the archive index. (See module note on the finish seam.)
-//!   3. **Finish seam.** [`ImagingWriter::finish_parquet`] flushes Parquet and hands the
+//!   4. **Finish seam.** [`ImagingWriter::finish_parquet`] flushes Parquet and hands the
 //!      still-open `ZipArchiveWriter` to Plan 03, which runs
 //!      `add_index_metadata("imaging", &block)` then `finish()` (RESEARCH.md Q4, RESOLVED).
 //!      This file deliberately defines NO plain index-writing `finish()` — doing so would
@@ -127,11 +127,11 @@ pub enum WriteError {
     #[error("imaging metadata block not wired — call write_run_metadata before imaging_metadata")]
     MetadataNotWired,
 
-    /// A `--image` TIFF could not be read for its dimensions (IMG-04). Surfaced as a typed,
-    /// actionable failure (not a panic) when `tiff::Decoder::new`/`dimensions()` rejects a
-    /// malformed / non-TIFF / unreadable file. Carries the offending path and the underlying
-    /// decoder error string. (Constructed in [`crate::write::image::read_tiff_dimensions`].)
-    #[error("failed to read TIFF dimensions for {path}: {detail}")]
+    /// An optical `--image` (or auto-discovered image) could not be read — wrong/unreadable file,
+    /// or malformed header for its detected format (TIFF/PNG/JPEG). Surfaced as a typed, actionable
+    /// failure (not a panic). Carries the offending path and the underlying cause; `detail` names the
+    /// specific format/reason. (Constructed across [`crate::write::image`]'s readers + `detect_format`.)
+    #[error("failed to read image dimensions for {path}: {detail}")]
     ImageDecode { path: String, detail: String },
 
     /// A `--image` was supplied but the MS pixel grid count (`Nx`×`Ny`) could not be
@@ -194,9 +194,9 @@ impl ImagingWriter {
         // Output-size knobs. Chunked encoding applies to both the spectrum m/z axis and the
         // (empty) chromatogram time axis. Compression is always set (legacy maps to the writer's
         // default zstd, so behaviour is unchanged). Row-group size is only overridden when set.
-        if let Some(chunk) = opts.mz_chunking.clone() {
+        if let Some(chunk) = opts.mz_chunking {
             builder = builder
-                .chunked_encoding(Some(chunk.clone()))
+                .chunked_encoding(Some(chunk))
                 .chromatogram_chunked_encoding(Some(chunk));
         }
         builder = builder.compression(opts.compression());

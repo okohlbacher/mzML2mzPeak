@@ -91,6 +91,7 @@ pub fn first_mismatch_f32(
 ///     needed and run through [`first_mismatch_f64`].
 ///   - output `F32` → compare at f32; the source is NARROWED f64→f32 when needed and run
 ///     through [`first_mismatch_f32`] (the rel-err cast to f32).
+///
 /// This NEVER widens the OUTPUT to f64 to mask a difference — it coerces the SOURCE to the
 /// output's (canonical) width, so the comparison happens at the stored output width.
 ///

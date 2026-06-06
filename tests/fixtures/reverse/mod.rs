@@ -31,6 +31,10 @@
 //! Both builders are deterministic. Cleanup is the CALLER's responsibility: each helper
 //! returns the path; the Plan-02 tests remove the file when done.
 
+// Shared test fixtures: each consuming test binary uses a SUBSET of these builders, so any single
+// binary's compile flags the unused remainder. The helpers are live across the suite as a whole.
+#![allow(dead_code)]
+
 use std::path::{Path, PathBuf};
 
 use mzml2mzpeak::read::record::{ImagingSpectrum, NumArray, Representation};
@@ -116,8 +120,7 @@ fn write_seam(
 /// archive resolves IMS:1000050 / IMS:1000051 by accession and carries a `metadata.imaging`
 /// block (geometry provided → `pixel_count` lands too). Caller removes the returned file.
 pub fn imaging_archive() -> PathBuf {
-    let pixels = vec![
-        ImagingSpectrum {
+    let pixels = [ImagingSpectrum {
             x: 3,
             y: 7,
             z: None,
@@ -136,8 +139,7 @@ pub fn imaging_archive() -> PathBuf {
             representation: Representation::Centroid,
             ms_level: 1,
             native_id: "spectrum=2".to_string(),
-        },
-    ];
+        }];
 
     let specs: Vec<MultiLayerSpectrum> = pixels
         .iter()

@@ -19,7 +19,6 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 use mzdata::io::mzml::MzMLWriter;
-use mzdata::prelude::SpectrumWriter;
 use mzdata::spectrum::bindata::{ArrayType, BinaryArrayMap, BinaryDataArrayType, DataArray};
 use mzdata::spectrum::{MultiLayerSpectrum, SignalContinuity, SpectrumDescription};
 use mzdata::params::Unit;

@@ -533,14 +533,14 @@ fn uniform_f64_mz_f32_intensity_with_zero_runs_no_panic() {
         assert_eq!(got_mz.len(), got_int.len(), "m/z and intensity stay paired after masking");
         for &m in got_mz.iter() {
             assert!(
-                src_mz.iter().any(|&v| v == m),
+                src_mz.contains(&m),
                 "read-back m/z {m} is an exact f64 source value at canonical width at ({},{})",
                 s.x, s.y
             );
         }
         for &v in got_int.iter() {
             assert!(
-                src_int.iter().any(|&w| w == v),
+                src_int.contains(&v),
                 "read-back intensity {v} is an exact f32 source value at canonical width at ({},{})",
                 s.x, s.y
             );

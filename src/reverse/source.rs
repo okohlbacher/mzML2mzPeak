@@ -260,8 +260,7 @@ mod tests {
     /// Build a 2-pixel imaging archive: pixel 0 Profile (F64 m/z, F32 intensity) at (3,7), pixel 1
     /// Centroid at (11,5). Returns its path; caller removes it.
     fn imaging_archive() -> PathBuf {
-        let pixels = vec![
-            ImagingSpectrum {
+        let pixels = [ImagingSpectrum {
                 x: 3,
                 y: 7,
                 z: None,
@@ -280,8 +279,7 @@ mod tests {
                 representation: Representation::Centroid,
                 ms_level: 1,
                 native_id: "spectrum=2".to_string(),
-            },
-        ];
+            }];
         let specs: Vec<MultiLayerSpectrum> = pixels
             .iter()
             .map(to_mzdata)

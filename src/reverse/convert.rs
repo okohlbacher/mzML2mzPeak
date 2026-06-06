@@ -271,7 +271,7 @@ fn export_samples(
     match export_image_members(archive, out_dir, images) {
         Ok(exported) => exported
             .into_iter()
-            .filter_map(|(path, entry)| {
+            .map(|(path, entry)| {
                 // The emitted IMS:1006008 value is the exported external FILENAME (the sample lives
                 // beside the `.imzML`); fall back to the whole path string if it has no file name.
                 let filename = path
@@ -279,7 +279,7 @@ fn export_samples(
                     .and_then(|s| s.to_str())
                     .map(str::to_string)
                     .unwrap_or_else(|| path.to_string_lossy().into_owned());
-                Some((filename, recover_descriptive(entry)))
+                (filename, recover_descriptive(entry))
             })
             .collect(),
         Err(e) => {
@@ -360,8 +360,7 @@ mod tests {
 
     /// A 2-pixel imaging `.mzpeak` archive (Profile + Centroid), F64 m/z + F32 intensity.
     fn imaging_archive(dir: &Path) -> PathBuf {
-        let pixels = vec![
-            ImagingSpectrum {
+        let pixels = [ImagingSpectrum {
                 x: 3,
                 y: 7,
                 z: None,
@@ -380,8 +379,7 @@ mod tests {
                 representation: Representation::Centroid,
                 ms_level: 1,
                 native_id: "spectrum=2".to_string(),
-            },
-        ];
+            }];
         let specs: Vec<MultiLayerSpectrum> = pixels
             .iter()
             .map(to_mzdata)
@@ -542,7 +540,7 @@ mod tests {
     fn imaging_archive_with_image(dir: &Path) -> (PathBuf, Vec<u8>) {
         use crate::schema::metadata::{ImageAffine, ImageEntry};
 
-        let pixels = vec![ImagingSpectrum {
+        let pixels = [ImagingSpectrum {
             x: 2,
             y: 4,
             z: None,

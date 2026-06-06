@@ -678,10 +678,10 @@ pub fn classify_exit(e: &anyhow::Error) -> ExitCode {
             return ExitCode::from(EXIT_UNSUPPORTED);
         }
     }
-    if let Some(we) = e.downcast_ref::<crate::write::WriteError>() {
-        if let crate::write::WriteError::Read(ReadError::UnsupportedDtype { .. }) = we {
-            return ExitCode::from(EXIT_UNSUPPORTED);
-        }
+    if let Some(crate::write::WriteError::Read(ReadError::UnsupportedDtype { .. })) =
+        e.downcast_ref::<crate::write::WriteError>()
+    {
+        return ExitCode::from(EXIT_UNSUPPORTED);
     }
     if let Some(ie) = e.downcast_ref::<IntegrityError>() {
         return classify_integrity_error(ie);
@@ -711,10 +711,10 @@ pub fn classify_exit(e: &anyhow::Error) -> ExitCode {
     }
 
     // 4) Integrity reached only through a WriteError::Read(ReadError::Integrity) wrapping.
-    if let Some(we) = e.downcast_ref::<crate::write::WriteError>() {
-        if let crate::write::WriteError::Read(re) = we {
-            return classify_read_error(re);
-        }
+    if let Some(crate::write::WriteError::Read(re)) =
+        e.downcast_ref::<crate::write::WriteError>()
+    {
+        return classify_read_error(re);
     }
 
     ExitCode::from(EXIT_GENERIC)

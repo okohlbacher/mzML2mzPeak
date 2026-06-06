@@ -541,6 +541,9 @@ impl ImzmlWriter {
     /// `<binaryDataArrayList count="2">` (m/z first, then intensity). Each array carries its dtype
     /// CV term, no-compression `MS:1000576`, the array-type term, the Phase-8
     /// `IMS:1000102/103/104` triple, and an empty `<binary/>`. Never accumulates (T-09-MEM).
+    // The per-spectrum coordinate/offset fields are passed flat by the streaming caller; bundling
+    // them into a struct would add an allocation per spectrum in the hot loop for no clarity gain.
+    #[allow(clippy::too_many_arguments)]
     pub fn write_spectrum(
         &mut self,
         index: u64,

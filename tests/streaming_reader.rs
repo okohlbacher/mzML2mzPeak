@@ -68,7 +68,7 @@ fn processed_streams_committed_fixture() {
     for item in reader.by_ref() {
         let s = item.expect("processed spectrum decodes");
         count += 1;
-        assert!(s.mz.len() > 0, "non-empty m/z");
+        assert!(!s.mz.is_empty(), "non-empty m/z");
         assert_eq!(s.intensity.len(), s.mz.len(), "axes equal length");
         // Per-axis dtype carry: synthetic fixture declares m/z 64-bit, intensity 32-bit.
         assert!(matches!(s.mz, NumArray::F64(_)), "processed m/z F64 (dtype carried)");

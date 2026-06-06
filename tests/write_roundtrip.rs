@@ -364,8 +364,8 @@ fn convert_ms_level_zero_imzml_does_not_panic() {
     let _ = std::fs::remove_file(&out);
     let reader = ImagingReader::open(continuous).expect("open committed continuous fixture");
     convert(reader, &out, &[]).expect("forward convert of an ms_level-0 imzML must NOT panic");
-    let mut r = MzPeakReader::new(&out).expect("reader opens the convert() output");
-    assert!(r.len() > 0, "converted archive has spectra");
+    let r = MzPeakReader::new(&out).expect("reader opens the convert() output");
+    assert!(!r.is_empty(), "converted archive has spectra");
     let _ = std::fs::remove_file(&out);
 }
 
