@@ -98,7 +98,7 @@ Bring the forward converter into mzPeak spec conformance:
 
 ### Optical image auto-discovery & auto-embed (OPT) — Phase 20
 
-- [ ] **OPT-01**: On forward conversion, the converter parses the source imzML's `IMS:1006008` (optical
+- [x] **OPT-01**: On forward conversion, the converter parses the source imzML's `IMS:1006008` (optical
   image location) reference, resolves the URI/path relative to the input `.imzML`, and automatically
   embeds the referenced optical image as an `images/image_NNNN.<ext>` ZIP member — **no manual
   `--image` flag required**. Reuses the v0.5 embedding machinery (member + sha256 + size + affine in
@@ -186,7 +186,7 @@ GEO×3, SRC×2, OPT×4, RIMG×3). No orphans, no duplicates.
 | GEO-03 | Phase 18 | Complete |
 | SRC-01 | Phase 19 | Complete |
 | SRC-02 | Phase 19 | Complete |
-| OPT-01 | Phase 20 | Pending |
+| OPT-01 | Phase 20 | Complete |
 | OPT-02 | Phase 20 | Pending |
 | OPT-03 | Phase 20 | Pending |
 | OPT-04 | Phase 20 | Pending |

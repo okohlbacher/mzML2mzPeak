@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: — Spec conformance — dtypes + CV/geometry/provenance
 status: verifying
-stopped_at: Completed 19-01-PLAN.md (SRC-01/SRC-02 — file_description.source_files[] lists .imzML + .ibd; the .ibd carries the reused UUID/checksum CURIE params, no second hash. Phase 19 complete 1/1).
-last_updated: "2026-06-06T03:02:03.118Z"
+stopped_at: Completed 19-01-PLAN.md (SRC-01/SRC-02 — source_files[] .imzML + .ibd, reused UUID/checksum, no second hash. Phase 19 complete 1/1).
+last_updated: "2026-06-06T03:29:50.110Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 10
-  completed_plans: 10
+  total_plans: 13
+  completed_plans: 11
   percent: 67
 ---
 
@@ -98,6 +98,7 @@ matching `schema/*.json`.
 | Phase 18 P02 | 10min | 2 tasks | 3 files |
 | Phase 18 P03 | 6min | 2 tasks | 1 files |
 | Phase 19 P01 | ~10min | 2 tasks | 5 files |
+| Phase 20 P01 | 12min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -154,6 +155,8 @@ Key file touchpoints for Phase 16 (from the milestone scoping):
 - [Phase 18]: Plan 18-02: metadata.imaging geometry (incl. absolute_offset_um) is a derived copy of the same ImagingRunMetadata that builds scan_settings_list (GEO-02 single source of truth)
 - [Phase 19]: Plan 19-01 (SRC-01/SRC-02): forward archive emits file_description.source_files[] — two entries: the input .imzML (id="imzml") + sibling .ibd (id="ibd", stem+.ibd, path-strings only, no open/hash). The .ibd entry's params carry the source UUID (IMS:1000080) + checksum CURIE (IMS:1000090 MD5 / IMS:1000091 SHA-1 / IMS:1000092 SHA-256) REUSED verbatim from RunProvenance — NO compute_digest on the write path (SRC-02). Threaded via NEW write_run_metadata_from(input_path: Option<&Path>) + convert_with(.., input_path) (mirrors Phase-18 geometry threading); back-compat write_run_metadata / convert() pass None ⇒ no source_files (existing callers byte-identical). A SHARED checksum_curie_param keys MD5/SHA-1/SHA-256 (dashed + un-dashed mzdata "SHA1"/"SHA256") for BOTH the contents mapping and the .ibd source-file params so they can't drift (added SHA-256→IMS:1000092 to the existing keying). source_files is ADDITIVE — contents UUID/checksum/mode untouched. Vendor raw file omitted (SHOULD, unavailable). Read-back proof: tests/source_files.rs (Example_Processed, path-threaded convert_with seam). Spec Edit 10 clarified. Phase 19 complete (1/1).
 - [Phase 18]: Plan 18-03 (GEO-03): tests/scan_settings.rs locks the two-level proof. Level 1 (non-vacuous) parses Synthetic_FullGeometry (declared 3×3/100µm/300µm + IMS:1000413) into BOTH scan_settings_list_from_geometry AND the derived imaging block (reached via the PUBLIC ImagingWriter::write_run_metadata + imaging_metadata() seam, since assemble_imaging_metadata is pub(crate)) and asserts geometry equality + correct IMS accessions + UO:0000017 µm unit (µm terms unit-bearing; grid + scan-pattern unitless). Level 2 converts Example_Processed via convert_with(Some(&geom)) (NOT the convert() wrapper, which passes None and omits the key) and asserts a well-formed scan_settings_list (id + parameters[]) in MzPeakReader.file_index().metadata. Two-fixture split documented (no fixture pairs a declared grid with an .ibd). Phase 18 complete (3/3).
+- [Phase ?]: Phase 20: optical decode_latin1 also XML-unescapes (H&amp;E to H&E); geometry numeric values never needed it.
+- [Phase ?]: Phase 20: is_tiff detects by magic bytes not extension so Aperio .svs gets TIFF dimensions.
 
 ### Pending Todos
 
@@ -191,7 +194,7 @@ Items acknowledged and carried forward to v0.7+:
 
 ## Session Continuity
 
-Last session: 2026-06-06T03:02:03.118Z
+Last session: 2026-06-06T03:28:01.912Z
 Stopped at: Completed 19-01-PLAN.md (SRC-01/SRC-02 — source_files[] .imzML + .ibd, reused UUID/checksum, no second hash. Phase 19 complete 1/1).
 Resume file: None
 

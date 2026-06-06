@@ -145,9 +145,11 @@ Plans:
   4. Auto-discovered and explicit `--image` images coexist without collision (deterministic `image_NNNN` ordering; the same resolved path is never embedded twice).
 
 **Plans**: 3 plans
-- [ ] 20-01-PLAN.md — parse_optical_images + path resolution + generalize image.rs embed beyond TIFF (OPT-01)
+
+- [x] 20-01-PLAN.md — parse_optical_images + path resolution + generalize image.rs embed beyond TIFF (OPT-01)
 - [ ] 20-02-PLAN.md — convert.rs auto-discovery + descriptive mapping + soft-fail + coexist/dedup/order (OPT-02/03/04)
 - [ ] 20-03-PLAN.md — synthetic IMS:1006008 fixtures + end-to-end tests + Edit 7 spec extension (OPT-01..04 acceptance)
+
 **UI hint**: yes
 
 ### Phase 21: Reverse optical image export
@@ -177,7 +179,7 @@ Plans:
 | 17. cv_list file-level CV declaration | v0.6 | 2/2 | Complete   | 2026-06-06 |
 | 18. scan_settings_list authoritative geometry facet | v0.6 | 3/3 | Complete |  |
 | 19. source_files[] provenance | v0.6 | 1/1 | Complete   | 2026-06-06 |
-| 20. Optical image auto-discovery & auto-embed | v0.6 | 0/3 | Planned | - |
+| 20. Optical image auto-discovery & auto-embed | v0.6 | 1/3 | In Progress|  |
 | 21. Reverse optical image export | v0.6 | 0/? | Not started | - |
 
 ## Next
