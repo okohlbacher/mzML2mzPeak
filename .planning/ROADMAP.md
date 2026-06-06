@@ -136,25 +136,22 @@ ours (`src/write/image.rs`), NOT a vendored-fork concern — independent of 999.
 Plans:
 - [ ] TBD (promote with `/gsd:review-backlog` when ready)
 
-### Phase 999.3: Vendor raw-file input support (Thermo .raw / Bruker .d / Sciex .wiff / …) (BACKLOG)
+### Phase 999.3: Complete the raw → mzML → mzPeak size/compression benchmark (BACKLOG)
 
-**Goal:** Let the converter ingest **vendor raw** files (not just `.imzML`/`.mzML`/`.mzpeak`), so the
-benchmarking corpus can include native instrument output and exercise a raw → mzPeak path.
+**Goal:** Finish acquiring vendor **raw** file *sizes* (and the files where cheap) to complete the
+size/compression-ratio benchmark in `data/raw-examples/README.md`. **NOT a conversion feature** — the
+converter intentionally does NOT ingest raw formats; raw is a size reference only. The clean project
+metric (**mzPeak/mzML**) is already complete for all 18 mzML datasets (mzPeak is 0.07×–0.65× of mzML).
 
-**Surfaced by:** the 2026-06-06 raw-file survey (see `data/raw-examples/README.md`). The CLI currently
-rejects raw at direction inference ("cannot infer direction from …raw"); it only knows three extensions.
-mzdata is built with **`bruker_tdf`** (Bruker `.d`/TDF *readable*) but the CLI doesn't route `.d` to it,
-and no Thermo/Sciex/Agilent/Waters mzdata features are enabled.
+**Surfaced by:** the 2026-06-06 raw survey (`data/raw-examples/README.md`). Done so far: 3 single-file
+Thermo `.raw` acquired (LTQ XL 70 MB, Velos 210 MB, FT-ICR 221 MB) + the full mzPeak/mzML table.
 
-**Scope sketch (incremental):**
-1. CLI: recognize raw input extensions and route forward-conversion through mzdata's vendor readers.
-   **Start with Bruker `.d`/TDF** — the one capability already linked in (`bruker_tdf`).
-2. Enable additional `mzdata` vendor features as needed (Thermo raw, etc.) — each is a dependency /
-   build-complexity decision (some need vendor libs / .NET; the pure-Rust Thermo reader is an option).
-3. `scripts/fetch-raw-examples.sh` (gated, like the GBM sections) using the confirmed URLs in
-   `data/raw-examples/README.md`. Confirmed-easy: Thermo `.raw` from PRIDE (PXD059878 70 MB seeded,
-   PXD000001 210 MB) + MetaboLights MTBLS3512. Directory formats (Bruker `.d`, Waters `.raw`,
-   Agilent `.D`) need zip/subtree handling. Sciex PXD066465 is mzML-only (no raw).
+**Remaining (size-reference only, optional):**
+1. Directory-format raw sizes — Bruker `.d` (timsTOF/micrOTOF/impact), Waters `.raw`, Agilent `.D` —
+   need zip/subtree size probing per repo.
+2. Multi-GB Astral `.raw` (MSV000100943) — record size without pulling 6 GB.
+3. Optional `scripts/fetch-raw-examples.sh` (gated, like the GBM sections) for reproducibility, using the
+   confirmed URLs. Sciex PXD066465 is mzML-only (no raw to fetch).
 
 **Requirements:** TBD
 **Plans:** 0 plans
