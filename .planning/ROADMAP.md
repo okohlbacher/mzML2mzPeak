@@ -102,6 +102,34 @@ diverges in exactly **3 source files**, each a fix for real-world imzML the refe
 distinct fixes, not one. All three are small, self-contained, well-commented (good PRs). Bumping the git rev
 `d1aaaf84 → 4843d88` is safe but cosmetic (doc-only).
 
+**Addendum (corpus optical-injection testing, 2026-06-06):** patch #3 (`writer/visitor.rs` ms_level-0
+default) logs the `"defaulting to MS1 spectrum (MS:1000579)"` warning **once per spectrum** — a centroid
+imzML with no spectrum-type cvParam (e.g. the Zenodo DESI sections, ~17,820 spectra each) emits ~17,820
+identical lines. Make it **log once** (rate-limit / first-occurrence flag) when upstreaming patch #3.
+
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with `/gsd:review-backlog` when ready)
+
+### Phase 999.2: Read JPEG/PNG dimensions for non-TIFF optical images (BACKLOG)
+
+**Goal:** When a non-TIFF optical image is embedded (forward `--image` or `IMS:1006008` auto-discovery),
+read its pixel dimensions so the full-extent affine is meaningful. Currently only TIFF (incl. Aperio
+`.svs`, via the first-IFD reader) gets width/height; **JPEG/PNG embed losslessly but with `width=height=0`
+and a degenerate zero-scale affine `[0,0,1,0,0,1]`** (`registration_quality:"assumed_full_extent"`), so the
+image is preserved but NOT spatially registered.
+
+**Surfaced by:** corpus optical-injection testing (2026-06-06) — all 7 Zenodo DESI sections inject their
+`.jpg` optical photos losslessly (bytes + sha256 + `role=optical`) but land `0×0` with a degenerate affine.
+TIFF/`.svs` sources are fine (PXD001283 904×482, GBM `.svs` 34199×22614, LA-ESI 1600×1200 — real affines).
+
+**Fix sketch:** in `src/write/image.rs`, add cheap header parsers — JPEG `SOF0/2` marker (width/height
+big-endian after the marker), PNG `IHDR` (first chunk) — alongside the existing `read_tiff_dimensions`;
+pick by magic bytes. Then `full_extent_affine` produces a real mapping for JPEG/PNG too. Implementation is
+ours (`src/write/image.rs`), NOT a vendored-fork concern — independent of 999.1.
+
 **Requirements:** TBD
 **Plans:** 0 plans
 
