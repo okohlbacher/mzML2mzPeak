@@ -17,6 +17,8 @@ Convert an arbitrary imzML imaging dataset into a valid imaging mzPeak file **wi
 - **`cv_list` (F3):** file-level CV declaration (spec Edit 2).
 - **`scan_settings_list` (F4):** authoritative geometry facet; the index block becomes a derived copy (spec Edit 3).
 - **`source_files[]` (F5):** source-file provenance (spec Edit 10).
+- **Optical image auto-discovery + auto-embed:** follow the source imzML's `IMS:1006008` "optical image location" reference and embed the referenced image automatically (no manual `--image`), capturing the descriptive optical CV attributes.
+- **Reverse optical image export:** write embedded optical-image members back out as external files + re-emit `IMS:1006008`, restoring forward↔reverse symmetry. Both optical features operate on the existing v0.5 separate-TIFF-member representation; the F8 `images.parquet` blob + CV-registration redesign stays deferred.
 
 **Locked decisions:** narrowing is recorded (metadata provenance note + CLI warning), not silent; `ConformanceLevel::L1` is redefined from bit-for-bit-at-source-width to value-equal-at-canonical-mzPeak-width (`mz=f64`, `intensity=f32`), so the reverse roundtrip bar becomes value-equal rather than dtype-identical.
 
@@ -78,9 +80,12 @@ Scoped 2026-06-05. Detailed REQ-IDs in `.planning/REQUIREMENTS.md`:
 - [ ] `cv_list` file-level CV declaration (F3)
 - [ ] `scan_settings_list` authoritative geometry facet; index block becomes derived copy (F4)
 - [ ] `source_files[]` provenance (F5)
+- [ ] Optical image auto-discovery + auto-embed via `IMS:1006008` (OPT)
+- [ ] Reverse optical image export + `IMS:1006008` re-emit (RIMG)
 
 Still-deferred (v0.7+): continuous-mode imzML emission, reverse `<sourceFileList>` copy, third-party
-imaging-mzPeak hardening, `pixel` facet (F6), reverse image export (F8), L2 conformance (F10).
+imaging-mzPeak hardening, `pixel` facet (F6), full `image` entity / `images.parquet` blob + CV
+registration (F8-rich), L2 conformance (F10).
 
 ### Out of Scope
 
