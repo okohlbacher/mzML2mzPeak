@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: — Spec conformance — dtypes + CV/geometry/provenance
-status: completed
-stopped_at: Completed 16-04-PLAN.md (dtype tests migrated to canonical width + mixed-dtype regression; checkpoint APPROVED-WITH-CAVEAT — PXD001283 full-dataset --ignored run outstanding pending real .ibd). Phase 16 complete (4/4).
-last_updated: "2026-06-06T01:46:06.925Z"
+status: in_progress
+stopped_at: Completed 17-01-PLAN.md (file-level cv_list MS/IMS/UO emitted from one shared constant equal to the reverse <cvList> literals; schema/cv_list.json + spec Edit 2 aligned — three places). Phase 17 plan 1 of 2 done.
+last_updated: "2026-06-06T02:07:05.315Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 6
+  completed_plans: 5
   percent: 17
 ---
 
@@ -31,9 +31,9 @@ fidelity contract the geometry facet (Phase 18) and the external validator depen
 
 ## Current Position
 
-Phase: 16 — Canonical-width dtype conformance (Complete — 4/4 plans)
-Plan: 16-04 complete (4 of 4); checkpoint APPROVED-WITH-CAVEAT (full PXD001283 --ignored run outstanding pending real .ibd)
-Status: Phase 16 complete — ready for phase 17 (cv_list)
+Phase: 17 — cv_list file-level CV declaration (in progress — 1/2 plans)
+Plan: 17-01 complete (1 of 2); forward cv_list (MS/IMS/UO) emitted + schema/cv_list.json + spec Edit 2 aligned (CVL-01). Next: 17-02 read-back consistency test (CVL-02).
+Status: Phase 17 in progress
 Last activity: 2026-06-06
 
 ## v0.6 Roadmap (Phases 16–21)
@@ -92,6 +92,7 @@ matching `schema/*.json`.
 | Phase 16 P02 | 5min | 2 tasks | 5 files |
 | Phase 16 P03 | 1min | 1 tasks | 1 files |
 | Phase 16 P04 | 12min | 2 tasks | 6 files |
+| Phase 17 P01 | 2min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -141,6 +142,7 @@ Key file touchpoints for Phase 16 (from the milestone scoping):
 - [Phase ?]: Phase 16 Plan 02: ConformanceLevel::L1 redefined to value-equal at canonical mzPeak width (mz=f64, intensity=f32); the relaxation is the comparison WIDTH, tolerance stays Δ=0. compare_axis + compare_profile_masked compare at the OUTPUT (canonical) width, coercing the source (widen f32→f64 m/z, narrow f64→f32 intensity); a value-equal dtype divergence is no longer a mismatch. Spec doc L1 paragraph aligned (three-places rule). Kept L1BitForBit identifier (rename optional).
 - [Phase ?]: Phase 16 Plan 03: reverse read path (src/reverse/source.rs) contract reframed to value-equal-at-canonical-width (DTY-06) — the stored canonical width (f64 m/z, f32 intensity) IS the roundtrip reference; no original source dtype is recovered. Pure contract/doc + test-rename change. decode_axis reject-non-float guard (UnsupportedDtype, T-07-02/T-16-05) unchanged.
 - [Phase ?]: Phase 16 Plan 04: dtype-preservation tests migrated to value-equal-at-canonical-width; mixed-/narrowing-dtype regression (F32 m/z + F64 intensity) proves lossless widening + lossy narrowing green at L1; reverse_read_spike no-widening assertion inverted (widened f32-source m/z reads back canonical f64); PXD001283 acceptance gate unchanged. DTY-07 complete.
+- [Phase 17]: Phase 17 Plan 01 (CVL-01): forward mzPeak archive now declares a file-level `cv_list` (MS/IMS/UO) via `add_index_metadata("cv_list", ..)` written alongside the imaging block before finish() (index-written-last preserved). The MS/IMS/UO id/full_name/uri facts live in ONE shared constant `src/schema/cv::cv_list()` whose literals EQUAL the reverse `imzml_writer.rs` `<cvList>` strings, so forward/reverse can't drift (T-17-02 anti-drift; asserted in cv.rs tests). schema/cv_list.json (draft-07, item required [id,full_name,uri], version string|null, additionalProperties:false) governs the block; spec Edit 2 example reconciled to the emitted strings (three places aligned). Fixed three-entry list (converter always references MS inflection + IMS coords + UO µm). IMS uri is a TODO(F9) placeholder — no CV minted, no governance block. metadata.rs untouched (cv_list is its own module). **Reuse anchor for 17-02:** `MzPeakReader.file_index().metadata["cv_list"]` is the read-back surface for the CVL-02 consistency test.
 
 ### Pending Todos
 
@@ -178,10 +180,10 @@ Items acknowledged and carried forward to v0.7+:
 
 ## Session Continuity
 
-Last session: 2026-06-06T01:45:54.801Z
-Stopped at: Completed 16-02-PLAN.md (L1 redefined to value-equal-at-canonical-width + canonical-width verify comparators).
+Last session: 2026-06-06T02:07:00Z
+Stopped at: Completed 17-01-PLAN.md (file-level cv_list MS/IMS/UO emitted from one shared constant equal to the reverse <cvList> literals; schema/cv_list.json + spec Edit 2 aligned).
 Resume file: None
 
 ## Operator Next Steps
 
-- Plan the lead phase: `/gsd:plan-phase 16` (Canonical-width dtype conformance — must land first).
+- Execute 17-02 (CVL-02): read-back consistency test asserting every referenced CV is in cv_list and none is spurious, via `MzPeakReader.file_index().metadata["cv_list"]`.
