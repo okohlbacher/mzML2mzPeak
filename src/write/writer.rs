@@ -530,7 +530,7 @@ fn wire_metadata_into(target: &mut impl MSDataFileMetadata, prov: &RunProvenance
 /// axes are present (an `{x, y}` pair is meaningless with one axis missing); absent geometry
 /// stays `None` and is omitted from the emitted JSON via `skip_serializing_if`. No CV terms
 /// are hand-invented — only what the geometry parse supplied (CONTEXT Area 4).
-fn assemble_imaging_metadata(geom: Option<&ImagingRunMetadata>) -> ImagingMetadata {
+pub(crate) fn assemble_imaging_metadata(geom: Option<&ImagingRunMetadata>) -> ImagingMetadata {
     let pixel_count = geom.and_then(|g| match (g.grid_x, g.grid_y) {
         (Some(x), Some(y)) => Some(PixelCount { x, y, z: None }),
         _ => None,
@@ -543,6 +543,15 @@ fn assemble_imaging_metadata(geom: Option<&ImagingRunMetadata>) -> ImagingMetada
         (Some(x), Some(y)) => Some(AxisPair { x, y }),
         _ => None,
     });
+    // Forward-populate absolute offsets (IMS:1000053/54) from the SAME ImagingRunMetadata that
+    // feeds scan_settings_list_from_geometry, gated on BOTH axes being Some exactly like the
+    // pixel_size_um / max_dimension_um pairs above (partial/absent stays None — no fabrication).
+    // This makes the imaging-block offset equal the facet's IMS:1000053/54 offset params, so the
+    // derived-copy invariant (GEO-02) now holds for offsets too.
+    let absolute_offset_um = geom.and_then(|g| match (g.absolute_offset_x, g.absolute_offset_y) {
+        (Some(x), Some(y)) => Some(AxisPair { x, y }),
+        _ => None,
+    });
     ImagingMetadata {
         is_imaging: true,
         pixel_count,
@@ -551,10 +560,7 @@ fn assemble_imaging_metadata(geom: Option<&ImagingRunMetadata>) -> ImagingMetada
         images: None,
         pixel_size_um,
         max_dimension_um,
-        // Forward-population of absolute offsets (IMS:1000053/54) is DEFERRED to v0.6+ (FID-02);
-        // the forward writer carries None and the reverse emitter re-emits offsets a source mzPeak
-        // index already carries. See ImagingMetadata::absolute_offset_um.
-        absolute_offset_um: None,
+        absolute_offset_um,
         scan_pattern: geom.and_then(|g| g.scan_pattern.clone()),
         scan_type: geom.and_then(|g| g.scan_type.clone()),
         line_scan_direction: geom.and_then(|g| g.line_scan_direction.clone()),
@@ -686,6 +692,39 @@ mod tests {
     /// A minimal all-`None` imaging block (is_imaging + base only) for fold_into tests.
     fn minimal_block() -> ImagingMetadata {
         assemble_imaging_metadata(None)
+    }
+
+    /// Forward offset population (GEO-02 derived-copy invariant for offsets): BOTH axes Some ⇒
+    /// `absolute_offset_um = Some(AxisPair)`; a PARTIAL offset (one axis None) ⇒ None (no
+    /// fabrication). Mirrors the {x,y}-gating proven for pixel_size_um / max_dimension_um, and
+    /// matches the builder's IMS:1000053/54 offset params so the imaging block == the facet.
+    /// (No fixture declares offsets, so this is the correctness-for-consistency assertion.)
+    #[test]
+    fn assemble_offsets_both_axes_some_else_none() {
+        let both = ImagingRunMetadata {
+            absolute_offset_x: Some(5000),
+            absolute_offset_y: Some(-2000),
+            ..Default::default()
+        };
+        let block = assemble_imaging_metadata(Some(&both));
+        let off = block
+            .absolute_offset_um
+            .expect("both offset axes Some ⇒ Some(AxisPair)");
+        assert_eq!(off.x, 5000);
+        assert_eq!(off.y, -2000);
+
+        // Partial offset (only x declared) ⇒ None (no fabrication of the missing axis).
+        let partial = ImagingRunMetadata {
+            absolute_offset_x: Some(5000),
+            absolute_offset_y: None,
+            ..Default::default()
+        };
+        assert!(
+            assemble_imaging_metadata(Some(&partial))
+                .absolute_offset_um
+                .is_none(),
+            "a partial offset (one axis missing) stays None — no fabrication"
+        );
     }
 
     /// observed_max derivation: two coords (3,7,None) then (11,5,None), no declared geometry →

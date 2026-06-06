@@ -311,9 +311,18 @@ fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
         }
         e
     };
+    // Parse the run-constant <scanSettings> geometry on the forward path (reusing the same
+    // lenient fallible call the dry-run preview uses). The parse is LENIENT: absent terms ⇒ None,
+    // so a file with no <scanSettings> yields an all-None struct. We pass `Some(&geom)` ALWAYS so
+    // the facet + imaging-block geometry derive from exactly what the source declared — an
+    // all-None geom yields a scan_settings_list with one empty-parameters entry, the imaging
+    // block geometry stays None, and observed_max still drives pixel_count via fold_into.
+    let geom = parse_scan_settings(&cli.input)
+        .with_context(|| format!("failed to parse scan settings for {}", cli.input.display()))?;
     let reader = ImagingReader::open_with(&cli.input, cli.allow_checksum_mismatch)
         .with_context(|| format!("failed to open imzML reader for {}", cli.input.display()))?;
-    let outcome = convert_with(reader, out, &cli.images, &enc).context("conversion failed")?;
+    let outcome = convert_with(reader, out, &cli.images, &enc, Some(&geom))
+        .context("conversion failed")?;
 
     // DTY-04 (Phase 16): if the canonical data-facet cast NARROWED an axis (lossy), warn —
     // naming the axis and the source→target dtype. Today only intensity can narrow

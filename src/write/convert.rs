@@ -70,8 +70,17 @@ pub fn convert(
     // Library/back-compat entry point: legacy lossless encoding (no chunking, default zstd) so the
     // L1 bit-for-bit guarantee and existing tests are unchanged. The CLI uses `convert_with`.
     // The narrowing outcome is the CLI's concern (DTY-04); the library wrapper drops it.
-    convert_with(reader, out_path, image_paths, &crate::write::EncodingOptions::legacy())
-        .map(|_outcome| ())
+    // No threaded run geometry on the back-compat path: pass `geometry = None` so existing
+    // library/test callers are byte-behaviour-identical (no scan_settings_list key, imaging-block
+    // geometry stays None — only observed_max can populate pixel_count via fold_into).
+    convert_with(
+        reader,
+        out_path,
+        image_paths,
+        &crate::write::EncodingOptions::legacy(),
+        None,
+    )
+    .map(|_outcome| ())
 }
 
 /// Like [`convert`] but applies output-size [`EncodingOptions`](crate::write::EncodingOptions)
@@ -83,6 +92,7 @@ pub fn convert_with(
     out_path: &Path,
     image_paths: &[PathBuf],
     opts: &crate::write::EncodingOptions,
+    geometry: Option<&crate::schema::ImagingRunMetadata>,
 ) -> Result<ConversionOutcome, WriteError> {
     // (0) PRE-FLIGHT image validation (WR-01): fail BEFORE any output file is created, so a
     //     bad/missing/non-TIFF/separator-named image passed anywhere in the --image list never
@@ -157,11 +167,14 @@ pub fn convert_with(
     // (2) Wire run metadata ONCE before the loop. Provenance is cloned out of the reader so
     //     the source-metadata borrow ends before the loop consumes the reader by value;
     //     copy_metadata_from(source) copies eagerly, so the &source borrow does not outlive
-    //     this call. Geometry (scanSettings) is not threaded through the reader seam in this
-    //     integration plan; the block is assembled from provenance with geom = None (the
-    //     ImagingMetadata block still carries is_imaging + coordinate_base — OUT-03).
+    //     this call. The parsed run geometry (`scanSettings`) is threaded in via `geometry`:
+    //     assemble_imaging_metadata derives the imaging-block geometry (pixel_count from a
+    //     declared grid, pixel_size_um, max_dimension_um, absolute_offset_um, scan-pattern child
+    //     terms) FROM the SAME ImagingRunMetadata that builds scan_settings_list below — one
+    //     source of truth (GEO-02). With `geometry = None` the block still carries is_imaging +
+    //     coordinate_base (OUT-03) and all geometry stays None.
     let provenance = reader.provenance().clone();
-    writer.write_run_metadata(reader.source_metadata(), &provenance, None)?;
+    writer.write_run_metadata(reader.source_metadata(), &provenance, geometry)?;
 
     // (2b) PROVENANCE (Phase 16, DTY-03): if the canonical cast narrowed intensity
     //      (Float64 → Float32, lossy), record a per-axis provenance note on the conversion
@@ -303,6 +316,19 @@ pub fn convert_with(
     // (CVL-01, T-17-02).
     zip.add_index_metadata("cv_list", &crate::schema::cv::cv_list())
         .map_err(WriteError::Json)?;
+
+    // scan_settings_list — the AUTHORITATIVE run-constant geometry facet (GEO-01/02). Emitted
+    // ONLY when run geometry was threaded in (Some); a coordinate-only run declares no
+    // run-constant geometry, so the key is omitted entirely (mirroring how `images` is omitted
+    // when no image is imported). scan_settings_list and metadata.imaging geometry are the SAME
+    // ImagingRunMetadata projected two ways — derived copy by construction; observed_max
+    // pixel_count is index-only (set by acc.fold_into above) and never enters the facet (the
+    // builder reads `geom` only, so no fabrication).
+    if let Some(geom) = geometry {
+        let list = crate::schema::scan_settings_list_from_geometry(geom);
+        zip.add_index_metadata("scan_settings_list", &list)
+            .map_err(WriteError::Json)?;
+    }
 
     zip.add_index_metadata("imaging", &block)
         .map_err(WriteError::Json)?;
