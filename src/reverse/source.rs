@@ -9,15 +9,28 @@
 //! memory; the caller MUST have called `load_all_spectrum_metadata()` once before any loop —
 //! Pitfall 1). Coordinates are recovered by IMS accession (`IMS:1000050` x / `IMS:1000051` y /
 //! optional `IMS:1000052` z) in the `SpectrumDescription` form (`p.value.to_i64()`). Arrays are
-//! decoded at their SOURCE dtype via [`decode_axis`] — an array dtype outside `{Float32, Float64}`
+//! decoded at their STORED dtype via [`decode_axis`] — an array dtype outside `{Float32, Float64}`
 //! is REJECTED with [`ReverseError::UnsupportedDtype`] (threat T-07-02 / Pitfall 3), never cast.
 //! Profile pixels read the `spectra_data` facet; Centroid/Unknown read the fixed-width
 //! `spectra_peaks` facet (Pattern E). A first-spectrum scan lacking x AND y is the fail-closed
 //! [`ReverseError::NotImaging`] (RMZ-04); a later-spectrum gap is [`ReverseError::NoScan`] /
 //! [`ReverseError::CoordMissing`].
 //!
-//! The coercing `mzs()`/`intensities()`/`as_f64()` accessors are NEVER used — they widen/narrow
-//! and destroy the source dtype required for L1 bit-for-bit fidelity (record.rs:53-62).
+//! ## Roundtrip contract: value-equal at canonical width (DECISION 2 / DTY-06)
+//!
+//! After Plan 16-01 the forward profile `spectra_data` facet ALWAYS stores canonical mzPeak
+//! widths (`mz=f64`, `intensity=f32`), regardless of the original source imzML width. The reverse
+//! read therefore reads back the STORED canonical width as-is — it does NOT attempt to recover the
+//! original (pre-forward-cast) source dtype, and there is no such recovery requirement anywhere in
+//! this module. The `mzPeak → imzML → mzPeak` roundtrip is judged **value-equal at canonical
+//! width**, NOT dtype-identical to the pre-cast source (per `ConformanceLevel::L1`'s 16-02
+//! redefinition). The stored canonical width IS the reference.
+//!
+//! The coercing `mzs()`/`intensities()`/`as_f64()` accessors are NEVER used — [`decode_axis`]
+//! reads each axis at its stored float dtype, which is the canonical width and thus the value-equal
+//! reference. The reject-non-float guard ([`ReverseError::UnsupportedDtype`]) is the integrity
+//! surface and stays exactly as-is (threat T-07-02): only the EXPECTATION relaxes (value-equal vs
+//! dtype-identical), never the input validation.
 
 use mzdata::curie;
 use mzdata::prelude::{ParamDescribed, ParamValue};
@@ -46,9 +59,11 @@ pub struct ReversePixel {
     pub ms_level: u8,
     /// Profile vs Centroid/Unknown — drives which facet the arrays came from.
     pub representation: Representation,
-    /// m/z axis at its SOURCE dtype (no widening).
+    /// m/z axis at its STORED canonical width (the value-equal roundtrip reference; profile data
+    /// facet stores `f64` — DTY-06).
     pub mz: NumArray,
-    /// intensity axis at its SOURCE dtype (no widening).
+    /// intensity axis at its STORED canonical width (the value-equal roundtrip reference; profile
+    /// data facet stores `f32` — DTY-06).
     pub intensity: NumArray,
 }
 
@@ -61,8 +76,9 @@ pub struct ReversePixel {
 /// Coordinates are read by IMS accession (`p.value.to_i64()`). A first-spectrum scan that lacks
 /// both x and y means "not an imaging archive" → [`ReverseError::NotImaging`] (RMZ-04 fail-closed);
 /// a later-spectrum gap is [`ReverseError::NoScan`] / [`ReverseError::CoordMissing`]. Arrays decode
-/// at their SOURCE dtype via [`decode_axis`]; Profile → `spectra_data`, Centroid/Unknown →
-/// `spectra_peaks` (Pattern E).
+/// at their STORED canonical width via [`decode_axis`]; Profile → `spectra_data`, Centroid/Unknown →
+/// `spectra_peaks` (Pattern E). The stored canonical width is the value-equal roundtrip reference —
+/// no original source dtype is recovered (DTY-06).
 pub fn read_pixel(reader: &mut MzPeakReader, index: u64) -> Result<ReversePixel, ReverseError> {
     let descr = reader
         .get_spectrum_metadata(index)
@@ -104,7 +120,8 @@ pub fn read_pixel(reader: &mut MzPeakReader, index: u64) -> Result<ReversePixel,
     let ms_level = descr.ms_level;
 
     let (mz, intensity) = match representation {
-        // Profile → spectra_data facet (raw arrays at SOURCE width — the L1 reference).
+        // Profile → spectra_data facet (arrays at the STORED canonical width — the value-equal L1
+        // reference; the facet stores f64 m/z + f32 intensity after Plan 16-01, DTY-06).
         Representation::Profile => {
             let arrays = reader
                 .get_spectrum_arrays(index)
@@ -124,9 +141,10 @@ pub fn read_pixel(reader: &mut MzPeakReader, index: u64) -> Result<ReversePixel,
         // Centroid AND Unknown → spectra_peaks facet (Pattern E). NOT a silent coercion: the
         // upstream `spectra_peaks` schema is FIXED-WIDTH BY DESIGN. `get_spectrum_peaks_for` is
         // the only surface for it and materializes mzpeaks `CentroidPeak`s whose `mz()` is `f64`
-        // and `intensity()` is `f32` at the TYPE level — there is NO narrower/wider source dtype
-        // to recover (unlike the Profile `spectra_data` facet `decode_axis` branches on). The
-        // `NumArray` widths below RECORD the schema; they do not widen an f32/f64 source.
+        // and `intensity()` is `f32` at the TYPE level — already the canonical mzPeak width, so
+        // (like the Profile data facet under DTY-06) there is no original source dtype to recover.
+        // The `NumArray` widths below RECORD the stored canonical width; the value-equal roundtrip
+        // reference is that canonical width, not a pre-cast source width.
         Representation::Centroid | Representation::Unknown => {
             let peaks = reader
                 .get_spectrum_peaks_for(index)
@@ -141,9 +159,14 @@ pub fn read_pixel(reader: &mut MzPeakReader, index: u64) -> Result<ReversePixel,
     Ok(ReversePixel { x, y, z, ms_level, representation, mz, intensity })
 }
 
-/// Decode one `DataArray` at its SOURCE dtype into a [`NumArray`], rejecting any dtype outside
+/// Decode one `DataArray` at its STORED dtype into a [`NumArray`], rejecting any dtype outside
 /// `{Float32, Float64}` with [`ReverseError::UnsupportedDtype`] (threat T-07-02 — reject, never
 /// cast). NEVER calls the coercing `mzs()`/`intensities()` accessors.
+///
+/// The stored float dtype IS the canonical mzPeak width (`f64` m/z / `f32` intensity for the
+/// profile data facet after Plan 16-01) and is returned as-is — it is the value-equal roundtrip
+/// reference, NOT a recovered original source dtype (DTY-06). The reject-non-float behavior is the
+/// input-integrity surface and is unchanged.
 pub fn decode_axis(
     da: &DataArray,
     index: u64,
@@ -325,9 +348,10 @@ mod tests {
     }
 
     /// read_pixel on an imaging Profile pixel returns x,y as i64 from IMS:1000050/051, z=None, and
-    /// m/z/intensity at SOURCE dtype (F64 m/z, F32 intensity preserved — no widening).
+    /// m/z/intensity at the STORED canonical width (f64 m/z + f32 intensity), accepted as the
+    /// value-equal roundtrip reference — no original source dtype is recovered (DTY-06).
     #[test]
-    fn imaging_profile_pixel_source_dtype_preserved() {
+    fn imaging_profile_pixel_canonical_width_accepted_value_equal() {
         let path = imaging_archive();
         let mut reader = open_primed(&path);
 
@@ -337,10 +361,13 @@ mod tests {
         assert_eq!(p0.z, None, "z absent => None");
         assert_eq!(p0.ms_level, 1, "ms_level carried verbatim from the source spectrum (WR-01)");
         assert_eq!(p0.representation, Representation::Profile);
-        assert!(matches!(p0.mz, NumArray::F64(_)), "m/z stays F64 (no widening)");
+        assert!(
+            matches!(p0.mz, NumArray::F64(_)),
+            "m/z read at stored canonical width f64 (value-equal reference)"
+        );
         assert!(
             matches!(p0.intensity, NumArray::F32(_)),
-            "intensity stays F32 (no widening)"
+            "intensity read at stored canonical width f32 (value-equal reference)"
         );
         assert!(!p0.mz.is_empty() && !p0.intensity.is_empty());
 
@@ -405,9 +432,10 @@ mod tests {
         }
     }
 
-    /// decode_axis preserves source dtype for both F32 and F64 inputs (no widening/narrowing).
+    /// decode_axis returns the STORED canonical float dtype as-is for both F32 and F64 inputs
+    /// (Float32 → NumArray::F32, Float64 → NumArray::F64) — the value-equal reference, no recovery.
     #[test]
-    fn decode_axis_preserves_float_dtypes() {
+    fn decode_axis_returns_stored_float_dtype() {
         let mut da32 = DataArray::wrap(
             &ArrayType::IntensityArray,
             BinaryDataArrayType::Float32,
