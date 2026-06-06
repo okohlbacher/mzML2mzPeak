@@ -231,6 +231,43 @@ fn small_fixture_l1_roundtrip() {
     std::fs::remove_file(&orig).ok();
 }
 
+/// DTY-07 (mixed-/narrowing-dtype reverse roundtrip): the mixed-dtype fixture (F32 m/z + F64
+/// intensity SOURCE, stored canonical f64 m/z + f32 intensity by the forward cast) round-trips
+/// `mzPeak → imzML → mzPeak` and VERIFIES green at the VALUE-EQUAL canonical-width bar (L1). The
+/// reverse read reads back the stored canonical width (no original source dtype recovered, DTY-06),
+/// and the second forward leg re-casts canonically — so the comparison is value-equal at canonical
+/// width on both directions, not dtype-identical to the pre-cast source.
+#[test]
+fn mixed_dtype_reverse_roundtrip_value_equal() {
+    let dir = tempdir("mixed");
+    let orig = reverse_fixtures::mixed_dtype_imaging_archive(); // F32 m/z + F64 intensity SOURCE
+    let rt = roundtrip(&orig, &dir);
+
+    // Source = the ORIGINAL mzPeak read back at its stored canonical width (the value-equal ref).
+    let mut src = MzPeakReader::new(&orig).expect("open original mixed-dtype mzPeak");
+    let n = src.len() as u64;
+    src.load_all_spectrum_metadata().expect("prime metadata cache once");
+    let source: Vec<ImagingSpectrum> = (0..n)
+        .map(|i| to_imaging(read_pixel(&mut src, i).expect("read source pixel")))
+        .collect();
+
+    let report = verify_streaming(
+        source.into_iter().map(Ok::<_, ReadError>),
+        &rt,
+        ConformanceLevel::L1BitForBit,
+    )
+    .expect("verification runs without a typed error");
+
+    assert!(
+        report.passed(),
+        "DTY-07: mixed-dtype roundtrip passes L1 value-equal at canonical width: {report:?}"
+    );
+    assert!(report.coordinates.passed, "coordinates integer-exact");
+
+    std::fs::remove_dir_all(&dir).ok();
+    std::fs::remove_file(&orig).ok();
+}
+
 /// RDAT-01 (SC-4): the repeatable real-dataset acceptance gate on the 34,840-spectrum,
 /// PXD001283-derived `out/HR2MSI.mzpeak`. `#[ignore]`-gated (432 MB, not in CI / fresh checkouts)
 /// and skips GRACEFULLY (early return, not a failure) when the archive is absent so a fresh

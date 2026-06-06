@@ -157,6 +157,46 @@ pub fn imaging_archive() -> PathBuf {
     out
 }
 
+/// Build the MIXED-/NARROWING-DTYPE imaging fixture (Phase 16 DTY-07) and return its path.
+///
+/// One Profile pixel with `NumArray::F32` m/z AND `NumArray::F64` intensity — the case PXD001283
+/// does NOT cover. It exercises BOTH the lossless widening on m/z (`f32 → f64`, value-equal) and
+/// the lossy narrowing on intensity (`f64 → f32`) end-to-end through the production `to_mzdata`
+/// canonical cast + `write_seam`. The m/z values (110.0, 220.0, 360.0) and the intensity values
+/// (5.0, 12.0, 33.0) are exactly representable across f32↔f64 so a value-equal comparison at
+/// canonical width is unambiguous and any mismatch is diagnosable. Caller removes the returned file.
+pub fn mixed_dtype_imaging_archive() -> PathBuf {
+    let pixels = vec![ImagingSpectrum {
+        x: 4,
+        y: 6,
+        z: None,
+        // F32 m/z (widened to canonical f64 by the forward cast — lossless).
+        mz: NumArray::F32(vec![110.0, 220.0, 360.0]),
+        // F64 intensity (narrowed to canonical f32 by the forward cast — lossy but value-equal here).
+        intensity: NumArray::F64(vec![5.0, 12.0, 33.0]),
+        representation: Representation::Profile,
+        ms_level: 1,
+        native_id: "spectrum=1".to_string(),
+    }];
+
+    let specs: Vec<MultiLayerSpectrum> = pixels
+        .iter()
+        .map(to_mzdata)
+        .collect::<Result<_, _>>()
+        .expect("reconstruct mixed-dtype fixture spectra");
+
+    let geom = ImagingRunMetadata {
+        grid_x: Some(13),
+        grid_y: Some(9),
+        scan_pattern: Some("IMS:1000413".to_string()),
+        ..Default::default()
+    };
+
+    let out = temp_out("mixed_dtype");
+    write_seam(&out, &specs, Some(&geom)).expect("mixed-dtype fixture writes a valid archive");
+    out
+}
+
 /// Build a PARAMETERIZED N-pixel imaging fixture for the bounded-memory proof (RCLI-02) and
 /// return its path.
 ///

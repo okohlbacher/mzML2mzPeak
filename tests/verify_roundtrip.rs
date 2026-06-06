@@ -778,6 +778,141 @@ fn centroid_f64_intensity_value_equal_narrowed_passes_l1() {
     let _ = std::fs::remove_file(&out);
 }
 
+/// DTY-07 (mixed-/narrowing-dtype regression — the decisive Phase 16 artifact): a Profile pixel
+/// whose SOURCE is F32 m/z + F64 intensity (the case PXD001283 does NOT cover) converts to a
+/// canonical data facet of f64 m/z + f32 intensity and verifies green at L1 (value-equal at
+/// canonical width). This exercises BOTH directions of the cast in one pixel:
+///   - m/z `f32 → f64` is LOSSLESS WIDENING — the stored f64 column equals `source.as_f64()`
+///     element-wise (DTY-02).
+///   - intensity `f64 → f32` is LOSSY NARROWING — the stored f32 column equals the source narrowed
+///     to f32 (value-equal here because the values are exactly representable in f32).
+/// Asserts: (1) the stored data-facet columns are exactly f64 m/z + f32 intensity (DTY-01); (2) the
+/// widened m/z is value-equal to `source.as_f64()`; (3) the narrowed intensity is value-equal at
+/// f32; (4) `verify_against_source` reports `passed()` at L1 (DTY-05/DTY-07).
+#[test]
+fn mixed_dtype_source_converts_value_equal_at_canonical_width() {
+    use arrow::array::AsArray;
+    use mzdata::spectrum::bindata::{ArrayType, ByteArrayView};
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+
+    // The mixed-dtype source: F32 m/z (widened) + F64 intensity (narrowed). Exactly representable
+    // values so the narrowing is value-equal at f32 and the widening is exact at f64.
+    let src_mz_f32: Vec<f32> = vec![110.0, 220.0, 360.0];
+    let src_int_f64: Vec<f64> = vec![5.0, 12.0, 33.0];
+    let fx = vec![ImagingSpectrum {
+        x: 4,
+        y: 6,
+        z: None,
+        mz: NumArray::F32(src_mz_f32.clone()),
+        intensity: NumArray::F64(src_int_f64.clone()),
+        representation: Representation::Profile,
+        ms_level: 1,
+        native_id: "spectrum=1".to_string(),
+    }];
+
+    let out = temp_out("mixed_dtype");
+    write_fixture(&out, &fx).expect("mixed-dtype source converts to a valid archive");
+
+    // (4) verify_against_source PASSES at L1 — value-equal at canonical width (DTY-05/DTY-07).
+    let report = verify_against_source(&fx, &out, ConformanceLevel::L1BitForBit)
+        .expect("verify returns a report");
+    assert!(
+        report.mz.passed,
+        "widened f32→f64 m/z is value-equal at canonical width (DTY-02): {:?}, mismatches={:?}",
+        report.mz, report.mismatches
+    );
+    assert!(
+        report.intensity.passed,
+        "narrowed f64→f32 intensity is value-equal at canonical f32 (DTY-05): {:?}, mismatches={:?}",
+        report.intensity, report.mismatches
+    );
+    assert!(
+        report.passed(),
+        "the mixed-/narrowing-dtype round-trip passes L1 at canonical width (DTY-07): {report:?}"
+    );
+
+    // (1) The STORED data-facet columns are exactly f64 m/z + f32 intensity (DTY-01) — read the
+    //     spectra_data.parquet facet DIRECTLY (unzip + arrow) so the dtype claim cannot be masked
+    //     by the reader's coercing accessors.
+    let file = std::fs::File::open(&out).expect("open archive");
+    let mut zip = zip::ZipArchive::new(file).expect("open zip");
+    let data_path = out.with_extension("mixed.spectra_data.parquet");
+    {
+        let mut f = zip
+            .by_name("spectra_data.parquet")
+            .expect("spectra_data.parquet present");
+        let mut tmp = std::fs::File::create(&data_path).expect("create temp parquet");
+        std::io::copy(&mut f, &mut tmp).expect("copy parquet");
+    }
+    let tmp = std::fs::File::open(&data_path).expect("reopen temp parquet");
+    let pq = ParquetRecordBatchReaderBuilder::try_new(tmp)
+        .expect("builder")
+        .build()
+        .expect("reader");
+    for batch in pq {
+        let batch = batch.expect("batch");
+        let point = batch.column_by_name("point").expect("point struct").as_struct();
+        // Canonical schema: a single f64 `mz` column (no per-width split) + a single f32 `intensity`.
+        assert!(
+            point.column_by_name("mz_f64_mz").is_none(),
+            "canonical schema has NO per-width m/z split (mz_f64_mz absent)"
+        );
+        let mz_field = point
+            .fields()
+            .iter()
+            .find(|f| f.name() == "mz")
+            .expect("canonical `mz` column present");
+        assert_eq!(
+            mz_field.data_type(),
+            &arrow::datatypes::DataType::Float64,
+            "stored m/z column is canonical Float64 (DTY-01) — f32 source was widened"
+        );
+        let int_field = point
+            .fields()
+            .iter()
+            .find(|f| f.name() == "intensity")
+            .expect("canonical `intensity` column present");
+        assert_eq!(
+            int_field.data_type(),
+            &arrow::datatypes::DataType::Float32,
+            "stored intensity column is canonical Float32 (DTY-01) — f64 source was narrowed"
+        );
+    }
+    let _ = std::fs::remove_file(&data_path);
+
+    // (2)+(3) The read-back m/z equals source.as_f64() element-wise (widening exact), and the
+    //         read-back intensity equals the source narrowed to f32 (narrowing value-equal).
+    let mut reader = MzPeakReader::new(&out).expect("reader opens");
+    let arrays = reader
+        .get_spectrum_arrays(0)
+        .expect("read data facet")
+        .expect("profile pixel has data-facet arrays");
+    let got_mz = arrays
+        .get(&ArrayType::MZArray)
+        .expect("m/z present")
+        .to_f64()
+        .expect("m/z decodes as f64");
+    let got_int = arrays
+        .get(&ArrayType::IntensityArray)
+        .expect("intensity present")
+        .to_f32()
+        .expect("intensity decodes as f32");
+    let want_mz: Vec<f64> = src_mz_f32.iter().map(|&v| v as f64).collect();
+    let want_int: Vec<f32> = src_int_f64.iter().map(|&v| v as f32).collect();
+    assert_eq!(
+        got_mz.as_ref(),
+        want_mz.as_slice(),
+        "widened f32→f64 m/z is element-wise value-equal to source.as_f64() (DTY-02)"
+    );
+    assert_eq!(
+        got_int.as_ref(),
+        want_int.as_slice(),
+        "narrowed f64→f32 intensity is element-wise value-equal to the source narrowed to f32"
+    );
+
+    let _ = std::fs::remove_file(&out);
+}
+
 /// Cross-module facet-routing alignment: an `Unknown`-continuity pixel is written by the
 /// reference writer to the `spectra_peaks` facet (its `write_spectrum_data` routes RAW arrays to
 /// `spectra_data` ONLY for `SignalContinuity::Profile`; `Centroid` AND `Unknown` go to
