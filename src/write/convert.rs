@@ -360,4 +360,101 @@ mod tests {
             ),
         }
     }
+
+    // ---- GEO-02 derived-copy invariant (writer-level, no full archive) ----
+    //
+    // These unit tests assert the single-source-of-truth direction WITHOUT building an archive:
+    // the authoritative scan_settings_list facet and the derived metadata.imaging geometry block
+    // are the SAME ImagingRunMetadata projected two ways, equal by construction; and observed_max
+    // pixel_count is index-only and never fabricated into the facet.
+
+    use crate::read::record::NumArray;
+    use crate::schema::scan_settings::{ScanSettings, scan_settings_list_from_geometry};
+    use crate::schema::ImagingRunMetadata;
+    use crate::write::writer::{assemble_imaging_metadata, IndexAccumulator};
+
+    /// Look up the value of a CV param by accession in a settings entry.
+    fn param_value<'a>(s: &'a ScanSettings, accession: &str) -> Option<&'a str> {
+        s.parameters
+            .iter()
+            .find(|p| p.accession == accession)
+            .and_then(|p| p.value.as_deref())
+    }
+
+    /// Declared-grid geometry: the grid counts + pixel sizes carried in the scan_settings_list
+    /// facet params EQUAL the metadata.imaging block's pixel_count / pixel_size_um — proving the
+    /// imaging block is a DERIVED COPY of the same ImagingRunMetadata (GEO-02, derived by
+    /// construction).
+    #[test]
+    fn declared_grid_facet_equals_imaging_block_geometry() {
+        let geom = ImagingRunMetadata {
+            grid_x: Some(260),
+            grid_y: Some(134),
+            pixel_size_x: Some(50.0),
+            pixel_size_y: Some(50.0),
+            ..Default::default()
+        };
+
+        // Authoritative facet.
+        let list = scan_settings_list_from_geometry(&geom);
+        assert_eq!(list.len(), 1, "exactly one scan_settings entry");
+        let facet = &list[0];
+        assert_eq!(param_value(facet, "IMS:1000042"), Some("260"), "facet grid x");
+        assert_eq!(param_value(facet, "IMS:1000043"), Some("134"), "facet grid y");
+        assert_eq!(param_value(facet, "IMS:1000046"), Some("50"), "facet pixel size x µm");
+        assert_eq!(param_value(facet, "IMS:1000047"), Some("50"), "facet pixel size y µm");
+
+        // Derived imaging block from the SAME source.
+        let block = assemble_imaging_metadata(Some(&geom));
+        let pc = block.pixel_count.expect("declared grid → pixel_count");
+        assert_eq!(pc.x, 260, "imaging block pixel_count.x == facet grid x");
+        assert_eq!(pc.y, 134, "imaging block pixel_count.y == facet grid y");
+        let ps = block.pixel_size_um.expect("declared pixel size → pixel_size_um");
+        assert_eq!(ps.x, 50.0, "imaging block pixel_size_um.x == facet IMS:1000046");
+        assert_eq!(ps.y, 50.0, "imaging block pixel_size_um.y == facet IMS:1000047");
+    }
+
+    /// All-None geom (no declared grid): the facet has empty parameters (no grid param). After a
+    /// fold_into with observed coordinates, the imaging block's pixel_count is Some with source
+    /// ObservedMax — but that observed value is ABSENT from scan_settings_list (no IMS:1000042/43
+    /// param). Proves observed_max is index-only and NEVER fabricated into the authoritative
+    /// facet (T-18-03).
+    #[test]
+    fn observed_max_populates_imaging_block_but_not_facet() {
+        let geom = ImagingRunMetadata::default();
+
+        // Facet built from geom ONLY → one entry, empty parameters, no grid params.
+        let list = scan_settings_list_from_geometry(&geom);
+        let facet = &list[0];
+        assert!(facet.parameters.is_empty(), "all-None geom → empty facet params");
+        assert!(
+            param_value(facet, "IMS:1000042").is_none()
+                && param_value(facet, "IMS:1000043").is_none(),
+            "no declared grid ⇒ no grid-count param in the facet"
+        );
+
+        // Imaging block derived from the same all-None geom (pixel_count None), then fold_into
+        // observed coordinates (max x=9, y=9) — the index-only derivation path.
+        let mut block = assemble_imaging_metadata(Some(&geom));
+        assert!(block.pixel_count.is_none(), "no declared grid ⇒ pixel_count starts None");
+        let mut acc = IndexAccumulator::new();
+        acc.observe(0, 0, None, 1, &NumArray::F64(vec![100.0]));
+        acc.observe(9, 9, None, 1, &NumArray::F64(vec![200.0]));
+        acc.fold_into(&mut block);
+
+        let pc = block.pixel_count.expect("observed coords → pixel_count");
+        assert_eq!((pc.x, pc.y), (9, 9), "observed_max pixel_count from coordinate maxima");
+        assert_eq!(
+            block.pixel_count_source,
+            Some(crate::schema::metadata::PixelCountSource::ObservedMax),
+            "no declared grid ⇒ source is ObservedMax"
+        );
+
+        // The authoritative facet still carries NO grid param — observed_max never leaked in.
+        assert!(
+            param_value(facet, "IMS:1000042").is_none()
+                && param_value(facet, "IMS:1000043").is_none(),
+            "observed_max pixel_count MUST NOT be fabricated into scan_settings_list"
+        );
+    }
 }
