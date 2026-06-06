@@ -582,19 +582,21 @@ impl ImzmlWriter {
         self.write_raw("\">")?;
 
         // Spectrum-level CV terms required for the output to be RE-CONVERTIBLE (the round-trip's
-        // point): without `MS:1000511 ms level` a re-reading consumer cannot infer the spectrum
-        // type (the mzpeak forward writer panics: "Couldn't infer spectrum type from MS level").
-        // The REAL source `ms_level` is threaded through and re-declared VERBATIM — NOT hardcoded
-        // to 1 — so a non-MS1 source round-trips its true level instead of being silently
-        // mis-declared (WR-01). The paired spectrum-type term is chosen FROM the level: only
-        // `ms_level == 1` may assert `MS:1000579 MS1 spectrum`; `ms_level >= 2` asserts
-        // `MS:1000580 MSn spectrum`. For `ms_level == 0` (a legal carried value — record.rs:119-121)
-        // NEITHER type term is emitted (asserting a false MS1 would be a fidelity bug); only the
-        // honest `ms level = 0` value goes out. This is a presence/level CV pair, not a value
-        // coercion.
+        // point). The REAL source `ms_level` is threaded through and re-declared VERBATIM via
+        // `MS:1000511` — NOT hardcoded — so a non-MS1 source round-trips its true level. The paired
+        // spectrum-TYPE term is chosen from the level: `ms_level >= 2` asserts `MS:1000580 MSn
+        // spectrum`; `ms_level == 1` AND `ms_level == 0` assert `MS:1000579 MS1 spectrum`.
+        //
+        // Why level 0 → MS1 spectrum: in imzML `ms_level == 0` is the "level not specified" carry
+        // value (record.rs:119-121), and the IMAGING convention pairs `MS1 spectrum` WITH
+        // `ms level = 0` — the canonical ms-imaging.org Example-1 referenceableParamGroup declares
+        // exactly `MS:1000579 MS1 spectrum` + `MS:1000511 ms level value="0"` together. Emitting the
+        // type term here therefore matches the source convention AND keeps the file re-convertible
+        // (a consumer that infers spectrum type from MS level — incl. the mzpeak forward writer —
+        // gets an explicit type and never has to guess). This makes the upstream `ms_level 0 ->
+        // MS1` writer fallback unnecessary on our round-tripped output.
         match ms_level {
-            0 => {} // no faithful spectrum-type term to assert at level 0
-            1 => self.write_raw(
+            0 | 1 => self.write_raw(
                 "<cvParam cvRef=\"MS\" accession=\"MS:1000579\" name=\"MS1 spectrum\" value=\"\"/>",
             )?,
             _ => self.write_raw(
@@ -1508,10 +1510,12 @@ mod tests {
     }
 
     /// WR-01 (level-0 boundary): the legal `ms_level = 0` carried value (record.rs:119-121) is
-    /// emitted as an honest `ms level = 0` and emits NEITHER spectrum-type term — asserting a false
-    /// `MS:1000579 MS1 spectrum` at level 0 would be an outright mis-declaration.
+    /// emitted as an honest `ms level = 0`, PAIRED with `MS:1000579 MS1 spectrum` — the imaging
+    /// convention (canonical ms-imaging.org Example-1 declares both together), which also keeps the
+    /// output re-convertible without relying on a downstream ms_level-0 fallback. It is NEVER an
+    /// `MS:1000580 MSn spectrum` (level 0 is not MSn).
     #[test]
-    fn ms_level_zero_emits_no_false_type_term() {
+    fn ms_level_zero_pairs_ms1_spectrum_type() {
         let dir = tempdir();
         let path = dir.join("level0.imzML");
         let mut w = ImzmlWriter::new(&path, Uuid::new_v4(), "deadbeef", 1, None).unwrap();
@@ -1536,12 +1540,12 @@ mod tests {
             "level 0 is carried verbatim, not normalized to 1"
         );
         assert!(
-            !text.contains("MS:1000579"),
-            "level 0 must NOT assert a false MS1-spectrum type term"
+            text.contains("MS:1000579"),
+            "level 0 pairs MS1 spectrum (imaging convention; keeps output re-convertible)"
         );
         assert!(
             !text.contains("MS:1000580"),
-            "level 0 emits no MSn-spectrum type term either"
+            "level 0 emits no MSn-spectrum type term"
         );
 
         fs::remove_dir_all(&dir).ok();
