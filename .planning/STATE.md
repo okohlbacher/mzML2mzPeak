@@ -210,11 +210,12 @@ Items acknowledged and carried forward to v0.7+:
 | Task | Title | Date |
 |------|-------|------|
 | 260606-90y | Expose checksum-mismatch escape hatch as `--ignore-incorrect-checksum` (alias `--allow-checksum-mismatch`) | 2026-06-06 |
+| 260606-a8f | Data-derive `sorting_rank` (Option 1, 4th vendored patch) + `--sort-peaks` opt-in repair (Option 2) + counted centroid non-monotonic warning (Option 3); validator handoff doc | 2026-06-06 |
 
 ## Session Continuity
 
-Last session: 2026-06-06T04:28:21.600Z
-Stopped at: Completed quick task 260606-90y
+Last session: 2026-06-06T05:00:00.000Z
+Stopped at: Completed quick task 260606-a8f
 Resume file: None
 
 ## Operator Next Steps
