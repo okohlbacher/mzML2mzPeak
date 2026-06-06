@@ -29,14 +29,16 @@
 > ```json
 > {
 >   "cv_list": [
->     {"id": "MS",  "full_name": "PSI-MS controlled vocabulary", "uri": "https://github.com/HUPO-PSI/psi-ms-CV/releases/.../psi-ms.obo", "version": "4.1.x"},
->     {"id": "UO",  "full_name": "Unit Ontology", "uri": "http://purl.obolibrary.org/obo/uo.obo", "version": "..."},
->     {"id": "IMS", "full_name": "Imaging MS controlled vocabulary", "uri": "<canonical imagingMS.obo URI>", "version": "1.1.x"}
+>     {"id": "MS",  "full_name": "PSI-MS controlled vocabulary", "uri": "https://raw.githubusercontent.com/HUPO-PSI/psi-ms-CV/master/psi-ms.obo", "version": "4.1.x"},
+>     {"id": "IMS", "full_name": "Mass Spectrometry Imaging controlled vocabulary", "uri": "https://raw.githubusercontent.com/imzML/imzML/master/imagingMS.obo", "version": "1.1.x"},
+>     {"id": "UO",  "full_name": "Unit Ontology", "uri": "https://raw.githubusercontent.com/bio-ontology-research-group/unit-ontology/master/unit.obo"}
 >   ]
 > }
 > ```
 >
-> **NOTE:** the canonical IMS CV URI is to be confirmed (the imaging CV is not currently in OLS/OBO Foundry; a governed home is being arranged).
+> The example above is exactly what the `mzML2mzPeak` converter emits (single shared source `src/schema/cv.rs::cv_list()`, equal by construction to the strings the reverse imzML `<cvList>` writes). `version` is OPTIONAL (`["string", "null"]`); the `UO` entry omits it.
+>
+> **NOTE:** the canonical IMS CV URI is to be confirmed (the imaging CV is not currently in OLS/OBO Foundry; a governed home is being arranged). The `imagingMS.obo` URI above is the best-known placeholder and is marked `TODO(F9)` in the converter.
 
 ### Edit 3 — Add `scan_settings_list` to `### File-Level Metadata`
 **Location:** "File-Level Metadata", and the metadata list under "Spectrum Metadata - spectra_metadata.parquet".

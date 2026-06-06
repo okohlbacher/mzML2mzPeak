@@ -295,6 +295,15 @@ pub fn convert_with(
         }
     }
 
+    // cv_list — declare every controlled vocabulary the archive references (MS column-name
+    // inflection + IMS coordinate columns + UO µm units). Written FIRST but in the SAME finish
+    // block as the imaging block, so both land before finish() (index-written-last ordering
+    // preserved). The value is the shared three-CV constant (src/schema/cv.rs) whose id/full_name/
+    // uri strings equal the reverse imzML <cvList> literals, so forward/reverse can't drift
+    // (CVL-01, T-17-02).
+    zip.add_index_metadata("cv_list", &crate::schema::cv::cv_list())
+        .map_err(WriteError::Json)?;
+
     zip.add_index_metadata("imaging", &block)
         .map_err(WriteError::Json)?;
     // ZipArchiveWriter::finish(self) returns ZipResult<()>; map the zip error into the I/O arm
