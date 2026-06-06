@@ -4,13 +4,13 @@ milestone: v0.6
 milestone_name: — Spec conformance — dtypes + CV/geometry/provenance
 status: verifying
 stopped_at: Completed 20-03-PLAN.md
-last_updated: "2026-06-06T03:49:21.802Z"
+last_updated: "2026-06-06T04:10:48.042Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 13
-  completed_plans: 13
+  total_plans: 16
+  completed_plans: 14
   percent: 83
 ---
 
@@ -101,6 +101,7 @@ matching `schema/*.json`.
 | Phase 20 P01 | 12min | 2 tasks | 4 files |
 | Phase 20 P02 | ~10 min | 2 tasks | 5 files |
 | Phase 20 P03 | 12m | 2 tasks | 8 files |
+| Phase 21 P01 | 4min | 1 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -164,6 +165,8 @@ Key file touchpoints for Phase 16 (from the milestone scoping):
 - [Phase ?]: Plan 20-02: global dedup by canonicalized path over the whole embed list (--image + auto), --image first then auto in document order
 - [Phase ?]: Plan 20-03: acceptance fixture is BOTH the ImagingReader spectrum source AND convert_with input_path, exercising the preflight-valid .ibd auto-discovery path end-to-end
 - [Phase ?]: Plan 20-03: synthetic .ibd sidecars are byte copies of Example_Processed.ibd so UUID/SHA-1 are reused verbatim (no invented checksums) and preflight passes
+- [Phase ?]: Reverse image export: ImageExport classified as generic I/O exit code in cli.rs
+- [Phase ?]: export_image_members no-ops (no archive open) on empty images slice
 
 ### Pending Todos
 
@@ -201,7 +204,7 @@ Items acknowledged and carried forward to v0.7+:
 
 ## Session Continuity
 
-Last session: 2026-06-06T03:49:21.799Z
+Last session: 2026-06-06T04:10:19.847Z
 Stopped at: Completed 20-03-PLAN.md
 Resume file: None
 

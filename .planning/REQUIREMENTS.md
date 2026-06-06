@@ -119,7 +119,7 @@ Bring the forward converter into mzPeak spec conformance:
 
 ### Reverse optical image export (RIMG) — Phase 21
 
-- [ ] **RIMG-01**: On reverse conversion, the converter reads embedded optical-image members + their
+- [x] **RIMG-01**: On reverse conversion, the converter reads embedded optical-image members + their
   `metadata.imaging.images[]` entries and writes each back out as an external image file alongside the
   produced `.imzML`. (Depends on the v0.5 vendored `FileEntry`-serde fix that makes `Other` members
   readable.)
@@ -190,6 +190,6 @@ GEO×3, SRC×2, OPT×4, RIMG×3). No orphans, no duplicates.
 | OPT-02 | Phase 20 | Complete |
 | OPT-03 | Phase 20 | Complete |
 | OPT-04 | Phase 20 | Complete |
-| RIMG-01 | Phase 21 | Pending |
+| RIMG-01 | Phase 21 | Complete |
 | RIMG-02 | Phase 21 | Pending |
 | RIMG-03 | Phase 21 | Pending |
