@@ -217,3 +217,34 @@ Plans:
 - [ ] TBD (promote with `/gsd:review-backlog` when ready)
 
 </details>
+
+### Phase 999.4: Finish the StackIT S3 upload of example files (originals + mzpeak) (BACKLOG)
+
+**Goal:** Complete the partial push to StackIT Object Storage (bucket `s3://v09`, profile `stackit`,
+endpoint `https://object.storage.eu01.onstackit.cloud`). The initial ~18 GB push (2026-06-06) was
+killed mid-sync, so the bucket is partial. The whole-tree public-read policy (`urn:sgws:s3:::v09/*`)
+is already applied.
+
+**Still missing:**
+1. Astral original — `mzML-examples/thermo-orbitrap-astral/20240912_WFB_exp01_magnet_5_0.mzML`
+   (~6.4 GB; the sync was interrupted on this file).
+2. Nearly all "mzpeak placed next to its source original, renamed to the source stem" files — only
+   `demo/PXD…mzpeak` and `mzML-examples/sciex-tripletof-6600/12_80.mzpeak` exist so far. Remaining:
+   - imaging mzpeak: PXD, AP-SMALDI, LA-ESI, LTP, GBM, example1-continuous, example1-processed, DESI ×7
+   - mzML mzpeak: astral, timstof-pro, fusion-lumos, ltq-orbitrap-velos, qexactive-plus, microtof-q2, waters-xevo, agilent-qtof
+   - root test mzpeak: small, small.chunked, small.numpress, has_uv
+
+**Resume (idempotent):** re-run the push script — currently the ephemeral `/tmp/push_data_s3.sh`;
+**persist it as `scripts/push-data-stackit.sh`** first. The originals `aws s3 sync` skips what is
+already present and finishes the Astral upload; the mzpeak-placement steps then fill the gaps. Uses
+`aws --profile stackit --endpoint-url https://object.storage.eu01.onstackit.cloud`.
+
+**Exclude (never upload):** `data/keys.txt`, `data/aws_login.sh` (+ its `~` backup) — both contain
+credentials — plus `*.log`, `*.DS_Store`, `data/cors.json`, and `thermo-orbitrap-astral-reconv.mzpeak`
+(dev duplicate).
+
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with `/gsd:review-backlog` when ready)
