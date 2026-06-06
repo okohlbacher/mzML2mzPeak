@@ -358,17 +358,19 @@ fn raw_facet_bit_for_bit() {
     let _ = std::fs::remove_file(&out);
 }
 
-/// DAT-01 (the decisive write-fix proof): after converting the fixture, the `spectra_data`
-/// `point.mz` / `point.intensity` columns are GENUINELY POPULATED (non-NULL) for the profile
-/// pixels — NOT spilled to `spectrum.auxiliary_arrays`. This reads the `spectra_data.parquet`
-/// facet DIRECTLY out of the archive (unzip + arrow), so unlike `raw_facet_bit_for_bit` (which
-/// goes through `MzPeakReader::get_spectrum_arrays`, which silently merges auxiliary arrays and
-/// would therefore PASS even with the bug) it cannot be satisfied by aux-array fallback.
+/// DAT-01 + Phase 16 DTY-01 (the decisive write-fix proof, updated to the CANONICAL contract):
+/// after converting the fixture, the `spectra_data` `point.mz` / `point.intensity` columns are
+/// GENUINELY POPULATED (non-NULL) for the profile pixels — NOT spilled to
+/// `spectrum.auxiliary_arrays`. This reads the `spectra_data.parquet` facet DIRECTLY out of the
+/// archive (unzip + arrow), so unlike `raw_facet_bit_for_bit` (which goes through
+/// `MzPeakReader::get_spectrum_arrays`, which silently merges auxiliary arrays and would
+/// therefore PASS even with the bug) it cannot be satisfied by aux-array fallback.
 ///
-/// The fixture has F64-m/z (pixel A) and F32-m/z (pixel B) profile spectra; both widths must
-/// appear in the POINT columns — F64 in `mz_f64`, F32 in the primary `mz` — proving THE CRUX
-/// (source width preserved, no widening). Every profile point must have exactly one non-null
-/// m/z value across the two width columns, and a non-null intensity.
+/// Phase 16 redefinition: the fixture has F64-m/z (pixel A) and F32-m/z (pixel B) profile
+/// spectra, but the canonical data facet now emits a SINGLE uniform `mz` Float64 column for BOTH
+/// (the F32 pixel is widened f32→f64, value-equal) and a single `intensity` Float32 column. So
+/// the old per-width split (`mz` f32 + `mz_f64_mz` f64) no longer exists: there is ONE non-null
+/// f64 `mz` value and ONE non-null f32 `intensity` value per point (no widths-spill, no aux).
 #[test]
 fn point_columns_populated_not_auxiliary() {
     use arrow::array::{Array, AsArray};
@@ -398,11 +400,10 @@ fn point_columns_populated_not_auxiliary() {
         .expect("parquet reader");
 
     // The two profile pixels contribute 3 + 4 = 7 POINT rows. Walk every row of the nested
-    // `point` struct and assert: at least one m/z width column is non-null, and intensity is
-    // non-null. Also confirm BOTH widths actually occur (F64 from pixel A, F32 from pixel B).
+    // `point` struct and assert: the canonical single f64 `mz` column is non-null AND the
+    // canonical single f32 `intensity` column is non-null (no aux spill, no per-width split).
     let mut total_points = 0usize;
-    let mut saw_f64_mz = false;
-    let mut saw_f32_mz = false;
+    let mut saw_canonical_mz = false;
     for batch in reader {
         let batch = batch.expect("record batch");
         let point = batch
@@ -410,11 +411,16 @@ fn point_columns_populated_not_auxiliary() {
             .expect("point struct column")
             .as_struct();
 
-        // Locate the m/z columns by name: the writer collapses the first-registered (Float32)
-        // variant to the bare primary `mz`, and the Float64 sibling keeps the dtype+unit suffix
-        // `mz_f64_mz` (f64 dtype, m/z unit). Pixel B (F32) populates `mz`; pixel A (F64) `mz_f64_mz`.
-        let mz_f32 = point.column_by_name("mz").map(|c| c.as_primitive::<arrow::datatypes::Float32Type>());
-        let mz_f64 = point.column_by_name("mz_f64_mz").map(|c| c.as_primitive::<arrow::datatypes::Float64Type>());
+        // Canonical schema (Phase 16): exactly ONE m/z column, named `mz`, dtype Float64 — there
+        // is NO `mz_f64_mz` sibling anymore (both source widths collapse into one f64 column).
+        assert!(
+            point.column_by_name("mz_f64_mz").is_none(),
+            "canonical schema has NO per-width m/z split column (mz_f64_mz must be absent)"
+        );
+        let mz = point
+            .column_by_name("mz")
+            .expect("canonical m/z column present")
+            .as_primitive::<arrow::datatypes::Float64Type>();
         let intensity = point
             .column_by_name("intensity")
             .expect("intensity column present")
@@ -423,15 +429,12 @@ fn point_columns_populated_not_auxiliary() {
         let n = point.len();
         total_points += n;
         for i in 0..n {
-            let f64_present = mz_f64.map(|a| a.is_valid(i)).unwrap_or(false);
-            let f32_present = mz_f32.map(|a| a.is_valid(i)).unwrap_or(false);
-            saw_f64_mz |= f64_present;
-            saw_f32_mz |= f32_present;
             assert!(
-                f64_present ^ f32_present,
-                "point {i}: exactly one m/z width column must be non-null (got f64={f64_present}, f32={f32_present}) \
+                mz.is_valid(i),
+                "point {i}: canonical f64 m/z must be non-null in the POINT column (DTY-01) \
                  — NOT spilled to auxiliary_arrays (DAT-01)"
             );
+            saw_canonical_mz = true;
             assert!(
                 intensity.is_valid(i),
                 "point {i}: intensity must be non-null in the spectra_data POINT column (DAT-01)"
@@ -440,8 +443,10 @@ fn point_columns_populated_not_auxiliary() {
     }
 
     assert_eq!(total_points, 7, "profile pixels contribute 3 + 4 = 7 POINT rows");
-    assert!(saw_f64_mz, "the F64-m/z profile pixel populated the `mz_f64` POINT column (no widening)");
-    assert!(saw_f32_mz, "the F32-m/z profile pixel populated the primary `mz` POINT column (THE CRUX)");
+    assert!(
+        saw_canonical_mz,
+        "both profile pixels populate the single canonical f64 `mz` POINT column (DTY-01)"
+    );
 
     let _ = std::fs::remove_file(&data_path);
     let _ = std::fs::remove_file(&out);

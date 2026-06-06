@@ -287,6 +287,32 @@ impl ImagingWriter {
         Ok(())
     }
 
+    /// Record that the intensity axis was NARROWED `Float64 → Float32` by the canonical
+    /// data-facet cast (Phase 16, DTY-03). Appends an `intensity narrowed` provenance param to
+    /// the `mzml2mzpeak_conversion` [`DataProcessing`] / [`ProcessingMethod`] that
+    /// [`ImagingWriter::write_run_metadata`] already records, so a consumer can tell stored
+    /// intensity precision was reduced from the source. Lossless widening (m/z `f32→f64`)
+    /// records NOTHING — this is called ONLY when narrowing occurred.
+    ///
+    /// MUST be called AFTER `write_run_metadata` (which creates the conversion DataProcessing).
+    /// If the conversion entry is somehow absent, this is a no-op (the note simply is not added)
+    /// rather than a panic — the CLI warning is the redundant second sink (DTY-04).
+    pub fn record_intensity_narrowing(&mut self) {
+        if let Some(dp) = self
+            .inner
+            .data_processings_mut()
+            .iter_mut()
+            .find(|dp| dp.id == "mzml2mzpeak_conversion")
+        {
+            if let Some(method) = dp.methods.first_mut() {
+                method.params.push(Param::new_key_value(
+                    "intensity narrowed",
+                    "Float64 -> Float32",
+                ));
+            }
+        }
+    }
+
     /// The assembled `metadata.imaging` block, for Plan 03 to insert at the finish stage via
     /// `zip.add_index_metadata("imaging", writer.imaging_metadata()?)`. Returns the discovery
     /// block assembled by [`ImagingWriter::write_run_metadata`].
@@ -897,6 +923,57 @@ mod tests {
         assert_eq!(block.scan_pattern.as_deref(), Some("IMS:1000413"));
         // pixel_size omitted (only one... actually neither axis present) → None.
         assert!(block.pixel_size_um.is_none(), "no pixel size → omitted");
+
+        let _ = std::fs::remove_file(&out);
+    }
+
+    /// DTY-03 (Phase 16): `record_intensity_narrowing` appends an `intensity narrowed`
+    /// `Float64 -> Float32` provenance param to the `mzml2mzpeak_conversion` DataProcessing,
+    /// and a run with NO narrowing call carries no such note.
+    #[test]
+    fn record_intensity_narrowing_adds_provenance_note() {
+        use mzdata::meta::FileMetadataConfig;
+
+        let mut out = std::env::temp_dir();
+        out.push(format!("mzml2mzpeak_writer_narrow_{}.mzpeak", std::process::id()));
+        let mut w = ImagingWriter::new(&out, &[]).expect("build writer");
+
+        let prov = RunProvenance {
+            uuid: None,
+            data_mode: StorageMode::Processed,
+            ibd_checksum: None,
+            ibd_checksum_type: None,
+        };
+        let source = FileMetadataConfig::default();
+        w.write_run_metadata(&source, &prov, None).expect("wire metadata");
+
+        // Helper: does the conversion DataProcessing carry the narrowing note?
+        let has_note = |w: &ImagingWriter| {
+            w.inner
+                .data_processings()
+                .iter()
+                .find(|dp| dp.id == "mzml2mzpeak_conversion")
+                .map(|dp| {
+                    dp.methods.iter().any(|m| {
+                        m.params.iter().any(|p| {
+                            p.name == "intensity narrowed"
+                                && p.value.to_string().contains("Float64")
+                                && p.value.to_string().contains("Float32")
+                        })
+                    })
+                })
+                .unwrap_or(false)
+        };
+
+        // Before recording: no narrowing note (lossless widening records nothing).
+        assert!(!has_note(&w), "no narrowing note until record_intensity_narrowing is called");
+
+        // After recording: the note is present, naming Float64 -> Float32.
+        w.record_intensity_narrowing();
+        assert!(
+            has_note(&w),
+            "record_intensity_narrowing appends the Float64 -> Float32 provenance note (DTY-03)"
+        );
 
         let _ = std::fs::remove_file(&out);
     }

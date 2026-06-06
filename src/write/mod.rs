@@ -26,9 +26,9 @@ pub mod convert;
 pub mod image;
 pub mod mzml;
 
-pub use spectrum::to_mzdata;
+pub use spectrum::{to_mzdata, to_mzdata_canonical, CastNarrowing};
 pub use writer::{ImagingWriter, WriteError};
-pub use convert::{convert, convert_with};
+pub use convert::{convert, convert_with, ConversionOutcome};
 pub use mzml::{convert_mzml, inspect_mzml, MzmlConvertError, MzmlConvertReport};
 
 use mzpeak_prototyping::chunk_series::ChunkingStrategy;

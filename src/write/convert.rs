@@ -27,8 +27,22 @@ use mzdata::prelude::SpectrumLike;
 use crate::read::ImagingReader;
 use crate::schema::metadata::PixelCountSource;
 use crate::write::image::{build_image_entry, full_extent_affine, read_tiff_dimensions, sha256_and_size};
+use crate::write::spectrum::{to_mzdata_canonical, CastNarrowing};
 use crate::write::writer::IndexAccumulator;
 use crate::write::{ImagingWriter, WriteError, to_mzdata};
+
+/// The outcome of a forward conversion, carrying the per-axis canonical-cast narrowing
+/// determination (Phase 16, DTY-04) so the CLI can surface a warning.
+///
+/// A real imzML run is dtype-homogeneous, so a single run-level narrowing flag (observed on the
+/// sampled-first spectrum) is authoritative: `narrowing.intensity_f64_to_f32 == true` iff the
+/// source intensity dtype is `Float64` (narrowed to canonical `Float32`). Lossless widening
+/// (m/z `f32→f64`) leaves the flag `false`. An empty run leaves it `false`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ConversionOutcome {
+    /// Per-axis narrowing incurred by the canonical data-facet cast (DTY-03/DTY-04).
+    pub narrowing: CastNarrowing,
+}
 
 /// Convert an imaging spectrum stream into an imaging mzPeak archive at `out_path`.
 ///
@@ -55,7 +69,9 @@ pub fn convert(
 ) -> Result<(), WriteError> {
     // Library/back-compat entry point: legacy lossless encoding (no chunking, default zstd) so the
     // L1 bit-for-bit guarantee and existing tests are unchanged. The CLI uses `convert_with`.
+    // The narrowing outcome is the CLI's concern (DTY-04); the library wrapper drops it.
     convert_with(reader, out_path, image_paths, &crate::write::EncodingOptions::legacy())
+        .map(|_outcome| ())
 }
 
 /// Like [`convert`] but applies output-size [`EncodingOptions`](crate::write::EncodingOptions)
@@ -67,7 +83,7 @@ pub fn convert_with(
     out_path: &Path,
     image_paths: &[PathBuf],
     opts: &crate::write::EncodingOptions,
-) -> Result<(), WriteError> {
+) -> Result<ConversionOutcome, WriteError> {
     // (0) PRE-FLIGHT image validation (WR-01): fail BEFORE any output file is created, so a
     //     bad/missing/non-TIFF/separator-named image passed anywhere in the --image list never
     //     strands a truncated/corrupt `.mzpeak` on disk. `ImagingWriter::new` below is the first
@@ -114,11 +130,18 @@ pub fn convert_with(
     // The sampled-first spectrum is OBSERVED on the raw ImagingSpectrum BEFORE to_mzdata consumes
     // it (CODEX review-#2 / IDX-02): the first pixel's coordinates + MS1 m/z must count toward the
     // index totals (no off-by-one drop). Bind the unwrapped record, observe it, THEN convert it.
+    // The canonical cast is uniform across the run (Phase 16): the sampled-first spectrum's
+    // per-axis narrowing is authoritative for the whole pass (a real imzML file is
+    // dtype-homogeneous), so capture it here. `narrowing` stays `Default` (no narrowing) for an
+    // empty run. m/z never narrows; intensity narrows iff its source dtype is f64 (DTY-03).
+    let mut narrowing = CastNarrowing::default();
     let first = match reader.next() {
         Some(item) => {
             let rec = item?;
             acc.observe(rec.x, rec.y, rec.z, rec.ms_level, &rec.mz);
-            Some(to_mzdata(&rec)?)
+            let (spec, n) = to_mzdata_canonical(&rec)?;
+            narrowing = n;
+            Some(spec)
         }
         None => None,
     };
@@ -139,6 +162,15 @@ pub fn convert_with(
     //     ImagingMetadata block still carries is_imaging + coordinate_base — OUT-03).
     let provenance = reader.provenance().clone();
     writer.write_run_metadata(reader.source_metadata(), &provenance, None)?;
+
+    // (2b) PROVENANCE (Phase 16, DTY-03): if the canonical cast narrowed intensity
+    //      (Float64 → Float32, lossy), record a per-axis provenance note on the conversion
+    //      DataProcessing the line above just created. Lossless m/z widening records NOTHING.
+    //      The CLI warning (DTY-04) is the redundant second sink, surfaced from the returned
+    //      ConversionOutcome.
+    if narrowing.intensity_f64_to_f32 {
+        writer.record_intensity_narrowing();
+    }
 
     // (3) Write the sampled-first spectrum (if any), then stream the REST one at a time
     //     (IN-08 — no collect-all). Each read error propagates via `?` (WriteError::Read).
@@ -269,7 +301,7 @@ pub fn convert_with(
     // (zip::result::ZipError: Into<std::io::Error> is not guaranteed, so convert explicitly).
     zip.finish()
         .map_err(|e| WriteError::Io(std::io::Error::other(e)))?;
-    Ok(())
+    Ok(ConversionOutcome { narrowing })
 }
 
 #[cfg(test)]

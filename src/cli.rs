@@ -313,7 +313,21 @@ fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
     };
     let reader = ImagingReader::open_with(&cli.input, cli.allow_checksum_mismatch)
         .with_context(|| format!("failed to open imzML reader for {}", cli.input.display()))?;
-    convert_with(reader, out, &cli.images, &enc).context("conversion failed")?;
+    let outcome = convert_with(reader, out, &cli.images, &enc).context("conversion failed")?;
+
+    // DTY-04 (Phase 16): if the canonical data-facet cast NARROWED an axis (lossy), warn —
+    // naming the axis and the source→target dtype. Today only intensity can narrow
+    // (Float64 → Float32); m/z is only ever widened (Float32 → Float64, exact) and warns nothing.
+    // This is the second, redundant sink alongside the metadata provenance note (recorded in
+    // convert_with). Lossless-only runs (e.g. PXD001283, already f64 m/z + f32 intensity) emit
+    // no warning.
+    if outcome.narrowing.intensity_f64_to_f32 {
+        log::warn!(
+            "intensity narrowed Float64 -> Float32 (lossy): source intensity is 64-bit but the \
+             canonical mzPeak data facet stores intensity as 32-bit — precision reduced (recorded \
+             as a conversion provenance note in metadata)"
+        );
+    }
 
     if let Some(pb) = bar {
         if let Some(n) = total {
