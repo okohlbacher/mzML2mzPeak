@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: — Spec conformance — dtypes + CV/geometry/provenance
 status: verifying
-stopped_at: Completed 19-01-PLAN.md (SRC-01/SRC-02 — source_files[] .imzML + .ibd, reused UUID/checksum, no second hash. Phase 19 complete 1/1).
-last_updated: "2026-06-06T03:42:25.477Z"
+stopped_at: Completed 20-03-PLAN.md
+last_updated: "2026-06-06T03:49:21.802Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 13
-  completed_plans: 12
-  percent: 67
+  completed_plans: 13
+  percent: 83
 ---
 
 # Project State
@@ -100,6 +100,7 @@ matching `schema/*.json`.
 | Phase 19 P01 | ~10min | 2 tasks | 5 files |
 | Phase 20 P01 | 12min | 2 tasks | 4 files |
 | Phase 20 P02 | ~10 min | 2 tasks | 5 files |
+| Phase 20 P03 | 12m | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -161,6 +162,8 @@ Key file touchpoints for Phase 16 (from the milestone scoping):
 - [Phase ?]: Plan 20-02: EmbedMode Strict/Soft is the only --image vs auto-discovered asymmetry (format identical, Option B pre-flight)
 - [Phase ?]: Plan 20-02: descriptive optical CV attrs folded into existing ImageEntry optional fields (IMS:1006017 alignment as a modality suffix) — no schema field added
 - [Phase ?]: Plan 20-02: global dedup by canonicalized path over the whole embed list (--image + auto), --image first then auto in document order
+- [Phase ?]: Plan 20-03: acceptance fixture is BOTH the ImagingReader spectrum source AND convert_with input_path, exercising the preflight-valid .ibd auto-discovery path end-to-end
+- [Phase ?]: Plan 20-03: synthetic .ibd sidecars are byte copies of Example_Processed.ibd so UUID/SHA-1 are reused verbatim (no invented checksums) and preflight passes
 
 ### Pending Todos
 
@@ -198,8 +201,8 @@ Items acknowledged and carried forward to v0.7+:
 
 ## Session Continuity
 
-Last session: 2026-06-06T03:41:56.406Z
-Stopped at: Completed 19-01-PLAN.md (SRC-01/SRC-02 — source_files[] .imzML + .ibd, reused UUID/checksum, no second hash. Phase 19 complete 1/1).
+Last session: 2026-06-06T03:49:21.799Z
+Stopped at: Completed 20-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
