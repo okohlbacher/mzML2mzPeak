@@ -107,9 +107,11 @@
 **Action:** describe how optical images are stored and registered.
 
 > **Optical images (v0.5).** An imaging archive _MAY_ embed **one or more optical images** —
-> microscopy / histology overviews of the imaged sample. In v0.5 optical images are **TIFF-only**.
-> Each image is stored as a **separate ZIP member** named `images/image_NNNN.tiff`, where `NNNN` is the
-> 0-based import order (zero-padded, e.g. `images/image_0000.tiff`, `images/image_0001.tiff`). Images
+> microscopy / histology overviews of the imaged sample. In v0.5 optical images were **TIFF-only**;
+> **[Phase 20]** lifts this — any image format is embeddable verbatim (see the auto-discovery /
+> any-format subsection below). Each image is stored as a **separate ZIP member** named
+> `images/image_NNNN.<ext>` (v0.5 `.tiff`; Phase 20 preserves the source extension), where `NNNN` is
+> the 0-based import order (zero-padded, e.g. `images/image_0000.tiff`, `images/image_0001.png`). Images
 > are added through the writer's ZIP API (`ZipArchiveWriter::start_other` / `add_file_from_read`) and
 > the bytes are copied **verbatim** (no re-encoding, no EXIF / orientation correction). Each member is
 > **registered in the archive's `FileIndex` as an `Other` entry by member name only**, so that
@@ -148,6 +150,38 @@
 > are imported as above. **Reverse (`mzPeak → imzML`) image export is OUT OF SCOPE for v0.5** — the
 > reverse path drops embedded optical images (a documented degrade; the spectral L1 round-trip bar is
 > unaffected).
+>
+> **[Phase 20] Auto-discovery + any-format embed.** Beyond explicit converter `--image` inputs, the
+> forward converter now **auto-discovers** optical images from the source imzML: every `IMS:1006008`
+> "optical image location" in a `<sample>` is parsed (with its descriptive siblings —
+> `IMS:1006011/12` subject, `IMS:1006013` morphology, `IMS:1006015` staining method, `IMS:1006017`
+> alignment method), resolved relative to the `.imzML` directory (rejecting any `..` path-escape),
+> and embedded — **no `--image` flag required**. The embed path is **no longer TIFF-only**: a TIFF
+> (or TIFF-based `.svs`, detected by magic bytes) gets its `width`/`height` from the first IFD and
+> `media_type="image/tiff"`; **any other format** (`.png`, `.jpg`, …) is embedded **verbatim** with
+> `media_type` derived from the file extension and `width`/`height` omitted (stored as `0`). The
+> archive member **preserves the source extension** — `images/image_NNNN.<ext>` (e.g.
+> `images/image_0000.png`), not a forced `.tiff`.
+>
+> **[Phase 20] Soft-fail asymmetry.** A missing/unreadable **auto-discovered** image is **non-fatal**:
+> the converter logs a WARNING and continues (the spectral output is unaffected — optical images are
+> auxiliary). A **path-escape** rejection is logged as a DISTINCT traversal warning (never silently
+> masked) and skipped. By contrast an explicit **`--image`** to a missing/unreadable path **still
+> hard-fails** (regardless of image format) — the user who names a path expects a hard failure.
+>
+> **[Phase 20] Coexist + dedup + order.** Explicit `--image` images and auto-discovered images embed
+> into ONE `images[]`. Order is deterministic and documented: **`--image` entries first**, then
+> auto-discovered entries in imzML **document order**; `image_NNNN` ordinals are dense + contiguous
+> over successfully-embedded images. The same resolved file is **embedded exactly once** (dedup by
+> canonicalized path) — e.g. `--image X` plus an imzML that also references `X` yields a single member.
+>
+> **[Phase 20] Descriptive-attr mapping.** The `IMS:1006008` descriptive siblings map **additively**
+> onto the existing optional `images[]` fields (no new field): `IMS:1006015` staining method (e.g.
+> `H&E`) → `modality`; `IMS:1006017` alignment method → a `modality` suffix (`"…; aligned: <method>"`)
+> so the alignment method stays observable; subject terms (`IMS:1006011` of-analysed-sample /
+> `IMS:1006012` adjacent-section) and `IMS:1006013` morphology → `derived_subtype`. `role` stays
+> `optical`. An explicit `--image` entry carries no descriptive attrs (its optional fields stay
+> absent — v0.5-identical).
 >
 > #### Future / richer option (F8 — deferred, NOT v0.5)
 >
