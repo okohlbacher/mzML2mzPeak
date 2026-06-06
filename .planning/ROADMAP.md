@@ -164,7 +164,10 @@ Plans:
   3. The mzPeak-only affine/registration degrades gracefully — it is NOT re-emitted as a CV param (no imzML CV transform term exists; `IMS:1006017` is free-text method only), and this loss is documented; an archive with no embedded images is a clean no-op (no spurious `IMS:1006008`).
   4. The change is reflected in all three places: implementation (`src/…`), `docs/mzpeak-imaging-spec-suggestions.md`, and the matching `schema/*.json`.
 
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 21-01-PLAN.md — Reverse image-member export primitive (read ZIP member bytes out, write external file beside .imzML, export-filename path guard, bounded streaming) [RIMG-01]
+- [ ] 21-02-PLAN.md — Shared IMS constants + inverse-fold recovery + <sampleList>/<sample> IMS:1006008 emit wired into reverse convert [RIMG-02]
+- [ ] 21-03-PLAN.md — Forward→reverse round-trip + no-op + soft-posture tests + spec doc Edit 7 (affine degrade) [RIMG-03]
 **UI hint**: yes
 
 ## Progress
@@ -180,7 +183,7 @@ Plans:
 | 18. scan_settings_list authoritative geometry facet | v0.6 | 3/3 | Complete |  |
 | 19. source_files[] provenance | v0.6 | 1/1 | Complete   | 2026-06-06 |
 | 20. Optical image auto-discovery & auto-embed | v0.6 | 3/3 | Complete   | 2026-06-06 |
-| 21. Reverse optical image export | v0.6 | 0/? | Not started | - |
+| 21. Reverse optical image export | v0.6 | 0/3 | Planned | - |
 
 ## Next
 
