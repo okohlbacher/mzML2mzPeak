@@ -9,8 +9,10 @@
 //!
 //! The extended fixture (over Phase 4's two pixels) covers CONTEXT Area 4:
 //!   - pixel A: `Profile`, m/z `F64`, intensity `F32`, coords (1,1) — the F64-m/z profile case.
-//!   - pixel B: `Profile`, m/z `F32`, intensity `F32`, coords (3,1) — the F32-m/z profile case
-//!     (proves the L1 f32-width path — RESEARCH Crux — and pairs uniquely by distinct x).
+//!   - pixel B: `Profile`, m/z `F32`, intensity `F32`, coords (3,1) — the F32-m/z profile case.
+//!     After the Phase 16 canonical cast its f32 m/z is WIDENED to canonical f64 (value-equal),
+//!     so it exercises the canonical-width L1 path — not a source-f32-width match. Pairs uniquely
+//!     by distinct x.
 //!   - pixel C: `Centroid`, m/z `F64`, intensity `F32`, coords (2,3) — the centroid case routing
 //!     to the peaks facet.
 //! The set {(1,1),(3,1),(2,3)} is sparse / non-rectangular: cells like (2,1),(1,2),(3,3) stay
@@ -20,8 +22,9 @@
 //!   - `count_equality` (VER-01): output count == source count, via the report.
 //!   - `coordinates_match` (VER-02): every source pixel pairs by coordinate.
 //!   - `values_l1` (VER-03): profile m/z AND intensity per-axis L1 Δ=0; `report.passed()`.
-//!   - `raw_facet_bit_for_bit` (VER-03 caveat): the `spectra_data` facet is the authoritative L1
-//!     reference (bit-for-bit at source width); the centroid peaks-facet m/z is widened, out-of-scope.
+//!   - `raw_facet_canonical_width` (VER-03 caveat): the `spectra_data` facet is the authoritative
+//!     L1 reference at CANONICAL width (f64 m/z + f32 intensity); a source f32 m/z is widened to
+//!     f64 value-equal. The centroid peaks-facet m/z is canonical too, out-of-scope.
 //!   - `centroid_source_reference` (VER-03): centroid intensity Δ=0 vs SOURCE; F32-source centroid
 //!     m/z widening is NOT an L1 failure (Pitfall 2).
 //!   - `values_l2` (VER-03, ≥1 L2): profile pixel under `L2Transformed` (the genuine relaxation).
@@ -51,9 +54,10 @@ use mzpeak_prototyping::MzPeakReader;
 const COORDS: [(i64, i64); 3] = [(1, 1), (3, 1), (2, 3)];
 
 /// Build the extended verification fixture (CONTEXT Area 4 coverage): a F64-m/z profile pixel,
-/// a F32-m/z profile pixel (the L1 f32-width path — RESEARCH Crux), and a centroid pixel, over
-/// the sparse / non-rectangular coordinate set {(1,1),(3,1),(2,3)}. All arrays are small and
-/// deterministic with distinct per-axis values so any mismatch is diagnosable.
+/// a F32-m/z profile pixel (its f32 m/z is WIDENED to canonical f64 by the Phase 16 cast and
+/// compared value-equal at canonical width), and a centroid pixel, over the sparse /
+/// non-rectangular coordinate set {(1,1),(3,1),(2,3)}. All arrays are small and deterministic
+/// with distinct per-axis values so any mismatch is diagnosable.
 fn fixture() -> Vec<ImagingSpectrum> {
     vec![
         // pixel A — Profile, F64 m/z, F32 intensity, coords (1,1).
@@ -67,7 +71,7 @@ fn fixture() -> Vec<ImagingSpectrum> {
             ms_level: 1,
             native_id: "spectrum=1".to_string(),
         },
-        // pixel B — Profile, F32 m/z (proves the L1 f32 path), F32 intensity, coords (3,1).
+        // pixel B — Profile, F32 m/z (widened to canonical f64 value-equal), F32 intensity, (3,1).
         ImagingSpectrum {
             x: COORDS[1].0,
             y: COORDS[1].1,
@@ -112,11 +116,12 @@ fn provenance() -> RunProvenance {
 fn write_fixture(out: &Path, spectra: &[ImagingSpectrum]) -> Result<(), WriteError> {
     use mzdata::spectrum::SpectrumLike;
 
-    // Reconstruct all spectra up front, then derive the data-facet schema from their array maps
-    // (mirrors the reference's sample_array_types_from_spectrum_source). The verification fixture
-    // is mixed-dtype (an F64-m/z and an F32-m/z profile pixel), so sampling ALL of them registers
-    // BOTH the f64 `mz_f64_mz` column and the primary f32 `mz` column — each width once, at its
-    // source dtype (no widening). A real (dtype-homogeneous) file registers a single m/z column.
+    // Reconstruct all spectra up front, then derive the data-facet schema from their array maps.
+    // Under the Phase 16 canonical cast (Plan 16-01) the forward profile facet ALWAYS emits a
+    // single uniform `mz` Float64 column + a single `intensity` Float32 column, regardless of the
+    // source widths — the F32-m/z profile pixel is widened f32→f64 (value-equal). So sampling the
+    // mixed-dtype fixture registers ONE canonical f64 m/z column (no per-width split, no
+    // `mz_f64_mz` sibling) and ONE canonical f32 intensity column.
     let specs: Vec<_> = spectra
         .iter()
         .map(to_mzdata)
@@ -233,8 +238,9 @@ fn coordinates_match() {
 }
 
 /// VER-03 (profile, phase crux): an honest round-trip's profile m/z AND intensity per-axis checks
-/// BOTH pass under L1 (Δ=0 at the SOURCE stored width — F64 m/z for pixel A, F32 m/z for pixel B),
-/// and the whole report `passed()`.
+/// BOTH pass under L1 (value-equal at CANONICAL width — pixel A's F64 m/z compares directly; pixel
+/// B's F32 m/z is widened to canonical f64 and compared value-equal), and the whole report
+/// `passed()`.
 #[test]
 fn values_l1() {
     let out = temp_out("vl1");
@@ -246,7 +252,7 @@ fn values_l1() {
 
     assert!(
         report.mz.passed,
-        "profile m/z per-axis L1 Δ=0 (F64 + F32 paths): {:?}, mismatches={:?}",
+        "profile m/z per-axis L1 value-equal at canonical width (F64 direct + F32→f64 widened): {:?}, mismatches={:?}",
         report.mz, report.mismatches
     );
     assert!(
@@ -262,18 +268,18 @@ fn values_l1() {
     let _ = std::fs::remove_file(&out);
 }
 
-/// VER-03 caveat (the authoritative L1 reference): re-open the archive with `MzPeakReader`, pull
-/// each PROFILE pixel's `spectra_data` m/z + intensity, and assert they are bit-for-bit equal to
-/// the source `NumArray` at MATCHING width (F64 m/z via `.to_f64()` exact-eq, F32 m/z via
-/// `.to_f32()` exact-eq) — proving the DATA facet is the L1 reference.
+/// VER-03 caveat (the authoritative L1 reference at CANONICAL width — Phase 16 DTY-01/DTY-02):
+/// re-open the archive with `MzPeakReader`, pull each PROFILE pixel's `spectra_data` m/z +
+/// intensity, and assert they are VALUE-EQUAL to the source `NumArray` coerced to CANONICAL width
+/// — f64 m/z (a source F32 m/z is WIDENED to f64, value-equal via `as_f64()`; a source F64 m/z
+/// compares directly) and f32 intensity. This proves the DATA facet is the L1 reference at the
+/// canonical width the forward cast now always emits, NOT a source-width bit-for-bit match.
 ///
 /// Documenting the centroid caveat: the centroid pixel's m/z lands in the `spectra_peaks` facet
-/// as Float64 (the upstream `CentroidPeak` schema stores m/z f64). A Float32-source centroid m/z
-/// is therefore WIDENED Float32→Float64 in that facet, so the peaks-facet m/z is NOT the L1
-/// reference (CONTEXT Area 2; out-of-L1-scope). Only the profile `spectra_data` facet is asserted
-/// bit-for-bit here.
+/// as Float64 (the upstream `CentroidPeak` schema stores m/z f64) — already canonical. Only the
+/// profile `spectra_data` facet is asserted at canonical width here.
 #[test]
-fn raw_facet_bit_for_bit() {
+fn raw_facet_canonical_width() {
     use mzdata::spectrum::bindata::{ArrayType, ByteArrayView};
 
     let out = temp_out("rawfacet");
@@ -283,7 +289,7 @@ fn raw_facet_bit_for_bit() {
     let mut reader = MzPeakReader::new(&out).expect("reader opens");
 
     // For each PROFILE pixel, find its output index by coordinate and assert the data-facet
-    // arrays equal the source NumArray bit-for-bit at the source stored width.
+    // arrays equal the source NumArray VALUE-EQUAL at the CANONICAL width (f64 m/z, f32 intensity).
     for s in fx.iter().filter(|s| s.representation == Representation::Profile) {
         // Locate the output index for this pixel's (x,y).
         let mut out_idx = None;
@@ -315,44 +321,29 @@ fn raw_facet_bit_for_bit() {
             .get(&ArrayType::IntensityArray)
             .expect("intensity present in spectra_data");
 
-        // m/z: compare at the SOURCE width — F64 source via to_f64, F32 source via to_f32.
-        match &s.mz {
-            NumArray::F64(src) => {
-                let got = mz_da.to_f64().expect("data-facet m/z decodes as f64");
-                assert_eq!(
-                    got.as_ref(),
-                    src.as_slice(),
-                    "F64-source profile m/z is bit-for-bit at pixel ({},{})",
-                    s.x, s.y
-                );
-            }
-            NumArray::F32(src) => {
-                let got = mz_da.to_f32().expect("data-facet m/z decodes as f32");
-                assert_eq!(
-                    got.as_ref(),
-                    src.as_slice(),
-                    "F32-source profile m/z is bit-for-bit (NO widening) at pixel ({},{})",
-                    s.x, s.y
-                );
-            }
-        }
+        // m/z: the stored facet is CANONICAL f64. Compare value-equal against the source coerced
+        // to canonical f64 (`as_f64()` widens an F32 source losslessly; an F64 source is identity).
+        let got_mz = mz_da.to_f64().expect("canonical data-facet m/z decodes as f64");
+        assert_eq!(
+            got_mz.as_ref(),
+            s.mz.as_f64().as_slice(),
+            "profile m/z is value-equal to source.as_f64() at CANONICAL f64 width at pixel ({},{})",
+            s.x, s.y
+        );
 
-        // intensity: source is F32 for both profile pixels — compare at f32 width.
-        match &s.intensity {
-            NumArray::F32(src) => {
-                let got = int_da.to_f32().expect("data-facet intensity decodes as f32");
-                assert_eq!(
-                    got.as_ref(),
-                    src.as_slice(),
-                    "F32-source profile intensity is bit-for-bit at pixel ({},{})",
-                    s.x, s.y
-                );
-            }
-            NumArray::F64(src) => {
-                let got = int_da.to_f64().expect("data-facet intensity decodes as f64");
-                assert_eq!(got.as_ref(), src.as_slice(), "F64-source intensity bit-for-bit");
-            }
-        }
+        // intensity: the stored facet is CANONICAL f32. Compare value-equal against the source
+        // coerced to f32 (both profile pixels are F32 source → identity here).
+        let got_int = int_da.to_f32().expect("canonical data-facet intensity decodes as f32");
+        let want_int: Vec<f32> = match &s.intensity {
+            NumArray::F32(v) => v.clone(),
+            NumArray::F64(v) => v.iter().map(|&x| x as f32).collect(),
+        };
+        assert_eq!(
+            got_int.as_ref(),
+            want_int.as_slice(),
+            "profile intensity is value-equal at CANONICAL f32 width at pixel ({},{})",
+            s.x, s.y
+        );
     }
 
     let _ = std::fs::remove_file(&out);
@@ -469,11 +460,12 @@ fn point_columns_populated_not_auxiliary() {
 /// no unvisited sibling and the masking path is consistent.
 ///
 /// Asserts: (1) `write_fixture` does not panic — THE crux of this regression; (2) the surviving
-/// data-facet points decode at the SOURCE width with NO widening (every read-back m/z equals an
-/// exact f64 source value; every read-back intensity equals an exact f32 source value) — note
+/// data-facet points decode at the CANONICAL width (this fixture's source is ALREADY canonical —
+/// f64 m/z + f32 intensity — so the canonical cast is a no-op here; every read-back m/z equals an
+/// exact f64 source value, every read-back intensity equals an exact f32 source value) — note
 /// `mask_zero_intensity_runs = true` deliberately drops zero-intensity RUNS, so the read-back is a
 /// subset, not the full array (that masking is the reference writer's documented behavior, not
-/// this fix's concern); (3) the POINT columns are populated as a SINGLE f64 `mz_f64_mz` column
+/// this fix's concern); (3) the POINT columns are populated as a SINGLE canonical f64 `mz` column
 /// (NOT split across two speculative widths) plus the single f32 `intensity` column.
 #[test]
 fn uniform_f64_mz_f32_intensity_with_zero_runs_no_panic() {
@@ -510,10 +502,11 @@ fn uniform_f64_mz_f32_intensity_with_zero_runs_no_panic() {
     // (1) The load-bearing assertion: this must NOT panic (it did on real data before the fix).
     write_fixture(&out, &fx).expect("uniform f64-m/z + f32-intensity (with zero runs) converts");
 
-    // (2) The surviving data-facet points decode at the SOURCE width with NO widening. Because
+    // (2) The surviving data-facet points decode at the CANONICAL width (f64 m/z, f32 intensity).
+    //     This fixture's source is ALREADY canonical, so the cast is a no-op. Because
     //     mask_zero_intensity_runs drops zero-intensity runs, the read-back is a SUBSET of the
     //     source — so we assert each surviving value is an EXACT member of the source array at the
-    //     source width (f64 m/z, f32 intensity), proving no f32-widening crept in.
+    //     canonical width.
     let mut reader = MzPeakReader::new(&out).expect("reader opens");
     for s in &fx {
         let mut out_idx = None;
@@ -541,14 +534,14 @@ fn uniform_f64_mz_f32_intensity_with_zero_runs_no_panic() {
         for &m in got_mz.iter() {
             assert!(
                 src_mz.iter().any(|&v| v == m),
-                "read-back m/z {m} is an exact f64 source value (no widening) at ({},{})",
+                "read-back m/z {m} is an exact f64 source value at canonical width at ({},{})",
                 s.x, s.y
             );
         }
         for &v in got_int.iter() {
             assert!(
                 src_int.iter().any(|&w| w == v),
-                "read-back intensity {v} is an exact f32 source value (no widening) at ({},{})",
+                "read-back intensity {v} is an exact f32 source value at canonical width at ({},{})",
                 s.x, s.y
             );
         }
@@ -591,7 +584,7 @@ fn uniform_f64_mz_f32_intensity_with_zero_runs_no_panic() {
         assert_eq!(
             mz_cols[0].data_type(),
             &arrow::datatypes::DataType::Float64,
-            "the single m/z POINT column is Float64 — source width preserved, no widening/narrowing"
+            "the single m/z POINT column is canonical Float64 (this source is already canonical)"
         );
         let mz = point
             .column_by_name(mz_cols[0].name())
@@ -998,8 +991,9 @@ fn sparse_grid_no_panic() {
 /// carries zero-intensity runs round-trips and VERIFIES under L1 even though the writer's
 /// `mask_zero_intensity_runs` drops interior zeros (so the output point arrays are a SUBSET of
 /// the source). The merge accepts the subset because every dropped point had intensity == 0 and
-/// every surviving point matches bit-for-bit at the source width. This is the case that FALSELY
-/// FAILED under the previous strict element-wise compare.
+/// every surviving point matches value-equal at the canonical width (this source is already
+/// canonical f64 m/z + f32 intensity). This is the case that FALSELY FAILED under the previous
+/// strict element-wise compare.
 #[test]
 fn profile_with_zero_runs_passes_l1_under_masking() {
     let out = temp_out("zeroruns_l1");
@@ -1034,7 +1028,7 @@ fn profile_with_zero_runs_passes_l1_under_masking() {
 
     assert!(
         report.mz.passed,
-        "m/z of surviving points is bit-for-bit; dropped zeros are not m/z failures: {:?}, mismatches={:?}",
+        "m/z of surviving points is value-equal at canonical width; dropped zeros are not m/z failures: {:?}, mismatches={:?}",
         report.mz, report.mismatches
     );
     assert!(

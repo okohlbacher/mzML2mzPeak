@@ -29,6 +29,15 @@
 //! internally; the Python reader crashes on IMS:* params (Pitfall 5), so it is never introduced.
 //! The processed-mode centroid f32→f64 m/z widening is out-of-L1-scope and is NOT a failure
 //! (Pitfall 6 — already handled inside `verify_streaming`'s representation branch).
+//!
+//! ## Phase 16 invariant: PXD001283 is already canonical (DTY-07)
+//!
+//! PXD001283 stores f64 m/z + f32 intensity — exactly the canonical mzPeak data-facet width. The
+//! Phase 16 canonical cast is therefore a NO-OP on this dataset: m/z is not widened (already f64),
+//! intensity is not narrowed (already f32), so NO narrowing provenance note and NO CLI warning are
+//! emitted, and the redefined value-equal-at-canonical-width L1 reduces to the prior exact compare.
+//! This gate must pass UNCHANGED at `ConformanceLevel::L1BitForBit` (the identifier kept in Plan
+//! 16-02; its semantics are now value-equal-at-canonical-width) and is NOT weakened.
 
 use std::path::Path;
 

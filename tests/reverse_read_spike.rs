@@ -3,10 +3,12 @@
 //! Proves — over the Plan-01 synthetic `.mzpeak` fixtures — that the reverse (mzPeak → imzML)
 //! read half composes the exact records Phases 8/9 will consume:
 //!
-//!   - `count_and_dtype` (RMZ-01): `MzPeakReader::len()` equals the fixture pixel count, and an
-//!     `F64` m/z axis reads back as [`NumArray::F64`] while an `F32` intensity axis reads back as
-//!     [`NumArray::F32`] — the SOURCE dtype is NOT widened. The single-index `read_pixel` helper
-//!     reads one spectrum at a time (bounded memory — never a `Vec`-of-all-spectra).
+//!   - `count_and_dtype` (RMZ-01 + Phase 16 DTY-07): `MzPeakReader::len()` equals the fixture
+//!     pixel count, and arrays read back at the STORED CANONICAL width (`mz=f64`, `intensity=f32`).
+//!     Under the Phase 16 canonical cast a widened (f32-SOURCE) m/z reads back as canonical
+//!     [`NumArray::F64`] (the INVERTED assertion — widening is now EXPECTED, no longer forbidden);
+//!     an already-canonical f64-source pixel still reads back f64. The single-index `read_pixel`
+//!     helper reads one spectrum at a time (bounded memory — never a `Vec`-of-all-spectra).
 //!   - `coords_by_accession` (RMZ-02): each pixel's `(x, y)` recovered via IMS:1000050 /
 //!     IMS:1000051 equals the fixture's coordinates; `z` (IMS:1000052) is `None` when absent.
 //!   - `imaging_metadata_optional` (RMZ-03): the imaging fixture yields `Some(dims)` from
@@ -22,7 +24,9 @@
 //! (`src/verify/verify.rs::build_index_coords` + the `decode_at` dtype branch +
 //! `compare_paired_pixel`'s Profile/Centroid facet routing) but returns a typed
 //! [`ReverseError`] instead of comparing. It NEVER calls the coercing `mzs()`/`intensities()`
-//! accessors (they widen/narrow and destroy the source dtype — record.rs:18-20).
+//! accessors; [`decode_axis`] reads each axis at its STORED canonical width (`mz=f64`,
+//! `intensity=f32` after Phase 16-01) — the value-equal roundtrip reference (DTY-06), not a
+//! recovered pre-cast source dtype.
 //!
 //! ## Synthetic-only (RESEARCH Pitfall 5 / VALIDATION 60s latency)
 //!
@@ -103,7 +107,8 @@ fn read_pixel(reader: &mut MzPeakReader, index: u64) -> Result<ReversePixel, Rev
     let representation: Representation = descr.signal_continuity.into();
 
     let (mz, intensity) = match representation {
-        // Profile → spectra_data facet (raw arrays at SOURCE width — the L1 reference).
+        // Profile → spectra_data facet (arrays at the STORED CANONICAL width — the value-equal
+        // L1 reference after Phase 16-01: f64 m/z + f32 intensity, DTY-06).
         Representation::Profile => {
             let arrays = reader
                 .get_spectrum_arrays(index)
@@ -145,9 +150,10 @@ fn read_pixel(reader: &mut MzPeakReader, index: u64) -> Result<ReversePixel, Rev
     Ok(ReversePixel { x, y, z, representation, mz, intensity })
 }
 
-/// Decode one `DataArray` at its SOURCE dtype into a [`NumArray`], rejecting any dtype outside
+/// Decode one `DataArray` at its STORED dtype into a [`NumArray`], rejecting any dtype outside
 /// `{Float32, Float64}` with [`ReverseError::UnsupportedDtype`] (threat T-07-02 — reject, never
-/// cast). NEVER calls the coercing `mzs()`/`intensities()` accessors.
+/// cast). NEVER calls the coercing `mzs()`/`intensities()` accessors. The stored dtype IS the
+/// canonical mzPeak width (DTY-06), returned as-is — not a recovered pre-cast source dtype.
 fn decode_axis(
     da: &mzdata::spectrum::bindata::DataArray,
     index: u64,
@@ -179,10 +185,41 @@ fn open_primed(path: &std::path::Path) -> (MzPeakReader, usize) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// RMZ-01: spectrum count + source-dtype (no-widen) bounded array reads.
+// RMZ-01 + Phase 16 DTY-07: spectrum count + CANONICAL-width bounded array reads.
+//
+// CONTRACT INVERSION (Phase 16): the pre-Phase-16 assertion was "the SOURCE dtype is NOT widened".
+// Under the canonical cast (Plan 16-01) the forward profile facet ALWAYS stores f64 m/z + f32
+// intensity, so a WIDENED (f32-SOURCE) m/z now reads back as canonical f64 — widening is EXPECTED,
+// not forbidden. This test asserts BOTH directions:
+//   - the WIDENED case: a pixel whose SOURCE m/z was Float32 reads back as canonical NumArray::F64
+//     (the inverted assertion — the decisive change), via the mixed-dtype fixture.
+//   - the already-canonical case: an f64-source pixel still reads back f64/f32 as before.
 // ---------------------------------------------------------------------------------------------
 #[test]
 fn count_and_dtype() {
+    // (A) The INVERTED assertion: a WIDENED (f32-SOURCE) m/z reads back at canonical f64.
+    // The mixed-dtype fixture's only pixel has a Float32 SOURCE m/z (and a Float64 SOURCE
+    // intensity); after the Plan 16-01 canonical cast the stored facet is f64 m/z + f32 intensity,
+    // so the reverse read MUST return NumArray::F64 for m/z — widening is now the expected contract.
+    let mixed = reverse_fixtures::mixed_dtype_imaging_archive();
+    let (mut mreader, mcount) = open_primed(&mixed);
+    assert_eq!(mcount, 1, "mixed-dtype fixture has one pixel");
+    let pm = read_pixel(&mut mreader, 0).expect("read mixed-dtype pixel 0");
+    assert!(
+        matches!(pm.mz, NumArray::F64(_)),
+        "WIDENED (f32-source) m/z reads back at CANONICAL f64 (Phase 16 inversion: widening is \
+         now EXPECTED, not forbidden), got {:?}",
+        pm.mz.source_dtype()
+    );
+    assert!(
+        matches!(pm.intensity, NumArray::F32(_)),
+        "NARROWED (f64-source) intensity reads back at CANONICAL f32, got {:?}",
+        pm.intensity.source_dtype()
+    );
+    assert!(!pm.mz.is_empty() && !pm.intensity.is_empty(), "mixed-dtype arrays non-empty");
+    std::fs::remove_file(&mixed).ok();
+
+    // (B) The already-canonical fixture: an f64-source pixel still reads back f64/f32 unchanged.
     let path = reverse_fixtures::imaging_archive();
     let (mut reader, count) = open_primed(&path);
 
@@ -192,15 +229,16 @@ fn count_and_dtype() {
     // Read the FIRST (Profile) pixel one index at a time (bounded — single-index helper).
     let p0 = read_pixel(&mut reader, 0).expect("read pixel 0");
 
-    // Dtype is NOT widened: the fixture's Float64 m/z stays F64, the Float32 intensity stays F32.
+    // Already-canonical: the fixture's Float64 m/z stays F64, the Float32 intensity stays F32
+    // (this pixel's SOURCE width already equals the canonical width — no cast effect to observe).
     assert!(
         matches!(p0.mz, NumArray::F64(_)),
-        "m/z must read back as NumArray::F64 (no widening), got {:?}",
+        "already-canonical m/z reads back as NumArray::F64, got {:?}",
         p0.mz.source_dtype()
     );
     assert!(
         matches!(p0.intensity, NumArray::F32(_)),
-        "intensity must read back as NumArray::F32 (no narrowing/widening), got {:?}",
+        "already-canonical intensity reads back as NumArray::F32, got {:?}",
         p0.intensity.source_dtype()
     );
     // Non-empty arrays.

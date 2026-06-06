@@ -101,9 +101,9 @@ fn write_spectra(
 ) -> Result<(), WriteError> {
     use mzdata::prelude::SpectrumLike;
 
-    // Reconstruct all spectra up front, then derive the data-facet schema from their array maps
-    // (mirrors the reference's sample_array_types_from_spectrum_source — the schema is the UNION
-    // of the source-dtype columns actually present, so each width is registered once).
+    // Reconstruct all spectra up front, then derive the data-facet schema from their array maps.
+    // Under the Phase 16 canonical cast the profile facet emits a single fixed f64 m/z + f32
+    // intensity schema regardless of source widths (this fixture is already canonical f64/f32).
     let specs: Vec<_> = spectra
         .iter()
         .map(to_mzdata)
