@@ -8,6 +8,18 @@ A command-line converter that reads imzML mass spectrometry **imaging** (MSI) fi
 
 Convert an arbitrary imzML imaging dataset into a valid imaging mzPeak file **without losing spatial or spectral information** — i.e. every pixel's coordinates and its m/z + intensity data survive the roundtrip.
 
+## Current Milestone: v0.6 Spec conformance — dtypes + CV/geometry/provenance
+
+**Goal:** Bring the converter into mzPeak spec conformance — fix the binary-array dtype mismatch (HUPO-PSI #11) via canonical-width casting, then add the carried-forward CV / geometry / provenance facets.
+
+**Target features:**
+- **Canonical-width dtype conformance (lead, relaxes L1):** forward emits canonical mzPeak data-facet dtypes (`point.mz=f64`, `point.intensity=f32`); records a provenance note + CLI-warns whenever an axis is narrowed; L1 / verify / reverse-roundtrip redefined to "value-equal at canonical width"; all dtype-preservation tests updated. Must land first — it touches the core fidelity contract the geometry facet and the validator depend on.
+- **`cv_list` (F3):** file-level CV declaration (spec Edit 2).
+- **`scan_settings_list` (F4):** authoritative geometry facet; the index block becomes a derived copy (spec Edit 3).
+- **`source_files[]` (F5):** source-file provenance (spec Edit 10).
+
+**Locked decisions:** narrowing is recorded (metadata provenance note + CLI warning), not silent; `ConformanceLevel::L1` is redefined from bit-for-bit-at-source-width to value-equal-at-canonical-mzPeak-width (`mz=f64`, `intensity=f32`), so the reverse roundtrip bar becomes value-equal rather than dtype-identical.
+
 ## Current State
 
 **v0.5 shipped (2026-06-05)** — forward `index.json` enrichment + optical-image import. The forward
@@ -31,12 +43,13 @@ Tag `v0.3`; see `MILESTONES.md`.
 
 ## Next Milestone
 
-Not yet scoped — run `/gsd:new-milestone` for v0.6. Strong candidates (`NEXT-ROADMAP-DRAFT.md` §B +
-"Deferred during v0.5"): **forward declared-geometry threading** (revives IDX-02 "declared" pixel
-counts + FID-02 forward-population by parsing imzML `<scanSettings>`), `cv_list` (MUST), authoritative
-`scan_settings_list` (F4), `pixel` facet / multi-spectrum-per-pixel (F6), continuous-mode shared-axis
-(F7), full `image` entity + **reverse image export** (F8), L2 conformance (F10). Also: file the
-upstream `mzpeak_prototyping` FileEntry-serde issue and drop the vendored fork when fixed.
+**v0.6 now scoped** (see Current Milestone above): canonical-width dtype conformance (lead) + `cv_list`
+(F3) + `scan_settings_list` (F4) + `source_files[]` (F5). Still-deferred candidates for v0.7+
+(`NEXT-ROADMAP-DRAFT.md` §B + "Deferred during v0.5"): **forward declared-geometry threading** (IDX-02
+"declared" pixel counts + FID-02 forward-population via imzML `<scanSettings>`), `pixel` facet /
+multi-spectrum-per-pixel (F6), continuous-mode shared-axis + emit (F7), full `image` entity + **reverse
+image export** (F8), L2 conformance (F10), reverse `sourceFileList` copy. Also: file the upstream
+`mzpeak_prototyping` FileEntry-serde issue and drop the vendored fork when fixed.
 
 ## Requirements
 
@@ -58,12 +71,16 @@ upstream `mzpeak_prototyping` FileEntry-serde issue and drop the vendored fork w
   (ENV/IN/SPA/SCH/OUT/VER/CLI/DAT) delivered and proven on real data (full PXD001283, 34,840
   spectra, masking-aware L1 roundtrip). See `MILESTONES.md` / `milestones/v0.3-REQUIREMENTS.md`.
 
-### Active (next milestone — not yet scoped)
+### Active (v0.6 — Spec conformance)
 
-Run `/gsd:new-milestone` to define. Carried-forward candidates from v0.4 deferrals:
-- [ ] Continuous-mode imzML emission (mirror the source's data mode rather than always processed)
-- [ ] Copy source `<sourceFileList>` provenance into the reverse `.imzML`
-- [ ] Harden against third-party (non-v0.3) imaging-mzPeak variability beyond best-effort
+Scoped 2026-06-05. Detailed REQ-IDs in `.planning/REQUIREMENTS.md`:
+- [ ] Canonical-width dtype conformance: forward casts the data facet to `mz=f64` / `intensity=f32`, records narrowing provenance + CLI warning, L1 redefined to value-equal-at-canonical-width
+- [ ] `cv_list` file-level CV declaration (F3)
+- [ ] `scan_settings_list` authoritative geometry facet; index block becomes derived copy (F4)
+- [ ] `source_files[]` provenance (F5)
+
+Still-deferred (v0.7+): continuous-mode imzML emission, reverse `<sourceFileList>` copy, third-party
+imaging-mzPeak hardening, `pixel` facet (F6), reverse image export (F8), L2 conformance (F10).
 
 ### Out of Scope
 
@@ -117,4 +134,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-03 after Phase 3 (imaging-schema-layer) completion*
+*Last updated: 2026-06-05 — scoped milestone v0.6 (Spec conformance — dtypes + CV/geometry/provenance)*
