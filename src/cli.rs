@@ -108,14 +108,6 @@ pub struct ConvertCli {
     /// ZSTD compression level (1–22). Higher = smaller output, slower. Default 19.
     #[arg(long = "zstd-level", value_name = "N", default_value_t = 19)]
     pub zstd_level: i32,
-
-    /// Sort each centroid spectrum's m/z (and its parallel arrays) ascending before writing.
-    /// OFF by default (the converter preserves source order for L1 fidelity, so non-monotonic
-    /// source m/z is carried through faithfully and the output declares `sorting_rank: null`).
-    /// Pass this to REPAIR the order: the output declares `sorting_rank: 0` and records a
-    /// `mzml2mzpeak_sort_peaks` data_processing step. Reorders vs source — opt-in only.
-    #[arg(long = "sort-peaks", default_value_t = false)]
-    pub sort_peaks: bool,
 }
 
 impl ConvertCli {
@@ -205,11 +197,8 @@ fn run_forward_mzml(cli: ConvertCli) -> anyhow::Result<()> {
     })?;
 
     log::info!("converting {} (plain mzML)", cli.input.display());
-    let report =
-        crate::write::convert_mzml_with(&cli.input, out, &cli.encoding_options(), cli.sort_peaks)
-            .with_context(|| {
-                format!("plain-mzML conversion failed for {}", cli.input.display())
-            })?;
+    let report = crate::write::convert_mzml(&cli.input, out, &cli.encoding_options())
+        .with_context(|| format!("plain-mzML conversion failed for {}", cli.input.display()))?;
     log::info!(
         "converted {} spectra + {} chromatograms → {}",
         report.spectra,
@@ -217,32 +206,21 @@ fn run_forward_mzml(cli: ConvertCli) -> anyhow::Result<()> {
         out.display()
     );
 
-    // Option 3 (visibility): a counted, non-fatal warning naming centroid spectra whose SOURCE m/z
-    // is non-monotonic. Exit code is UNCHANGED — warnings never fail. With --sort-peaks the order
-    // was repaired (output declares sorting_rank: 0); without it the output declares sorting_rank
-    // null and faithfully preserves source order.
+    // Visibility: a counted, non-fatal warning naming centroid spectra whose SOURCE m/z was
+    // non-monotonic and was therefore sorted ascending on write (so the output honestly declares
+    // m/z sorting_rank: 0). Exit code is UNCHANGED — warnings never fail.
     let nm = &report.centroid_nonmonotonic;
     if nm.count > 0 {
         let shown: Vec<String> = nm.indices.iter().map(|i| i.to_string()).collect();
         let suffix = if nm.count > nm.indices.len() { ", …" } else { "" };
-        if report.sort_peaks_applied {
-            log::warn!(
-                "{} centroid spectrum(s) had non-monotonic source m/z and were sorted ascending \
-                 (--sort-peaks); indices: [{}{}]",
-                nm.count,
-                shown.join(", "),
-                suffix
-            );
-        } else {
-            log::warn!(
-                "{} centroid spectrum(s) have non-monotonic source m/z; output declares m/z \
-                 sorting_rank: null (unsorted) and preserves source order. Pass --sort-peaks to \
-                 reorder. Indices: [{}{}]",
-                nm.count,
-                shown.join(", "),
-                suffix
-            );
-        }
+        log::warn!(
+            "{} centroid spectrum(s) had non-monotonic source m/z and were sorted ascending on \
+             write (output declares sorting_rank: 0; a mzml2mzpeak_sort_peaks data_processing step \
+             is recorded); indices: [{}{}]",
+            nm.count,
+            shown.join(", "),
+            suffix
+        );
     }
 
     if cli.verify {

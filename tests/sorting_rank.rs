@@ -122,8 +122,10 @@ fn peaks_mz_sorting_rank(archive: &Path) -> Option<u32> {
 }
 
 #[test]
-fn descending_centroid_mz_declares_null_sorting_rank() {
-    // Test A: deliberately descending source m/z (mirrors the Astral inversion shape).
+fn descending_centroid_mz_is_sorted_and_declares_rank_zero() {
+    // Test A (HUPO-PSI/mzPeak#23): deliberately descending source m/z (the Astral inversion shape)
+    // is now SORTED ascending on write, so point.mz honestly declares sorting_rank: 0 (the writer's
+    // range index + chunked binning require a sorted main axis).
     let specs = vec![centroid_spectrum(
         "scan=1",
         &[300.0, 200.0, 100.0],
@@ -140,12 +142,13 @@ fn descending_centroid_mz_declares_null_sorting_rank() {
     )
     .expect("convert descending fixture");
     assert_eq!(report.spectra, 1);
+    assert!(report.sort_peaks_applied, "the descending spectrum was reordered on write");
 
-    // The point.mz column must declare sorting_rank ABSENT (null) — the data is non-monotonic.
+    // The point.mz column declares sorting_rank 0 — the data was sorted ascending on write.
     assert_eq!(
         peaks_mz_sorting_rank(&out),
-        None,
-        "descending source m/z must demote point.mz to sorting_rank: null"
+        Some(0),
+        "descending source m/z is sorted on write so point.mz declares sorting_rank: 0"
     );
 
     let _ = std::fs::remove_file(&mzml);
@@ -177,8 +180,9 @@ fn sorted_centroid_mz_keeps_sorting_rank_zero() {
 }
 
 #[test]
-fn sort_peaks_repairs_descending_and_declares_rank_zero() {
-    // Test C: --sort-peaks on the descending fixture → ascending m/z + sorting_rank 0.
+fn sort_on_write_repairs_unsorted_and_records_data_processing() {
+    // Test C (HUPO-PSI/mzPeak#23): an unsorted fixture is always sorted ascending on write — the
+    // archive declares sorting_rank 0, reports the reorder, and reads back via the reference reader.
     let specs = vec![centroid_spectrum(
         "scan=1",
         &[300.0, 100.0, 200.0],
@@ -186,46 +190,26 @@ fn sort_peaks_repairs_descending_and_declares_rank_zero() {
     )];
     let mzml = write_mzml("sortC", &specs);
 
-    // OFF: null rank, no data_processing reorder flag.
-    let out_off = tmp("sortC-off", "mzpeak");
-    let _ = std::fs::remove_file(&out_off);
-    let report_off = mzml2mzpeak::write::convert_mzml_with(
+    let out = tmp("sortC", "mzpeak");
+    let _ = std::fs::remove_file(&out);
+    let report = mzml2mzpeak::write::convert_mzml(
         &mzml,
-        &out_off,
+        &out,
         &mzml2mzpeak::write::EncodingOptions::default(),
-        false,
     )
-    .expect("convert OFF");
-    assert!(!report_off.sort_peaks_applied);
+    .expect("convert");
+    assert!(report.sort_peaks_applied, "≥1 spectrum reordered on write");
     assert_eq!(
-        peaks_mz_sorting_rank(&out_off),
-        None,
-        "without --sort-peaks the descending source stays unsorted-by-declaration"
-    );
-
-    // ON: ascending m/z, sorting_rank 0, sort_peaks_applied set, data_processing recorded.
-    let out_on = tmp("sortC-on", "mzpeak");
-    let _ = std::fs::remove_file(&out_on);
-    let report_on = mzml2mzpeak::write::convert_mzml_with(
-        &mzml,
-        &out_on,
-        &mzml2mzpeak::write::EncodingOptions::default(),
-        true,
-    )
-    .expect("convert ON");
-    assert!(report_on.sort_peaks_applied, "≥1 spectrum reordered");
-    assert_eq!(
-        peaks_mz_sorting_rank(&out_on),
+        peaks_mz_sorting_rank(&out),
         Some(0),
-        "with --sort-peaks the m/z is ascending so point.mz declares sorting_rank: 0"
+        "sorted-on-write m/z is ascending so point.mz declares sorting_rank: 0"
     );
 
-    // The repaired archive opens + reads back via the reference reader (structural sanity).
-    assert!(MzPeakReader::new(&out_on).is_ok());
+    // The archive opens + reads back via the reference reader (structural sanity).
+    assert!(MzPeakReader::new(&out).is_ok());
 
     let _ = std::fs::remove_file(&mzml);
-    let _ = std::fs::remove_file(&out_off);
-    let _ = std::fs::remove_file(&out_on);
+    let _ = std::fs::remove_file(&out);
 }
 
 #[test]

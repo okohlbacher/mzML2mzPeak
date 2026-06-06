@@ -34,8 +34,14 @@ pub enum ConformanceLevel {
     /// 2. every SOURCE point ABSENT from the output had intensity == 0 (no NON-ZERO signal
     ///    was ever dropped). A dropped non-zero point is genuine data loss and an L1 failure.
     ///
-    /// The verifier enforces this via a two-pointer merge over source vs output points in m/z
-    /// order (`crate::verify::compare::merge_masked`), not a strict equal-length compare.
+    /// ORDERING (HUPO-PSI/mzPeak#23): the forward path now SORTS the primary m/z axis ascending on
+    /// write (`to_mzdata_canonical` / the mzML path), because mzPeak declares `point.mz`
+    /// `sorting_rank: 0` and its range index + chunked layout REQUIRE a sorted main axis. L1 no
+    /// longer preserves the SOURCE point ORDER bit-for-bit — it preserves the (m/z, intensity)
+    /// MULTISET (value-equal, no point lost). This is transparent to verification: the contract is
+    /// enforced via a two-pointer merge over source vs output points IN M/Z ORDER
+    /// (`crate::verify::compare::merge_masked`), which compares the points as m/z-sorted multisets,
+    /// not a strict equal-length/same-order compare — so a reordered-but-equal output still passes.
     L1BitForBit,
     /// L2 — opt-in transformed/compressed (Numpress/delta/null-marking). Per-axis relative
     /// error bounds apply and the transform CURIE + tolerance MUST be recorded. L2 MUST NOT

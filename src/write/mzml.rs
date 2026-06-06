@@ -59,8 +59,8 @@ pub enum MzmlConvertError {
     #[error("mzPeak finalize error: {0}")]
     Finish(#[source] Box<dyn std::error::Error + Send + Sync>),
 
-    /// `--sort-peaks` could not reorder a spectrum's arrays (e.g. an array failed to decode).
-    #[error("--sort-peaks reorder failed: {0}")]
+    /// The m/z sort-on-write could not reorder a spectrum's arrays (e.g. an array failed to decode).
+    #[error("m/z sort-on-write reorder failed: {0}")]
     SortPeaks(String),
 }
 
@@ -88,8 +88,8 @@ pub struct MzmlConvertReport {
     pub chromatograms: usize,
     /// Centroid spectra whose source m/z was non-monotonic (Option 3 data-quality signal).
     pub centroid_nonmonotonic: CentroidNonMonotonic,
-    /// True iff `--sort-peaks` actually reordered at least one spectrum (Option 2). Drives the
-    /// `mzml2mzpeak_sort_peaks` data_processing step.
+    /// True iff the m/z sort-on-write actually reordered at least one spectrum. Drives the
+    /// `mzml2mzpeak_sort_peaks` data_processing provenance step.
     pub sort_peaks_applied: bool,
 }
 
@@ -109,19 +109,6 @@ fn readable_path(input: &Path) -> Result<(PathBuf, Option<TranscodedXml>), MzmlC
             Ok((guard.path().to_path_buf(), Some(guard)))
         }
     }
-}
-
-/// Open `input` (any mzdata-readable `.mzML`/`.mzML.gz`) and write a NON-imaging mzPeak archive
-/// to `output`. Streams spectra then chromatograms through the reference writer and returns the
-/// counts. m/z arrays of ion-mobility spectra (timsTOF) are sorted before writing, mirroring the
-/// reference converter, so the writer always sees ascending m/z.
-pub fn convert_mzml(
-    input: &Path,
-    output: &Path,
-    opts: &crate::write::EncodingOptions,
-) -> Result<MzmlConvertReport, MzmlConvertError> {
-    // Back-compat wrapper: existing callers (and tests) get the default behaviour with sorting OFF.
-    convert_mzml_with(input, output, opts, false)
 }
 
 /// Return `true` if `mzs` is non-decreasing (the spec's `sorting_rank: 0` predicate). Empty and
@@ -169,17 +156,20 @@ fn permute_arrays(arrays: &mut BinaryArrayMap, perm: &[usize]) -> Result<(), Mzm
     Ok(())
 }
 
-/// Open `input` and write a NON-imaging mzPeak archive, with explicit control over centroid m/z
-/// sorting. When `sort_peaks` is `true`, any centroid spectrum whose source m/z is non-monotonic is
-/// reordered ascending (m/z + every parallel array) before being handed to the writer, and a
-/// `mzml2mzpeak_sort_peaks` data_processing step is recorded. When `false`, no reorder occurs and
-/// the output is byte-identical to the pre-flag baseline. In BOTH cases, centroid spectra with
-/// non-monotonic source m/z are counted (Option 3) and surfaced in the returned report.
-pub fn convert_mzml_with(
+/// Open `input` (any mzdata-readable `.mzML`/`.mzML.gz`) and write a NON-imaging mzPeak archive to
+/// `output`. Streams spectra then chromatograms through the reference writer and returns the counts.
+///
+/// Every spectrum's primary m/z axis is guaranteed ascending before it reaches the writer
+/// (HUPO-PSI/mzPeak#23): ion-mobility spectra are stack/unstack-sorted, and any other spectrum whose
+/// m/z is non-monotonic has its arrays reordered ascending (parallel columns kept aligned, picked
+/// peak set dropped so the sorted arrays are consumed). This is a no-op for already-sorted input, so
+/// real data is byte-unchanged; a reorder preserves the (m/z,intensity) multiset (value-equal). When
+/// at least one spectrum was reordered a `mzml2mzpeak_sort_peaks` data_processing step is recorded,
+/// and centroid spectra with non-monotonic source m/z are counted and surfaced in the report.
+pub fn convert_mzml(
     input: &Path,
     output: &Path,
     opts: &crate::write::EncodingOptions,
-    sort_peaks: bool,
 ) -> Result<MzmlConvertReport, MzmlConvertError> {
     // `_xml_guard` keeps the transcoded temp file (if any) alive for the reader's lifetime.
     let (read_path, _xml_guard) = readable_path(input)?;
@@ -231,14 +221,17 @@ pub fn convert_mzml_with(
                     }
                 }
             }
-        } else if entry.signal_continuity() == SignalContinuity::Centroid {
-            // Option 3 (visibility) + Option 2 (opt-in repair). The writer consumes the spectrum's
-            // primary representation in SOURCE order (the converter never re-sorts by default —
-            // CR-01); detect when its m/z is non-monotonic so we can count it, and optionally repair
-            // it under --sort-peaks. The m/z the writer sees is `peaks()`'s — which prefers a picked
-            // peak set over the raw arrays — so observe the SAME m/z the writer will, and when
-            // repairing, sort the raw arrays AND drop the (now stale) picked peak set so the writer
-            // falls back to the sorted arrays.
+        } else {
+            // Non-ion-mobility (profile or centroid). Guarantee the writer's primary m/z axis is
+            // ascending (HUPO-PSI/mzPeak#23): mzPeak declares `point.mz` `sorting_rank: 0` and its
+            // Parquet range index + chunked-layout binning REQUIRE a sorted main axis, so an unsorted
+            // column is both a conformance defect and a downstream slicing hazard. The m/z the writer
+            // consumes is `peaks()`'s (a picked peak set, if present) else the raw arrays — so observe
+            // THAT m/z, and when it is non-monotonic sort the raw arrays in place and drop the (now
+            // stale) picked peak set so the writer falls back to the freshly-sorted arrays. This is a
+            // no-op for already-sorted input (the common case), so real data is byte-unchanged; a
+            // reorder preserves the (m/z,intensity) multiset (value-equal), it does not drop data.
+            let is_centroid = entry.signal_continuity() == SignalContinuity::Centroid;
             let observed_mz: Option<Vec<f64>> = match entry.peaks.as_ref() {
                 Some(peaks) => Some(
                     peaks
@@ -250,20 +243,22 @@ pub fn convert_mzml_with(
             };
             if let Some(mzs) = observed_mz {
                 if !mzs_nondecreasing(&mzs) {
-                    nonmono.count += 1;
-                    if nonmono.indices.len() < CENTROID_NONMONOTONIC_INDEX_CAP {
-                        nonmono.indices.push(spectra as u64);
-                    }
-                    if sort_peaks {
-                        // Repair the raw arrays in place, then drop the picked peak set so `peaks()`
-                        // resolves to the freshly-sorted arrays the writer will consume.
-                        if let Some(arrays) = entry.arrays.as_mut() {
-                            let perm = argsort_mz(&mzs);
-                            permute_arrays(arrays, &perm)?;
-                            entry.peaks = None;
-                            entry.deconvoluted_peaks = None;
-                            sort_applied = true;
+                    // Count centroid non-monotonicity for the user-facing report (profile
+                    // non-monotonicity is pathological; the verify path tracks it separately).
+                    if is_centroid {
+                        nonmono.count += 1;
+                        if nonmono.indices.len() < CENTROID_NONMONOTONIC_INDEX_CAP {
+                            nonmono.indices.push(spectra as u64);
                         }
+                    }
+                    // Always repair: sort the raw arrays ascending and drop any picked peak set so
+                    // `peaks()` resolves to the freshly-sorted arrays the writer consumes.
+                    if let Some(arrays) = entry.arrays.as_mut() {
+                        let perm = argsort_mz(&mzs);
+                        permute_arrays(arrays, &perm)?;
+                        entry.peaks = None;
+                        entry.deconvoluted_peaks = None;
+                        sort_applied = true;
                     }
                 }
             }
@@ -326,7 +321,7 @@ pub fn convert_mzml_with(
     })
 }
 
-/// Record the `--sort-peaks` repair as a `mzml2mzpeak_sort_peaks` data_processing step on the
+/// Record the m/z sort-on-write as a `mzml2mzpeak_sort_peaks` data_processing step on the
 /// plain-mzML writer (mirrors `ImagingWriter::record_sort_peaks` / the `record_intensity_narrowing`
 /// shape, but the plain path carries metadata on the vendored writer directly). Called once per
 /// file, only when ≥1 spectrum was actually reordered.
@@ -343,7 +338,7 @@ fn record_sort_peaks(writer: &mut MzPeakWriterType<File>) {
             software_reference: "mzml2mzpeak".to_string(),
             params: vec![Param::new_key_value(
                 "sort_peaks",
-                "m/z peaks sorted ascending (--sort-peaks)",
+                "m/z sorted ascending on write (conformance: point.mz sorting_rank 0)",
             )],
         }],
     });

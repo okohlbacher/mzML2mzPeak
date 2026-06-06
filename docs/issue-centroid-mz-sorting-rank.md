@@ -1,9 +1,30 @@
 # Handoff: `spectra_peaks` declares `sorting_rank: 0` (ascending) but writes non-monotonic m/z
 
-**Status:** resolved · **Date:** 2026-06-06 · **Found by:** mzPeakValidator full-scan run (`~/Claude/mzPeakValidator`)
+**Status:** resolved (revised — see addendum) · **Date:** 2026-06-06 · **Found by:** mzPeakValidator full-scan run (`~/Claude/mzPeakValidator`)
 **Component:** `mzML → mzPeak` write path + vendored `mzpeak_prototyping` writer
 
-> **Resolution (2026-06-06, quick task 260606-a8f).** Fixed with **Option 1 (default)** +
+> **REVISED RESOLUTION (2026-06-06, after HUPO-PSI/mzPeak#23 maintainer feedback).** The upstream
+> maintainer pointed out that declaring `sorting_rank: null` on an unsorted column is not viable:
+> mzPeak's Parquet range index AND its chunked-layout binning REQUIRE a sorted main axis, so `null`
+> silently breaks m/z range slices downstream. The agreed fix (okohlbacher in-thread) is to **ensure
+> strictly-sorted m/z on write** and tighten the spec SHOULD→MUST, NOT to declare null.
+>
+> So the resolution is now **Option 2 made the DEFAULT (sort-on-write, always on)**:
+> - The imaging path (`to_mzdata_canonical`) and the mzML path (`convert_mzml`) sort the (m/z,
+>   intensity) pair ascending before the writer sees it — a no-op fast path when already sorted, so
+>   real data is byte-unchanged; a reorder preserves the multiset (value-equal). The opt-in
+>   `--sort-peaks` flag is REMOVED (sorting is unconditional). A `mzml2mzpeak_sort_peaks`
+>   data_processing step is recorded whenever a reorder actually happened, and centroid
+>   non-monotonicity is still counted + warned (Option 3, retained).
+> - Because the m/z column is now always ascending, the writer's stock constant `sorting_rank: 0` is
+>   always honest — so the **data-derived-rank vendored patch (#4) is no longer needed** and is
+>   dropped (the fork shrinks). L1 relaxed: source ORDER is no longer preserved, the (m/z,intensity)
+>   MULTISET is (verifier already merges in m/z order — see `tolerance.rs`). The validator handoff
+>   (`mz_monotonic_peaks` gated on declared `sorting_rank == 0`) stays valid.
+>
+> The original Option-1 resolution below is SUPERSEDED (kept for history).
+
+> **Resolution (2026-06-06, quick task 260606-a8f) [SUPERSEDED].** Fixed with **Option 1 (default)** +
 > **Option 3 (visibility)** + **Option 2 (opt-in `--sort-peaks`)**:
 > - **Option 1 — data-derived `sorting_rank` (4th vendored patch, backlog 999.1 upstreaming).**
 >   The vendored writer no longer hard-codes `sorting_rank: Some(0)` eagerly. Both facets now
