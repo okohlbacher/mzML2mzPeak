@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: — Spec conformance — dtypes + CV/geometry/provenance
 status: verifying
-stopped_at: Completed 16-02-PLAN.md (L1 redefined to value-equal-at-canonical-width + canonical-width verify comparators).
-last_updated: "2026-06-06T01:27:43.693Z"
+stopped_at: Completed 16-03-PLAN.md (reverse read contract reframed to value-equal-at-canonical-width; non-float reject guard intact).
+last_updated: "2026-06-06T01:32:04.513Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
-  percent: 50
+  completed_plans: 3
+  percent: 75
 ---
 
 # Project State
@@ -32,9 +32,9 @@ fidelity contract the geometry facet (Phase 18) and the external validator depen
 ## Current Position
 
 Phase: 16 — Canonical-width dtype conformance (In Progress)
-Plan: 16-02 complete (2 of 4); next is 16-03 (reverse read + roundtrip bar at value-equal canonical width)
-Status: In Progress — DTY-01..05 delivered (canonical f64/f32 data facet + narrowing provenance/warning, L1 redefined to value-equal-at-canonical-width, verify comparators compare at canonical width)
-Last activity: 2026-06-06 — executed Phase 16 Plan 02
+Plan: 16-03 complete (3 of 4); next is 16-04 (acceptance gate / cross-test inversions)
+Status: In Progress — DTY-01..06 delivered (canonical f64/f32 forward data facet + narrowing provenance/warning, L1 redefined value-equal-at-canonical-width, verify comparators + reverse read contract at canonical width)
+Last activity: 2026-06-06 — executed Phase 16 Plan 03
 
 ## v0.6 Roadmap (Phases 16–21)
 
@@ -90,6 +90,7 @@ matching `schema/*.json`.
 
 *Updated after each plan completion.*
 | Phase 16 P02 | 5min | 2 tasks | 5 files |
+| Phase 16 P03 | 1min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -137,6 +138,7 @@ Key file touchpoints for Phase 16 (from the milestone scoping):
 `tests/{acceptance,verify_roundtrip,reverse_read_spike,write_roundtrip,reverse_roundtrip}.rs`.
 
 - [Phase ?]: Phase 16 Plan 02: ConformanceLevel::L1 redefined to value-equal at canonical mzPeak width (mz=f64, intensity=f32); the relaxation is the comparison WIDTH, tolerance stays Δ=0. compare_axis + compare_profile_masked compare at the OUTPUT (canonical) width, coercing the source (widen f32→f64 m/z, narrow f64→f32 intensity); a value-equal dtype divergence is no longer a mismatch. Spec doc L1 paragraph aligned (three-places rule). Kept L1BitForBit identifier (rename optional).
+- [Phase ?]: Phase 16 Plan 03: reverse read path (src/reverse/source.rs) contract reframed to value-equal-at-canonical-width (DTY-06) — the stored canonical width (f64 m/z, f32 intensity) IS the roundtrip reference; no original source dtype is recovered. Pure contract/doc + test-rename change. decode_axis reject-non-float guard (UnsupportedDtype, T-07-02/T-16-05) unchanged.
 
 ### Pending Todos
 
@@ -174,7 +176,7 @@ Items acknowledged and carried forward to v0.7+:
 
 ## Session Continuity
 
-Last session: 2026-06-06T01:27:43.589Z
+Last session: 2026-06-06T01:31:58.824Z
 Stopped at: Completed 16-02-PLAN.md (L1 redefined to value-equal-at-canonical-width + canonical-width verify comparators).
 Resume file: None
 

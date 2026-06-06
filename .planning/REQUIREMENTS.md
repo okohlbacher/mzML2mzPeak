@@ -59,7 +59,7 @@ Bring the forward converter into mzPeak spec conformance:
   (`mz=f64`, `intensity=f32`)": verify comparators compare values at canonical width and no longer
   treat source-vs-output dtype divergence as a mismatch.
 
-- [ ] **DTY-06**: The reverse path and `mzPeak → imzML → mzPeak` roundtrip pass at the value-equal bar
+- [x] **DTY-06**: The reverse path and `mzPeak → imzML → mzPeak` roundtrip pass at the value-equal bar
   (no longer dtype-identical); the reverse read path accepts canonical-width data without recovering the
   original source dtype.
 
@@ -177,7 +177,7 @@ GEO×3, SRC×2, OPT×4, RIMG×3). No orphans, no duplicates.
 | DTY-03 | Phase 16 | Complete |
 | DTY-04 | Phase 16 | Complete |
 | DTY-05 | Phase 16 | Complete |
-| DTY-06 | Phase 16 | Pending |
+| DTY-06 | Phase 16 | Complete |
 | DTY-07 | Phase 16 | Pending |
 | CVL-01 | Phase 17 | Pending |
 | CVL-02 | Phase 17 | Pending |

@@ -76,7 +76,7 @@ Plans:
 
 - [x] 16-01-PLAN.md — Forward canonical cast (mz=f64/intensity=f32) + narrowing provenance note + CLI warning (DTY-01..04)
 - [x] 16-02-PLAN.md — Redefine ConformanceLevel::L1 to value-equal-at-canonical-width + verify comparators (DTY-05)
-- [ ] 16-03-PLAN.md — Reverse read accepts canonical width; roundtrip bar becomes value-equal (DTY-06)
+- [x] 16-03-PLAN.md — Reverse read accepts canonical width; roundtrip bar becomes value-equal (DTY-06)
 - [ ] 16-04-PLAN.md — Migrate dtype tests to canonical width + mixed-dtype regression; PXD001283 unchanged (DTY-07)
 
 ### Phase 17: cv_list file-level CV declaration
@@ -157,7 +157,7 @@ Plans:
 | 13. Index enrichment | v0.5 | 1/1 | Complete | 2026-06-05 |
 | 14. Reverse-emit fidelity | v0.5 | 1/1 | Complete | 2026-06-05 |
 | 15. TIFF optical-image import | v0.5 | 3/3 | Complete | 2026-06-05 |
-| 16. Canonical-width dtype conformance | v0.6 | 2/4 | In Progress|  |
+| 16. Canonical-width dtype conformance | v0.6 | 3/4 | In Progress|  |
 | 17. cv_list file-level CV declaration | v0.6 | 0/? | Not started | - |
 | 18. scan_settings_list authoritative geometry facet | v0.6 | 0/? | Not started | - |
 | 19. source_files[] provenance | v0.6 | 0/? | Not started | - |
