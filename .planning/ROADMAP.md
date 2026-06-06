@@ -139,7 +139,16 @@ identical lines. Make it **log once** (rate-limit / first-occurrence flag) when 
 Plans:
 - [ ] TBD (promote with `/gsd:review-backlog` when ready)
 
-### Phase 999.2: Read JPEG/PNG dimensions for non-TIFF optical images (BACKLOG)
+### Phase 999.2: Read JPEG/PNG dimensions for non-TIFF optical images ✅ DONE (2026-06-06, commit e06ecf3)
+
+**Resolution:** `src/write/image.rs` gained `detect_format` (magic-byte TIFF/PNG/JPEG/Other classifier,
+replacing the narrow `is_tiff`) + `read_png_dimensions` (IHDR) + `read_jpeg_dimensions` (first SOF marker,
+with an under-length-SOF guard added in review commit 413efbe). `convert.rs` branches on the format: TIFF
+dims stay authoritative, PNG/JPEG dims are best-effort (unparseable → honest 0/0 embed). Verified
+end-to-end on real corpus images (LTP CHJ2.png 472×275, 130704.jpg 480×640 — real dims + non-degenerate
+affines). Independent of 999.1 (no vendored-fork change).
+
+<details><summary>Original goal</summary>
 
 **Goal:** When a non-TIFF optical image is embedded (forward `--image` or `IMS:1006008` auto-discovery),
 read its pixel dimensions so the full-extent affine is meaningful. Currently only TIFF (incl. Aperio
@@ -156,13 +165,19 @@ big-endian after the marker), PNG `IHDR` (first chunk) — alongside the existin
 pick by magic bytes. Then `full_extent_affine` produces a real mapping for JPEG/PNG too. Implementation is
 ours (`src/write/image.rs`), NOT a vendored-fork concern — independent of 999.1.
 
-**Requirements:** TBD
-**Plans:** 0 plans
+</details>
 
-Plans:
-- [ ] TBD (promote with `/gsd:review-backlog` when ready)
+### Phase 999.3: Complete the raw → mzML → mzPeak size/compression benchmark ✅ DONE (2026-06-06, commit d3463a5)
 
-### Phase 999.3: Complete the raw → mzML → mzPeak size/compression benchmark (BACKLOG)
+**Resolution:** All 18 datasets are now sized. The remaining MassIVE raw sizes were obtained via the
+GNPS2 datasetcache file API: sciex-zenotof `.wiff`+`.wiff.scan`+`.wiff2` triple **73 MB**, bruker-timstof
+`.d` **2106 MB** (52 files), thermo-astral `.raw` **8638 MB** (fully downloaded on disk). The benchmark,
+previously only in the git-ignored `data/raw-examples/README.md`, was promoted to a tracked deliverable at
+[`docs/compression-benchmark.md`](../docs/compression-benchmark.md) (linked from `docs/mzml-examples.md`).
+The optional `scripts/fetch-raw-examples.sh` was **not** created (the size table is the deliverable; the
+multi-GB binaries stay out of the repo) — defer if reproducibility of the raw set is ever wanted.
+
+<details><summary>Original goal</summary>
 
 **Goal:** Finish acquiring vendor **raw** file *sizes* (and the files where cheap) to complete the
 size/compression-ratio benchmark in `data/raw-examples/README.md`. **NOT a conversion feature** — the
@@ -188,3 +203,5 @@ studies (verified MTBLS520) are **mzML-only** (no raw to fetch).
 
 Plans:
 - [ ] TBD (promote with `/gsd:review-backlog` when ready)
+
+</details>
