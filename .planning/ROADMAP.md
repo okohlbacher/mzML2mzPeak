@@ -248,3 +248,35 @@ credentials — plus `*.log`, `*.DS_Store`, `data/cors.json`, and `thermo-orbitr
 
 Plans:
 - [ ] TBD (promote with `/gsd:review-backlog` when ready)
+
+### Phase 999.5: SDRF sample-metadata + TMT/isobaric channel modeling in mzPeak (BACKLOG)
+
+**Goal:** Make mzPeak carry SDRF-compliant sample metadata and **isobaric (TMT/iTRAQ) channel
+assignment**, ingested from an existing SDRF during conversion (mzML or vendor → mzPeak). Design is
+worked out in [`docs/sdrf-mzpeak-integration.md`](../docs/sdrf-mzpeak-integration.md) — a discussion
+draft that is **RAG-verified against the `knowledge/` vault and CODEX-reviewed to convergence**
+(3 rounds → "NO BLOCKING ISSUES").
+
+**Why:** mzPeak currently has only a flat `sample_list` (id/name/parameters), **no run→sample ref,
+and no label/channel/reporter/role construct** — so TMT channel→sample assignment (which SDRF models
+fully via `comment[label]` + per-channel rows + pooled/carrier/reference) cannot be represented.
+This is mzPeak §5.7 (SDRF integration = open question).
+
+**Proposed additions (none exist yet):**
+- Reuse `sample_list` for `characteristics[*]` (key by SDRF `source name`).
+- New **`channel_list`** (file-level footer JSON): isobaric channel → sample(s) + reporter m/z + role
+  + `sdrf_row_ref`; `ms_run.channel_set` + `plex_id` bind the run; reporter quant via an
+  `auxiliary_array` whose columns carry `channel_id`.
+- Per-spectrum `assay_ref`; MSI ROI table (`region → sample` + per-pixel `roi_ref`).
+- Embed the file's SDRF rows **verbatim** as the lossless source (a typed `sample-metadata`/`sdrf`
+  member) + dataset back-ref; the structured fields are query projections.
+
+**Open issues (from the doc):** `assay_ref`/`channel_list`/ROI/run-binding don't exist; CV coverage
+gaps; MSI ROI→sample is a real SDRF extension (no spatial/pixel vocabulary); precedence rule needed
+(repo SDRF authoritative). Companion vault cluster: `knowledge/SDRF/`.
+
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with `/gsd:review-backlog` when ready)
