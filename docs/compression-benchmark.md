@@ -15,9 +15,10 @@ the git-ignored `data/raw-examples/` (working notes in its local `README.md`); t
 record.
 
 > **Regenerated 2026-06-06** on the migrated stack (mzdata 0.64.1 + upstream mzpeak `8435967`, with
-> m/z sort-on-write and the explicit spectrum-type CV). Full corpus e2e: **32/32 PASS**. All 18 mzPeak
-> sizes are **unchanged** from the previous run at 0.1 MB resolution — the conformance changes did not
-> affect output size.
+> m/z sort-on-write and the explicit spectrum-type CV). Full corpus e2e: **32/32 PASS**. The 17
+> centroided rows are **unchanged** from the previous run at 0.1 MB resolution. The **Astral row was
+> switched to PROFILE** (†): its `.raw` was re-converted with peak-picking off (ThermoRawFileParser
+> `--noPeakPicking`) and that profile mzML + mzPeak now replace the centroided ones on the bucket.
 
 | dataset | raw MB | mzML MB | mzPeak MB | mzPeak/mzML | mzPeak/raw | raw source |
 |---|--:|--:|--:|--:|--:|---|
@@ -38,7 +39,14 @@ record.
 | thermo-ltq-orbitrap-velos | 210 | 429.2 | 101.5 | 0.24× | 0.48× | `.raw` on disk |
 | thermo-fusion-lumos | 659 | 588.6 | 156.5 | 0.27× | 0.24× | PRIDE (size-only) |
 | bruker-timstof-pro | 2106 | 1386.5 | 677.2 | 0.49× | 0.32× | MassIVE `.d`, 52 files (size) |
-| thermo-orbitrap-astral | 8638 | 6118.4 | 3359.4 | 0.55× | 0.39× | MassIVE `.raw` on disk |
+| thermo-orbitrap-astral † | 8638 | 7481.3 | 3566.4 | 0.48× | 0.41× | MassIVE `.raw` on disk |
+
+† **Astral is PROFILE.** Unlike the other rows (whose mzML is the published *centroided* file), the
+Astral mzML/mzPeak here are the **profile** re-conversion of the `.raw` (ThermoRawFileParser
+`--noPeakPicking`, 307,590 scans), which replaces the centroided published mzML on the bucket. This
+is the one true **profile → profile** like-for-like row (raw, mzML and mzPeak all profile). For
+reference, the *centroided* Astral was mzML 6118.4 → mzPeak 3359.4 MB (0.55×). mzPeak compresses the
+denser profile data **relatively better** (0.48× vs 0.55×).
 
 ## Takeaways
 
@@ -46,8 +54,10 @@ record.
   (≈1.5×–14× reduction). Tightest on sparse/centroided data (Shimadzu 0.07×, Agilent IM/GC/SRM
   ≤0.17×); loosest on dense profile spectra (Bruker QTOFs ~0.65×).
 - **vs vendor raw:** mzPeak is 0.02×–0.80× of the `.raw`/`.d`/`.wiff`. For the two MassIVE giants the
-  vendor raw is *larger* than the mzML (timsTOF `.d` 2106 > 1386; Astral `.raw` 8638 > 6118), so mzPeak
-  is ~3× smaller than the vendor raw there. FT-ICR's 0.02× is a peak-picked mzML against a profile raw.
+  vendor raw is *larger* than the mzML (timsTOF `.d` 2106 > 1386; Astral `.raw` 8638 > 7481 profile),
+  so mzPeak is ~2–3× smaller than the vendor raw there. FT-ICR's 0.02× is a peak-picked mzML against a
+  profile raw — the centroid-vs-profile mismatch that makes mzPeak/raw "indicative only" for the rows
+  whose published mzML is centroided (Astral is the exception: it's profile end-to-end, †).
 - **SCIEX is the exception where mzML > raw:** the ZenoTOF `.wiff`+`.wiff.scan`+`.wiff2` triple is a
   compact 73 MB vs the 89.8 MB verbose-XML mzML, yet mzPeak (50.9 MB) is still 0.69× of even that
   compact raw.
