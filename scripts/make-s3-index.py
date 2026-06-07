@@ -14,6 +14,25 @@ from collections import defaultdict
 BASE = "https://object.storage.eu01.onstackit.cloud/v09"
 SELF = {"index.html", "README.md"}
 
+# Browser-based mzPeak viewers (deep links — see docs/deep-links.md). Both take a percent-encoded
+# absolute object URL as `?file=`; the bucket serves range requests + CORS for these origins.
+EXPLORER = "https://okohlbacher.github.io/mzPeakExplorer/"   # general LC-MS / any .mzpeak
+MZPEAKIV = "https://okohlbacher.github.io/mzPeakIV/"         # imaging (MSI) .mzpeak
+
+def is_imaging(key):
+    """Imaging (MSI) datasets live under the imzml-examples/ corpus → also link mzPeakIV."""
+    return key.startswith("imzml-examples/")
+
+def viewer_links(key):
+    """HTML deep-link badges for a .mzpeak object: mzPeak Explorer always; mzPeakIV if imaging."""
+    enc = quote(f"{BASE}/{key}", safe="")
+    out = [f'<a class="viewer ex" target="_blank" rel="noopener" href="{EXPLORER}?file={enc}" '
+           f'title="Open in mzPeak Explorer">▶ Explorer</a>']
+    if is_imaging(key):
+        out.append(f'<a class="viewer iv" target="_blank" rel="noopener" href="{MZPEAKIV}?file={enc}" '
+                   f'title="Open in mzPeakIV (imaging viewer)">▦ mzPeakIV</a>')
+    return " ".join(out)
+
 data = json.load(sys.stdin)
 objs = [(o["Key"], o["Size"]) for o in data.get("Contents", []) if o["Key"] not in SELF]
 objs.sort(key=lambda x: x[0])
@@ -51,8 +70,9 @@ for d in sorted(dirs):
     rows.append(f'<details open><summary><b>{html.escape(d)}</b> '
                 f'<span class="muted">— {len(files)} files, {hs(dsize)}</span></summary><ul>')
     for rel, key, s in sorted(files):
-        rows.append(f'<li><a href="{quote(key)}">{html.escape(rel)}</a> '
-                    f'<span class="sz">{hs(s)}</span></li>')
+        badges = f'<span class="links">{viewer_links(key)}</span>' if key.lower().endswith(".mzpeak") else ""
+        rows.append(f'<li><a class="fname" href="{quote(key)}">{html.escape(rel)}</a>'
+                    f'<span class="right">{badges}<span class="sz">{hs(s)}</span></span></li>')
     rows.append("</ul></details>")
 
 page = f"""<!doctype html>
@@ -66,17 +86,26 @@ page = f"""<!doctype html>
  details {{ border:1px solid #e2e2e2; border-radius:8px; margin:.5rem 0; padding:.4rem .8rem; background:#fafafa; }}
  summary {{ cursor:pointer; }}
  ul {{ list-style:none; margin:.4rem 0 .4rem .4rem; padding:0; }}
- li {{ display:flex; justify-content:space-between; padding:2px 0; border-bottom:1px dotted #eee; }}
+ li {{ display:flex; justify-content:space-between; align-items:center; gap:.6rem; padding:3px 0; border-bottom:1px dotted #eee; }}
  a {{ text-decoration:none; color:#1558d6; word-break:break-all; }}
  a:hover {{ text-decoration:underline; }}
- .sz {{ color:#888; font-variant-numeric:tabular-nums; padding-left:1rem; white-space:nowrap; }}
+ .fname {{ flex:1 1 auto; min-width:0; }}
+ .right {{ display:flex; align-items:center; gap:.4rem; white-space:nowrap; flex:0 0 auto; }}
+ .viewer {{ font-size:12px; line-height:1.6; padding:1px 9px; border-radius:12px; border:1px solid transparent; }}
+ .viewer.ex {{ background:#e7efff; color:#1558d6; border-color:#c7d9ff; }}
+ .viewer.iv {{ background:#e8f7ec; color:#1a7f37; border-color:#bfe6c9; }}
+ .viewer:hover {{ filter:brightness(.96); text-decoration:none; }}
+ .sz {{ color:#888; font-variant-numeric:tabular-nums; white-space:nowrap; }}
  .muted {{ color:#999; font-weight:normal; }}
  code {{ background:#eee; padding:1px 5px; border-radius:4px; }}
 </style></head><body>
 <h1>mzPeak example data</h1>
 <div class="meta"><code>s3://v09</code> · public read · {total_n} objects · {hs(total_b)} · see <a href="README.md">README.md</a></div>
+<div class="meta">Each <code>.mzpeak</code> opens directly in a browser viewer (streamed via HTTP range — no download):
+<a class="viewer ex" target="_blank" rel="noopener" href="{EXPLORER}">▶ Explorer</a> = mzPeak Explorer (any file),
+<a class="viewer iv" target="_blank" rel="noopener" href="{MZPEAKIV}">▦ mzPeakIV</a> = imaging viewer (imzML datasets only).</div>
 {''.join(rows)}
-<p class="meta" style="margin-top:1.5rem">Mass-spectrometry example datasets (imzML/mzML originals + converted mzPeak) for the mzML2mzPeak project. Click any file to download.</p>
+<p class="meta" style="margin-top:1.5rem">Mass-spectrometry example datasets (imzML/mzML originals + converted mzPeak) for the mzML2mzPeak project. Click a file name to download; click <b>▶ Explorer</b> / <b>▦ mzPeakIV</b> to open a <code>.mzpeak</code> in the viewer.</p>
 </body></html>"""
 
 with open(sys.argv[1], "w") as f:
@@ -97,10 +126,16 @@ for d in sorted(dirs):
     dsize = sum(s for _, _, s in files)
     md.append(f"## `{d}` — {len(files)} files, {hs(dsize)}")
     md.append("")
-    md.append("| file | size | url |")
-    md.append("|---|--:|---|")
+    md.append("| file | size | download | viewer |")
+    md.append("|---|--:|---|---|")
     for rel, key, s in sorted(files):
-        md.append(f"| `{rel}` | {hs(s)} | [link]({BASE}/{quote(key)}) |")
+        view = ""
+        if key.lower().endswith(".mzpeak"):
+            enc = quote(f"{BASE}/{key}", safe="")
+            view = f"[▶ Explorer]({EXPLORER}?file={enc})"
+            if is_imaging(key):
+                view += f" · [▦ mzPeakIV]({MZPEAKIV}?file={enc})"
+        md.append(f"| `{rel}` | {hs(s)} | [link]({BASE}/{quote(key)}) | {view} |")
     md.append("")
 
 with open(sys.argv[2], "w") as f:
