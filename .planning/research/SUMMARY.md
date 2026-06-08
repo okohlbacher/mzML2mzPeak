@@ -1,209 +1,227 @@
 # Project Research Summary
 
-**Project:** mzML2mzPeak
-**Domain:** All-Rust CLI format converter — MSI imzML → imaging mzPeak (Parquet/ZIP)
-**Researched:** 2026-06-03
+**Project:** mzML2mzPeak — v0.7 Upstreaming, de-vendoring & sample/spatial modeling
+**Domain:** Rust MS-imaging converter (imzML ↔ imaging mzPeak) — SDRF/TMT sample modeling, imaging-spec extensions, CV governance/L2 conformance, geometry/provenance round-trip
+**Researched:** 2026-06-08
 **Confidence:** HIGH
 
 ## Executive Summary
 
-mzML2mzPeak is a one-way, lossless, batch format converter for mass spectrometry imaging (MSI) data. It reads imzML (`.imzML` + `.ibd` sidecar) in both continuous and processed storage modes and writes imaging mzPeak archives — ZIP files of Apache Parquet tables — extending the mzPeak reference implementation (`mzpeak_prototyping`, now `HUPO-PSI/mzPeak`) with a spatial/imaging schema that does not yet exist upstream. The project is narrow and well-scoped: pure Rust, no Python/R writing, no analysis, no GUI. The recommended approach is a thin adapter between two crates by the same author (Joshua Klein / mobiusklein): read via `mzdata` (with its non-default `imzml` feature enabled), write by calling the public `add_spectrum_scan_field` extension API on `MzPeakWriterType`. The shared `mzdata` spectrum model on both sides means there is no impedance-mismatch translation layer.
+mzML2mzPeak v0.7 extends a fully-shipped, tested v0.6 converter (335 tests green, full PXD001283 round-trip proven) with four interconnected capability clusters: SDRF/TMT isobaric sample modeling (999.5), MSI imaging-spec extensions (F6 pixel facet, F7 shared-axis, F8 image entity), CV governance (F9) and L2 conformance (F10), plus geometry/provenance fidelity gap-fills (GEO-F, RSRC). The recommended approach is additive integration exclusively — every new construct lands on one of six already-proven seams (footer-JSON metadata block, scan/spectrum promoted column, auxiliary array, supplementary Parquet member, geometry-threading, reverse header) without editing any core mzpeak_prototyping struct. The only new dependency is `csv = "=1.4.0"` for SDRF TSV parsing; all hard pins (arrow/parquet `=57.0.0`, zip `=4.1.0`, mzpeaks `=1.0.9`) hold entirely unchanged across every v0.7 feature.
 
-The central project risk — whether `mzdata` exposes per-spectrum spatial coordinates or silently treats imzML as plain mzML — is **resolved by source inspection**. `mzdata`'s `src/io/imzml/` module (gated behind the `imzml` Cargo feature) parses IMS scan-position CV params and surfaces them as scan-level `Param`s reachable via `spec.acquisition().scans[0].get_param_by_curie(&curie!(IMS:1000050))`, with passing integration tests for both continuous and processed modes. The concrete extension point in `mzpeak_prototyping` is equally clear: `MzPeakWriterBuilder::add_spectrum_scan_field(CustomBuilderFromParameter::from_spec(curie, name, DataType::Int64))` adds a typed Parquet column to `spectra_metadata.parquet` with zero edits to core writer structs. These two findings remove the two biggest architectural unknowns.
+The single most important structural constraint is sequencing. CV governance (F9) must precede every term-emitting phase because new facets (pixel, SDRF channels, MSI ROI, imaging co-registration) cite CV accessions that must be canonical before landing in the already-public StackIT corpus. The F6 pixel facet is the structural keystone for the spatial-sample story: the per-pixel `roi_ref` column in the MSI ROI model requires a stable pixel primary key that only F6 provides, so MSI ROI→sample must follow F6. De-vendoring (999.1) is explicitly the LAST phase — it is gated on upstream PR #20 (file_index serde `Other`-member round-trip) being merged and verified un-forked, because dropping the fork early causes silent total FileIndex loss with no compile error and no test failure on a forward-only smoke test.
 
-Key residual risks: (1) the `imzml` feature is absent from `mzpeak_prototyping`'s own mzdata pin (`0.63.3`, no `imzml` feature), so enabling it in our workspace requires a deliberate version reconciliation confirmed by a Phase 1 spike on real data; (2) run-level pixel-size and scan-pattern params (`IMS:1000046/47/48/49`) may not be retained by `mzdata`'s `ImzMLFileMetadata` struct and may require a small direct XML parse of the imzML header; (3) continuous-mode m/z materialization behavior (whether mzdata always materializes a full per-spectrum array or exposes the shared axis) must be confirmed before designing the write path; (4) the numerical tolerance contract for roundtrip verification (m/z vs intensity, f32 vs f64 preservation) must be decided explicitly in the design phase; (5) the test dataset `.ibd` (PXD001283 / HR2MSI mouse urinary bladder, UUID `C7822330-F1A8-4D11-AD30-504B30B33722`) is missing locally and must be fetched before any read path runs.
-
----
+The key risks are: (1) de-vendoring too early — mitigated by a hard scriptable gate (`gh pr view 20 == MERGED` AND an `Other`-member round-trip un-forked); (2) minting non-canonical or provisional IMS/PSI-MS accessions into the public corpus — mitigated by F9 establishing a single-source constants module before any facet emits new CURIEs; (3) forward/reverse symmetry breaks — mitigated by a cross-cutting requirement that every new forward-written facet defines its reverse fate up front and carries a round-trip assertion. Three patches across two repos must be tracked independently: mzpeak_prototyping file_index serde (PR #20) + chunk_series index-desync (999.6, not yet submitted); mzdata IM/SONAR accessions (999.7, not yet submitted).
 
 ## Key Findings
 
 ### Recommended Stack
 
-The stack is almost entirely determined by the two upstream crates and their exact dependency pins. Any version drift from `mzpeak_prototyping`'s pinned set (arrow/parquet `57.0.0`, zip `4.1.0`, mzdata `0.63.3`, mzpeaks `1.0.9`) causes duplicate-crate type-mismatch compile errors with the writer. The project must run on Rust 1.85+ because `mzpeak_prototyping` uses `edition = "2024"`. The `mzpeak_prototyping` crate is git-only (not on crates.io; the repo moved from `mobiusklein/mzpeak_prototyping` to `HUPO-PSI/mzPeak` on 2026-06-03) and must be pinned to a specific commit rev for reproducibility. `mzdata` must be requested with `features = ["imzml"]` — this feature is NOT in the default set and is NOT enabled by `mzpeak_prototyping`'s own dependency on mzdata.
+v0.7 needs almost no new crates. The entire work is schema/CV-modeling and governance, not tooling acquisition. The single new dependency is `csv = "=1.4.0"` (BurntSushi, pure-Rust, no shared transitive types with the Arrow/mzdata graph) for SDRF TSV ingestion — even this is optional if you accept a simpler tab-split, but real SDRF has quoted free-text `characteristics` so `csv` is preferred. All existing hard pins are unthreatened by any v0.7 feature.
 
 **Core technologies:**
-- **Rust 1.85+ (edition 2024):** Required by `mzpeak_prototyping`; pin via `rust-toolchain.toml`.
-- **mzdata `0.63.3` + `features = ["imzml"]`:** imzML reader + shared spectrum model; the `imzml` feature enables `mzdata::io::imzml::ImzMLReader` and pulls in `uuid`. Pin to `0.63.3` to match `mzpeak_prototyping`'s dep; confirmed present in the 2025-12-06 release.
-- **mzpeak_prototyping git `HUPO-PSI/mzPeak`, main, pinned to a commit rev:** mzPeak writer/reader; git-only; NOT on crates.io; pin to a specific `rev` after initial checkout for reproducibility.
-- **arrow `57.0.0` + parquet `57.0.0` (features `["encryption"]`):** Must match `mzpeak_prototyping`'s exact pin; mixing arrow majors causes type-graph fracture. Current crates.io is 58.x — do not bump independently.
-- **zip `4.1.0`:** Upstream archive code targets 4.x APIs; current crates.io is 8.x — do not bump independently.
-- **mzpeaks `1.0.9`:** Transitive shared peak type; pin to avoid two incompatible copies in the dep graph.
-- **clap `4.5.38` (derive):** CLI arg parsing; match upstream pin.
-- **anyhow `1.0.102` + thiserror `2.0.18`:** Error handling; anyhow for the binary, thiserror for library error enums.
-- **indicatif `0.17.10`:** Progress bar; match upstream pin (0.17→0.18 has API breaks).
-- **log `0.4.27` + env_logger `0.11.8`:** Upstream uses these; do not introduce `tracing`.
-- **serde `1.0.219` + serde_json `1.0.140` + serde_with `3.12.0`:** Serialization; all at upstream pins.
-
-**Defer:** `rayon` parallel processing — 34k spectra convert fine single-threaded; Parquet/ZIP writing is sequential; revisit only if profiling shows a CPU bottleneck.
+- **arrow/parquet `=57.0.0`** (already pinned): all v0.7 Parquet work — `Int64` FK columns (pixel_id, assay_ref, roi_ref), `LargeBinary` blob (F8 images.parquet), continuous shared-axis layout (F7) — fits within Arrow 57's type system. Do NOT bump; crates.io is at 58.3.0 but bumping fractures the writer's type graph.
+- **zip `=4.1.0`** (already pinned): verbatim-SDRF embed and `images.parquet` reuse `ZipArchiveWriter::start_other` + `FileIndex` `Other`-entry exactly as proven for TIFF in v0.5.
+- **mzdata `=0.64.1`** (vendored snapshot): `curie!` macro, `IbdDataMode::{Continuous,Processed}` for F7 branching. `[patch.crates-io]` drops when IM/SONAR PR merges and 0.64.1 publishes.
+- **mzpeak_prototyping** (vendored fork at rev `8435967`): `add_index_metadata("KEY", &serde)` is the footer-JSON seam; `add_spectrum_scan_field` / `add_spectrum_array_override` are the promoted-column and aux-array seams. `[patch]` drops when file_index PR #20 merges.
+- **serde/serde_json** (already pinned): all v0.7 structured metadata is plain serde structs into `serde_json::Value`. `serde_with` is NOT required.
+- **csv `=1.4.0`** (NEW): the only new `[dependencies]` line. Tab-delimited SDRF parse with `Delimiter(b'\t')` + `flexible(true)`.
+- **No Rust SDRF parser exists** — verified crates.io 2026-06-08. Hand-roll the model; use `sdrf-pipelines` (Python, external) as the validation oracle.
+- **PSI-MS CV covers classic TMT/iTRAQ fully** (`MS:1002615`–`MS:1002621` + N/C isotopologues). TMTpro 16/18-plex (channels 132–135) is a genuine CV gap in both live `4.1.249` and the vendored copy — use parent term + free-text `value` and file a CV request in F9.
+- **imagingMS CV is NOT under HUPO-PSI** — governed at `github.com/imzML/imzML`. Refresh vendored `imagingMS.obo` from `imzML/imzML@master` before F9 minting. Existing `IMS:1006008/12/13/16/17` terms cover optical image + co-registration; audit before assuming new terms must be minted.
 
 ### Expected Features
 
-This is a lossless format translator, not an analysis tool. The competitive baseline (pyimzML, imzMLConverter, CardinalIO, METASPACE) sets minimum expectations; the differentiators are where this project earns its existence — it is the first imaging mzPeak writer and must define the spatial extension.
+**Must have (table stakes — P1, v0.7 core):**
+- **F9 CV governance** — confirm `MS:1000616`, resolve IMS CV URI placeholder, establish single-source constants module. Must precede every term-emitting phase.
+- **GEO-F forward declared-geometry threading** — wires the already-built `parse_scan_settings` into the forward path, flips `pixel_count_source` to `"declared"`. Reuses `src/schema/geometry.rs`; low-risk.
+- **RSRC reverse `<sourceFileList>` copy** — reads `file_description.source_files[]` back via `MzPeakReader`, re-emits into reverse `<sourceFileList>`. Pure plumbing.
+- **SDRF verbatim embed + `assay_ref`** — the lossless anchor for cluster A. Verbatim `*.sdrf.tsv` bytes as a ZIP `Other` member + `metadata.sdrf` back-ref + per-spectrum `assay_ref` Int64 column. Covers label-free, fractionation, and isobaric topology.
+- **`channel_list` + run binding (isobaric)** — one entry per isobaric channel: `label` (CV-backed), `reporter_mz` (shipped `const` table), `tag_modification`, `sample_refs`, `pool_member_refs`, `role`, `sdrf_row_ref`. Non-isobaric datasets get NO `channel_list`.
+- **F6 `pixel` facet / `pixel_index` FK** — structural keystone. `pixel_id` as a promoted `Int64` grouping column; must preserve promoted-scan-column shortcut for 1:1 back-compat. Depends on F9 for `MS:1000616`.
 
-**Must have (table stakes) — P1:**
-- Read both continuous and processed imzML storage modes — a reader handling only one is broken for half the field
-- Parse `.ibd` binary via per-array byte offsets; handle 32-bit and 64-bit float encodings independently per array
-- Handle zlib compression and no-compression binary data
-- Preserve per-pixel x/y(/z) coordinates — the defining feature of imaging MS
-- Preserve profile vs centroid spectrum representation (orthogonal to storage mode)
-- Carry MS level per spectrum (MS2: preserve if present, do not require)
-- Map essential PSI-MS + IMS CV parameters (instrument, source, sample) to mzPeak's metadata model
-- Emit a valid mzPeak archive readable by `mzpeak_prototyping`'s own reader
-- Spectrum-count integrity: input count == output row count, verified
-- CLI with input/output paths, mode auto-detection, clear errors, progress bar for ~35k spectra
-- End-to-end conversion of PXD001283 (34,840 spectra) as the acceptance test
-- Roundtrip + numerical-fidelity verification (count exact; x/y exact integers; m/z+intensity within documented per-axis tolerances)
-- UUID + ibd SHA-1 integrity check: converter-owned hard-failure gate (mzdata only warns; checksum check is an unimplemented TODO in mzdata source)
+**Should have (differentiators — P2, v0.7 stretch):**
+- **Reporter-quant auxiliary array** — per-MS2 vector keyed by `channel_id` via `add_spectrum_array_override`. Spike keying before committing storage contract.
+- **MSI ROI→sample** — region table + per-pixel `roi_ref` Int64 column. Needs F6 for stable pixel key.
+- **F7 continuous shared-axis + imzML continuous emit** — store shared m/z axis once; committee-open on buffer placement; gate on a continuous-mode test fixture.
+- **F10 L2 conformance** — wires existing `ToleranceContract::L2` into `--conformance l2` + transform-record. Small.
 
-**Should have (differentiators) — P1/P2:**
-- Ion-image reconstruction sanity check: reconstruct a pixel-intensity matrix from output to confirm spatial + spectral data survived together
-- Imaging mzPeak schema extension: defines pixel coordinates, scan pattern, pixel size, UUID linkage — foundational for the mzPeak+MSI ecosystem
-- Preserve scan pattern / pixel size / image dimensions as first-class metadata in `mzpeak_index.json`
-- Dry-run / validate-only mode: inspect mode, spectrum count, dimensions, checksum without writing
-
-**Defer to v1.x:**
-- Richer QC report (per-pixel diff stats, sparse-pixel report)
-- Configurable fidelity tolerances + machine-readable QC JSON for CI/automation
-- MS2 / precursor preservation hardening (needs an MS2 imaging dataset for testing)
-
-**Defer to v2+:**
-- Multi-file merge/stitch
-- Reverse conversion (mzPeak → imzML) — wait until the imaging extension stabilizes
-- Upstream PR into `mzpeak_prototyping` — built mergeable-by-design but not committed for v1
-
-**Anti-features (never):** peak picking / centroiding during conversion (breaks lossless guarantee), resampling/rebinning to fake a common axis, auto-fetching missing `.ibd` over the network.
+**Defer (v0.8+):**
+- **F8a `images.parquet` blob entity** — re-represents the already-working separate-TIFF story.
+- **F8b CV-governed affine round-trip** — limited by imzML's lack of a registration CV term.
+- **F8c true co-registration** — explicit anti-feature for a converter. Carry a registration, don't compute one.
 
 ### Architecture Approach
 
-The architecture is a thin adapter between two same-author libraries sharing a spectrum model — `mzdata` on the read side, `mzpeak_prototyping` on the write side — with no translation layer. Our crate owns only the CLI, a coordinate-extraction helper, the imaging field-set module that registers CV-param-derived columns with the writer, and the verification harness. Key design decisions for mergeability: (1) imaging coordinates go into `spectra_metadata.parquet` as scan-level columns alongside existing scan fields, not into a new facet file, preserving the existing 1:1 scan↔spectrum row alignment via `ScanBuilder`; (2) each column is registered via the public `add_spectrum_scan_field(CustomBuilderFromParameter::from_spec(...))` API with no edits to core writer structs; (3) run-level imaging facts (UUID linkage, pixel size, scan pattern, image extent) go in `mzpeak_index.json`'s `metadata` object; (4) a new `schema/imaging.json` JSONSchema documents the extension for upstream mergeability.
+v0.7 is a subsequent-milestone integration study, NOT greenfield. The v0.3–v0.6 pipeline is the substrate. All new features attach to one of six proven seams without editing any core mzpeak_prototyping struct (OUT-02 invariant). The footer-JSON block seam (`add_index_metadata("KEY", &serde)`, called after `finish_parquet()`) is the most de-vendor-safe seam — prefer it over new FileEntry types wherever possible.
 
-**Major components:**
-1. **CLI (clap):** Parses args, exposes imzML as an input format, drives the pipeline; pattern mirrors `mzpeak_prototyping`'s `examples/convert.rs::ConvertCli` / `run_convert`.
-2. **Input Reader / Adapter:** `mzdata::io::imzml::ImzMLReader::open_path(path)` with `imzml` feature; auto-derives `.ibd`/`.IBD` sibling; yields `MultiLayerSpectrum` via `SpectrumSource` iterator.
-3. **Coordinate Extractor:** Per-spectrum: `spec.acquisition().scans[0].get_param_by_curie(&curie!(IMS:1000050/51/52))`; run-level: `reader.imzml_metadata` (`ImzMLFileMetadata { uuid, data_mode, ibd_checksum, ... }`).
-4. **Schema / Imaging-Extension module:** Thin module exposing `imaging_scan_fields() -> Vec<CustomBuilderFromParameter>` using `from_spec(curie!(IMS:1000050), "position x", DataType::Int64)` etc.; declares matching `MetadataColumn` entries for the reader side; documents run-level metadata convention.
-5. **Writer (mzpeak_prototyping):** `MzPeakWriterType::<File>::builder().add_spectrum_scan_field(x_col).add_spectrum_scan_field(y_col)...build(file)`; streaming `writer.write_spectrum(&spec)` loop; `writer.finish()`.
-6. **Verification Harness:** Reopens output with `mzpeak_prototyping`'s `MzPeakReaderType`; asserts spectrum count, per-spectrum x/y (exact integers), m/z+intensity within documented per-axis tolerances; reconstructs ion image as spatial coherence check.
+**Major new/modified components:**
+1. **`src/sdrf/`** (NEW) — SDRF TSV parse (`csv = "=1.4.0"`) + reagent lookup (TMT/TMTpro/iTRAQ reporter m/z `const` table) + role derivation. Threaded into `convert_with` as `Option<&SdrfProjection>` via `--sdrf <PATH>`.
+2. **`src/schema/`** (MODIFY + NEW) — single source of all CV facts; `cv.rs` gets F9 URI fix (lockstep with reverse `<cvList>`); `channel.rs`, `sample.rs`, `roi.rs` are new; `columns.rs`, `metadata.rs`, `geometry.rs` are widened. Three-places rule applies to every new facet.
+3. **`src/write/convert.rs` + `writer.rs`** (MODIFY) — thread `Option<&SdrfProjection>`; new `add_index_metadata` calls; register promoted cols; aux reporter-quant array seam.
+4. **`src/reverse/imzml_writer.rs` + `source.rs`** (MODIFY) — RSRC sourceFileList re-emit; F7 continuous emit branch; sample/channel re-emit in `write_header_to`.
+5. **`src/verify/compare.rs`** (MODIFY) — F10 L2 relative-error arm wired to `--conformance l2`.
 
 ### Critical Pitfalls
 
-1. **mzdata version/feature mismatch** — `mzpeak_prototyping` pins `mzdata = "0.63.3"` WITHOUT the `imzml` feature; a naive `cargo build` will not compile the imzML read path at all. The Phase 1 spike must confirm `mzdata 0.63.3` with `features = ["imzml"]` compiles and exposes coordinates on the real PXD001283 file, and that Cargo resolves a single copy of mzdata across the workspace. Pin `mzpeak_prototyping` to a specific git commit rev, not just `branch = "main"`.
+1. **De-vendor before PR #20 merges → silent total FileIndex loss** — stock upstream `file_index.rs` `Other(String)` serializes as `{"other":"..."}` that `DeserializeFromStr` cannot read back; reader's `.ok()` silently drops the ENTIRE `FileIndex`. No compile error; green forward-only smoke test. Gate: `gh pr view 20 --repo HUPO-PSI/mzPeak --json state == MERGED` AND `Other`-member round-trip passes un-forked. Sequence de-vendor LAST.
 
-2. **UUID/checksum mismatch silently accepted** — `mzdata`'s `check_ibd_file()` only `warn!`s on UUID mismatch and the checksum implementation is an explicit `// TODO` in source. The converter must own its own preflight: read the first 16 bytes of `.ibd`, compare to imzML `IMS:1000080`, hard-fail on mismatch; compute the declared ibd SHA-1/MD5 digest, hard-fail on mismatch. Test this by deliberately feeding a mismatched `.ibd`.
+2. **CV governance skipped → non-canonical CURIEs baked into the public corpus** — StackIT corpus is already public; recalled URIs are unrecoverable. F9 must precede every facet that emits new IMS or PSI-MS accessions; single constants module mandatory; honest free-text for genuinely missing terms.
 
-3. **Continuous vs processed mode conflation** — mzdata hands you per-spectrum `raw_arrays()` regardless of mode, hiding the storage difference. Must branch the writer on `reader.imzml_metadata.data_mode`; must test CI fixtures for both modes; must clarify whether mzdata always materializes a full per-spectrum m/z array for continuous files.
+3. **Forward/reverse symmetry breaks per new facet** — v0.5 shipped a forward-only optical feature that needed v0.6 to fix. Every v0.7 facet must have its reverse fate defined up front, with a round-trip assertion in `src/verify/`. Cross-cutting success criterion for every phase.
 
-4. **Schema drift makes output unreadable by upstream reader** — mzPeak has no imaging variant; bespoke column naming, wrong Arrow type, wrong Parquet file placement, or malformed `mzpeak_index.json` will break the reference reader on open. Use `CustomBuilderFromParameter` + `add_spectrum_scan_field` exclusively (no hand-patching `ScanBuilder`'s fixed fields); validate every output against the JSONSchemas in `mzpeak_prototyping/schema/`; re-open every produced archive with `mzpeak_prototyping`'s own reader as a CI acceptance gate.
+4. **SDRF projection treated as authoritative over the verbatim embed** — embedded `*.sdrf.tsv` rows are the lossless anchor; `channel_list`/`sample_list`/`assay_ref` are projections. Embed verbatim FIRST; `sdrf-pipelines` re-validates on round-trip. Sequence within Phase 26: embed before projections.
 
-5. **Structural-only verification declared as success** — passing row count + JSONSchema is insufficient. Must compare m/z and intensity arrays with separate per-axis numerical tolerances (m/z: near-exact relative tolerance since they are typically f64; intensity: tolerance that reflects actual encoding choices). Decide and document the f32/f64 encoding contract end-to-end before the write phase begins.
-
-6. **Memory blow-up on 34,840-spectrum file** — mzdata reads array data on demand via stored external offsets; a `collect`-all pipeline throws that away and OOMs. Design the pipeline as streaming from day one: one spectrum at a time from mzdata, Parquet row-group-flushed writes, bounded memory regardless of dataset size.
-
----
+5. **`UInt32` column type promoted when the writer panics on it** — `CustomBuilderFromParameter` in `visitor.rs` has `unimplemented!()` for anything but `Null/Bool/Int64/Float64/LargeUtf8`. All new columns use `Int64` as the baseline.
 
 ## Implications for Roadmap
 
-Based on the build dependency graph in ARCHITECTURE.md and the pitfall-to-phase mapping in PITFALLS.md:
+Continuing from Phase 22. All agents agreed on the following phase order.
 
-### Phase 0: Environment Setup
-**Rationale:** `mzpeak_prototyping` requires edition 2024 / Rust 1.85+; the local machine has no confirmed Rust toolchain; `mzpeak_prototyping` is git-only and its repo moved 2026-06-03; the test `.ibd` is missing. These are hard prerequisites that block all subsequent work.
-**Delivers:** Working Rust toolchain pinned via `rust-toolchain.toml`; `Cargo.toml` with all version pins confirmed (arrow/parquet `57.0.0`, zip `4.1.0`, mzdata `0.63.3`, mzpeaks `1.0.9`); `mzpeak_prototyping` pinned to a specific commit rev at `HUPO-PSI/mzPeak`; PXD001283 `.ibd` fetched and UUID-verified against `C7822330-F1A8-4D11-AD30-504B30B33722`.
-**Avoids:** Pitfall #1 (version/feature mismatch discovered late), UUID gotcha on first real read.
+### Phase 22: Upstream PR preparation (999.6/7/8/9)
 
-### Phase 1: Coordinate-Exposure Spike (blocking gate)
-**Rationale:** Despite source-level verification, this must be confirmed on the *pinned* mzdata version against the *actual* local processed-mode file before any architecture commitment. ARCHITECTURE.md and PITFALLS.md both mark it as a blocking gate. The spike is a ~1-day confirm-and-pin exercise, not a does-it-even-exist investigation.
-**Delivers:** Confirmed that `mzdata 0.63.3` + `features = ["imzml"]` compiles and exposes `(index, x, y, n_mz_points)` tuples for both a continuous fixture (`mzdata`'s bundled `Example_Continuous.imzML`) and the local processed HR2MSI file; Cargo resolves a single `mzdata` across the workspace; UUID and `data_mode` are reachable from `reader.imzml_metadata`; continuous-mode m/z materialization behavior clarified.
-**Addresses:** FEATURES read-path requirements; PITFALLS #1 (version pin), #3 (mode detection), #10 (dtype/compression).
-**Avoids:** Over-engineering a fallback XML parser before confirming the main path works.
+**Rationale:** Submit three ready PRs immediately so merge latency overlaps later phases. Does NOT remove forks yet.
+**Delivers:** PRs submitted: mzpeak_prototyping chunk_series index-desync (999.6) + file_index serde #20 (already open); mzdata IM/SONAR accessions (999.7); mzPeakValidator `index_files_present` non-Parquet skip (999.8/9); `array_buffer` empty-first-spectrum issue filed.
+**Addresses:** 999.6, 999.7, 999.8, 999.9.
+**Avoids:** Pitfall 1 — establishes the merge gate early.
 
-### Phase 2: Read Layer + UUID/Checksum Preflight
-**Rationale:** Input reader and coordinate extractor are independent of the write path (ARCHITECTURE build order [1]+[2]). Getting the read layer right — including the converter-owned UUID+checksum hard-failure gate — before touching the writer keeps concerns separated and gives a standalone, testable foundation.
-**Delivers:** `ImzMLReader::open_path` integration; per-spectrum `(x, y, z, m/z[], intensity[])` extraction; `ImzMLFileMetadata` UUID/mode/checksum reading; converter-owned UUID + SHA-1 preflight that hard-fails on mismatch (not mzdata's warn-only path); mode auto-detection logged to the user; clear error when `.ibd` is absent.
-**Uses:** `mzdata` with `imzml` feature, `anyhow`/`thiserror`, `log`/`env_logger`.
-**Addresses:** FEATURES table-stakes: `.ibd` decode, 32/64-bit float, zlib, coordinate extraction, UUID/SHA-1 verification, MS level, profile/centroid flag.
-**Avoids:** Pitfall #3 (UUID mismatch silently swallowed).
+### Phase 23: CV governance / IMS URI minting (F9)
 
-### Phase 3: Design — Imaging mzPeak Schema Extension
-**Rationale:** The write path cannot begin until the imaging schema extension is designed — a hard gate noted in PROJECT.md, FEATURES.md, and PITFALLS.md. The design must decide: exact column names and Arrow types for position x/y/z in `spectra_metadata.parquet`; which run-level facts go in `mzpeak_index.json.metadata`; whether pixel-size/scan-pattern requires direct imzML XML parsing; the numerical tolerance contract; and the `schema/imaging.json` JSONSchema.
-**Delivers:** Documented imaging schema design (column names, Arrow types, column paths conforming to mzPeak's `^([A-Za-z0-9_]+)(\.[A-Za-z0-9_]+)+$` path regex); `MetadataColumn` entries for the reader side; `mzpeak_index.json.metadata` convention; resolution of whether direct XML header parsing is needed for run-level params (`IMS:1000046/47/48/49`); numerical tolerance contract.
-**Avoids:** Pitfall #7 (schema drift), #9 (structural-only verification).
-**Research flag:** Needs inspection of the live `mzpeak_prototyping` reader source to confirm reader-side `MetadataColumn` registration path; needs Phase 1 spike result on continuous-mode m/z materialization. Recommend `--research-phase` for this planning phase.
+**Rationale:** One-string change in `cv.rs` + reverse `<cvList>` lockstep, but must precede every facet emitting new accessions. Cheap in code; foundational in correctness. Refresh vendored `imagingMS.obo` from `imzML/imzML@master` first.
+**Delivers:** Canonical IMS CV URI in `cv.rs` + reverse header in lockstep; resolved `TODO(F9)` placeholder; single constants module as the mandatory emit path; TMTpro CV gap documented + term request filed; `MS:1000616` confirmed.
+**Addresses:** F9 — unblocks F6 naming, F7 shared-axis CURIE, F8 image-role CURIEs, MSI ROI CV terms.
+**Avoids:** Pitfall 3 (non-canonical URI minting); Pitfall 4 (CV-string drift forward vs reverse).
+**Research flag:** LOW — well-defined string + governance action.
 
-### Phase 4: Writer Integration
-**Rationale:** Depends on Phase 2 (coords reachable) and Phase 3 (schema locked). Corresponds to ARCHITECTURE build order [3]+[4]+[5].
-**Delivers:** `MzPeakWriterType::<File>::builder()` baseline proven end-to-end; `imaging_scan_fields()` module with `CustomBuilderFromParameter` visitors registered via `add_spectrum_scan_field`; full imzML→mzPeak streaming pipeline; `mzpeak_index.json` metadata block for run-level imaging facts; indicatif progress bar.
-**Uses:** `mzpeak_prototyping` writer API, arrow `57.0.0`, parquet `57.0.0`, zip `4.1.0`, `indicatif`.
-**Addresses:** FEATURES: valid mzPeak archive, CV metadata mapping, scan pattern/pixel size preservation, spectrum-count integrity, progress reporting.
-**Avoids:** Pitfall #6 (streaming, not collect-all), #7 (CV-param visitor pattern, no ScanBuilder hand-patching), #8 (upstream writer chunking strategy, not bespoke Parquet).
+### Phase 24: GEO-F — forward declared-geometry threading
 
-### Phase 5: Verification + CLI Polish
-**Rationale:** Verification requires Phase 4's output as the subject. CLI polish is cheapest once all underlying functionality is stable.
-**Delivers:** Roundtrip + numerical-fidelity verification harness (spectrum count exact; per-spectrum x/y exact; m/z+intensity within documented per-axis tolerances); ion-image reconstruction sanity check (sparse pixel-to-matrix scatter, sentinel fill for absent pixels, documented y-orientation); CLI `--dry-run` / validate-only mode; end-to-end conversion of full PXD001283 34,840-spectrum dataset under a memory cap; CI fixtures for both continuous and processed modes; zlib-compressed and float32 fixtures round-tripping correctly.
-**Addresses:** FEATURES: roundtrip verification, ion-image check, dry-run, full PXD001283 acceptance test.
-**Avoids:** Pitfall #4 (coordinate origin/axis conventions documented), #5 (sparse grid handling), #9 (numerical fidelity, not structural-only), #10 (compression + dtype fixtures).
+**Rationale:** Widens a fully-plumbed seam (reverse geometry parser already exists). Parallel-able with Phase 25.
+**Delivers:** Forward path calls `parse_scan_settings`, passes `Some(geom)` into `convert_with`; `pixel_count_source:"declared"` when source declares grid counts; `absolute_offset_um` populated where declared.
+**Addresses:** GEO-F fidelity gap-fill; establishes stable geometry before ROI→sample.
+**Avoids:** Pitfall 2 (forward-only — symmetry maintained via existing reverse parser).
+**Research flag:** LOW — existing parser; known seam.
+
+### Phase 25: RSRC — reverse `<sourceFileList>` copy
+
+**Rationale:** Isolated reverse-header change; parallel-able with Phase 24.
+**Delivers:** Reverse-emitted `.imzML` carries original vendor-RAW provenance.
+**Addresses:** RSRC round-trip provenance.
+**Avoids:** Pitfall 2 (the v0.5 forward-only trap).
+**Research flag:** LOW — pure plumbing.
+
+### Phase 26: SDRF model — sample_list + channel_list + assay_ref + verbatim embed (999.5 core)
+
+**Rationale:** The model before the quant array. New `src/sdrf/` module; `--sdrf <PATH>` CLI flag; verbatim embed reuses the v0.5 TIFF storage contract (same `start_other` path); channel_list/sample_list as footer-JSON blocks; `assay_ref` as promoted `Int64` column. Depends on Phase 23 (CV terms for channel labels) and on the vendored FileEntry-serde fix (already present; only gated at de-vendor time).
+**Delivers:** `src/sdrf/` (parse_sdrf + SdrfProjection + reagent lookup); `schema/channel.rs` + `schema/sample.rs`; `metadata["channel_list"]` + `metadata["sample_list"]`; per-spectrum `assay_ref` column; verbatim `*.sdrf.tsv` ZIP member + `metadata["sdrf"]` back-ref; `--sdrf <PATH>` flag. Round-trip validates with `sdrf-pipelines` on MTBLS1129 (label-free) and PXD011799 (TMT 10-plex).
+**Addresses:** 999.5 core (SDRF verbatim embed + assay_ref + channel_list + run binding).
+**Avoids:** Pitfall 6 (embed before projections); Pitfall 7 (repo-SDRF-wins rule + conflict detection); Pitfall 3 (channel label CURIEs via Phase-23 constants module).
+**Research flag:** MEDIUM — SDRF topology handling (pooled/carrier/reference/unused channels) non-trivial; validate both fixtures before declaring done.
+
+### Phase 27: Reporter-ion quant + MSI ROI→sample (roi_table, roi_ref)
+
+**Rationale:** Reporter-quant is the payoff of the channel model (depends on Phase 26); ROI→sample is the SDRF × imaging intersection (depends on F6 pixel_id from Phase 29 for full facet, but Phase 26 assay_ref for the SDRF model). Spike aux-array keying before committing.
+**Delivers:** Per-MS2 reporter-intensity auxiliary array keyed by `channel_id`; `roi_table` footer block; per-pixel `roi_ref` `Int64` column; single spatial model reconciled with `scan_settings_list` geometry.
+**Addresses:** Reporter-quant (999.5 stretch); MSI ROI→sample (999.5 stretch).
+**Avoids:** Pitfall 8 (ROI→sample invented ad hoc — align with imaging geometry); Pitfall 12 (large-MSI perf — stream rows).
+**Research flag:** MEDIUM — spike `add_spectrum_array_override` keying to confirm `channel_id` survives read-back.
+
+### Phase 28: L2 conformance (F10)
+
+**Rationale:** Wires existing `ToleranceContract::L2` into CLI and array-index record. Independent of SDRF and imaging extensions; small.
+**Delivers:** `--conformance l2` CLI flag; transform CURIE + tolerance recorded in array index + `metadata`; `compare.rs` L2 arm in acceptance tests.
+**Addresses:** F10 (L2 conformance contract).
+**Avoids:** Pitfall 5 (sorting_rank — transform record must include the array's rank context).
+**Research flag:** LOW — scaffolding already exists; well-defined contract.
+
+### Phase 29: Imaging extensions — F6 pixel index, F7 continuous shared-axis, F8 image entity
+
+**Rationale:** Largest and most speculative cluster (open committee questions). F6 as `pixel_id` promoted `Int64` column first (structural keystone, also completes ROI→sample from Phase 27). F7 continuous-mode branch. F8 additive to existing separate-member representation. Depends on Phase 23 (CV terms for pixel compound-key, image role, shared-axis CURIE).
+**Delivers:** `pixel_id` `Int64` grouping column on `scan`; F6/F7/F8 additive `ImagingMetadata` fields; F7 continuous-mode forward branch + continuous `.imzML` reverse emit; F8 `images.parquet` LargeBinary blob (additive; existing separate-TIFF untouched); mzPeakValidator handoff for new sortable axes.
+**Addresses:** F6, F7, F8a/F8b. F8c excluded as anti-feature.
+**Avoids:** Pitfall 5 (sorting_rank — declare sorted IFF data is sorted; sort-on-write for continuous shared axis); Pitfall 9 (multi-spectrum-per-pixel — pixel_id keys on stable `spectrum.index`); Pitfall 10 (continuous-axis on processed mode — branch on `IbdDataMode`; test BOTH modes); Pitfall 11 (images.parquet regresses optical round-trip — additive only, corpus parity gate); Pitfall 12 (large-MSI perf — stream blob).
+**Research flag:** HIGH — F6 scan-PK gap needs explicit decision; F7 buffer placement needs committee alignment or explicit deferral; F8 blob design needs a pre-implementation decision.
+
+### Phase 30: De-vendor — drop both vendored forks (999.1)
+
+**Rationale:** Explicitly LAST. Inventory = THREE patches across TWO repos. Gate is not negotiable: `gh pr view 20 --repo HUPO-PSI/mzPeak --json state == MERGED` AND a full `Other`-member round-trip (embedded TIFF + embedded SDRF) passes against the un-forked build. By sequencing last, the gate exercises the worst case — all new `Other`-typed ZIP members exist.
+**Delivers:** `[patch]` blocks removed; `vendor/` deleted; zero fork divergence.
+**Addresses:** 999.1 (de-vendor tech debt).
+**Avoids:** Pitfall 1 (silent total FileIndex loss) — the gate is not negotiable.
+**Research flag:** LOW — well-defined; only uncertainty is upstream PR merge timing.
 
 ### Phase Ordering Rationale
 
-- Phase 0 is a hard prerequisite for everything: no Rust toolchain, no git dep, no `.ibd` means nothing compiles or runs.
-- Phase 1 before Phases 2–5: if mzdata 0.63.3 does not expose coords on the pinned version, the fallback strategy changes the read layer design before it is built. One day of spike prevents weeks of wrong-direction building.
-- Phase 2 (read layer) and Phase 3 (schema design) can overlap in calendar time because they are independent — the read layer can be built and tested while the schema design is being worked out, as long as the coordinate output shape is confirmed (Phase 1 result) before the schema is finalized.
-- Phase 3 gates Phase 4 hard: cannot register imaging columns with the writer without knowing what they are.
-- Phase 4 gates Phase 5: cannot verify output that does not exist.
-- This ordering front-loads the two biggest pitfall clusters (version mismatch in Phase 0/1, schema drift in Phase 3) before any irreversible work is done.
+- **CV governance first (Phase 23):** every subsequent phase that emits new IMS or PSI-MS accessions must cite canonical terms; provisional placeholders baked into the public corpus are unrecoverable.
+- **GEO-F + RSRC early (Phases 24–25):** low-risk "widen existing seam" work that closes known fidelity gaps before SDRF modeling builds on the geometry coordinate model.
+- **SDRF model before reporter-quant and ROI (Phase 26 before 27):** channel_list and embedded rows are what reporter-quant aux array and ROI `sdrf_row_ref` index into; foundation before superstructure.
+- **F6 before MSI ROI→sample:** `roi_ref` needs a stable per-pixel key (`pixel.index` PK) that only F6 provides.
+- **De-vendor last (Phase 30):** dropping the fork while any `Other`-typed ZIP member exists and PR #20 has not merged causes silent total FileIndex loss with no detectable symptom on a forward-only test.
 
 ### Research Flags
 
-Phases needing deeper research or design inspection during planning:
-- **Phase 3 (Schema Design):** Requires live source inspection of `mzpeak_prototyping` reader to confirm whether reader-side `MetadataColumn` registration is sufficient for round-trip column resolution; requires checking whether `ImzMLFileMetadata` retains run-level CV params (`IMS:1000046/47/48/49`) or whether a `quick-xml` parse of the imzML `<scanSettings>` element is needed; requires Phase 1 spike result on continuous-mode m/z materialization. Recommend `--research-phase`.
-- **Phase 1 (Spike):** By design a research-grade deliverable — its output either confirms the architecture or triggers a pivot.
+Phases likely needing deeper research or spikes during planning:
+- **Phase 26 (SDRF model):** MEDIUM — topology handling for pooled/carrier/reference/unused channels is non-trivial; validate with `sdrf-pipelines` on both fixtures before declaring done.
+- **Phase 27 (reporter-quant + ROI):** MEDIUM — spike `add_spectrum_array_override` aux-array keying to confirm `channel_id` survives read-back before committing storage contract.
+- **Phase 29 (imaging extensions):** HIGH — F6 scan-PK gap, F7 buffer placement, F8 blob design all need explicit committee-alignment or deferral decisions before implementation begins.
 
-Phases with standard, well-documented patterns (skip research-phase):
-- **Phase 0 (Environment):** Standard Rust toolchain setup + git dep pinning.
-- **Phase 2 (Read Layer):** mzdata API is source-verified; UUID/checksum preflight is straightforward file I/O.
-- **Phase 4 (Writer):** `add_spectrum_scan_field` + `CustomBuilderFromParameter` seam is source-verified; writer builder pattern is documented in `examples/convert.rs`. Standard patterns once schema is locked.
-- **Phase 5 (Verification):** Roundtrip testing and ion-image matrix reconstruction are standard patterns.
-
----
+Phases with standard patterns (skip research or LOW signal):
+- **Phase 22 (upstream PRs):** PR content already written; submission + tracking only.
+- **Phase 23 (CV governance):** string replacements in two files; governance process is known.
+- **Phases 24–25 (GEO-F + RSRC):** existing parsers + known seams.
+- **Phase 28 (L2 conformance):** existing scaffolding; known contract.
+- **Phase 30 (de-vendor):** dependency tracking + `Cargo.toml` edit only.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All version pins verified against live `HUPO-PSI/mzPeak` `Cargo.toml`, crates.io, and both crate source trees. Git-only nature and repo move are confirmed facts. |
-| Features | HIGH | imzML spec (1.1.1), IMS OBO CV, pyimzML source, CardinalIO, METASPACE requirements all cross-verified. MEDIUM only on mzPeak output mapping details for the imaging extension itself, which is explicitly deferred to the design phase. |
-| Architecture | HIGH | Extension seam verified at file:line in cloned source. Coordinate exposure verified in mzdata integration tests. One real gap: reader-side `MetadataColumn` registration for round-trip column resolution is flagged as an integration task but not yet confirmed end-to-end. |
-| Pitfalls | HIGH | Source-verified: UUID warn-only behavior and unimplemented checksum TODO in `mzdata` reader source; `imzml` feature not in `mzpeak_prototyping`'s dep; `edition = "2024"` toolchain requirement; arrow/parquet/zip version pins. MEDIUM on ecosystem/spec pitfalls (1-based coordinate convention, sparse acquisition patterns). |
+| Stack | HIGH | All dependencies verified at crates.io + local `Cargo.toml` + source level. One new dep (`csv`). Hard pins confirmed unthreatened. TMTpro CV gap verified in live PSI-MS CV 4.1.249 AND vendored copy. |
+| Features | HIGH | Grounded in repo design docs (sdrf-mzpeak-integration.md, imaging-mzpeak-spec-draft.md), SDRF-Proteomics Nature Comms 2021, verified CV term landscape. Spec-committee items marked MEDIUM where un-ratified. |
+| Architecture | HIGH | Read directly from source: `convert.rs`, `writer.rs`, `reverse/`, `schema/`, `Cargo.toml` `[patch]` blocks. Six seams verified. FileEntry-serde de-vendor dependency confirmed in STATE.md. |
+| Pitfalls | HIGH | Grounded in the 39-issue conformance review vs HUPO-PSI/mzPeak @ `d1aaaf84`, shipped v0.3–v0.6 invariants, RAG-verified SDRF design doc, and the sorting_rank resolution history. |
 
-**Overall confidence:** HIGH for the happy path. Residual unknowns are design-phase decisions, not architectural blockers.
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Run-level scanSettings params (pixel size, scan pattern):** Unverified whether `mzdata`'s `ImzMLFileMetadata` retains `IMS:1000046/47/48/49` from the imzML `<scanSettings>` block. Resolve in Phase 3 by inspecting `reader.imzml_metadata`'s actual field set using the Phase 1 spike.
-- **Continuous-mode m/z materialization:** Whether mzdata always materializes a full per-spectrum m/z array for continuous files affects the write-path design for size efficiency. Confirm in Phase 1 spike with `Example_Continuous.imzML`.
-- **Numerical tolerance contract:** The roundtrip tolerance (f32 vs f64 preservation, per-axis m/z vs intensity) must be explicitly decided before any verification test is written. This is a design decision to lock in during Phase 3.
-- **Reader-side MetadataColumn registration:** Whether adding imaging `MetadataColumn` entries requires upstream code changes vs purely additive registration in our own extension module is unconfirmed. Verify in Phase 3/4 against `src/reader/metadata.rs`.
-- **PXD001283 `.ibd` fetch:** The test dataset is unusable without the binary sidecar. Fetch and UUID-verify as part of Phase 0.
-
----
+- **F6 multi-spectrum-per-pixel base-schema scan-PK gap:** `scan` facet has no primary key (conformance review B4); Phase 29 spike must decide whether `pixel_id` as a grouping column is sufficient for v0.7 or whether a scan PK is needed. Flag for committee.
+- **F7 continuous shared-axis buffer placement:** in-file vs companion `spectra_data_shared_axis.parquet` is an open committee item. Phase 29 planning needs a committee decision or explicit v0.7 deferral.
+- **F8 `images.parquet` design decision:** whether F8-rich supersedes or supplements the v0.5/v0.6 separate-TIFF representation needs a pre-Phase-29 committee-aligned decision. Additive is the safe default.
+- **Reporter-quant aux-array keying spike:** `channel_id` in `parameters` vs sidecar map — must be confirmed survivable through `add_spectrum_array_override` read-back before Phase 27 commits the storage contract.
+- **TMTpro 16/18-plex CV gap:** `MS:` terms for channels 132–135 absent from PSI-MS CV 4.1.249. Phase 23 should file the term request; if TMTpro datasets appear before minting, use parent `MS:1002615` + free-text channel name.
+- **mzPeak Python reader crashes on `IMS:*` params (C1):** do not use the Python binding to validate imaging output until fixed upstream. Validate with the Rust reader + mzPeakValidator.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- `https://github.com/HUPO-PSI/mzPeak` (cloned 2026-06-03) — `Cargo.toml` dep pins; `src/writer/builder.rs` `add_spectrum_scan_field`; `src/writer/visitor.rs` `CustomBuilderFromParameter`/`from_spec`/`ScanBuilder`; `src/spectrum.rs` `ScanEntry::metadata_columns`; `src/param.rs` `MetadataColumn`; `src/reader/metadata.rs` column resolution; `examples/convert.rs`; `small.unpacked.mzpeak/` archive layout; `schema/*.json`
-- `https://github.com/mobiusklein/mzdata` (cloned 2026-06-03) — `src/io/imzml/mod.rs`; `src/io/imzml/reader.rs` (1481 lines: `ImzMLFileMetadata`, `check_ibd_file`, `load_ibd_arrays`, UUID/checksum/mode/offset handling, unimplemented checksum TODO); `src/io/imzml/tests.rs` (`test_imzml_read_operation` proving `IMS:1000050/1000051` for continuous AND processed modes); `src/params.rs` (`curie!` macro, `get_param_by_curie`)
-- crates.io API — mzdata `0.63.3`/`0.63.5` feature table (`imzml = ["mzml", "dep:uuid"]`, confirmed non-default); `mzpeak`/`mzpeak_prototyping` both "crate does not exist"; all supporting crate versions
+
+- `src/write/convert.rs`, `src/write/writer.rs` — forward orchestrator + all six integration seams (read at source)
+- `src/schema/{cv,scan_settings,geometry,metadata,tolerance,columns}.rs` — schema layer, promoted-column dtype constraints, `TODO(F9)` placeholder location
+- `src/reverse/{convert,imzml_writer,source}.rs` — reverse pipeline, `write_header_to`, `<sourceFileList>` deferred stub
+- `src/cli.rs`, `Cargo.toml` (`[patch]` blocks, hard pins) — CLI surface + vendoring state
+- `docs/sdrf-mzpeak-integration.md` — RAG-verified + CODEX-reviewed SDRF design (lossless-embed-vs-projection, channel_list topology, precedence open issue, ROI→sample extension)
+- `docs/imaging-mzpeak-spec-draft.md`, `docs/imaging-overview-parquet.md` — imaging extension intent + supplementary-Parquet template (Edits 1–10 + Parts B–E)
+- `docs/mzpeak-spec-conformance-issues.md` — 39-issue conformance review vs HUPO-PSI/mzPeak @ `d1aaaf84` (B1/B2/B3/B4 CV drift, C1 Python IMS crash, C3/D11 name-vs-transform decode, A5 Other-variant serde)
+- `docs/sdrf-examples.md` — MTBLS1129 (label-free) + PXD011799 (TMT 10-plex) fixture details + `sdrf-pipelines` template notes
+- `.planning/PROJECT.md`, `.planning/STATE.md` — shipped-state invariants, milestone scope, de-vendor blocker
+- `.planning/ROADMAP.md` — backlog 999.1/999.5/999.6/999.7/999.8/999.9 patch inventory; PR #20 as de-vendor blocker
+- `knowledge/cv/obo/psi-ms.obo` — `MS:1002615`–`MS:1002621` TMT channels, `MS:1002009` isobaric parent, reporter-ion intensity terms; TMTpro 132–135 absence confirmed
+- `knowledge/cv/obo/imagingMS.obo` — `IMS:1006008/12/13/16/17` optical + co-registration terms confirmed present despite stale header
+- crates.io API — csv 1.4.0, arrow/parquet 58.3.0 (DO-NOT-BUMP), zip 8.6.0 (DO-NOT-BUMP), zero results for any Rust SDRF parser (2026-06-08)
+- `https://raw.githubusercontent.com/HUPO-PSI/psi-ms-CV/master/psi-ms.obo` — live `data-version: 4.1.249` (2026-06-01); TMTpro 132–135 absent confirmed
+- `gh repo list HUPO-PSI` — no imagingMS-CV repo; `github.com/imzML/imzML` is canonical IMS CV home
 
 ### Secondary (MEDIUM confidence)
-- imzML 1.1.1 spec (`https://www.ms-imaging.org/imzml/imzml-1-1-1/`) + IMS OBO (`imagingMS.obo`) — CV accessions for IMS:1000050/51/52 (position x/y/z), IMS:1000030/31 (continuous/processed), IMS:1000046/47 (pixel size), IMS:1000048/49 (scan type/direction), IMS:1000080 (UUID), IMS:1000090/91 (ibd MD5/SHA-1), IMS:1000102/103/104 (offset/length/encoded-length)
-- pyimzML source (`alexandrovteam/pyimzML`) — coordinate extraction, offset handling, no checksum verification, `getionimage`
-- CardinalIO (Bioconductor) — continuous vs processed semantics, Positions data frame, offset/length frames, CV mapping
-- METASPACE ingest requirements — centroided imzML requirement, metadata validation
-- Schramm et al. 2012 (imzML paper, J. Proteomics) — format specification
-- Alan Race `imzml` crate (v0.1.3, 2022) — confirmed stale; `imzMLConverter` — partial UUID handling
+
+- Perez-Riverol et al. 2021, Nature Communications — SDRF-Proteomics standard; grounds `comment[label]` topology, carrier/reference channel conventions
+- Slavov lab SCoPE2 protocol; Sivanich et al. PROTEOMICS 2022 — grounds `role` vocabulary {carrier, reference, norm}
+- https://www.psidev.info/controlled-vocabularies + https://www.ms-imaging.org/imzml/controlled-vocabulary/ — PSI ontology-coordinator + IMS CV governance process
 
 ### Tertiary (LOW confidence)
-- imzy GitHub issue #61 — processed≠centroided clarification (single community issue)
+
+- HUPO-PSI/mzPeak spec draft imaging edits (Edits 1–10) — MEDIUM for shipped mechanisms; LOW for un-ratified imaging edits pending committee ratification
+- Open committee questions (F7 buffer placement, F6 scan-PK gap, F8 blob design) — resolution depends on external committee action; treat as planning-time unknowns
 
 ---
-*Research completed: 2026-06-03*
+*Research completed: 2026-06-08*
 *Ready for roadmap: yes*

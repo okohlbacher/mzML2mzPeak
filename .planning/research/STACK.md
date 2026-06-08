@@ -1,177 +1,204 @@
-# Stack Research
+# Stack Research — v0.7
 
-**Domain:** Rust CLI converter — imzML (MS imaging) → imaging mzPeak
-**Researched:** 2026-06-03
-**Confidence:** HIGH (all versions, feature flags, and the coordinate-exposure question verified against live crates.io / GitHub source / docs.rs)
+**Domain:** Rust MS-imaging converter (imzML ↔ mzPeak) — v0.7 stack ADDITIONS for SDRF/TMT sample modeling, imaging-spec extensions (pixel facet / continuous shared-axis / images.parquet), and CV governance / L2 conformance
+**Researched:** 2026-06-08
+**Confidence:** HIGH
+
+> Prior milestone stack research preserved in `.planning/research/v0.6-STACK.md`. This file
+> covers ONLY the NEW v0.7 features (per the milestone scope). The de-vendoring / upstream-PR
+> items are out of scope for stack research by design.
+
+> **Headline for the roadmapper:** v0.7 needs **almost no new crates.** The single likely
+> new dependency is a TSV reader (**`csv = "=1.4.0"`**) for SDRF ingestion — and even that
+> is optional. Everything else (TMT/iTRAQ CV vocabulary, OBO files, TIFF, Arrow/Parquet,
+> serde) is **already in the tree or already vendored under `knowledge/cv/obo/`.** The hard
+> pins (arrow/parquet `=57.0.0`, zip `=4.1.0`) are **not threatened by anything in v0.7.**
+> The real v0.7 work is schema/CV-modeling and governance, not tooling acquisition.
 
 ---
 
-## Headline Finding: mzdata DOES expose per-spectrum spatial coordinates — verified at source level
+## Per-feature verdict (the short version)
 
-**Answer: YES (definitive, with quoted evidence).** `mzdata`'s imzML reader parses the IMS scan-position CV params and surfaces them as **scan-level params** on the spectrum's acquisition. The fallback to Alan Race's `imzml` crate or hand-rolled XML parsing is **NOT needed**.
-
-Evidence — `mzdata`'s own integration test, `src/io/imzml/tests.rs` (`test_imzml_read_operation`), exercises both continuous and processed modes:
-
-```rust
-let mut reader = ImzMLReader::open_path("test/data/imaging/Example_Continuous.imzML")?;
-let spec = reader.get_spectrum_by_index(0).unwrap();
-let acq = spec.acquisition();
-let event = &acq.scans[0];
-let x = event.get_param_by_curie(&crate::curie!(IMS:1000050)).unwrap(); // position x
-assert_eq!(x.to_i64(), Ok(1));
-let y = event.get_param_by_curie(&crate::curie!(IMS:1000051)).unwrap(); // position y
-assert_eq!(y.to_i64(), Ok(1));
-
-let arrays = spec.raw_arrays().unwrap();
-let arr = arrays.mzs()?;
-assert_eq!(arr.len(), 8399);
-// ...identical assertions repeated for Example_Processed.imzML
-```
-Source: https://github.com/mobiusklein/mzdata/blob/master/src/io/imzml/tests.rs
-
-**How to read coordinates in our converter:**
-```rust
-use mzdata::prelude::*;          // brings ParamDescribed / get_param_by_curie into scope
-use mzdata::curie;
-
-let scan = &spectrum.acquisition().scans[0];
-let x = scan.get_param_by_curie(&curie!(IMS:1000050)).and_then(|p| p.to_i64().ok());
-let y = scan.get_param_by_curie(&curie!(IMS:1000051)).and_then(|p| p.to_i64().ok());
-// IMS:1000052 = position z, if present (3D imaging)
-```
-`get_param_by_curie` is a trait method (mzdata `src/params.rs:2353`) available on any `ParamDescribed` (scans, spectra). The `curie!` macro is defined in `src/params.rs:1378` and is public. m/z + intensity arrays come from `spectrum.raw_arrays()` (a `BinaryArrayMap`), with `.mzs()` / `.intensities()` accessors — these are read out of the `.ibd` sidecar via the IMS external-data CV params (IMS:1000102 offset / IMS:1000103 array length / IMS:1000104 encoded length), which the reader resolves and seeks in the `.ibd` file.
-
-**Caveats (read before building):**
-- The reader requires the `.ibd` sidecar and validates the UUID against the imzML (`reader.rs` `check_ibd_file`: errors on "UUID mismatch"). Our local test file is missing its `.ibd` — must fetch from PXD001283 before any read path works.
-- The module README still carries a stale line: *"Currently provides basic functionality with room for enhancement (e.g., actual IBD data reading)."* This is **out of date** — `reader.rs` (1481 lines) implements real `.ibd` array reads (`load_ibd_arrays`, seek + `read_exact`, NoCompression/zlib handling). Trust the test + source over the README sentence. (Confidence MEDIUM on this being fully robust across all real-world imzML — verify on PXD001283 in an early spike, per PROJECT.md.)
-- Coordinates land as scan params on `scans[0]`. If a file has zero scans the lookup fails — guard for it.
+| v0.7 feature | New crate? | What it actually needs |
+|---|---|---|
+| **SDRF parse** | `csv = "=1.4.0"` (optional — see below) | TSV reader; the data model is hand-rolled structs + serde. **No Rust SDRF parser exists.** |
+| **TMT/iTRAQ `channel_list`** | **none** | PSI-MS CV already carries the full classic isobaric vocabulary (`MS:1002615`–`MS:100262x`, N/C isotopologues, `MS:1002009`, reporter-ion intensity terms). Reporter m/z is a **physical constant table you ship**, not a CV lookup. |
+| **`pixel` facet / multi-spectrum-per-pixel (F6)** | **none** | Arrow/Parquet `=57.0.0` (already pinned) — a new `Int64` FK column. Pure schema work. |
+| **Continuous shared-axis + imzML emit (F7)** | **none** | Arrow/Parquet `=57.0.0`; the reverse `.ibd`/`.imzML` emitter already exists (v0.4). Pure schema/encoding work. |
+| **`images.parquet` blob + co-registration (F8)** | **none** (maybe `image`, deferred) | Arrow/Parquet `=57.0.0` for the blob; `tiff = "=0.11.3"` **already pinned**; co-registration is a CV-typed affine, not new tooling. |
+| **CV minting / IMS URIs (F9)** | **none** | Governance + docs problem, not a tooling problem. Optionally `curie = "0.1.4"`, but the project already does CURIEs via `mzdata::curie!` + hardcoded accessions. |
+| **L2 conformance (F10)** | **none** | numeric tolerance check in pure Rust; digests (`sha2`/`md-5`/`sha1`) already pinned. |
 
 ---
 
 ## Recommended Stack
 
-### Core Technologies
+### Core Technologies (already present — confirm, do not re-add)
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| **Rust toolchain** | **1.96.0** (pinned) | Compiler | `mzpeak_prototyping` is `edition = "2024"` (Cargo.toml). **1.85 is edition-2024's floor, NOT the build floor:** the git-pinned writer `mzpeak_prototyping@d1aaaf84` has an *undeclared* MSRV of ~1.87 — it uses `io::ErrorKind::InvalidFilename` (feature `io_error_more`) and const `String::as_bytes` (feature `const_vec_string_slice`), both stabilized in **Rust 1.87.0**. The writer's `Cargo.toml` declares no `rust-version`, so nothing flags this at resolve time. The project therefore pins **1.96.0** (latest local stable) in `rust-toolchain.toml`; edition 2024 is unaffected (it only requires ≥1.85). |
-| **mzdata** | `0.63.5` (latest on crates.io; pin to **`0.63.3`** to match upstream — see compat note) | imzML reader + shared spectrum data model | Only actively-maintained Rust imzML reader; same author as mzPeak; exposes IMS coordinates (verified above). Updated 2026-05-12. |
-| **mzpeak_prototyping** | git `HUPO-PSI/mzPeak`, branch `main` (crate version `0.1.0`) | mzPeak writer/reader we extend | The reference mzPeak implementation. **NOT published to crates.io** — git-only. Repo moved from `mobiusklein/mzpeak_prototyping` → `HUPO-PSI/mzPeak` (pushed 2026-06-03); crate name unchanged. |
-| **mzpeaks** | `1.0.9` | Peak/centroid types (`CentroidPeak`, `DeconvolutedPeak`) shared by both halves | Transitive requirement of both crates; pin to the exact version mzpeak_prototyping uses to avoid two incompatible copies in the dep graph. |
-| **arrow** | `57.0.0` | Columnar in-memory model for Parquet | **Must match `mzpeak_prototyping`'s pin exactly.** crates.io is at 58.3.0, but mixing arrow majors with the writer's pinned 57 causes type-mismatch errors. Use 57.0.0. |
-| **parquet** | `57.0.0` (features `["encryption"]`) | Parquet file writing | Same — pinned by upstream; the `encryption` feature is enabled there. Match it. |
-| **zip** | `4.1.0` | ZIP archive container (mzPeak = ZIP of Parquet + index.json) | Upstream pin. crates.io is at 8.6.0; do **not** bump independently — the archive module (`src/archive/sync.rs`) is written against `zip` 4.x APIs. |
+| **arrow** | `=57.0.0` *(pinned)* | Columnar model for the new `pixel` facet column (F6), `images.parquet` blob (F8), continuous shared-axis grid (F7) | Hard pin — must match vendored `mzpeak_prototyping`. **All v0.7 Parquet work fits 57's type system** (Int64 FK, binary blob column). crates.io is at 58.3.0 — DO NOT bump; would fracture the writer's type graph. |
+| **parquet** | `=57.0.0` (feature `encryption`) *(pinned)* | Write the new facets | Same hard pin. v0.7 adds columns/files, not Parquet *features* — no pin pressure. |
+| **zip** | `=4.1.0` *(pinned)* | Add `images.parquet` / embedded `*.sdrf.tsv` as ZIP members | Hard pin (archive code targets 4.x API). The verbatim-SDRF-embed reuses the **exact** `ZipArchiveWriter::start_other` + `FileIndex` `Other`-entry path proven for TIFF in v0.5 — no zip API change. |
+| **mzdata** | `=0.64.1` *(vendored snapshot)* | imzML read; `curie!` macro; PSI-MS/IMS param model | Already the read half. Provides `mzdata::curie!` (used in `src/write/spectrum.rs`) and `get_param_by_curie` — the CV plumbing for channel/role params needs nothing more. |
+| **mzpeak_prototyping** | git `HUPO-PSI/mzPeak` rev `8435967` *(vendored patch)* | mzPeak writer we extend | The `channel_list` and embedded-SDRF land as **footer JSON in `FileIndex.metadata`** (open map) + an `Other` ZIP member — the same additive mechanism used for `metadata.imaging`. `add_spectrum_array_override(from,to)` is the hook for reporter-intensity auxiliary arrays (design doc §`channel_list`). |
+| **serde / serde_json** | `=1.0.228` / `=1.0.150` *(pinned)* | (De)serialize `channel_list`, `assay_ref`, ROI table, SDRF-row projections into `metadata.*` | Already pinned + load-bearing (the v0.5 FileEntry serde fix). All v0.7 structured metadata is serde structs → `serde_json::Value` in the open `metadata` map. No new serde adapter needed (`serde_with` NOT required). |
 
 ### Supporting Libraries
 
 | Library | Version | Purpose | When to Use |
 |---------|---------|---------|-------------|
-| **clap** | `4.5.38` (derive feature) | CLI argument parsing | Match upstream's pin; `4.6.1` is current but stay aligned. Use the `derive` macro pattern as in `examples/convert.rs`. |
-| **serde** | `1.0.219` (derive) | (De)serialize schema structs | Already a transitive + direct dep of upstream. |
-| **serde_json** | `1.0.140` | Emit/parse `mzpeak_index.json` and JSON schema | Required for the index file mzPeak emits. |
-| **serde_with** | `3.12.0` | Field-level serde adapters | Used by upstream; pull in if extending its serde structs. |
-| **anyhow** | `1.0.102` | Application-level error handling in `main`/CLI | Use in the binary crate for ergonomic `?`-propagation + context. mzdata/mzpeak use `io::Result`; wrap at the app boundary. |
-| **thiserror** | `2.0.18` | Typed library errors for our imaging-extension module | Use for our own error enum (e.g. `ConvertError`) so it composes cleanly; keep `anyhow` for the binary only. |
-| **indicatif** | `0.17.10` | Progress bar for the 34,840-spectrum conversion | Match upstream's pin (it already depends on indicatif 0.17). `0.18.4` is current but 0.17→0.18 has API breaks; stay on 0.17.10 to share one copy. |
-| **log** + **env_logger** | `0.4.27` / `0.11.8` | Logging (upstream uses these) | Use the same logging facade as upstream rather than introducing `tracing`. |
-| **uuid** | (transitive via mzdata `imzml` feature) | UUID linkage imzML↔ibd↔mzPeak | Pulled in automatically by `mzdata`'s `imzml` feature; re-exported as `mzdata::io::imzml::Uuid`. No need to add directly unless we mint UUIDs. |
-
-### Optional / Defer
-
-| Library | Version | Purpose | Decision |
-|---------|---------|---------|----------|
-| **rayon** | `1.12.0` | Data-parallel spectrum processing | **Defer to v2.** Parquet/ZIP writing is sequential & ordered; the win is marginal vs. complexity, and `mzdata` gates parallel reads behind its own `parallelism` feature. 34k spectra convert fine single-threaded. Revisit only if profiling shows a CPU bottleneck. |
+| **csv** | `=1.4.0` | Parse `*.sdrf.tsv` (tab-delimited, quoted, ragged-but-rectangular) | **The one likely new crate.** BurntSushi's `csv` with `Delimiter(b'\t')` + `flexible(true)` handles SDRF's tab format and repeated column headers (`characteristics[...]`, `comment[...]`) robustly. 35M recent downloads, pure-Rust, **no shared types with arrow/mzdata** → cannot fracture the pinned graph. Pin `=1.4.0`. **Optional:** SDRF is a simple `\t`-split if you forgo quoting/escaping — but real SDRF has quoted free-text `characteristics`, so use `csv`. |
+| **tiff** | `=0.11.3` *(already pinned, `default-features=false`)* | F8 optical-image dimensions inside the richer `image` entity | **Already a dependency** (v0.5 IMG-04). F8's full `image` entity reuses it; no change. |
+| **sha2 / md-5 / sha1** | `=0.10.9 / =0.10.6 / =0.10.6` *(already pinned)* | F10 L2 integrity; per-image/per-SDRF-member checksums | Already pinned (v0.4 IBD digests, v0.5 per-image sha256). The verbatim-SDRF member gets a sha256 the same way. **Zero new crates for digests.** |
+| **quick-xml** | `=0.30.0` *(already pinned)* | F7 continuous-mode imzML emit (shared m/z axis); GEO-F `<scanSettings>` thread | Already pinned to mzdata's transitive 0.30.0. The reverse emitter (`src/reverse/imzml_writer.rs`) already hand-writes imzML; continuous emit extends it. No version pressure. |
 
 ### Development Tools
 
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| `rust-toolchain.toml` | Pin toolchain to **1.96.0** | Edition 2024 needs ≥1.85, but the git-pinned `mzpeak_prototyping@d1aaaf84` has an undeclared ~1.87 MSRV (io_error_more + const as_bytes). Pin 1.96.0 to clear the writer's real build floor. |
-| `cargo` (workspace) | Build/test | Single-binary crate is sufficient; no workspace needed for v1. |
-| `cargo nextest` (optional) | Faster test runs | Roundtrip/fidelity tests will be I/O-heavy; nice-to-have. |
+| **`sdrf-pipelines`** (Python, `uv tool install`) | **External** SDRF validation oracle in the E2E harness (`scripts/e2e-sdrf-examples.sh`) | Already wired. The official `parse_sdrf validate-sdrf` is the **round-trip correctness check** for embedded-SDRF — it is NOT a Rust dependency, it runs in CI/E2E only. Add `[ontology]` extra for OLS term checks if L2 wants ontology validation. |
+| **`knowledge/cv/obo/*.obo`** | Vendored `psi-ms.obo`, `imagingMS.obo`, `uo.obo` | **Already in-repo.** Source of truth for accession/name verification. **Stale vs live** (see CV governance below) — refresh before F9. |
+| **mzPeakValidator** | external conformance checker | One of the prepared upstream PRs targets it; L2 (F10) conformance should add an imaging+channel check there. Not a Rust dep here. |
 
----
-
-## Installation / `Cargo.toml`
+## Installation
 
 ```toml
-[package]
-name = "mzml2mzpeak"
-version = "0.1.0"
-edition = "2024"
-rust-version = "1.85"
+# The ONLY new line v0.7 likely adds to Cargo.toml:
+csv = "=1.4.0"   # SDRF .tsv parse — pure-Rust, no arrow/mzdata type overlap
 
-[dependencies]
-# Core read path — note the explicit `imzml` feature (enables imzML reader + uuid)
-mzdata = { version = "0.63.3", features = ["imzml", "serde", "zstd", "nalgebra"] }
-mzpeaks = "1.0.9"
-
-# Core write path — git-only, pin to a commit for reproducibility
-mzpeak_prototyping = { git = "https://github.com/HUPO-PSI/mzPeak", branch = "main" }
-# Prefer pinning a rev once you choose one:
-# mzpeak_prototyping = { git = "https://github.com/HUPO-PSI/mzPeak", rev = "<commit-sha>" }
-
-# Arrow/Parquet/zip — MUST match mzpeak_prototyping's pins
-arrow = "57.0.0"
-parquet = { version = "57.0.0", features = ["encryption"] }
-zip = "4.1.0"
-
-# CLI + serialization
-clap = { version = "4.5.38", features = ["derive"] }
-serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.140"
-serde_with = "3.12.0"
-
-# Errors, logging, progress
-anyhow = "1.0.102"
-thiserror = "2.0.18"
-log = "0.4.27"
-env_logger = "0.11.8"
-indicatif = "0.17.10"
+# Everything else is ALREADY in [dependencies] — confirm, do not duplicate:
+#   arrow/parquet = "=57.0.0"  zip = "=4.1.0"  serde/serde_json  tiff = "=0.11.3"
+#   sha2/md-5/sha1  quick-xml = "=0.30.0"  mzdata (vendored)  mzpeak_prototyping (vendored)
 ```
 
-> The `imzml` feature flag for mzdata is **`"imzml"`** (verified: `imzml => ["mzml", "dep:uuid"]` in the crate's feature table). It is NOT in the `default` set (default = `["zlib-ng-compat", "mgf", "mzml"]`), so it must be requested explicitly. Without it, `mzdata::io::imzml` does not compile in (the module is `#![cfg(feature = "imzml")]`).
+```bash
+# External validation oracle (CI/E2E only — not a cargo dep):
+uv tool install sdrf-pipelines
+# optional ontology term checks for L2:
+#   pip install 'sdrf-pipelines[ontology]'
+```
 
 ---
 
-## mzpeak_prototyping: how to depend on it, layout, and writer entry points
+## SDRF: there is no Rust parser — parse the TSV directly
 
-**Publication:** Git-only. `mzpeak` / `mzpeak_prototyping` do NOT exist on crates.io (both return "crate does not exist"). Depend via git. Repo is now `https://github.com/HUPO-PSI/mzPeak` (former `mobiusklein/mzpeak_prototyping`; the package name in Cargo.toml is still `mzpeak_prototyping`, so `use mzpeak_prototyping::...`).
+**Verified (crates.io, 2026-06-08): no `sdrf`, `proteomics-sdrf`, or sample-relationship-format
+crate exists in any form.** The entire SDRF tooling ecosystem is Python (`sdrf-pipelines`) and
+the bigbio curation repos. This matches the design doc's framing and the E2E harness's use of the
+Python validator.
 
-**Crate/module layout (`src/`):**
-- `lib.rs` — re-exports: `MzPeakReader`, `MzPeakWriter`, `param::{CURIE, ...}`, `peak_series::{BufferName, ToMzPeakDataSeries}`
-- `writer.rs` + `writer/` (`base.rs`, `builder.rs`, `array_buffer.rs`, `split.rs`, `visitor.rs`, `mini_peak.rs`) — the writer
-- `reader.rs` + `reader/` — the reader (for roundtrip verification)
-- `archive/` (`mod.rs`, `sync.rs`, `object_store_async.rs`, `file_index.rs`) — ZIP container + `mzpeak_index.json` indexing
-- `spectrum.rs`, `chunk_series.rs`, `peak_series.rs`, `buffer_descriptors.rs`, `param.rs`, `constants.rs`, `filter.rs`
-- `examples/convert.rs` — **the canonical end-to-end converter to mirror**
+**Recommendation:** hand-roll the model. SDRF is a flat TSV — a header row of ontology-typed
+columns (`source name`, `characteristics[organism]`, `comment[label]`, `comment[data file]`,
+`factor value[...]`) + one row per (sample × data-file). Parse rows with `csv`
+(`Delimiter(b'\t')`, `flexible(true)`), keep **every raw row verbatim** for the embedded member
+(the lossless anchor — design doc "Authority & identity"), and build typed projections
+(`sample_list`, `channel_list`, `assay_ref`) over them.
 
-**Writer entry points (from `examples/convert.rs`, verified):**
-- Public types: `mzpeak_prototyping::writer::{AbstractMzPeakWriter, MzPeakWriterType, MzPeakWriterBuilder}` (the `MzPeakWriter` re-export in `lib.rs` is the alias).
-- Build → write loop:
-  ```rust
-  use mzpeak_prototyping::writer::{AbstractMzPeakWriter, MzPeakWriterType};
+- **Column-name parsing** (`characteristics[X]`, `comment[X]`, `factor value[X]`) is a trivial
+  bracket-split — no parser-combinator crate warranted. If you want one anyway, `nom`/`winnow`
+  are already transitively present via mzdata; do **not** add a new one.
+- **Verbatim embed = proven mechanism.** Embed `*.sdrf.tsv` bytes as a ZIP `Other` member +
+  `FileIndex` registration + a `metadata.sdrf` back-ref object — **identical** to the v0.5
+  `images/image_NNNN.tiff` storage contract (`FileEntry` holds only name/entity/data_kind;
+  descriptive fields live in the `metadata` map). No new zip/serde work.
+- **Correctness oracle = `sdrf-pipelines`**, not a Rust crate. Round-trip = re-serve the embedded
+  bytes and re-validate with `parse_sdrf validate-sdrf` (already in `scripts/e2e-sdrf-examples.sh`).
+- **Fixtures already exist:** `MTBLS1129` (label-free SDRF↔mzML pair) and `PXD011799` (TMT 10-plex,
+  `comment[label]`→sample) per `docs/sdrf-examples.md`.
 
-  let handle = std::fs::File::create(output_path)?;
-  let mut writer = MzPeakWriterType::<std::fs::File>::builder()
-      .buffer_size(/* ... */)
-      .chunked_encoding(/* ChunkingStrategy::Delta { chunk_size: 50.0 } */)
-      .compression(Compression::ZSTD(ZstdLevel::try_new(level).unwrap()))
-      // ...builder options mirror ConvertArgs in examples/convert.rs...
-      .build(handle);
+---
 
-  writer.copy_metadata_from(&reader);           // softwares/data_processing/instrument
-  for mut entry in reader.iter() {              // mzdata reader iterator
-      writer.write_spectrum(&spectrum)?;        // per-spectrum
-  }
-  // chromatograms (none for imaging) via writer.write_chromatogram(&c)?
-  writer.finish()?;                             // flushes Parquet + writes index + closes ZIP
-  ```
-- Trait surface lives on `AbstractMzPeakWriter` (`write_spectrum`, `write_chromatogram`, `write_spectrum_data`, metadata setters `softwares_mut()`, `data_processings_mut()`).
-- Other useful symbols seen in the example: `archive::make_common_encryption_properties`, `buffer_descriptors::BufferOverrideTable`, `chunk_series::ChunkingStrategy`, `writer::ArrayConversionHelper`, builder method `add_spectrum_array_override(from, to)` (the hook for adding new data columns — relevant to our imaging extension).
+## TMT / iTRAQ in PSI-MS CV: the vocabulary already exists — verified at source
 
-**Pinned dependency versions inside `mzpeak_prototyping` (its `Cargo.toml`, branch `main`):**
-arrow `57.0.0`, parquet `57.0.0` (+`encryption`), zip `4.1.0`, mzdata `0.63.3` (features `serde, bruker_tdf, nalgebra, zstd, numpress`), mzpeaks `1.0.9`, serde `1.0.219`, serde_json `1.0.140`, serde_with `3.12.0`, clap `4.5.38`, indicatif `0.17.10`, nalgebra `0.33.2`, num-traits `0.2.19`, bytemuck `1.23.1`. Default feature is `async` (tokio + object_store + opendal); for a simple local-file converter you can disable defaults (`default-features = false`) to drop the async/cloud stack if you don't need S3/object-store output.
+The `channel_list` "label" field maps to **existing PSI-MS CV terms**; nothing must be minted for
+classic isobaric plexes.
+
+| Construct | PSI-MS accession(s) | Confidence | Notes |
+|---|---|---|---|
+| isobaric label quantitation (parent) | `MS:1002009` | HIGH | parent of TMT/iTRAQ analysis terms |
+| TMT / iTRAQ quantitation analysis | `MS:1002009` subtree | HIGH | workflow-level |
+| **TMT reagent (parent)** | `MS:1002615` | HIGH | parent of all TMT channel terms |
+| **TMT channels 126–131** | `MS:1002616`–`MS:1002621` | HIGH | classic 6-plex (verified contiguous in `psi-ms.obo`) |
+| **TMT N/C isotopologues** (e.g. 130N/130C) | present in `MS:100262x`+ range (e.g. names "TMT reagent 130N"/"130C") | HIGH | the 10/11-plex split channels — verified by name in CV |
+| **iTRAQ reagent (parent + channels)** | `MS:1002622` parent; `MS:1002623`–`MS:1002630` (113–121) | HIGH | 4-/8-plex (verified contiguous) |
+| reporter ion intensity / raw / normalized | reporter-ion intensity term family (`MS:100210x`/`MS:100217x`) | HIGH | for the per-MS2 reporter **auxiliary array** the design doc proposes |
+
+**Verified against the live HUPO-PSI psi-ms-CV (`data-version: 4.1.249`, 2026-06-01) AND the
+vendored `knowledge/cv/obo/psi-ms.obo`:** classic TMT (incl. N/C) + iTRAQ are present in BOTH.
+
+**GAP — TMTpro 16/18-plex (channels 132–135) is NOT in the CV** (neither live 4.1.249 nor
+vendored; only up to 131 + N/C variants exist). If v0.7 must model TMTpro plexes, the label cannot
+use a `TMT reagent 13x` accession — options: (a) use `MS:1002615` "TMT reagent" parent + the
+channel name as free-text `value`, (b) the design doc's `PRIDE:0000xxx` label namespace, or
+(c) **request the terms via the psidev-ms-vocab process** (folds into F9). Flag for the
+roadmapper: **TMTpro support has a CV gap**; the PXD011799 fixture is classic TMT-10 so it is
+unaffected.
+
+**Reporter m/z is a physical constant, NOT a CV value.** The design doc's `reporter_mz: 131.1382`
+comes from a **reagent constant table you ship in-crate** ("record source"), validated against the
+vendor method — there is no CV term carrying the m/z. Do not look for a crate; embed a small
+`const` table (TMT/TMTpro/iTRAQ reporter m/z values are fixed, published constants).
+
+---
+
+## CV governance / IMS URI minting (F9) — a process problem, not a tooling problem
+
+**Key governance findings (verified):**
+
+- The **PSI-MS CV** is HUPO-PSI-governed (`github.com/HUPO-PSI/psi-ms-CV`, live `data-version
+  4.1.249`, 2026-06-01) via the elected **PSI ontology coordinator** + the `psidev-ms-vocab`
+  mailing list. New `MS:` terms are requested there.
+- The **imagingMS CV (`IMS:` namespace) is NOT under HUPO-PSI.** It is canonically maintained at
+  **`github.com/imzML/imzML` (`imagingMS.obo`)** (Alan Race / Thorsten Schramm; ms-imaging.org).
+  There is **no `HUPO-PSI/imagingMS-CV` repo** (verified: 404 / not in the HUPO-PSI repo list).
+  IMS term requests go through that project, not the PSI-MS process.
+- **The vendored `knowledge/cv/obo/imagingMS.obo` is STALE-LOOKING** — header says
+  `data-version: 1.1.0` / `2018`, yet it already contains `IMS:1006008` (optical image of analysed
+  sample), `IMS:1006016` (ion source model), `IMS:1006017` (method used to align optical image).
+  Treat the header date as unreliable; **refresh from `imzML/imzML@master` before minting** so F9
+  builds on the current accession space and doesn't collide.
+- **Co-registration already has a term:** `IMS:1006017` "method used to align optical image" is
+  the existing CV hook for F8 co-registration — v0.7 should reuse it rather than mint a new one.
+  Image-role/subject terms (`IMS:1006012` optical of analysed sample, `IMS:1006013` adjacent
+  section, `IMS:1006008` optical image of analysed sample, etc.) likewise exist. **Audit existing
+  IMS:1006xxx before assuming F9 must mint.**
+- **Canonical URI convention:** OBO PURLs — `http://purl.obolibrary.org/obo/MS_1002615` (PSI-MS)
+  and the imagingMS PURL/IRI per the `imzML/imzML` ontology header. Resolve the v0.6 `TODO(F9)`
+  placeholders to these PURLs; do NOT invent a bespoke URI scheme. The project already references
+  `https://raw.githubusercontent.com/HUPO-PSI/psi-ms-CV/master/psi-ms.obo` in `src/schema/cv.rs`
+  and `src/reverse/imzml_writer.rs`.
+
+**Tooling verdict for F9:** **no OBO/CV crate is needed.** The project already does CURIEs via
+`mzdata::curie!` + hardcoded accession strings (`src/write/spectrum.rs`, `src/schema/cv.rs`) and
+ships the `.obo` files for human verification. If you ever want *programmatic* OBO loading
+(e.g. to auto-validate that every emitted accession exists in the shipped CV), the mature option
+is **`fastobo = "0.15.5"`** (althonos/Martin Larralde; faultless OBO 1.4 AST) — but this is a
+**nice-to-have for a build-time/test-time validator, not a runtime dependency**, and is **not
+required for v0.7.** Defer unless F10 explicitly wants automated accession-existence checks.
+
+---
+
+## Imaging-spec extensions (F6/F7/F8) — all fit the pinned Arrow/Parquet 57
+
+- **F6 `pixel` facet / multi-spectrum-per-pixel:** add a `pixel` group/table + a `pixel_index`
+  **`Int64` FK** on `scan` (the spec draft already settled on `Int64` because the writer's
+  `CustomBuilderFromParameter` panics on unsigned types). Pure schema work in Arrow 57. Confirm
+  `MS:1000616` (the scan compound-key term the roadmap flags) is present in the shipped CV.
+  **No new crate.**
+- **F7 continuous shared-axis + imzML emit:** a shared-m/z-axis grid layout is an Arrow/Parquet
+  encoding decision (dictionary/RLE/delta within 57), and continuous `.imzML` emit extends the
+  existing hand-rolled reverse emitter (`src/reverse/imzml_writer.rs` + `.ibd` writer). **No new
+  crate.** Heed the spec's own flag that grid encoding is an open compression problem — a *design*
+  risk, not a *tooling* risk.
+- **F8 full `image` entity / `images.parquet` blob + CV co-registration:** the blob is a binary
+  Parquet column (Arrow 57 `Binary`/`LargeBinary`); `tiff = "=0.11.3"` (already pinned) reads
+  dimensions; co-registration uses existing `IMS:1006017`. This is the *richer* design the v0.5
+  roadmap explicitly **superseded** with the separate-TIFF-member representation — re-opening it
+  is a deliberate scope choice, but it needs **no new dependency.** If a richer image entity
+  wants actual pixel decode/transcode (not just blob passthrough + dimensions), `image =
+  "0.25.10"` is the de-facto crate — but **do NOT add it for blob passthrough**; verbatim bytes +
+  `tiff` dimensions (the v0.5 contract) is sufficient and keeps the dep graph clean.
 
 ---
 
@@ -179,74 +206,73 @@ arrow `57.0.0`, parquet `57.0.0` (+`encryption`), zip `4.1.0`, mzdata `0.63.3` (
 
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
-| `mzdata` imzML reader | Alan Race's **`imzml`** crate (`imzml-rs`) | **Do not use.** v0.1.3, last published **2022-10-13**, 5,578 total downloads, no updates in ~3.5 years. Only justified if mzdata's reader proves broken on real PXD001283 data — but the verified test coverage makes that unlikely. Keep as a documented escape hatch, not a plan. |
-| `mzdata` reader | Hand-parse IMS CV scan params from imzML XML (`quick-xml`) | Only if we hit a specific gap (e.g. an exotic CV param mzdata drops). Last resort — duplicates the `.ibd` offset/seek logic mzdata already implements. |
-| arrow/parquet `57.0.0` | arrow/parquet `58.3.0` (current crates.io) | Only after `mzpeak_prototyping` itself bumps to 58. Bumping unilaterally fractures the arrow type graph between our code and the writer. Track upstream. |
-| zip `4.1.0` | zip `8.6.0` (current) | Never independently — upstream archive code targets 4.x. |
-| Single-threaded write | `rayon` parallel | If profiling on the full 34k-spectrum set shows read/decode is CPU-bound. Writing stays sequential regardless (ordered Parquet rows). |
-| `anyhow` + `thiserror` | `eyre`, `snafu` | No reason to deviate; anyhow/thiserror are the ecosystem default and compose with upstream's `io::Result`. |
-
----
+| `csv = "=1.4.0"` for SDRF | hand-rolled `\t` split | Only if you can guarantee no quoted/escaped free-text in `characteristics` — real SDRF has it, so prefer `csv`. |
+| `csv` | `polars` / `arrow-csv` | **Never.** Would pull a second Arrow major (58) and fracture the pinned-57 graph. SDRF is tiny; a streaming `csv` reader is right-sized. |
+| hand-rolled SDRF structs | a Rust SDRF crate | N/A — **none exists** (verified crates.io 2026-06-08). |
+| reuse existing `MS:` isobaric terms | mint new channel terms | Only TMTpro 132–135 (real CV gap) — and that goes through the psidev-ms-vocab process (F9), not a crate. |
+| `mzdata::curie!` + shipped `.obo` | `fastobo = "0.15.5"` | Only for a **build/test-time** validator that programmatically checks emitted accessions against the CV (F10 nice-to-have). Not runtime, not required. |
+| `curie = "0.1.4"` | (skip) | The project already represents CURIEs as accession strings + `mzdata::curie!`; adding `curie` buys little. Use only if you need formal CURIE↔URI expansion at runtime — F9 PURLs are static strings, so likely skip. |
+| verbatim TIFF member (v0.5) | `image = "0.25.10"` full decode | Only if F8's `image` entity must transcode/normalize pixels, not just store + report dimensions. |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| **Python/R mzPeak bindings** for writing | Read-only by design (PROJECT.md constraint + upstream design); cannot emit mzPeak | Rust `mzpeak_prototyping` writer |
-| **pyimzML** (Python imzML reader) | Wrong language; would force a Python↔Rust boundary and a second data model — defeats the all-Rust, shared-model rationale | `mzdata` imzML reader |
-| **Alan Race `imzml` v0.1.3** | Stale since 2022; unmaintained; would fork us off the shared mzdata spectrum model | `mzdata` (`imzml` feature) |
-| Independently bumping **arrow/parquet/zip** ahead of upstream | Causes duplicate-crate / type-mismatch compile errors against the writer | Match `mzpeak_prototyping`'s pins exactly |
-| `mzdata` **without** the `imzml` feature | `mzdata::io::imzml` is `#![cfg(feature = "imzml")]` — module won't exist; you'd get plain mzML behavior at best | Add `features = ["imzml"]` |
-| Relying on the `imzml/README.md` "no IBD reading yet" sentence | Stale; contradicted by `reader.rs` + passing tests | Trust source + tests; verify on PXD001283 |
-| `tracing` for logging | Upstream uses `log`/`env_logger`; mixing facades adds noise | `log` + `env_logger` |
-
----
+| Any `arrow`/`parquet` **58.x** | Bumping ahead of vendored `mzpeak_prototyping`'s pinned 57 fractures the type graph (duplicate Arrow majors → compile errors). v0.7 needs **zero** Parquet *features* beyond 57. | Stay on `=57.0.0`. |
+| `zip` **8.x** (current) | Archive code (`src/archive/`, `ZipArchiveWriter`) targets the 4.x API; the SDRF/image members reuse it verbatim. | `=4.1.0`. |
+| `polars`, `arrow-csv`, `calamine` for SDRF | Pull a second Arrow major or are spreadsheet-oriented; SDRF is a flat TSV. | `csv = "=1.4.0"`. |
+| A "find a Rust SDRF parser" rabbit hole | Verified: **none exists** on crates.io. | Hand-rolled structs + `csv` + `sdrf-pipelines` as the external oracle. |
+| Minting new IMS terms for co-registration / image role | `IMS:1006017` (align method) + `IMS:1006008/12/13` (image subject) already exist. | Audit existing `IMS:1006xxx` first; mint only genuine gaps via `imzML/imzML`. |
+| Treating `imagingMS.obo` header date as current | Vendored copy is stale-looking (1.1.0/2018 header) yet contains 2018+ terms; canonical source is `imzML/imzML`, NOT HUPO-PSI. | Refresh from `github.com/imzML/imzML@master` before F9. |
+| Looking for a CV term carrying reporter **m/z** | No such term — reporter m/z values are physical constants. | Ship a small in-crate `const` reagent→m/z table; record the source. |
+| `tracing` for any new logging | Project standardized on `log`/`env_logger`. | `log` + `env_logger` (already pinned). |
+| `serde_with` | Not needed — v0.7 metadata are plain serde structs → `serde_json::Value`. | `serde` + `serde_json` (already pinned). |
 
 ## Stack Patterns by Variant
 
-**If output must be a plain local file (the v1 case):**
-- Add `mzpeak_prototyping` with `default-features = false` to drop the async/object_store/opendal/tokio stack
-- Use the synchronous `archive::sync` path and `MzPeakWriterType::<File>`
-- Because: simpler dep tree, faster builds, no need for S3/cloud writers
+**If embedding the verbatim SDRF file:**
+- Use the **v0.5 TIFF storage contract verbatim** — `ZipArchiveWriter::start_other` +
+  `FileIndex` `Other` entry (name/entity/data_kind only) + all descriptive fields
+  (`source_dataset`, `sha256`, `size_bytes`, row-identity keys) in a `metadata.sdrf` object.
+- Because: the FileEntry serde round-trip fix (vendored mzpeak_prototyping patch) already makes
+  `Other` members survive read-back; reusing it means **zero new storage code or crates.**
 
-**If you later need cloud/object-store output:**
-- Keep upstream `default = ["async"]` and enable the `s3` feature
-- Because: that machinery (`object_store`, `opendal`, `async_zip`) already exists upstream
+**If modeling a TMTpro (16/18-plex) dataset:**
+- Use `MS:1002615` "TMT reagent" parent + channel name as `value` (or the `PRIDE:0000xxx` label
+  namespace), and flag the missing per-channel `MS:` accession as an F9 term request.
+- Because: per-channel TMTpro terms do **not** exist in PSI-MS CV 4.1.249 (verified). Classic
+  TMT 126–131 (+N/C) and iTRAQ are fully covered and need no workaround.
 
-**If continuous-mode imzML performance matters (shared m/z axis):**
-- Read the shared m/z array once; for processed mode each spectrum carries its own arrays via `raw_arrays()`
-- mzdata exposes `IbdDataMode::{Continuous, Processed}` in `imzml_metadata.data_mode` — branch on it
-
----
+**If F8 reopens the `images.parquet` blob design:**
+- Use Arrow 57 `LargeBinary` column for verbatim image bytes + `tiff` for dimensions + reuse
+  `IMS:1006017` for co-registration method. Do **not** add `image` unless transcoding pixels.
+- Because: keeps the pinned graph intact; the v0.5 separate-member design already proves the
+  byte-passthrough + dimension-read pattern.
 
 ## Version Compatibility
 
 | Package A | Compatible With | Notes |
 |-----------|-----------------|-------|
-| `mzpeak_prototyping` (main) | `mzdata = 0.63.3` | Upstream's exact pin. Our `0.63.3` request unifies to one copy. mzdata 0.63.5 *should* be semver-compatible (`^0.63.3`), but pin 0.63.3 to be safe and re-test if you bump. |
-| `mzpeak_prototyping` | `arrow/parquet = 57.0.0`, `zip = 4.1.0`, `mzpeaks = 1.0.9` | Hard pins — match exactly. |
-| `mzdata 0.63.x` | feature `imzml` | `imzml` pulls `mzml` + `uuid`. Available since at least 0.63.3 (verified 2025-12-06 release). |
-| Rust toolchain | `edition 2024` | Edition 2024 requires Rust ≥ 1.85, but the actual build floor is ~1.87 (the writer `mzpeak_prototyping@d1aaaf84` uses 1.87-stabilized stdlib: `io_error_more` + const `String::as_bytes`). Project pins **1.96.0**. |
-| `mzdata` master | `0.64.0` (unreleased; edition 2021) | Repo HEAD is ahead of crates.io 0.63.5. Don't track master unless upstream mzpeak does; stay on published 0.63.x. |
-
----
+| `csv = 1.4.0` | arrow/parquet 57, mzdata 0.64.1 | Pure-Rust, **no shared transitive types** with the Arrow/mzdata graph → cannot cause duplicate-crate fracture. Pin `=1.4.0`. |
+| `tiff = 0.11.3` (`default-features=false`) | arrow/parquet 57, zip 4.1 | Already pinned; dimensions-only use, no codecs. Unchanged for F8. |
+| live PSI-MS CV `4.1.249` | vendored `psi-ms.obo` | Vendored copy has classic TMT/iTRAQ; **neither has TMTpro 132–135.** Refresh vendored CV if accuracy matters. |
+| vendored `imagingMS.obo` (1.1.0 header) | canonical `imzML/imzML@master` | **Refresh before F9.** Governed outside HUPO-PSI. |
+| `fastobo = 0.15.5` (if added, test-only) | independent of Arrow graph | Build/test-time only; safe but **not required** for v0.7. |
 
 ## Sources
 
-- crates.io API `mzdata` — version 0.63.5 (updated 2026-05-12), full feature table incl. `imzml => ["mzml", "dep:uuid"]` — HIGH
-- crates.io API `mzdata/0.63.3` — confirmed `imzml` feature present (release 2025-12-06) — HIGH
-- https://github.com/mobiusklein/mzdata/blob/master/src/io/imzml/mod.rs — `#![cfg(feature = "imzml")]`, exports `ImzMLReader`/`ImzMLReaderType`/`is_imzml` — HIGH
-- https://github.com/mobiusklein/mzdata/blob/master/src/io/imzml/reader.rs (1481 lines) — `.ibd` IBD read logic, UUID check, IMS:1000102/103/104 external-data handling, `IbdDataMode` — HIGH
-- https://github.com/mobiusklein/mzdata/blob/master/src/io/imzml/tests.rs — `test_imzml_read_operation` proving IMS:1000050/1000051 coordinate exposure for continuous AND processed modes — HIGH (decisive evidence)
-- https://github.com/mobiusklein/mzdata/blob/master/src/params.rs — `curie!` macro (L1378), `get_param_by_curie` trait method (L2353) — HIGH
-- crates.io API `mzpeak` / `mzpeak_prototyping` — both "crate does not exist" (git-only) — HIGH
-- https://github.com/HUPO-PSI/mzPeak (former mobiusklein/mzpeak_prototyping, redirect repo id 990169501, pushed 2026-06-03) `Cargo.toml` — all dependency pins (arrow/parquet 57.0.0, zip 4.1.0, mzdata 0.63.3, mzpeaks 1.0.9, clap 4.5.38, indicatif 0.17.10, edition 2024) — HIGH
-- https://github.com/HUPO-PSI/mzPeak/blob/main/src/lib.rs — module layout + `MzPeakWriter`/`MzPeakReader` exports — HIGH
-- https://github.com/HUPO-PSI/mzPeak/blob/main/examples/convert.rs — writer builder + `copy_metadata_from` + `write_spectrum` + `finish` flow — HIGH
-- https://github.com/HUPO-PSI/mzPeak/blob/main/src/writer/base.rs — `AbstractMzPeakWriter` method surface — HIGH
-- crates.io API — clap 4.6.1, indicatif 0.18.4, anyhow 1.0.102, thiserror 2.0.18, rayon 1.12.0, serde_json 1.0.150, zip 8.6.0, arrow/parquet 58.3.0 (current upstream-of-pin versions) — HIGH
-- crates.io API `imzml` (Alan Race / imzml-rs) — v0.1.3, updated 2022-10-13, 5,578 downloads — HIGH (basis for "avoid: stale")
+- crates.io API search `sdrf` / `proteomics-sdrf` / `sample-data-relationship` — **zero results** (no Rust SDRF parser exists) — HIGH (decisive negative)
+- crates.io API `csv` (max 1.4.0, 35M recent dl, updated 2025-10-17) — HIGH
+- crates.io API `tiff` (0.11.3, already pinned), `image` (0.25.10), `fastobo` (0.15.5), `curie` (0.1.4), `arrow`/`parquet` (58.3.0 current — confirms DO-NOT-BUMP pressure) — HIGH
+- Local `Cargo.toml` — confirms arrow/parquet `=57.0.0`, zip `=4.1.0`, tiff `=0.11.3`, sha2/md-5/sha1, quick-xml `=0.30.0`, serde, mzdata/mzpeak_prototyping vendored — HIGH
+- Local `knowledge/cv/obo/psi-ms.obo` — `MS:1002615` TMT reagent (parent) + `MS:1002616`–`MS:1002621` channels 126–131, N/C isotopologues (130N/130C names), `MS:1002622`+ iTRAQ 113–121, `MS:1002009` isobaric parent, reporter-ion intensity terms — HIGH (source-level)
+- Local `knowledge/cv/obo/imagingMS.obo` — `IMS:1006008/12/13/16/17` optical-image + co-registration terms present despite 2018/1.1.0 header — HIGH (source-level)
+- https://raw.githubusercontent.com/HUPO-PSI/psi-ms-CV/master/psi-ms.obo — live `data-version: 4.1.249` (2026-06-01); **TMTpro 132–135 absent** — HIGH
+- `gh repo list HUPO-PSI` — **no imagingMS-CV repo**; psi-ms-CV present (updated 2026-06-01) — HIGH
+- https://github.com/imzML/imzML/blob/master/imagingMS.obo — canonical imagingMS CV home (Alan Race / imzML project) — HIGH
+- https://www.psidev.info/controlled-vocabularies + https://www.ms-imaging.org/imzml/controlled-vocabulary/ — PSI ontology-coordinator + psidev-ms-vocab governance process — MEDIUM (multiple sources agree)
+- `docs/sdrf-mzpeak-integration.md`, `docs/sdrf-examples.md`, `docs/imaging-mzpeak-spec-draft.md`, `.planning/NEXT-ROADMAP-DRAFT.md` (F6–F10 definitions) — project design intent — HIGH
 
 ---
-*Stack research for: Rust imzML→imaging-mzPeak converter*
-*Researched: 2026-06-03*
+*Stack research for: mzML2mzPeak v0.7 — SDRF/TMT + imaging-spec + CV governance additions*
+*Researched: 2026-06-08*
