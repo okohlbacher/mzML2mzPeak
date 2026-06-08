@@ -36,10 +36,21 @@ add L2 conformance (Phase 30), and fully de-vendor LAST (Phase 31, gated on PR #
 
 ## Current Position
 
-Phase: 22 (not started)
+Phase: 23 DONE (rebase, out of order by request); discussing remaining phases
 Plan: —
-Status: Roadmap re-created (v0.7 spec-review revision) — ready to plan Phase 22
-Last activity: 2026-06-08 — v0.7 roadmap re-created (Phases 22–31, 27/27 requirements mapped)
+Status: Phase 23 (upstream rebase) complete (`5021eed`). Phase 22 reduced to UPS-01+UPS-03 (UPS-02/04 fixed upstream). Discussing Phases 24/27/28/29 design + de-vendor sequencing before planning.
+Last activity: 2026-06-08 — rebased onto mzpeak a5c222c + mzdata 0.64.2; 2 of 3 vendored patches dropped (upstreamed); pwiz 139/139; all tests green
+
+### Rebase findings (2026-06-08, commit 5021eed)
+
+- Vendored mzpeak_prototyping `8435967`→`a5c222c`; mzdata `0.64.1/eb70388`→`0.64.2/f9abc00` (main).
+- **Fixed upstream (patches dropped):** mzdata SONAR/IM accessions (dedicated ArrayType variants);
+  file_index FileEntry serde (PR #20 → upstream `#[serde(untagged)]`, round-trip verified);
+  array_buffer empty-first-spectrum (B2 → writer rewrite; pwiz 138→139/139).
+- **Remaining vendored patch:** chunk_series intensity/mz index-desync only (PR pending = UPS-01).
+- **De-vendor (Phase 31) now gated only on:** chunk_series upstreamed (DVN-01) + mzdata 0.64.2 on crates.io (DVN-02).
+- Spec moved to `HUPO-PSI/mzPeak-specification` (rewritten today; defines none of our extensions but
+  provides the Data-Kind/Entity-Type + file-level-JSON + CV-inflection extension mechanisms).
 
 ## v0.7 Roadmap (Phases 22–31)
 

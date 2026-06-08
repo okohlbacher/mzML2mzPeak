@@ -17,13 +17,13 @@
 ### Upstreaming (UPS) — submit the prepared fixes
 
 - [ ] **UPS-01**: The `chunk_series` intensity/mz index-desync fix is submitted as a PR to HUPO-PSI/mzPeak (branch already on `okohlbacher/mzPeak`).
-- [ ] **UPS-02**: The mzdata IM/SONAR binary-array-accession fix (MS:1002893/1003157/1003158) is submitted as a PR to mobiusklein/mzdata.
+- [x] **UPS-02**: ~~Submit the mzdata IM/SONAR accession PR~~ — **DONE UPSTREAM** (mzdata `main`/0.64.2 added dedicated `ScanningQuadrupolePosition{Lower,Upper}BoundMZ` variants + MS:1003157/1003158 reader mappings; better than our `NonStandardDataArray` patch). No PR needed; our patch dropped on rebase.
 - [ ] **UPS-03**: The mzPeakValidator `index_files_present` non-Parquet-skip fix is submitted as a PR to the validator repo.
-- [ ] **UPS-04**: The `array_buffer.rs` empty-first-spectrum type-mismatch is **re-validated against current upstream** (the file was heavily rewritten in the "vast torrents" commit); a characterized issue is filed at HUPO-PSI/mzPeak **only if it still reproduces** (it may already be fixed).
+- [x] **UPS-04**: ~~File the `array_buffer` empty-first-spectrum issue~~ — **OBSOLETE / FIXED UPSTREAM** by the writer rewrite (`a5c222c`); the previously-failing pwiz file now converts (corpus 139/139). No issue to file.
 
 ### Upstream rebase (REB) — adopt current upstream before building new facets
 
-- [ ] **REB-01**: Bump the vendored `mzpeak_prototyping` (rev `8435967` → current `HUPO-PSI/mzPeak` HEAD) and `mzdata` revs, re-apply the 3 vendored patches onto the rewritten writer API (`writer/base.rs`, `array_buffer.rs`, `buffer_descriptors.rs`, `file_index.rs`), and re-verify (full test suite + corpus e2e green) — so all new v0.7 facets are built on the current API, not the stale rev.
+- [x] **REB-01**: ✅ DONE 2026-06-08 (`5021eed`). Bumped vendored `mzpeak_prototyping` `8435967`→`a5c222c` + `mzdata` `0.64.1`→`0.64.2`; re-applied **only the chunk_series patch** (the other 2 were fixed upstream); rebuilt clean (zero converter API drift); full test suite green (245 lib + all integration); pwiz 139/139; imaging Other-member round-trip intact.
 
 ### De-vendoring (DVN) — gated on upstream merges
 

@@ -41,8 +41,16 @@
 
 ### v0.7 — Upstreaming, de-vendoring & sample/spatial modeling (Phases 22–31)
 
-- [ ] **Phase 22: Upstream PR prep** - Submit the three ready fixes, re-validate + (only if still broken) file the rewritten `array_buffer` bug, confirm PR #20 as the Phase-31 de-vendor gate. No fork removal.
-- [ ] **Phase 23: Upstream rebase + re-verify** - Bump vendored `mzpeak_prototyping` 8435967→HEAD + `mzdata`, re-apply the 3 patches onto the rewritten writer API, re-verify green. All new facets build on current API.
+> **Rebase outcome (2026-06-08, commit `5021eed`).** Phase 23 done early (user request). Rebased onto
+> mzpeak `a5c222c` + mzdata `0.64.2`. **3 of 4 upstream issues were already fixed upstream:** mzdata
+> SONAR/IM (B1, dedicated variants), file_index serde (PR #20 → upstream `#[serde(untagged)]`), and the
+> `array_buffer` empty-spectrum bug (B2 → writer rewrite; pwiz now **139/139**). Only the **chunk_series**
+> patch remains vendored. Net effect: **Phase 22** reduces to UPS-01 (chunk_series PR) + UPS-03 (validator
+> PR) — UPS-02/UPS-04 are obsolete. **Phase 31** de-vendor now only waits on chunk_series upstreamed
+> (DVN-01) + mzdata 0.64.2 published to crates.io (DVN-02). 245 lib + all integration tests green.
+
+- [ ] **Phase 22: Upstream PR prep** - ~~UPS-02 (mzdata)~~ + ~~UPS-04 (array_buffer)~~ **done upstream**. Remaining: submit the chunk_series PR (UPS-01) + the mzPeakValidator PR (UPS-03); confirm de-vendor gates. No fork removal.
+- [x] **Phase 23: Upstream rebase + re-verify** - DONE 2026-06-08 (`5021eed`). mzpeak→`a5c222c`, mzdata→`0.64.2`; 2 of 3 patches dropped (upstreamed); only chunk_series remains; build + full test suite green; pwiz 139/139.
 - [ ] **Phase 24: Spec alignment & CV governance** - Align every facet to the new spec's mechanisms, submit imaging/SDRF/ROI proposals to `HUPO-PSI/mzPeak-specification`, reconcile `cv_list`, mint canonical IMS URIs. Precedes every term-emitting phase.
 - [ ] **Phase 25: Forward declared-geometry threading (GEO-F)** - Thread imzML `<scanSettings>` declared grid; flip `pixel_count_source` to "declared".
 - [ ] **Phase 26: Reverse `<sourceFileList>` copy (RSRC)** - Re-emit `file_description.source_files[]` provenance into the reverse `.imzML`. Parallel-able with Phase 25.
