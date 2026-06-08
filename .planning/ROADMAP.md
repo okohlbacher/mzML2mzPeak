@@ -76,6 +76,15 @@ file the upstream `mzpeak_prototyping` FileEntry-serde issue and drop the vendor
 directly. The fork carries **TWO** patches, each load-bearing and each pending an upstream PR; drop
 each patch when its PR merges, and remove the fork entirely once both land.
 
+> **ADDENDUM (2026-06-08) — current vendored-patch inventory = THREE (two repos).** The status block
+> below (from the 2026-06-06 migration) says the mzdata fork was deleted; that is now superseded —
+> `vendor/mzdata` was **re-introduced** as a 0.64.1 snapshot and carries one local patch. Current
+> patches: (1) `mzpeak_prototyping` file_index serde (PR #20, still open — the de-vendor blocker);
+> (2) `mzpeak_prototyping` chunk_series index-desync (**999.6**, PR not yet submitted);
+> (3) `mzdata` IM/SONAR array accessions (**999.7**, PR not yet submitted). De-vendor mzdata when its
+> patch merges AND mzdata 0.64.1 is published to crates.io. Submission of #2/#3 + the upstream issue
+> for the unfixed writer bug are tracked as **999.6 / 999.7 / 999.9**.
+
 **VENDORED PATCH #B — chunk_series intensity/mz index desync (2026-06-07, commit-TBD).**
 `ArrowArrayChunk::from_arrays` indexed the filtered `arrow_arrays` with the source-map enumerate
 index → panic (or silent wrong-column) whenever an array is spilled to auxiliary. Bites profile
@@ -226,7 +235,17 @@ Plans:
 
 </details>
 
-### Phase 999.4: Finish the StackIT S3 upload of example files (originals + mzpeak) (BACKLOG)
+### Phase 999.4: Finish the StackIT S3 upload of example files (originals + mzpeak) ✅ DONE (2026-06-08)
+
+**Resolution:** The full corpus is on `s3://v09` (192 objects, 32.3 GB). The Astral original + profile
+mzPeak (3.74 GB) uploaded, and **all 32 example mzPeaks were re-converted with the current binary**
+(sort-on-write, spectrum-type CV, chunk_series + mzdata fixes) and placed next to their source,
+renamed to the source stem (`scripts/reconvert-corpus.sh`). `index.html` + `README.md` regenerated
+with per-dataset deep links. The push script is persisted as `scripts/push-data-stackit.sh` (originals)
++ `scripts/reconvert-corpus.sh` (re-convert + replace outputs). The ProteoWizard `pwiz-examples` set is
+deliberately **local-only** (see 999.x note / `docs/pwiz-examples.md`) and is NOT on the bucket.
+
+<details><summary>Original goal</summary>
 
 **Goal:** Complete the partial push to StackIT Object Storage (bucket `s3://v09`, profile `stackit`,
 endpoint `https://object.storage.eu01.onstackit.cloud`). The initial ~18 GB push (2026-06-06) was
@@ -251,11 +270,7 @@ already present and finishes the Astral upload; the mzpeak-placement steps then 
 credentials — plus `*.log`, `*.DS_Store`, `data/cors.json`, and `thermo-orbitrap-astral-reconv.mzpeak`
 (dev duplicate).
 
-**Requirements:** TBD
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (promote with `/gsd:review-backlog` when ready)
+</details>
 
 ### Phase 999.5: SDRF sample-metadata + TMT/isobaric channel modeling in mzPeak (BACKLOG)
 
@@ -288,3 +303,62 @@ gaps; MSI ROI→sample is a real SDRF extension (no spatial/pixel vocabulary); p
 
 Plans:
 - [ ] TBD (promote with `/gsd:review-backlog` when ready)
+
+---
+
+> **Upstream-fix backlog (999.6–999.9).** Each is a fix found while building/testing mzML2mzPeak that
+> belongs upstream. Three are carried as **local vendored patches** (drop when merged — feeds 999.1);
+> one is an unfixed upstream bug (no safe downstream workaround). Drafts live in `/tmp/mzpeak-prs/`.
+
+### Phase 999.6: Submit the `chunk_series` intensity/mz index-desync PR to HUPO-PSI/mzPeak (BACKLOG)
+
+**Goal:** Open the PR for the `ArrowArrayChunk::from_arrays` fix (index the filtered `arrow_arrays`
+by `arrow_arrays.len()`, not the source-map enumerate index — else profile ion-mobility spectra panic
+or get a wrong column when an array spills to auxiliary). Took the pwiz sweep 123→136/139.
+
+**State:** Branch `fix/chunk-series-intensity-index-desync` **already pushed to `okohlbacher/mzPeak`**;
+PR body drafted (`/tmp/mzpeak-prs/`), **not yet submitted** (owner writes the final text). Currently a
+vendored patch in `vendor/mzpeak_prototyping/src/chunk_series.rs` (commit `56b9192`).
+**On merge:** remove the vendored edit (feeds 999.1).
+
+**Requirements:** TBD · **Plans:** 0 plans
+
+### Phase 999.7: Submit the mzdata IM/SONAR binary-array-accession PR to mobiusklein/mzdata (BACKLOG)
+
+**Goal:** Open the PR mapping the unmapped PSI-MS binary-array accessions MS:1002893 (generic
+ion-mobility), MS:1003157 / MS:1003158 (SONAR scanning-quadrupole bound m/z) in the mzML reader's
+`fill_binary_data_array`, so they no longer stay `ArrayType::Unknown` and panic in `as_param` on real
+Waters SONAR / IM data. Lifted the pwiz sweep 136→138/139.
+
+**State:** PR body + patch drafted (`/tmp/mzpeak-prs/mzdata-PR-body-DRAFT.md`,
+`mzdata-ion-mobility-array-accessions.patch`), **not submitted**. Carried as a local patch in the
+**re-vendored** `vendor/mzdata` (0.64.1 snapshot, commit `1990999`). **On merge:** drop the patch;
+drop the whole `[patch.crates-io] mzdata` once 0.64.1 is published to crates.io.
+
+**Requirements:** TBD · **Plans:** 0 plans
+
+### Phase 999.8: Submit the mzPeakValidator `index_files_present` non-Parquet-skip PR (BACKLOG)
+
+**Goal:** In the separate `~/Claude/mzPeakValidator` repo, the `index_files_present` rule opened every
+`files[]` member as Parquet — false-positive failure on non-Parquet members (e.g. embedded
+`images/*.tiff`). Fix: skip members whose `data_kind`/`entity_type` is `other` or whose name isn't
+`.parquet`.
+
+**State:** Branch `fix/index-files-present-skip-nonparquet` + patch in `/tmp/mzpv-pr` /
+`/tmp/mzpeak-prs/0001-fix-index_files_present-*.patch`, **not submitted**. Validator repo is separate
+(not vendored here). **No converter change needed.**
+
+**Requirements:** TBD · **Plans:** 0 plans
+
+### Phase 999.9: File the `array_buffer.rs:104` empty-first-spectrum type-mismatch issue (HUPO-PSI/mzPeak) (BACKLOG)
+
+**Goal:** File the characterized issue: the writer's `empty_main_axis` path registers scalar columns
+while non-empty spectra register chunked `LargeList(Float32)` under the same names, so a file whose
+first spectrum is empty panics (`expected Float32 but found LargeList(Float32)`). The lone failure in
+the pwiz sweep (138/139): `Agilent/…/ImsSynthAllIons-ignoreZeros-combineIMS-mzMobilityFilter.mzML`.
+
+**State:** **Unfixed** — issue draft only (`/tmp/mzpeak-prs/mzpeak-issue-array_buffer-DRAFT.md`); proven
+upstream-only (skipping the empty spectrum is lossy; non-chunked has its own empty-array edge). NOT a
+vendored patch. **Action:** file the issue; track upstream fix.
+
+**Requirements:** TBD · **Plans:** 0 plans

@@ -220,4 +220,12 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Phase 19 complete (SRC-01/02). Next milestone phase: Phase 20 (optical image auto-discovery & auto-embed, IMS:1006008, OPT-01..04) — operates on the v0.5 separate-TIFF-member representation.
+- **Milestone v0.6 is shipped** (phases 16–21, tag `v0.6`). No active phase. Run `/gsd:new-milestone`
+  to scope **v0.7** (candidates in `.planning/ROADMAP.md` → `## Next`: F6 pixel facet, F7 continuous
+  shared-axis, F8 image entity, F9 CV governance, F10 L2, GEO-F, RSRC).
+- **Post-v0.6 maintenance work (2026-06-08):** the published example corpus on `s3://v09` was
+  re-converted with the current binary and re-uploaded (192 objects, 32.3 GB) — backlog **999.4 DONE**.
+  The ProteoWizard `pwiz-examples` set is converted **local-only** (138/139; not on S3).
+- **Open backlog:** 999.1 (de-vendor — blocked on PR #20), 999.5 (SDRF/TMT), and the new upstream-fix
+  items **999.6** (chunk_series PR), **999.7** (mzdata array-accession PR), **999.8** (mzPeakValidator
+  PR), **999.9** (file the `array_buffer` empty-spectrum issue). PR/issue drafts in `/tmp/mzpeak-prs/`.
