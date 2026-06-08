@@ -40,29 +40,39 @@ green in ~11 s, ~535 MB bounded. Milestone audit passed (15/15 reqs, 5/5 integra
 full real PXD001283 dataset: converts + masking-aware L1 roundtrip in ~7 s, 366 MB bounded.
 Tag `v0.3`; see `MILESTONES.md`.
 
-## Current Milestone: v0.7 — Upstreaming, de-vendoring & sample/spatial modeling
+## Current Milestone: v0.7 — Upstreaming, de-vendoring & sample-metadata modeling
 
-**Goal:** Empty the open backlog — land the prepared upstream fixes and fully de-vendor, then add SDRF/TMT
-sample modeling and the deferred imaging-spec extensions.
+**Goal:** Empty the upstreaming/de-vendoring backlog — land the prepared upstream fixes and fully
+de-vendor — then add SDRF/TMT sample + isobaric-channel modeling, close the geometry/provenance fidelity
+gaps, and add L2 conformance. **Re-scoped 2026-06-08:** the imaging-structure cluster (pixel facet, ROI
+polygons, continuous shared-axis, `images.parquet`) is **deferred beyond v1.0** — v0.7 is sample-metadata
+modeling + conformance + fidelity, NOT spatial structural modeling. **8 phases (22–29), 21 active reqs.**
 
 **Target features:**
-- **Upstreaming & de-vendoring** (999.6/7/8/9 → 999.1): submit the 3 ready PRs (chunk_series index-desync →
-  HUPO-PSI/mzPeak; mzdata IM/SONAR array accessions → mobiusklein/mzdata; mzPeakValidator
-  `index_files_present` non-Parquet skip); file the `array_buffer` empty-first-spectrum issue; drop both
-  vendored forks (`mzpeak_prototyping` + the re-vendored `mzdata`) once their patches merge.
-- **SDRF + isobaric (TMT/iTRAQ) channel modeling** (999.5): `channel_list`, `assay_ref`, run→sample
-  binding, MSI ROI→sample, verbatim SDRF embed (design in `docs/sdrf-mzpeak-integration.md`).
-- **Imaging spec extensions** (F6/F7/F8): `pixel` facet / multi-spectrum-per-pixel; continuous-mode
-  shared-axis + imzML emit; full `image` entity / `images.parquet` blob + CV-governed co-registration.
-- **CV governance & conformance** (F9/F10): mint canonical IMS URIs (resolves the v0.6 `TODO(F9)`
-  placeholders); L2 conformance.
+- **Upstreaming & de-vendoring**: submit the 2 still-needed PRs (chunk_series index-desync → HUPO-PSI/mzPeak;
+  mzPeakValidator `index_files_present` non-Parquet skip) — both DEFERRED/held by owner; then drop both
+  vendored forks once the chunk_series fix is upstreamed and mzdata 0.64.2 publishes to crates.io. (mzdata
+  IM/SONAR accessions + the `array_buffer` empty-spectrum bug were both fixed upstream on the rebase.)
+- **Spec alignment & CV governance** (SPEC/CVG, ex-F9): model every facet via the rewritten
+  `HUPO-PSI/mzPeak-specification` mechanisms + stable CV tokens; resolve the v0.6 `TODO(F9)` IMS
+  placeholders; reconcile `cv_list`; submit extension write-ups as a BATCH at the END of v0.7.
 - **Geometry & provenance round-trip** (GEO-F/RSRC): forward declared-geometry threading beyond parsed
   (imzML `<scanSettings>`); reverse `<sourceFileList>` copy into the emitted `.imzML`.
+- **SDRF + isobaric (TMT/iTRAQ) channel modeling + reporter-quant** (999.5): verbatim SDRF embed,
+  `sample_list`/`channel_list`, `assay_ref` + run→sample binding, reporter-ion quant (aux array keyed by
+  `channel_id`) — design in `docs/sdrf-mzpeak-integration.md`.
+- **L2 conformance** (F10): wire `--conformance l2` value-equal-under-recorded-transform onto the existing
+  `ToleranceContract::L2`.
+
+**Deferred beyond v1.0 (imaging structure, F6/F7/F8):** `pixel` facet / multi-spectrum-per-pixel + scan
+compound-key (PIX-01, ex-999.10); MSI ROI spatial-annotation polygon + region→sample (ROI-01);
+continuous-mode shared-axis + imzML emit (CONT-01); full `image` entity / `images.parquet` blob (IMG-01).
+See REQUIREMENTS.md → "Deferred beyond v1.0".
 
 ## Next Milestone
 
-v0.8+ — TBD (anything deferred out of v0.7 during scoping; e.g. perfectly-bijective descriptive optical
-round-trip if not reached in F8).
+v0.8+ / v1.0 imaging-structure milestone — the deferred imaging cluster (PIX-01, ROI-01, CONT-01, IMG-01)
+plus anything else deferred during scoping (e.g. perfectly-bijective descriptive optical round-trip).
 
 ## Requirements
 
@@ -91,13 +101,18 @@ round-trip if not reached in F8).
   (ENV/IN/SPA/SCH/OUT/VER/CLI/DAT) delivered and proven on real data (full PXD001283, 34,840
   spectra, masking-aware L1 roundtrip). See `MILESTONES.md` / `milestones/v0.3-REQUIREMENTS.md`.
 
-### Active (next milestone — not yet scoped)
+### Active (v0.7 — Upstreaming, de-vendoring & sample-metadata modeling)
 
-Run `/gsd:new-milestone` to define v0.7. Carried-forward candidates: `pixel` facet / multi-spectrum-per-pixel
-(F6), continuous-mode shared-axis + emit (F7), full `image` entity / `images.parquet` blob + CV-governed
-registration / true co-registration (F8), CV governance / canonical IMS URI minting (F9), L2 conformance
-(F10), forward declared-geometry threading beyond parsed (GEO-F), reverse `<sourceFileList>` copy (RSRC),
-perfectly-bijective descriptive optical round-trip, third-party imaging-mzPeak hardening.
+8 phases (22–29), 21 active requirements: UPS-01/03 (upstream PRs — Phase 22, deferred/held), REB-01
+(rebase — Phase 23, ✅ done), SPEC-01/02/03 + CVG-01/02 (spec alignment & CV governance — Phase 24),
+GEOF-01 (Phase 25), RSRC-01 (Phase 26), SDRF-01..05 + CHAN-01/02/03 (SDRF + channels + reporter-quant —
+Phase 27), L2-01 (Phase 28), DVN-01/02 (de-vendor — Phase 29, deferred/gated). UPS-02/UPS-04 are
+done-upstream (fixed by the rebase). See `.planning/REQUIREMENTS.md` + `.planning/ROADMAP.md`.
+
+### Deferred beyond v1.0 (imaging structure — F6/F7/F8)
+
+PIX-01 (pixel facet + scan compound-key, ex-999.10), ROI-01 (spatial-annotation polygon ROI), CONT-01
+(continuous shared-axis), IMG-01 (`images.parquet` blob). Carried to a later imaging-structure milestone.
 
 ### Out of Scope
 
@@ -132,6 +147,7 @@ perfectly-bijective descriptive optical round-trip, third-party imaging-mzPeak h
 | Roundtrip + numerical-fidelity as the verification bar | Core value is lossless spatial+spectral preservation; structural validity alone is insufficient | — Pending |
 | Test against public PXD001283 (HR2MSI mouse urinary bladder) | Matches the existing local file; real, citable MSI dataset | — Pending |
 | Process: GSD harness + adversarial CODEX/CLI review at start & end of each phase | User-mandated quality process | — Pending |
+| Defer the imaging-structure cluster (pixel facet, ROI polygons, continuous shared-axis, `images.parquet`) beyond v1.0 | v0.7 owner decision (2026-06-08): focus the milestone on upstreaming, de-vendoring, sample/SDRF/channel modeling + conformance/fidelity; spatial structural modeling needs more committee alignment (F6 scan-PK, F7 buffer placement, F8 blob design) | ✓ Decided — moved to REQUIREMENTS "Deferred beyond v1.0" |
 
 ## Evolution
 
@@ -151,4 +167,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-06 — shipped milestone v0.6 (Spec conformance — dtypes + CV/geometry/provenance)*
+*Last updated: 2026-06-08 — v0.7 reshaped to "Upstreaming, de-vendoring & sample-metadata modeling" (8 phases 22–29, 21 active reqs); imaging-structure cluster deferred beyond v1.0*
