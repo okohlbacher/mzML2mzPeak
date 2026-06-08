@@ -40,15 +40,29 @@ green in ~11 s, ~535 MB bounded. Milestone audit passed (15/15 reqs, 5/5 integra
 full real PXD001283 dataset: converts + masking-aware L1 roundtrip in ~7 s, 366 MB bounded.
 Tag `v0.3`; see `MILESTONES.md`.
 
+## Current Milestone: v0.7 — Upstreaming, de-vendoring & sample/spatial modeling
+
+**Goal:** Empty the open backlog — land the prepared upstream fixes and fully de-vendor, then add SDRF/TMT
+sample modeling and the deferred imaging-spec extensions.
+
+**Target features:**
+- **Upstreaming & de-vendoring** (999.6/7/8/9 → 999.1): submit the 3 ready PRs (chunk_series index-desync →
+  HUPO-PSI/mzPeak; mzdata IM/SONAR array accessions → mobiusklein/mzdata; mzPeakValidator
+  `index_files_present` non-Parquet skip); file the `array_buffer` empty-first-spectrum issue; drop both
+  vendored forks (`mzpeak_prototyping` + the re-vendored `mzdata`) once their patches merge.
+- **SDRF + isobaric (TMT/iTRAQ) channel modeling** (999.5): `channel_list`, `assay_ref`, run→sample
+  binding, MSI ROI→sample, verbatim SDRF embed (design in `docs/sdrf-mzpeak-integration.md`).
+- **Imaging spec extensions** (F6/F7/F8): `pixel` facet / multi-spectrum-per-pixel; continuous-mode
+  shared-axis + imzML emit; full `image` entity / `images.parquet` blob + CV-governed co-registration.
+- **CV governance & conformance** (F9/F10): mint canonical IMS URIs (resolves the v0.6 `TODO(F9)`
+  placeholders); L2 conformance.
+- **Geometry & provenance round-trip** (GEO-F/RSRC): forward declared-geometry threading beyond parsed
+  (imzML `<scanSettings>`); reverse `<sourceFileList>` copy into the emitted `.imzML`.
+
 ## Next Milestone
 
-Not yet scoped — run `/gsd:new-milestone` for v0.7. Candidates (`NEXT-ROADMAP-DRAFT.md` §B + "Deferred
-during v0.6"): `pixel` facet / multi-spectrum-per-pixel (F6), continuous-mode shared-axis + emit (F7),
-full `image` entity / `images.parquet` blob + CV-governed registration / true co-registration (F8), CV
-governance / canonical IMS URI minting (F9 — resolves the v0.6 `TODO(F9)` placeholders), L2 conformance
-(F10), forward declared-geometry threading beyond parsed (GEO-F), reverse `<sourceFileList>` copy (RSRC),
-perfectly-bijective descriptive optical round-trip. Also: file the upstream `mzpeak_prototyping`
-FileEntry-serde issue and drop the vendored fork when fixed (now load-bearing for Phase-21 reverse).
+v0.8+ — TBD (anything deferred out of v0.7 during scoping; e.g. perfectly-bijective descriptive optical
+round-trip if not reached in F8).
 
 ## Requirements
 

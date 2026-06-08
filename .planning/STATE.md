@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.6
-milestone_name: — Spec conformance — dtypes + CV/geometry/provenance
-status: Awaiting next milestone
-stopped_at: Completed milestone v0.6 (21-03-PLAN.md)
-last_updated: "2026-06-06T05:00:00.000Z"
-last_activity: 2026-06-06 — Milestone v0.6 completed and archived
+milestone: v0.7
+milestone_name: Upstreaming, de-vendoring & sample/spatial modeling
+status: planning
+last_updated: "2026-06-08T02:41:09.292Z"
+last_activity: 2026-06-08
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 16
-  completed_plans: 16
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -31,10 +30,10 @@ fidelity contract the geometry facet (Phase 18) and the external validator depen
 
 ## Current Position
 
-Phase: Milestone v0.6 complete (6/6 phases, 16/16 plans) — archived
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone (run /gsd:new-milestone for v0.7)
-Last activity: 2026-06-06 — Milestone v0.6 completed and archived (tag v0.6); audit PASSED (21/21 reqs, 21/21 integration, 5/5 E2E); 335 tests green
+Status: Defining requirements
+Last activity: 2026-06-08 — Milestone v0.7 started
 
 ## v0.6 Roadmap (Phases 16–21)
 
@@ -223,9 +222,11 @@ Resume file: None
 - **Milestone v0.6 is shipped** (phases 16–21, tag `v0.6`). No active phase. Run `/gsd:new-milestone`
   to scope **v0.7** (candidates in `.planning/ROADMAP.md` → `## Next`: F6 pixel facet, F7 continuous
   shared-axis, F8 image entity, F9 CV governance, F10 L2, GEO-F, RSRC).
+
 - **Post-v0.6 maintenance work (2026-06-08):** the published example corpus on `s3://v09` was
   re-converted with the current binary and re-uploaded (192 objects, 32.3 GB) — backlog **999.4 DONE**.
   The ProteoWizard `pwiz-examples` set is converted **local-only** (138/139; not on S3).
+
 - **Open backlog:** 999.1 (de-vendor — blocked on PR #20), 999.5 (SDRF/TMT), and the new upstream-fix
   items **999.6** (chunk_series PR), **999.7** (mzdata array-accession PR), **999.8** (mzPeakValidator
   PR), **999.9** (file the `array_buffer` empty-spectrum issue). PR/issue drafts in `/tmp/mzpeak-prs/`.
