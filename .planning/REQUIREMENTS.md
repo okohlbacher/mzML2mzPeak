@@ -7,7 +7,8 @@
 > **Standing cross-cutting criterion (XRT) — applies to EVERY structured requirement below.** Any new
 > facet / metadata block / column must (a) preserve forward↔reverse round-trip symmetry (define each
 > facet's reverse fate + a `src/verify/` round-trip assertion), (b) keep masking-aware L1 intact, and
-> (c) pass mzPeakValidator with the new column's `sorting_rank` gating recognized. Every structured
+> (c) pass mzPeakValidator with the new column's `sorting_rank` gating recognized, and (d) be modeled
+> via the updated spec's mechanisms + captured as a spec extension proposal (SPEC-01/02). Every structured
 > addition also obeys the standing **three-places rule**: `src/…` + `docs/mzpeak-imaging-spec-suggestions.md`
 > + the matching `schema/*.json`.
 
@@ -18,15 +19,22 @@
 - [ ] **UPS-01**: The `chunk_series` intensity/mz index-desync fix is submitted as a PR to HUPO-PSI/mzPeak (branch already on `okohlbacher/mzPeak`).
 - [ ] **UPS-02**: The mzdata IM/SONAR binary-array-accession fix (MS:1002893/1003157/1003158) is submitted as a PR to mobiusklein/mzdata.
 - [ ] **UPS-03**: The mzPeakValidator `index_files_present` non-Parquet-skip fix is submitted as a PR to the validator repo.
-- [ ] **UPS-04**: The `array_buffer.rs:104` empty-first-spectrum type-mismatch is filed as a characterized issue at HUPO-PSI/mzPeak (no local fix — upstream-only).
+- [ ] **UPS-04**: The `array_buffer.rs` empty-first-spectrum type-mismatch is **re-validated against current upstream** (the file was heavily rewritten in the "vast torrents" commit); a characterized issue is filed at HUPO-PSI/mzPeak **only if it still reproduces** (it may already be fixed).
+
+### Upstream rebase (REB) — adopt current upstream before building new facets
+
+- [ ] **REB-01**: Bump the vendored `mzpeak_prototyping` (rev `8435967` → current `HUPO-PSI/mzPeak` HEAD) and `mzdata` revs, re-apply the 3 vendored patches onto the rewritten writer API (`writer/base.rs`, `array_buffer.rs`, `buffer_descriptors.rs`, `file_index.rs`), and re-verify (full test suite + corpus e2e green) — so all new v0.7 facets are built on the current API, not the stale rev.
 
 ### De-vendoring (DVN) — gated on upstream merges
 
 - [ ] **DVN-01**: Once PR #20 (FileEntry serde) merges, drop `vendor/mzpeak_prototyping` + the `[patch."…/mzPeak"]` redirect and depend on upstream directly — gated on an `Other`-member round-trip verified green un-forked.
 - [ ] **DVN-02**: Once the mzdata accession PR merges AND mzdata 0.64.1 is published to crates.io, drop the `vendor/mzdata` patch + the `[patch.crates-io] mzdata` redirect.
 
-### CV governance (CVG) — F9 (must precede every term-emitting phase)
+### Spec alignment & CV governance (SPEC / CVG) — must precede every term-emitting phase
 
+- [ ] **SPEC-01**: Every new facet/metadata block is modeled via the updated spec's own mechanisms — file-level metadata as JSON in the `metadata` data-kind Parquet KV; new members via the documented **"Adding a new Data Kind / Entity Type"** process; CV concepts via the spec's **column-name inflection** + `parameters` list — not ad-hoc structures.
+- [ ] **SPEC-02**: The imaging + SDRF/sample/channel/ROI extensions are written up and **submitted as proposals/PRs to `HUPO-PSI/mzPeak-specification`** (the new spec repo) so the format stays mergeable-by-design; the committee's open questions (SDRF §5.7; ROI polygons) are tracked.
+- [ ] **SPEC-03**: The v0.6 `cv_list` block is reconciled with the updated spec's CV-declaration mechanism (the spec defines no `cv_list` — confirm/align/propose).
 - [ ] **CVG-01**: Canonical IMS CV URIs are declared via the single-source `src/schema/cv.rs` (resolving the v0.6 `TODO(F9)` placeholders), with forward emit + reverse `<cvList>` guaranteed not to drift.
 - [ ] **CVG-02**: Existing `IMS:1006xxx` accessions are audited and the vendored `imagingMS.obo` refreshed before any new accession is referenced; CV decode is by CURIE, not column name (fixes the documented B1/B2/B3 / C1/C3/D11 drift classes).
 
@@ -51,8 +59,8 @@
 
 ### Spatial structure (PIX / ROI)
 
-- [ ] **PIX-01**: A `pixel` facet supports multi-spectrum-per-pixel with a stable pixel primary key (and the scan compound-key it forces). *(Structural keystone — precedes ROI-01.)*
-- [ ] **ROI-01**: An MSI region table (`region → sample`) + per-pixel `roi_ref` maps spatial regions to samples (depends on PIX-01 + SDRF model).
+- [ ] **PIX-01**: A `pixel` facet supports multi-spectrum-per-pixel with a stable pixel primary key (and the scan compound-key it forces — including canonical `scan.scan_index` + `scan.spectrum_reference`, ex-999.10). *(Structural keystone — precedes ROI-01.)*
+- [ ] **ROI-01**: An MSI region of interest is modeled as a **spatial-annotation polygon** (per PSI spring-2026 feedback + minutes §imaging), with a `region → sample` mapping on top and a per-pixel/per-spectrum `roi_ref`; supports spatial queries / feature-extraction bounding boxes (depends on PIX-01 + SDRF model).
 
 ### Output modes & conformance (CONT / IMG / L2)
 
@@ -81,16 +89,40 @@
 
 ## Traceability
 
-Filled by the roadmapper during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (to be mapped) | — | Pending |
+| UPS-01 | Phase 22 | Pending |
+| UPS-02 | Phase 22 | Pending |
+| UPS-03 | Phase 22 | Pending |
+| UPS-04 | Phase 22 | Pending |
+| REB-01 | Phase 23 | Pending |
+| SPEC-01 | Phase 24 | Pending |
+| SPEC-02 | Phase 24 | Pending |
+| SPEC-03 | Phase 24 | Pending |
+| CVG-01 | Phase 24 | Pending |
+| CVG-02 | Phase 24 | Pending |
+| GEOF-01 | Phase 25 | Pending |
+| RSRC-01 | Phase 26 | Pending |
+| SDRF-01 | Phase 27 | Pending |
+| SDRF-02 | Phase 27 | Pending |
+| SDRF-03 | Phase 27 | Pending |
+| SDRF-04 | Phase 27 | Pending |
+| SDRF-05 | Phase 27 | Pending |
+| PIX-01 | Phase 28 | Pending |
+| CONT-01 | Phase 28 | Pending |
+| IMG-01 | Phase 28 | Pending |
+| CHAN-01 | Phase 29 | Pending |
+| CHAN-02 | Phase 29 | Pending |
+| CHAN-03 | Phase 29 | Pending |
+| ROI-01 | Phase 29 | Pending |
+| L2-01 | Phase 30 | Pending |
+| DVN-01 | Phase 31 | Pending |
+| DVN-02 | Phase 31 | Pending |
 
 **Coverage:**
-- v1 requirements: 23 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 23 ⚠️
+- v1 requirements: 27 total
+- Mapped to phases: 27 ✓
+- Unmapped: 0 ✓
 
 ---
-*Requirements defined: 2026-06-08*
+*Requirements defined: 2026-06-08 · Mapped to roadmap: 2026-06-08 (Phases 22–31, spec-review revision: +REB-01 +SPEC-01/02/03, UPS-04 & ROI-01 changed)*

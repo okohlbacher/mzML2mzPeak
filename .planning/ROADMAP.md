@@ -1,9 +1,16 @@
 # Roadmap: mzML2mzPeak
 
-> **Active milestone: v0.7 — Upstreaming, de-vendoring & sample/spatial modeling.** Phases 22–30,
-> 23 requirements (UPS / DVN / CVG / GEOF / RSRC / SDRF / CHAN / PIX / ROI / CONT / IMG / L2).
+> **Active milestone: v0.7 — Upstreaming, de-vendoring & sample/spatial modeling.** Phases 22–31,
+> 27 requirements (UPS / REB / DVN / SPEC / CVG / GEOF / RSRC / SDRF / CHAN / PIX / ROI / CONT / IMG / L2).
 > Numbering continues from v0.6's Phase 21 (do **not** reset). v0.3 (forward), v0.4 (reverse),
 > v0.5 (index enrichment + optical import), and v0.6 (spec conformance) are shipped.
+>
+> **v0.7 was re-scoped 2026-06-08 after a spec-comparison review** against the newly-split
+> [`HUPO-PSI/mzPeak-specification`](https://github.com/HUPO-PSI/mzPeak-specification) repo (rewritten
+> that day), the impl repo's "vast torrents of changes", and PSI-committee notes. The review **added 4
+> requirements** (REB-01 upstream rebase; SPEC-01/02/03 spec alignment) and **changed 2** (UPS-04 →
+> re-validate the rewritten `array_buffer` before filing; ROI-01 → spatial-annotation **polygon** model
+> per PSI spring-2026 feedback). Net: 23 → **27 requirements**, 9 → **10 phases**.
 
 ## Shipped Milestones
 
@@ -26,21 +33,24 @@
 > column must, in addition to its own success criteria: (a) preserve forward↔reverse round-trip
 > symmetry (define the facet's reverse fate + a `src/verify/` round-trip assertion), (b) keep
 > masking-aware L1 intact, (c) pass mzPeakValidator with the new column's `sorting_rank` gating
-> recognized, and (d) obey the **three-places rule** (`src/…` + `docs/mzpeak-imaging-spec-suggestions.md`
-> + the matching `schema/*.json`). The pinned stack (`arrow`/`parquet` = 57.0.0, `zip` = 4.1.0,
-> `mzpeaks` = 1.0.9) holds every phase; the only new dep expected is `csv` (SDRF TSV, Phase 26).
+> recognized, (d) be modeled via the updated spec's mechanisms **and captured as a spec-extension
+> proposal to `HUPO-PSI/mzPeak-specification`** (SPEC-01/02), and (e) obey the **three-places rule**
+> (`src/…` + `docs/mzpeak-imaging-spec-suggestions.md` + the matching `schema/*.json`). The pinned
+> stack (`arrow`/`parquet` = 57.0.0, `zip` = 4.1.0, `mzpeaks` = 1.0.9) holds every phase; the only new
+> dep expected is `csv` (SDRF TSV, Phase 27).
 
-### v0.7 — Upstreaming, de-vendoring & sample/spatial modeling (Phases 22–30)
+### v0.7 — Upstreaming, de-vendoring & sample/spatial modeling (Phases 22–31)
 
-- [ ] **Phase 22: Upstream PR preparation** - Submit the three ready fixes + file the unfixed issue (no fork removal yet); start the merge clock early.
-- [ ] **Phase 23: CV governance / IMS URI minting (F9)** - Single-source canonical CV constants; must precede every accession-emitting phase.
-- [ ] **Phase 24: Forward declared-geometry threading (GEO-F)** - Thread imzML `<scanSettings>` declared grid; flip `pixel_count_source` to "declared".
-- [ ] **Phase 25: Reverse `<sourceFileList>` copy (RSRC)** - Re-emit `file_description.source_files[]` provenance into the reverse `.imzML`.
-- [ ] **Phase 26: SDRF sample model — embed + sample_list + channel_list + assay_ref** - Verbatim SDRF embed + projected sample/channel model + run→sample binding.
-- [ ] **Phase 27: Reporter-ion quant + MSI ROI→sample** - Per-MS2 reporter-quant aux array keyed by channel + region→sample table with per-pixel `roi_ref`.
-- [ ] **Phase 28: L2 conformance verify path (F10)** - `--conformance l2` value-equal-under-recorded-transform arm on the existing `ToleranceContract::L2`.
-- [ ] **Phase 29: Imaging extensions — pixel facet, continuous shared-axis, image entity (F6/F7/F8)** - `pixel_id` facet, continuous-mode shared m/z axis, additive `images.parquet` blob, + canonical `scan.scan_index`/`scan.spectrum_reference` (ex-999.10).
-- [ ] **Phase 30: De-vendor — drop both vendored forks (999.1)** - Remove `[patch]` blocks + `vendor/`; gated on PR #20 merged + un-forked `Other`-member round-trip green. LAST.
+- [ ] **Phase 22: Upstream PR prep** - Submit the three ready fixes, re-validate + (only if still broken) file the rewritten `array_buffer` bug, confirm PR #20 as the Phase-31 de-vendor gate. No fork removal.
+- [ ] **Phase 23: Upstream rebase + re-verify** - Bump vendored `mzpeak_prototyping` 8435967→HEAD + `mzdata`, re-apply the 3 patches onto the rewritten writer API, re-verify green. All new facets build on current API.
+- [ ] **Phase 24: Spec alignment & CV governance** - Align every facet to the new spec's mechanisms, submit imaging/SDRF/ROI proposals to `HUPO-PSI/mzPeak-specification`, reconcile `cv_list`, mint canonical IMS URIs. Precedes every term-emitting phase.
+- [ ] **Phase 25: Forward declared-geometry threading (GEO-F)** - Thread imzML `<scanSettings>` declared grid; flip `pixel_count_source` to "declared".
+- [ ] **Phase 26: Reverse `<sourceFileList>` copy (RSRC)** - Re-emit `file_description.source_files[]` provenance into the reverse `.imzML`. Parallel-able with Phase 25.
+- [ ] **Phase 27: SDRF sample model — embed + sample_list + channel_list + assay_ref** - Verbatim SDRF embed + projected sample/channel model + run→sample binding. Only new dep (`csv`).
+- [ ] **Phase 28: Imaging extensions — pixel facet, continuous shared-axis, image entity (F6/F7/F8)** - `pixel_id` facet (structural keystone, PIX before ROI), continuous-mode shared m/z axis, additive `images.parquet` blob, + canonical `scan.scan_index`/`scan.spectrum_reference` (ex-999.10).
+- [ ] **Phase 29: Reporter-ion quant + ROI polygons** - Per-MS2 reporter-quant aux array keyed by channel + spatial-annotation polygon ROI with region→sample + per-pixel/spectrum `roi_ref`. Depends on PIX (28) + SDRF (27).
+- [ ] **Phase 30: L2 conformance verify path (F10)** - `--conformance l2` value-equal-under-recorded-transform arm on the existing `ToleranceContract::L2`.
+- [ ] **Phase 31: De-vendor — drop both vendored forks (999.1)** - Remove `[patch]` blocks + `vendor/`; gated on PR #20 merged + un-forked `Other`-member round-trip green. LAST.
 
 <details>
 <summary>✅ v0.6 Spec conformance — dtypes + CV/geometry/provenance (Phases 16–21) — SHIPPED 2026-06-06</summary>
@@ -79,52 +89,63 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 
 ## Phase Details
 
-### Phase 22: Upstream PR preparation
-**Goal**: Submit the three already-prepared upstream fixes and file the one unfixed upstream issue, so merge latency overlaps the rest of v0.7. No forks are removed in this phase — this only opens the upstream surface and starts the de-vendor merge clock.
+### Phase 22: Upstream PR prep
+**Goal**: Submit the three already-prepared upstream fixes, re-validate the rewritten `array_buffer` bug and file it only if it still reproduces, and confirm PR #20's status as the Phase-31 de-vendor gate — so merge latency overlaps the rest of v0.7. No forks are removed here; this only opens the upstream surface and starts the de-vendor merge clock.
 **Depends on**: Nothing (first phase of v0.7; runs immediately so PRs age while later phases proceed)
 **Requirements**: UPS-01, UPS-02, UPS-03, UPS-04
 **Success Criteria** (what must be TRUE):
   1. The `chunk_series` intensity/mz index-desync fix is an open PR against HUPO-PSI/mzPeak (URL recorded), from the prepared `okohlbacher/mzPeak` branch.
-  2. The mzdata IM/SONAR binary-array-accession fix (MS:1002893/1003157/1003158) **is already upstream** (in mzdata `main` + tag `v0.64.1`, verified 2026-06-08) → UPS-02 = **confirm & close** (no PR to submit); reset `vendor/mzdata` to clean `v0.64.1` (retire the local patch); full un-vendor still gated on crates.io publishing 0.64.1.
+  2. The mzdata IM/SONAR binary-array-accession fix (MS:1002893/1003157/1003158) is an open PR against mobiusklein/mzdata (URL recorded).
   3. The mzPeakValidator `index_files_present` non-Parquet-skip fix is an open PR against the validator repo (URL recorded).
-  4. The `array_buffer.rs:104` empty-first-spectrum type-mismatch is a characterized, reproducible issue filed at HUPO-PSI/mzPeak (URL recorded); no local fix attempted.
-  5. PR #20 (FileEntry serde — the de-vendor blocker) status is confirmed and recorded as the gate for Phase 30.
+  4. The `array_buffer` empty-first-spectrum type-mismatch is **re-validated against current upstream** (the file was rewritten in the "vast torrents" commit); a characterized issue is filed at HUPO-PSI/mzPeak (URL recorded) **only if it still reproduces** — otherwise the close-as-fixed determination is recorded with evidence.
+  5. PR #20 (FileEntry serde — the de-vendor blocker) status is confirmed and recorded as the gate for Phase 31.
 **Plans**: TBD
 
-### Phase 23: CV governance / IMS URI minting (F9)
-**Goal**: Establish a single authoritative source of all CV facts so every later facet cites canonical CURIEs. Resolve the v0.6 `TODO(F9)` IMS URI placeholders before any new accession lands in the already-public corpus.
-**Depends on**: Phase 22 (none structurally, but ordered first among emitting work so no provisional CURIE is baked in)
-**Requirements**: CVG-01, CVG-02
+### Phase 23: Upstream rebase + re-verify
+**Goal**: Adopt current upstream before building any new facet. Bump the vendored `mzpeak_prototyping` (rev `8435967` → current `HUPO-PSI/mzPeak` HEAD) and the `mzdata` revs, re-apply the three vendored patches onto the **rewritten** writer API, and re-verify green — so all new v0.7 facets are built on the current API, not the stale rev.
+**Depends on**: Phase 22 (knows which patches are being upstreamed / which may already be fixed, so the rebase re-applies only the still-needed ones). Must precede every new-facet phase.
+**Requirements**: REB-01
 **Success Criteria** (what must be TRUE):
-  1. Canonical IMS CV URIs are declared once in `src/schema/cv.rs`; the v0.6 `TODO(F9)` placeholders are gone.
-  2. Forward emit and the reverse `<cvList>` read the same constants and are proven not to drift (round-trip assertion).
-  3. The vendored `imagingMS.obo` is refreshed from `imzML/imzML@master` and existing `IMS:1006xxx` accessions are audited before any new accession is referenced.
-  4. CV decode is keyed by CURIE (not column name), closing the documented B1/B2/B3/C1/C3/D11 drift classes; the TMTpro 16/18-plex CV gap is documented and a term request is filed.
+  1. The vendored `mzpeak_prototyping` rev is bumped from `8435967` to current `HUPO-PSI/mzPeak` HEAD and `mzdata` revs are bumped, with the hard pins (`arrow`/`parquet` = 57.0.0, `zip` = 4.1.0, `mzpeaks` = 1.0.9) unchanged.
+  2. The three still-needed vendored patches are re-applied onto the rewritten writer API surface (`writer/base.rs`, `array_buffer.rs`, `buffer_descriptors.rs`, `file_index.rs`); any patch obsoleted by the rewrite is dropped with a recorded reason.
+  3. The full test suite + corpus e2e are green against the rebased vendored stack (no regression vs the v0.6 335-test baseline).
+**Plans**: TBD
+
+### Phase 24: Spec alignment & CV governance
+**Goal**: Establish a single authoritative source of all CV facts AND align every new v0.7 facet to the rewritten spec's own mechanisms before any term lands in the already-public corpus. Resolve the v0.6 `TODO(F9)` IMS URI placeholders, reconcile the v0.6 `cv_list` with the new spec, and contribute the imaging/SDRF/ROI extensions back as proposals so the format stays mergeable-by-design.
+**Depends on**: Phase 23 (rebased onto the current spec/API surface). Ordered first among emitting work so no provisional CURIE or ad-hoc structure is baked in. **Precedes every term-emitting phase (27/28/29).**
+**Requirements**: SPEC-01, SPEC-02, SPEC-03, CVG-01, CVG-02
+**Success Criteria** (what must be TRUE):
+  1. Every planned new facet/metadata block is mapped to the spec's own mechanisms — file-level metadata as JSON in the `metadata` data-kind KV, new members via the documented "Adding a new Data Kind / Entity Type" process, CV concepts via column-name inflection + `parameters` — recorded as the binding design contract (no ad-hoc structures).
+  2. The imaging + SDRF/sample/channel/ROI extensions are written up and **submitted as proposals/PRs to `HUPO-PSI/mzPeak-specification`** (URLs recorded); the committee's open questions (SDRF §5.7; ROI polygons) are tracked.
+  3. The v0.6 `cv_list` block is reconciled with the rewritten spec's CV-declaration mechanism (the spec defines no `cv_list`) — confirmed, aligned, or proposed, with the decision recorded.
+  4. Canonical IMS CV URIs are declared once in `src/schema/cv.rs` (the `TODO(F9)` placeholders are gone), forward emit and reverse `<cvList>` read the same constants and are proven not to drift, and the vendored `imagingMS.obo` is refreshed before any new accession is referenced.
+  5. CV decode is keyed by CURIE (not column name), closing the documented B1/B2/B3/C1/C3/D11 drift classes; the TMTpro 16/18-plex CV gap is documented and a term request is filed.
 **Plans**: TBD
 **UI hint**: yes
 
-### Phase 24: Forward declared-geometry threading (GEO-F)
+### Phase 25: Forward declared-geometry threading (GEO-F)
 **Goal**: The forward path threads imzML `<scanSettings>` *declared* geometry beyond parsed coordinates, so a source that declares its grid is honored as authoritative.
-**Depends on**: Phase 23 (CV governance settled; reuses the existing reverse geometry parser). Parallel-able with Phase 25.
+**Depends on**: Phase 24 (CV/spec alignment settled; reuses the existing reverse geometry parser). Parallel-able with Phase 26.
 **Requirements**: GEOF-01
 **Success Criteria** (what must be TRUE):
   1. When the source `<scanSettings>` declares grid counts, the forward path emits `pixel_count_source: "declared"` (not the parsed-coordinate fallback).
   2. Declared `absolute_offset_um` is populated where the source declares it.
-  3. Forward↔reverse geometry symmetry is preserved (existing reverse parser round-trips the declared values).
+  3. Forward↔reverse geometry symmetry is preserved (the existing reverse parser round-trips the declared values with a `src/verify/` assertion).
 **Plans**: TBD
 
-### Phase 25: Reverse `<sourceFileList>` copy (RSRC)
+### Phase 26: Reverse `<sourceFileList>` copy (RSRC)
 **Goal**: The reverse path copies `file_description.source_files[]` back into the emitted `.imzML` `<sourceFileList>`, restoring original vendor-RAW provenance on the round-trip.
-**Depends on**: Phase 23 (CV governance). Parallel-able with Phase 24.
+**Depends on**: Phase 24 (CV/spec alignment). Parallel-able with Phase 25.
 **Requirements**: RSRC-01
 **Success Criteria** (what must be TRUE):
   1. A reverse-emitted `.imzML` carries a `<sourceFileList>` reconstructed from the archive's `file_description.source_files[]`.
   2. The original source-file provenance (id, name, params) survives a forward→reverse round-trip with a `src/verify/` assertion.
 **Plans**: TBD
 
-### Phase 26: SDRF sample model — embed + sample_list + channel_list + assay_ref
+### Phase 27: SDRF sample model — embed + sample_list + channel_list + assay_ref
 **Goal**: mzPeak carries SDRF-compliant sample metadata and isobaric (TMT/iTRAQ) channel assignment, ingested from a user-specified sibling SDRF. The verbatim embed is the lossless anchor; the structured blocks are projections.
-**Depends on**: Phase 23 (channel-label CURIEs from the constants module). The model precedes reporter-quant + ROI (Phase 27).
+**Depends on**: Phase 24 (channel-label CURIEs + spec-aligned member mechanism). The model precedes reporter-quant + ROI (Phase 29). Adds the only new dependency this milestone: `csv` (SDRF TSV).
 **Requirements**: SDRF-01, SDRF-02, SDRF-03, SDRF-04, SDRF-05
 **Success Criteria** (what must be TRUE):
   1. A new `--sdrf <PATH>` flag ingests a sibling SDRF during conversion (explicitly NOT auto-discovered).
@@ -134,20 +155,32 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
   5. Round-trip validates with `sdrf-pipelines` on a label-free fixture (MTBLS1129) and a TMT 10-plex fixture (PXD011799).
 **Plans**: TBD
 
-### Phase 27: Reporter-ion quant + MSI ROI→sample
-**Goal**: Realize the payoff of the channel model — per-MS2 reporter-ion quantitation — and connect the SDRF sample model to the spatial domain via a region→sample table with per-pixel references.
-**Depends on**: Phase 26 (channel_list + assay_ref). ROI's per-pixel key is completed by the Phase 29 pixel facet; this phase delivers the region table + `roi_ref` reconciled to `scan_settings_list` geometry.
+### Phase 28: Imaging extensions — pixel facet, continuous shared-axis, image entity (F6/F7/F8)
+**Goal**: Land the deferred imaging-spec extensions additively: a `pixel` facet supporting multi-spectrum-per-pixel (the structural keystone that gives ROI its stable per-pixel key), continuous-mode shared m/z axis storage + reverse emit, and a full `image` entity / `images.parquet` blob alongside (not replacing) the v0.5 separate-TIFF members. **Sequenced before the ROI phase so PIX-01's pixel primary key exists when ROI-01 references it.**
+**Depends on**: Phase 24 (pixel/image/shared-axis CURIEs + spec-aligned mechanism; also governs the canonical `scan_index`/`spectrum_reference` USI). Largest/most speculative cluster — committee-open questions (F6 scan-PK gap, F7 buffer placement, F8 blob design) resolved or explicitly deferred at planning time.
+**Requirements**: PIX-01, CONT-01, IMG-01
+**Success Criteria** (what must be TRUE):
+  1. A `pixel` facet (`pixel_id` Int64 grouping column + the scan compound-key it forces — emitting canonical `scan.scan_index` + `scan.spectrum_reference`, ex-999.10) supports multi-spectrum-per-pixel with a stable pixel primary key, preserving the 1:1 promoted-scan-column back-compat.
+  2. Continuous-mode datasets store a shared m/z axis once and re-emit it on the reverse imzML path; both continuous and processed modes are tested.
+  3. A full `image` entity / `images.parquet` LargeBinary blob is added additively — the existing separate-TIFF optical members and their round-trip remain untouched (corpus parity gate).
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 29: Reporter-ion quant + ROI polygons
+**Goal**: Realize the payoff of the channel model — per-MS2 reporter-ion quantitation — and connect the SDRF sample model to the spatial domain via a **spatial-annotation polygon** ROI model (per PSI spring-2026 feedback + minutes §imaging) with a region→sample mapping and per-pixel/per-spectrum references.
+**Depends on**: Phase 27 (channel_list + assay_ref) for reporter-quant; Phase 28 (PIX-01 pixel primary key) for the per-pixel `roi_ref`. ROI is the SDRF × imaging intersection — both upstreams now precede it.
 **Requirements**: CHAN-01, CHAN-02, CHAN-03, ROI-01
 **Success Criteria** (what must be TRUE):
   1. A file-level `channel_list` (channel → sample(s) + reporter m/z + role + `sdrf_row_ref`) is emitted and read back intact.
   2. `ms_run.channel_set` / `plex_id` bind each run to its channel set.
   3. Reporter-ion quantitation is stored as an `auxiliary` array keyed by `channel_id`, with `channel_id` proven to survive read-back.
-  4. An MSI region table (`region → sample`) plus a per-pixel `roi_ref` column maps spatial regions to samples, reconciled with the authoritative geometry facet.
+  4. An MSI region of interest is modeled as a **spatial-annotation polygon** with a `region → sample` mapping and a per-pixel/per-spectrum `roi_ref` (keyed on the Phase-28 pixel primary key), reconciled with the authoritative `scan_settings_list` geometry and supporting spatial-query / feature-extraction bounding boxes.
 **Plans**: TBD
+**UI hint**: yes
 
-### Phase 28: L2 conformance verify path (F10)
+### Phase 30: L2 conformance verify path (F10)
 **Goal**: Wire an L2 conformance verify path (value-equal under a recorded transform) into the CLI on top of the existing `ToleranceContract::L2`, recording the transform.
-**Depends on**: Phase 23 (transform-record CURIEs). Independent of the SDRF and imaging clusters; small and self-contained.
+**Depends on**: Phase 24 (transform-record CURIEs). Independent of the SDRF and imaging clusters; small and self-contained.
 **Requirements**: L2-01
 **Success Criteria** (what must be TRUE):
   1. A `--conformance l2` CLI flag selects the L2 verify arm in `compare.rs`.
@@ -155,21 +188,9 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
   3. L2 value-equal-under-transform passes the acceptance comparator where L1 strict equality would not.
 **Plans**: TBD
 
-### Phase 29: Imaging extensions — pixel facet, continuous shared-axis, image entity (F6/F7/F8)
-**Goal**: Land the deferred imaging-spec extensions additively: a `pixel` facet supporting multi-spectrum-per-pixel, continuous-mode shared m/z axis storage + reverse emit, and a full `image` entity / `images.parquet` blob alongside (not replacing) the v0.5 separate-TIFF members.
-**Depends on**: Phase 23 (pixel/image/shared-axis CURIEs). F6 also completes the per-pixel key the Phase 27 ROI model references. Largest/most speculative cluster — committee-open questions resolved or explicitly deferred at planning time.
-**Requirements**: PIX-01, CONT-01, IMG-01
-**Success Criteria** (what must be TRUE):
-  1. A `pixel` facet (`pixel_id` Int64 grouping column on `scan`) supports multi-spectrum-per-pixel with a stable pixel primary key, preserving the 1:1 promoted-scan-column back-compat.
-  2. Continuous-mode datasets store a shared m/z axis once and re-emit it on the reverse imzML path; both continuous and processed modes are tested.
-  3. A full `image` entity / `images.parquet` LargeBinary blob is added additively — the existing separate-TIFF optical members and their round-trip remain untouched (corpus parity gate).
-  4. **(ex-999.10) Canonical `scan.scan_index`** (uint64, 0-based, +1/entry) is emitted as the per-scan key — completing B4 and underpinning the `pixel` facet's compound key — **and `scan.spectrum_reference`** (string; USI for external) is emitted; both round-trip on the reverse path. Per `docs/mzpeak-spec-conformance-issues.md` → "Canonical spec re-validation (2026-06-08)" / NEW-1.
-**Plans**: TBD
-**UI hint**: yes
-
-### Phase 30: De-vendor — drop both vendored forks (999.1)
-**Goal**: Fully de-vendor — remove both `[patch]` blocks and the `vendor/` trees, depending on upstream directly with zero fork divergence. Sequenced LAST so the gate exercises the worst case (every new `Other`-typed ZIP member exists).
-**Depends on**: Phases 22–29 (all `Other`-typed members in existence) + upstream merges. Non-negotiable gate per Pitfall 1.
+### Phase 31: De-vendor — drop both vendored forks (999.1)
+**Goal**: Fully de-vendor — remove both `[patch]` blocks and the `vendor/` trees, depending on upstream directly with zero fork divergence. Sequenced LAST so the gate exercises the worst case (every new `Other`-typed ZIP member — embedded TIFF + embedded SDRF + images.parquet — exists).
+**Depends on**: Phases 22–30 (all `Other`-typed members in existence) + upstream merges. Non-negotiable gate per Pitfall 1.
 **Requirements**: DVN-01, DVN-02
 **Success Criteria** (what must be TRUE):
   1. PR #20 (FileEntry serde) is MERGED (`gh pr view 20 --repo HUPO-PSI/mzPeak` == MERGED) and a full `Other`-member round-trip (embedded TIFF + embedded SDRF) passes against the un-forked build before `vendor/mzpeak_prototyping` + its `[patch]` redirect are dropped.
@@ -181,19 +202,20 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 22. Upstream PR preparation | 0/? | Not started | - |
-| 23. CV governance / IMS URI minting | 0/? | Not started | - |
-| 24. Forward declared-geometry threading | 0/? | Not started | - |
-| 25. Reverse `<sourceFileList>` copy | 0/? | Not started | - |
-| 26. SDRF sample model | 0/? | Not started | - |
-| 27. Reporter-quant + MSI ROI→sample | 0/? | Not started | - |
-| 28. L2 conformance verify path | 0/? | Not started | - |
-| 29. Imaging extensions (F6/F7/F8) | 0/? | Not started | - |
-| 30. De-vendor both forks | 0/? | Not started | - |
+| 22. Upstream PR prep | 0/? | Not started | - |
+| 23. Upstream rebase + re-verify | 0/? | Not started | - |
+| 24. Spec alignment & CV governance | 0/? | Not started | - |
+| 25. Forward declared-geometry threading | 0/? | Not started | - |
+| 26. Reverse `<sourceFileList>` copy | 0/? | Not started | - |
+| 27. SDRF sample model | 0/? | Not started | - |
+| 28. Imaging extensions (F6/F7/F8) | 0/? | Not started | - |
+| 29. Reporter-quant + ROI polygons | 0/? | Not started | - |
+| 30. L2 conformance verify path | 0/? | Not started | - |
+| 31. De-vendor both forks | 0/? | Not started | - |
 
 ## Backlog — Realized in v0.7
 
-> The 999.x backlog below is **fully realized as v0.7 phases 22–30** (history preserved, not deleted).
+> The 999.x backlog below is **fully realized as v0.7 phases 22–31** (history preserved, not deleted).
 > Pointers map each open backlog item to its v0.7 phase. The DONE items (999.2/3/4) are kept as
 > shipped history. The collapsed sections retain the original analysis for provenance.
 
@@ -201,21 +223,22 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 
 | Backlog item | Realized as | Requirement(s) |
 |--------------|-------------|----------------|
-| 999.1 — de-vendor both forks | **Phase 30** | DVN-01, DVN-02 |
-| 999.5 — SDRF + isobaric channel modeling | **Phases 26 + 27** | SDRF-01..05, CHAN-01..03, ROI-01 |
+| 999.1 — de-vendor both forks | **Phase 31** | DVN-01, DVN-02 |
+| (upstream rebase before new facets — spec-review 2026-06-08) | **Phase 23** | REB-01 |
+| 999.5 — SDRF + isobaric channel modeling | **Phases 27 + 29** | SDRF-01..05, CHAN-01..03, ROI-01 |
 | 999.6 — chunk_series index-desync PR | **Phase 22** | UPS-01 |
 | 999.7 — mzdata IM/SONAR accession PR | **Phase 22** | UPS-02 |
 | 999.8 — mzPeakValidator non-Parquet-skip PR | **Phase 22** | UPS-03 |
-| 999.9 — array_buffer empty-spectrum issue | **Phase 22** | UPS-04 |
-| (F9 CV governance — from `## Next`) | **Phase 23** | CVG-01, CVG-02 |
-| (GEO-F / RSRC — from `## Next`) | **Phases 24 + 25** | GEOF-01, RSRC-01 |
-| (F6/F7/F8 imaging — from `## Next`) | **Phase 29** | PIX-01, CONT-01, IMG-01 |
-| 999.10 — canonical `scan_index`/`spectrum_reference` | **Phase 29** | SCAN-01 |
-| (F10 L2 conformance — from `## Next`) | **Phase 28** | L2-01 |
+| 999.9 — array_buffer empty-spectrum (re-validate, then file if still broken) | **Phase 22** | UPS-04 |
+| (new-spec alignment + F9 CV governance — spec-review 2026-06-08) | **Phase 24** | SPEC-01/02/03, CVG-01, CVG-02 |
+| (GEO-F / RSRC — from `## Next`) | **Phases 25 + 26** | GEOF-01, RSRC-01 |
+| 999.10 — canonical `scan.scan_index` + `scan.spectrum_reference` | **Phase 28** (scan compound-key folded into PIX-01) | PIX-01 |
+| (F6/F7/F8 imaging — from `## Next`) | **Phase 28** | PIX-01, CONT-01, IMG-01 |
+| (F10 L2 conformance — from `## Next`) | **Phase 30** | L2-01 |
 
 The 999.2/999.3/999.4 items below are already DONE (kept as shipped history); their content is unchanged.
 
-### Phase 999.1: Drop the vendored mzpeak_prototyping patches once their upstream PRs merge — → rolled into **Phase 30 (v0.7)**
+### Phase 999.1: Drop the vendored mzpeak_prototyping patches once their upstream PRs merge — → rolled into **Phase 31 (v0.7)**
 
 **Goal:** Fully de-vendor — delete `vendor/mzpeak_prototyping` + the
 `[patch."https://github.com/HUPO-PSI/mzPeak"]` redirect and depend on upstream `HUPO-PSI/mzPeak`
@@ -229,23 +252,8 @@ each patch when its PR merges, and remove the fork entirely once both land.
 > (2) `mzpeak_prototyping` chunk_series index-desync (**999.6**, PR not yet submitted);
 > (3) `mzdata` IM/SONAR array accessions (**999.7**, PR not yet submitted). De-vendor mzdata when its
 > patch merges AND mzdata 0.64.1 is published to crates.io. Submission of #2/#3 + the upstream issue
-> for the unfixed writer bug are tracked as **999.6 / 999.7 / 999.9** → now **Phase 22 (UPS)**.
-
-> **UPSTREAM HEAD CHECK (verified 2026-06-08):**
-> - **mzdata patch (3) is now UPSTREAM** — the MS:1002893/1003157/1003158 accessions are present in
->   mzdata `main` **and the released git tag `v0.64.1` (ae4a4c2d)**. → our local mzdata patch is
->   **redundant**: reset `vendor/mzdata` to the clean `v0.64.1` snapshot (patch retired), and **UPS-02
->   becomes confirm-and-close**, not submit. Full mzdata un-vendor still gated on a **crates.io** 0.64.1
->   release — **not yet published** (max on crates.io is 0.64.0), so the snapshot stays for now.
-> - **chunk_series patch (2) is NOT upstream** — upstream HEAD `chunk_series.rs` lacks the
->   `arrow_arrays.len()` index fix → **keep**; UPS-01 still pending.
-> - **serde patch (1) / PR #20 is STILL OPEN** → de-vendor (Phase 30) gate unchanged.
-> - **mzpeak_prototyping `main` is +5 commits ahead of our pin `8435967`**, incl. a **major writer
->   rework** (`writer/base.rs +342/-129`, `array_buffer.rs` 1307→1324, `split.rs`, `visitor.rs`,
->   `file_index.rs +47`) and **removal of `doc/index.md`/notes** (spec moved to the spec repo). When the
->   rev is next bumped, expect a **non-trivial rebase of both mzpeak patches + full writer re-test**;
->   also re-verify the empty-first-spectrum panic (UPS-04) still reproduces on the reworked base, and
->   whether the rework already emits `scan_index`/`spectrum_reference` (would assist Phase 29).
+> for the unfixed writer bug are tracked as **999.6 / 999.7 / 999.9** → now **Phase 22 (UPS)**. The
+> rebase onto current upstream HEAD before any new facet is **Phase 23 (REB-01)**.
 
 **VENDORED PATCH #B — chunk_series intensity/mz index desync (2026-06-07, commit-TBD).**
 `ArrowArrayChunk::from_arrays` indexed the filtered `arrow_arrays` with the source-map enumerate
@@ -422,15 +430,15 @@ credentials — plus `*.log`, `*.DS_Store`, `data/cors.json`, and `thermo-orbitr
 
 </details>
 
-### Phase 999.5: SDRF sample-metadata + TMT/isobaric channel modeling in mzPeak — → rolled into **Phases 26 + 27 (v0.7)**
+### Phase 999.5: SDRF sample-metadata + TMT/isobaric channel modeling in mzPeak — → rolled into **Phases 27 + 29 (v0.7)**
 
 **Goal:** Make mzPeak carry SDRF-compliant sample metadata and **isobaric (TMT/iTRAQ) channel
 assignment**, ingested from an existing SDRF during conversion (mzML or vendor → mzPeak). Design is
 worked out in [`docs/sdrf-mzpeak-integration.md`](../docs/sdrf-mzpeak-integration.md) — a discussion
 draft that is **RAG-verified against the `knowledge/` vault and CODEX-reviewed to convergence**
 (3 rounds → "NO BLOCKING ISSUES"). **Realized:** verbatim embed + `sample_list`/`channel_list` +
-`assay_ref` + run binding land in **Phase 26 (SDRF-01..05, CHAN-01/02)**; reporter-ion quant + MSI
-ROI→sample land in **Phase 27 (CHAN-03, ROI-01)**.
+`assay_ref` + run binding land in **Phase 27 (SDRF-01..05, CHAN-01/02)**; reporter-ion quant + MSI
+ROI→sample land in **Phase 29 (CHAN-03, ROI-01 — now a spatial-annotation polygon model)**.
 
 **Why:** mzPeak currently has only a flat `sample_list` (id/name/parameters), **no run→sample ref,
 and no label/channel/reporter/role construct** — so TMT channel→sample assignment (which SDRF models
@@ -442,7 +450,8 @@ This is mzPeak §5.7 (SDRF integration = open question).
 - New **`channel_list`** (file-level footer JSON): isobaric channel → sample(s) + reporter m/z + role
   + `sdrf_row_ref`; `ms_run.channel_set` + `plex_id` bind the run; reporter quant via an
   `auxiliary_array` whose columns carry `channel_id`.
-- Per-spectrum `assay_ref`; MSI ROI table (`region → sample` + per-pixel `roi_ref`).
+- Per-spectrum `assay_ref`; MSI ROI table (`region → sample` + per-pixel `roi_ref`), now modeled as a
+  **spatial-annotation polygon** per PSI spring-2026 feedback.
 - Embed the file's SDRF rows **verbatim** as the lossless source (a typed `sample-metadata`/`sdrf`
   member) + dataset back-ref; the structured fields are query projections.
 
@@ -453,7 +462,7 @@ gaps; MSI ROI→sample is a real SDRF extension (no spatial/pixel vocabulary); p
 ---
 
 > **Upstream-fix backlog (999.6–999.9).** Each is a fix found while building/testing mzML2mzPeak that
-> belongs upstream. Three are carried as **local vendored patches** (drop when merged — feeds Phase 30);
+> belongs upstream. Three are carried as **local vendored patches** (drop when merged — feeds Phase 31);
 > one is an unfixed upstream bug (no safe downstream workaround). Drafts live in `/tmp/mzpeak-prs/`.
 > **All four are realized as Phase 22 (UPS-01..04).**
 
@@ -466,7 +475,7 @@ or get a wrong column when an array spills to auxiliary). Took the pwiz sweep 12
 **State:** Branch `fix/chunk-series-intensity-index-desync` **already pushed to `okohlbacher/mzPeak`**;
 PR body drafted (`/tmp/mzpeak-prs/`), **not yet submitted** (owner writes the final text). Currently a
 vendored patch in `vendor/mzpeak_prototyping/src/chunk_series.rs` (commit `56b9192`).
-**On merge:** remove the vendored edit (feeds Phase 30).
+**On merge:** remove the vendored edit (feeds Phase 31).
 
 ### Phase 999.7: Submit the mzdata IM/SONAR binary-array-accession PR to mobiusklein/mzdata — → rolled into **Phase 22 (UPS-02)**
 
@@ -478,7 +487,7 @@ Waters SONAR / IM data. Lifted the pwiz sweep 136→138/139.
 **State:** PR body + patch drafted (`/tmp/mzpeak-prs/mzdata-PR-body-DRAFT.md`,
 `mzdata-ion-mobility-array-accessions.patch`), **not submitted**. Carried as a local patch in the
 **re-vendored** `vendor/mzdata` (0.64.1 snapshot, commit `1990999`). **On merge:** drop the patch;
-drop the whole `[patch.crates-io] mzdata` once 0.64.1 is published to crates.io (feeds Phase 30).
+drop the whole `[patch.crates-io] mzdata` once 0.64.1 is published to crates.io (feeds Phase 31).
 
 ### Phase 999.8: Submit the mzPeakValidator `index_files_present` non-Parquet-skip PR — → rolled into **Phase 22 (UPS-03)**
 
@@ -491,18 +500,21 @@ drop the whole `[patch.crates-io] mzdata` once 0.64.1 is published to crates.io 
 `/tmp/mzpeak-prs/0001-fix-index_files_present-*.patch`, **not submitted**. Validator repo is separate
 (not vendored here). **No converter change needed.**
 
-### Phase 999.9: File the `array_buffer.rs:104` empty-first-spectrum type-mismatch issue (HUPO-PSI/mzPeak) — → rolled into **Phase 22 (UPS-04)**
+### Phase 999.9: Re-validate + (only if still broken) file the `array_buffer` empty-first-spectrum type-mismatch issue (HUPO-PSI/mzPeak) — → rolled into **Phase 22 (UPS-04)**
 
-**Goal:** File the characterized issue: the writer's `empty_main_axis` path registers scalar columns
-while non-empty spectra register chunked `LargeList(Float32)` under the same names, so a file whose
-first spectrum is empty panics (`expected Float32 but found LargeList(Float32)`). The lone failure in
-the pwiz sweep (138/139): `Agilent/…/ImsSynthAllIons-ignoreZeros-combineIMS-mzMobilityFilter.mzML`.
+**Goal:** **Re-validate against current upstream first** — `array_buffer.rs` was heavily rewritten in
+the "vast torrents" commit, so the bug may already be fixed. If it still reproduces, file the
+characterized issue: the writer's `empty_main_axis` path registers scalar columns while non-empty
+spectra register chunked `LargeList(Float32)` under the same names, so a file whose first spectrum is
+empty panics (`expected Float32 but found LargeList(Float32)`). The lone failure in the pwiz sweep
+(138/139): `Agilent/…/ImsSynthAllIons-ignoreZeros-combineIMS-mzMobilityFilter.mzML`.
 
-**State:** **Unfixed** — issue draft only (`/tmp/mzpeak-prs/mzpeak-issue-array_buffer-DRAFT.md`); proven
-upstream-only (skipping the empty spectrum is lossy; non-chunked has its own empty-array edge). NOT a
-vendored patch. **Action:** file the issue; track upstream fix.
+**State:** **Re-validation pending** (UPS-04 changed 2026-06-08 — file only if still broken). Issue
+draft only (`/tmp/mzpeak-prs/mzpeak-issue-array_buffer-DRAFT.md`); previously proven upstream-only
+(skipping the empty spectrum is lossy; non-chunked has its own empty-array edge). NOT a vendored patch.
+**Action:** re-validate on current HEAD; file the issue or record the close-as-fixed determination.
 
-### Phase 999.10: Emit canonical-spec `scan.scan_index` + `scan.spectrum_reference` — → rolled into **Phase 29 (v0.7)** (SCAN-01)
+### Phase 999.10: Emit canonical-spec `scan.scan_index` + `scan.spectrum_reference` — → folded into **Phase 28 (v0.7, PIX-01 scan compound-key)**
 
 **Goal:** Conform to the canonical spec ([`HUPO-PSI/mzPeak-specification`](https://github.com/HUPO-PSI/mzPeak-specification),
 v0.9, ingested 2026-06-08), which **added two `scan` fields** the converter does not yet emit:
@@ -513,14 +525,10 @@ v0.9, ingested 2026-06-08), which **added two `scan` fields** the converter does
 - **`spectrum_reference`** (string; external refs *SHOULD* be a [USI](https://www.psidev.info/usi);
   `USI000000` + a `source_files` id when unpublished).
 
-**Backlog comparison / overlap:** the **scan compound-key** part is already in scope for **F6**
-(`pixel facet + … + scan compound-key`, `NEXT-ROADMAP-DRAFT.md §B`) — fold `scan_index` into F6 when
-v0.7 plans it. `spectrum_reference` (USI) is **not** covered by any existing item → genuinely new.
-Severity **Major** (a spec-faithful reader may key scans by `scan_index`). No code/schema change to the
-schemas themselves (byte-identical to canonical); this is a writer-emission + reverse-read gap.
+**Realized:** the **scan compound-key** part is delivered by **Phase 28 (PIX-01)** — `pixel_id` +
+the scan compound-key it forces (`scan_index`). `spectrum_reference` (USI) is addressed there too as
+part of the spec-aligned scan facet (Phase 24 governs the CURIE/USI mechanism; Phase 28 emits it).
+Severity **Major** (a spec-faithful reader may key scans by `scan_index`).
 
-**Requirements:** TBD
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (promote with `/gsd:review-backlog` when ready; or fold `scan_index` into F6 and keep `spectrum_reference` standalone)
+**Requirements:** PIX-01 (scan compound-key + scan_index/spectrum_reference)
+**Plans:** folded into Phase 28
