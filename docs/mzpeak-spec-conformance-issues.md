@@ -4,6 +4,7 @@
 **Source reviewed:** `HUPO-PSI/mzPeak` @ commit `d1aaaf84` (2026-06-02, "fix: fix source of NaN").
 **Spec status:** explicitly an unstable work-in-progress; no version tag. Authoritative writeup: [`doc/index.md`](https://github.com/HUPO-PSI/mzPeak/blob/main/doc/index.md); schemas: [`schema/`](https://github.com/HUPO-PSI/mzPeak/tree/main/schema).
 **Date:** 2026-06-03
+**Re-validated against the canonical spec 2026-06-08:** the spec now lives in its own repo **[`HUPO-PSI/mzPeak-specification`](https://github.com/HUPO-PSI/mzPeak-specification)** (nominal v0.9). Its 10 JSON Schemas are **byte-identical** to those reviewed here (so all schema-side findings stand), and the prose `index.md` differs by only ~11 lines. **Spec-side changes since this review:** **B1 RESOLVED** and **B4 addressed** (see [Canonical spec re-validation](#canonical-spec-re-validation-2026-06-08)). Line numbers below are vs the original `d1aaaf84` prose and have shifted slightly in the canonical text; the code-side findings (Groups A/C/D and B2–B11) were **not** re-verified against current code and are presumed to still hold.
 
 ---
 
@@ -16,7 +17,7 @@ The reference **Rust writer ↔ Rust reader round-trips correctly** because both
 3. **The alternate readers (Python, R) lag the writer and the spec**, with the gaps concentrated exactly where this project's imaging/IMS extension will live: the Python reader **crashes on any non-MS/UO CURIE (incl. `IMS:*`)**, and both alternate readers decide null-marking reconstruction by hardcoded array *name* rather than the array *transform* CURIE. See **Groups C, D**.
 4. **The shipped examples are clean** but for one schema-enum violation, and the spec's own example block is stale relative to them. See **Group E**.
 
-**Severity tally:** 6 Critical · 15 Major · 18 Minor (+3 informational) = 39 issues.
+**Severity tally:** 6 Critical · 15 Major · 18 Minor (+3 informational) = 39 issues. *(As of 2026-06-08: **B1 resolved** → 5 Critical / 38 open on the spec side; **B4 addressed** by the new `scan_index` field.)*
 
 | Legend | Meaning |
 |---|---|
@@ -26,6 +27,24 @@ The reference **Rust writer ↔ Rust reader round-trips correctly** because both
 | **Confidence** | High = directly observed in code/bytes; Medium = depends on a path not exercised; Low = inferred. |
 
 > **Note on root cause for Group A:** most schema mismatches stem from `Option<T>` fields serialized **without** `#[serde(skip_serializing_if = "Option::is_none")]`, so absent values become explicit `null` rather than being omitted — which collides with `required` + scalar-typed schema fields.
+
+---
+
+## Canonical spec re-validation (2026-06-08)
+
+Diff of canonical `HUPO-PSI/mzPeak-specification@main` vs the `d1aaaf84` prose reviewed here. Schemas: **no change** (byte-identical). Prose: ~11 lines.
+
+**Resolved / addressed:**
+- **B1 — RESOLVED.** The canonical scan **and** selected_ion fields are now **`ion_mobility_value`** (`index.md` ~L1282 and ~L1307), matching the writer. Spec ↔ code now agree; the interop gap is closed.
+- **B4 — ADDRESSED.** The canonical adds **`scan.scan_index`** (uint64, 0-based, *MUST* increment by 1 per entry, uniquely identifies a scan incl. multiple scans per spectrum) — i.e. the "scan primary key" B4 flagged as missing now exists in the spec.
+
+**New normative text (we already comply):**
+- **Sort-on-write is now a MUST:** "if an array with a sorting rank is unsorted, the entry's data arrays **MUST** be re-sorted accordingly." Our converter already sorts m/z ascending on write (commits `1c65250`/`472835a`), so the writer's `sorting_rank: 0` is honest. (This also confirms the rationale for retiring the old PR #23.)
+
+**New spec additions we do NOT yet emit → fresh conformance gap (NEW-1):**
+- **`scan.scan_index`** (see B4) and **`scan.spectrum_reference`** (string; an external reference *SHOULD* be a [USI](https://www.psidev.info/usi); `USI000000` + a `source_files` id when unpublished). The converter currently emits neither. Severity: **Major** (a spec-conformant reader may expect `scan_index` as the scan key). Tracked against the backlog (see roadmap).
+
+`scan_settings_list` is now referenced in the canonical prose (still marked *TODO* there); our v0.6 Phase 18 already implements it as the authoritative geometry facet, so the implementation leads the prose here.
 
 ---
 
@@ -79,7 +98,8 @@ The reference **Rust writer ↔ Rust reader round-trips correctly** because both
 ## Group B — Prose spec ↔ Rust reference divergences
 
 ### B1. Ion-mobility column name: spec `ion_mobility` vs code `ion_mobility_value`
-- **Severity:** Critical · **Confidence:** High
+- **✅ RESOLVED (canonical spec, 2026-06-08):** the spec now names both `scan` and `selected_ion` fields **`ion_mobility_value`**, matching the writer. Retained below for history.
+- **Severity:** ~~Critical~~ resolved · **Confidence:** High
 - **Spec:** `scan.ion_mobility (floatf64)` and `selected_ion.ion_mobility` (`doc/index.md:1277,1302,1381`).
 - **Code:** the writer emits `ion_mobility_value` (Float64) in both builders (`src/writer/visitor.rs:831`, `:1328`).
 - **Impact:** an independent reader following the spec looks for `ion_mobility` and finds nothing — ion-mobility values are missed. The reference reader only works because it agrees with itself.
@@ -225,13 +245,13 @@ Four issues bear directly on this project's imaging extension and should be trea
 - **C1** — Python crashes on `IMS:*` params (spatial coordinates). Read-back validation of imaging files is impossible until `_format_curie` is generalized.
 - **B2 / C5** — `IMS`-prefixed column inflection is under-specified (spec names only MS/UO) and not parsed by the readers.
 - **C3 / D11** — null-marking reconstruction on a non-m/z rank-0 axis (imaging coordinate / IM-major) is name-gated, not transform-gated.
-- **B4** — no scan primary key; the imaging draft's "one scan per pixel" constraint is forced by this base-schema gap, not a free design choice.
+- **B4** — no scan primary key; the imaging draft's "one scan per pixel" constraint is forced by this base-schema gap, not a free design choice. **✅ Addressed (canonical 2026-06-08): the spec now defines `scan.scan_index` as a per-scan key.**
 
 ---
 
 ## Appendix — issue index by severity
 
-**Critical (6):** A1, A2, B1, C1, D1, D2
-**Major (15):** A3, A4, A5, A6, A7, B2, B3, B4, B5, C2, C3, D3, D4, D5, D6
+**Critical (5):** A1, A2, C1, D1, D2  · *(B1 resolved 2026-06-08)*
+**Major (15):** A3, A4, A5, A6, A7, B2, B3, B4 *(addressed 2026-06-08)*, B5, C2, C3, D3, D4, D5, D6 · *(+ NEW-1: `scan_index`/`spectrum_reference` not yet emitted)*
 **Minor (18):** A8, A9, A10, B6, B7, B8, B9, B10, C4, C5, C6, C7, D7, D8, D9, D10, D11, E1
 **Informational (3):** E2, E3, E4
