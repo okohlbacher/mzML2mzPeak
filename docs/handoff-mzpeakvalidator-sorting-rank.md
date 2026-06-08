@@ -7,6 +7,15 @@
 > agree. **Do NOT** make any edits to the converter based on this doc — they are already done.
 > Apply the validator change inside `~/Claude/mzPeakValidator` separately.
 
+> **REVISION (final, sort-on-write).** The converter's resolution was later changed (per HUPO-PSI/mzPeak#23
+> maintainer feedback) from "declare `sorting_rank: null` when unsorted" to **sort the m/z axis ascending
+> on write, unconditionally** (the `--sort-peaks` flag was removed; sorting is the default). So in practice
+> the converter now **always declares `sorting_rank: 0`** and never emits `null`. The validator-side
+> contract below is unchanged and still correct/defensive: **enforce `mz_monotonic_peaks` only when
+> `point.mz` declares a numeric `sorting_rank` (== 0); skip otherwise.** The `null`/Astral examples below
+> are kept for history but no longer occur with the current converter. See the REVISED RESOLUTION block in
+> `docs/issue-centroid-mz-sorting-rank.md`.
+
 ---
 
 ## Why this changed
@@ -45,8 +54,9 @@ Make `mz_monotonic_peaks` **conditional on the declared `sorting_rank`**, per th
 - The Astral file: `point.mz` now declares `sorting_rank: null` → the validator does **not** flag
   `mz_monotonic_peaks`. The file is spec-conformant: unsorted order faithfully preserved AND
   correctly labeled.
-- A file produced with the converter's `--sort-peaks` flag: m/z is ascending and declares
-  `sorting_rank: 0` → the validator **does** enforce (and the file passes).
+- A current-converter file (sort-on-write is always on): m/z is ascending and declares
+  `sorting_rank: 0` → the validator **does** enforce (and the file passes). *(Historically this was
+  the opt-in `--sort-peaks` path; that flag has since been removed and sorting is unconditional.)*
 - A genuinely-mislabeled file (declares `sorting_rank: 0` but contains descents) → the validator
   still FAILs `mz_monotonic_peaks`. That is the correct, narrowed contract.
 

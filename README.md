@@ -148,6 +148,7 @@ mzml2mzpeak run.imzML run.mzpeak --ignore-incorrect-checksum
 - [`docs/compression-benchmark.md`](docs/compression-benchmark.md) — raw → mzML → mzPeak size table (18 datasets).
 - [`docs/imaging-mzpeak-spec-draft.md`](docs/imaging-mzpeak-spec-draft.md) — the imaging (spatial) mzPeak extension.
 - [`docs/mzml-examples.md`](docs/mzml-examples.md) / [`docs/imzml-examples.md`](docs/imzml-examples.md) — the public test corpora and how to fetch them.
+- [`docs/pwiz-examples.md`](docs/pwiz-examples.md) — the ProteoWizard vendor-reader corpus (139 files, 138 convert) used for broad e2e coverage (local-only; not deposited in S3).
 
 ## Acknowledgements
 
