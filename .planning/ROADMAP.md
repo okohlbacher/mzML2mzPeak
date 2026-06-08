@@ -39,7 +39,7 @@
 - [ ] **Phase 26: SDRF sample model — embed + sample_list + channel_list + assay_ref** - Verbatim SDRF embed + projected sample/channel model + run→sample binding.
 - [ ] **Phase 27: Reporter-ion quant + MSI ROI→sample** - Per-MS2 reporter-quant aux array keyed by channel + region→sample table with per-pixel `roi_ref`.
 - [ ] **Phase 28: L2 conformance verify path (F10)** - `--conformance l2` value-equal-under-recorded-transform arm on the existing `ToleranceContract::L2`.
-- [ ] **Phase 29: Imaging extensions — pixel facet, continuous shared-axis, image entity (F6/F7/F8)** - `pixel_id` facet, continuous-mode shared m/z axis, additive `images.parquet` blob.
+- [ ] **Phase 29: Imaging extensions — pixel facet, continuous shared-axis, image entity (F6/F7/F8)** - `pixel_id` facet, continuous-mode shared m/z axis, additive `images.parquet` blob, + canonical `scan.scan_index`/`scan.spectrum_reference` (ex-999.10).
 - [ ] **Phase 30: De-vendor — drop both vendored forks (999.1)** - Remove `[patch]` blocks + `vendor/`; gated on PR #20 merged + un-forked `Other`-member round-trip green. LAST.
 
 <details>
@@ -85,7 +85,7 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 **Requirements**: UPS-01, UPS-02, UPS-03, UPS-04
 **Success Criteria** (what must be TRUE):
   1. The `chunk_series` intensity/mz index-desync fix is an open PR against HUPO-PSI/mzPeak (URL recorded), from the prepared `okohlbacher/mzPeak` branch.
-  2. The mzdata IM/SONAR binary-array-accession fix (MS:1002893/1003157/1003158) is an open PR against mobiusklein/mzdata (URL recorded).
+  2. The mzdata IM/SONAR binary-array-accession fix (MS:1002893/1003157/1003158) **is already upstream** (in mzdata `main` + tag `v0.64.1`, verified 2026-06-08) → UPS-02 = **confirm & close** (no PR to submit); reset `vendor/mzdata` to clean `v0.64.1` (retire the local patch); full un-vendor still gated on crates.io publishing 0.64.1.
   3. The mzPeakValidator `index_files_present` non-Parquet-skip fix is an open PR against the validator repo (URL recorded).
   4. The `array_buffer.rs:104` empty-first-spectrum type-mismatch is a characterized, reproducible issue filed at HUPO-PSI/mzPeak (URL recorded); no local fix attempted.
   5. PR #20 (FileEntry serde — the de-vendor blocker) status is confirmed and recorded as the gate for Phase 30.
@@ -163,6 +163,7 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
   1. A `pixel` facet (`pixel_id` Int64 grouping column on `scan`) supports multi-spectrum-per-pixel with a stable pixel primary key, preserving the 1:1 promoted-scan-column back-compat.
   2. Continuous-mode datasets store a shared m/z axis once and re-emit it on the reverse imzML path; both continuous and processed modes are tested.
   3. A full `image` entity / `images.parquet` LargeBinary blob is added additively — the existing separate-TIFF optical members and their round-trip remain untouched (corpus parity gate).
+  4. **(ex-999.10) Canonical `scan.scan_index`** (uint64, 0-based, +1/entry) is emitted as the per-scan key — completing B4 and underpinning the `pixel` facet's compound key — **and `scan.spectrum_reference`** (string; USI for external) is emitted; both round-trip on the reverse path. Per `docs/mzpeak-spec-conformance-issues.md` → "Canonical spec re-validation (2026-06-08)" / NEW-1.
 **Plans**: TBD
 **UI hint**: yes
 
@@ -209,6 +210,7 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 | (F9 CV governance — from `## Next`) | **Phase 23** | CVG-01, CVG-02 |
 | (GEO-F / RSRC — from `## Next`) | **Phases 24 + 25** | GEOF-01, RSRC-01 |
 | (F6/F7/F8 imaging — from `## Next`) | **Phase 29** | PIX-01, CONT-01, IMG-01 |
+| 999.10 — canonical `scan_index`/`spectrum_reference` | **Phase 29** | SCAN-01 |
 | (F10 L2 conformance — from `## Next`) | **Phase 28** | L2-01 |
 
 The 999.2/999.3/999.4 items below are already DONE (kept as shipped history); their content is unchanged.
@@ -228,6 +230,22 @@ each patch when its PR merges, and remove the fork entirely once both land.
 > (3) `mzdata` IM/SONAR array accessions (**999.7**, PR not yet submitted). De-vendor mzdata when its
 > patch merges AND mzdata 0.64.1 is published to crates.io. Submission of #2/#3 + the upstream issue
 > for the unfixed writer bug are tracked as **999.6 / 999.7 / 999.9** → now **Phase 22 (UPS)**.
+
+> **UPSTREAM HEAD CHECK (verified 2026-06-08):**
+> - **mzdata patch (3) is now UPSTREAM** — the MS:1002893/1003157/1003158 accessions are present in
+>   mzdata `main` **and the released git tag `v0.64.1` (ae4a4c2d)**. → our local mzdata patch is
+>   **redundant**: reset `vendor/mzdata` to the clean `v0.64.1` snapshot (patch retired), and **UPS-02
+>   becomes confirm-and-close**, not submit. Full mzdata un-vendor still gated on a **crates.io** 0.64.1
+>   release — **not yet published** (max on crates.io is 0.64.0), so the snapshot stays for now.
+> - **chunk_series patch (2) is NOT upstream** — upstream HEAD `chunk_series.rs` lacks the
+>   `arrow_arrays.len()` index fix → **keep**; UPS-01 still pending.
+> - **serde patch (1) / PR #20 is STILL OPEN** → de-vendor (Phase 30) gate unchanged.
+> - **mzpeak_prototyping `main` is +5 commits ahead of our pin `8435967`**, incl. a **major writer
+>   rework** (`writer/base.rs +342/-129`, `array_buffer.rs` 1307→1324, `split.rs`, `visitor.rs`,
+>   `file_index.rs +47`) and **removal of `doc/index.md`/notes** (spec moved to the spec repo). When the
+>   rev is next bumped, expect a **non-trivial rebase of both mzpeak patches + full writer re-test**;
+>   also re-verify the empty-first-spectrum panic (UPS-04) still reproduces on the reworked base, and
+>   whether the rework already emits `scan_index`/`spectrum_reference` (would assist Phase 29).
 
 **VENDORED PATCH #B — chunk_series intensity/mz index desync (2026-06-07, commit-TBD).**
 `ArrowArrayChunk::from_arrays` indexed the filtered `arrow_arrays` with the source-map enumerate
@@ -484,7 +502,7 @@ the pwiz sweep (138/139): `Agilent/…/ImsSynthAllIons-ignoreZeros-combineIMS-mz
 upstream-only (skipping the empty spectrum is lossy; non-chunked has its own empty-array edge). NOT a
 vendored patch. **Action:** file the issue; track upstream fix.
 
-### Phase 999.10: Emit canonical-spec `scan.scan_index` + `scan.spectrum_reference` (BACKLOG)
+### Phase 999.10: Emit canonical-spec `scan.scan_index` + `scan.spectrum_reference` — → rolled into **Phase 29 (v0.7)** (SCAN-01)
 
 **Goal:** Conform to the canonical spec ([`HUPO-PSI/mzPeak-specification`](https://github.com/HUPO-PSI/mzPeak-specification),
 v0.9, ingested 2026-06-08), which **added two `scan` fields** the converter does not yet emit:
