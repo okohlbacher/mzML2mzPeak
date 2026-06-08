@@ -69,12 +69,20 @@ file the upstream `mzpeak_prototyping` FileEntry-serde issue and drop the vendor
 
 ## Backlog
 
-### Phase 999.1: Drop the last vendored mzpeak_prototyping patch (#1 serde) once PR #20 merges (BACKLOG)
+### Phase 999.1: Drop the vendored mzpeak_prototyping patches once their upstream PRs merge (BACKLOG)
 
 **Goal:** Fully de-vendor — delete `vendor/mzpeak_prototyping` + the
 `[patch."https://github.com/HUPO-PSI/mzPeak"]` redirect and depend on upstream `HUPO-PSI/mzPeak`
-directly. After the 2026-06-06 migration the fork is down to **ONE** patch (#1 serde symmetry),
-which is **load-bearing** for optical-image read-back, so the fork drops only when PR #20 merges.
+directly. The fork carries **TWO** patches, each load-bearing and each pending an upstream PR; drop
+each patch when its PR merges, and remove the fork entirely once both land.
+
+**VENDORED PATCH #B — chunk_series intensity/mz index desync (2026-06-07, commit-TBD).**
+`ArrowArrayChunk::from_arrays` indexed the filtered `arrow_arrays` with the source-map enumerate
+index → panic (or silent wrong-column) whenever an array is spilled to auxiliary. Bites profile
+ion-mobility spectra (extra per-point array spilled). Fix: index by `arrow_arrays.len()`. Took the
+ProteoWizard pwiz vendor-reader sweep from 123/139 → 136/139. **Upstream PR branch prepared**
+(`fix/chunk-series-intensity-index-desync` on `okohlbacher/mzPeak`, not yet submitted). **REMOVE this
+vendored edit once that PR is approved/merged.**
 
 **STATUS — fork reduced 4 → 1 (2026-06-06 migration, commit `f10d97f`):** base bumped
 `d1aaaf84 → 8435967` (upstream HEAD "fix compatibility with imzML core feature set"), and the
