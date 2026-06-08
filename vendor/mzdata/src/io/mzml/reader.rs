@@ -206,6 +206,27 @@ pub trait SpectrumBuilding<'a, C: CentroidLike, D: DeconvolutedCentroidLike, S: 
                     };
                     *self.current_array_mut().unit_mut() = param.unit();
                 },
+                // === VENDORED PATCH (mzML2mzPeak) — drop once upstreamed (PR draft in
+                // /tmp/mzpeak-prs/mzdata-PR-body-DRAFT.md). Maps PSI-MS binary-array accessions the
+                // stock reader left as ArrayType::Unknown, which then panicked in as_param() on real
+                // SONAR / ion-mobility data. ===
+                1002893 => {
+                    // Generic "ion mobility array" (MS:1002893) — was unmapped, leaving the array
+                    // as ArrayType::Unknown. Map it like the other IM array accessions.
+                    self.current_array_mut().name = ArrayType::IonMobilityArray;
+                    self.current_array_mut().unit = param.unit();
+                }
+                1003157 | 1003158 => {
+                    // SONAR scanning-quadrupole position lower/upper-bound m/z arrays
+                    // (MS:1003157 / MS:1003158). mzdata has no dedicated ArrayType variant for these
+                    // yet, so without this arm they stayed ArrayType::Unknown and later panicked in
+                    // ArrayType::as_param ("Could not determine how to name for array Unknown") on
+                    // Waters SONAR data. Preserve the array + its term name as a non-standard array.
+                    self.current_array_mut().name = ArrayType::NonStandardDataArray {
+                        name: Box::new(param.name().to_string()),
+                    };
+                    *self.current_array_mut().unit_mut() = param.unit();
+                }
                 1002477 => {
                     self.current_array_mut().name = ArrayType::MeanDriftTimeArray;
                     self.current_array_mut().unit = param.unit();

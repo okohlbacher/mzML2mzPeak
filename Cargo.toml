@@ -117,10 +117,15 @@ env_logger = "=0.11.8"
 # CLI (Phase 06-02), never in a library module (mirrors the anyhow binary-only boundary). ---
 indicatif = "=0.17.11"
 
-# --- VENDORED SNAPSHOT (not a fork): mzdata 0.64.1 (master HEAD eb70388) is not yet published on
-# crates.io (max published 0.64.0), so we pin an UNMODIFIED snapshot here. 0.64.x already upstreamed
-# `ChromatogramSource::count_chromatograms` — there are NO local patches; this exists only to track
-# 0.64.1 ahead of its crates.io release. Drop this [patch] once mzdata 0.64.1 is published. ---
+# --- VENDORED PATCH + SNAPSHOT: mzdata 0.64.1 (master HEAD eb70388) is not yet published on
+# crates.io (max published 0.64.0), so we pin a snapshot here (also gives us the upstreamed
+# `ChromatogramSource::count_chromatograms`). It additionally carries ONE local patch in
+# `src/io/mzml/reader.rs`: the mzML reader's `fill_binary_data_array` left several valid PSI-MS
+# binary-array accessions unmapped (MS:1002893 generic ion-mobility; MS:1003157/1003158 SONAR
+# scanning-quadrupole bound-m/z arrays), so the array stayed `ArrayType::Unknown` and later
+# panicked in `ArrayType::as_param` on real Waters SONAR data. The patch maps them (IM array /
+# NonStandardDataArray). PR draft in /tmp/mzpeak-prs/mzdata-PR-body-DRAFT.md; drop the patch once
+# merged upstream, and drop the whole [patch] once 0.64.1 is published to crates.io. ---
 [patch.crates-io]
 mzdata = { path = "vendor/mzdata" }
 
