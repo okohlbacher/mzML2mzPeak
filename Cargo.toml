@@ -42,18 +42,18 @@ parquet = { version = "=57.0.0", features = ["encryption"] }
 zip = "=4.1.0"
 # imzml is the NON-default addition that makes `mzdata::io::imzml` exist; the other
 # features mirror upstream so the unioned single copy is identical to upstream + imzml.
-# 0.64.1: the latest mzdata (master HEAD eb70388) — NOT yet published on crates.io (max published is
+# 0.64.2: the latest mzdata (main HEAD f9abc00) — NOT yet published on crates.io (max published is
 # 0.64.0), so it is VENDORED as an unmodified pinned snapshot via [patch.crates-io] below. Satisfies
-# upstream mzpeak_prototyping@8435967's `mzdata = 0.64.0` (^0.64) requirement; both unify to one copy.
-# 0.64.x upstreamed `ChromatogramSource::count_chromatograms`, so this vendored copy is UNPATCHED
-# (a clean snapshot, not a fork) — drop the vendoring once 0.64.1 is published to crates.io.
-mzdata = { version = "=0.64.1", features = ["imzml", "serde", "bruker_tdf", "nalgebra", "zstd", "numpress"] }
+# upstream mzpeak_prototyping@a5c222c's `mzdata = 0.64.1` (^0.64) requirement; both unify to one copy.
+# Clean snapshot, no patches (our former SONAR/ion-mobility patch is upstreamed in main — see the
+# [patch.crates-io] note below). Drop the vendoring once 0.64.2 is published to crates.io.
+mzdata = { version = "=0.64.2", features = ["imzml", "serde", "bruker_tdf", "nalgebra", "zstd", "numpress"] }
 mzpeaks = "=1.0.9"
 
 # --- Write path: git-only reference implementation, pinned to a CONCRETE commit rev.
 # default-features = false drops the async/object_store/opendal/tokio stack
 # (STACK.md local-file-only v1 variant). ---
-mzpeak_prototyping = { git = "https://github.com/HUPO-PSI/mzPeak", rev = "8435967", default-features = false }
+mzpeak_prototyping = { git = "https://github.com/HUPO-PSI/mzPeak", rev = "a5c222c", default-features = false }
 
 # --- Integrity digest crates (Plan 02-02, IN-07): canonical RustCrypto LEAF crates,
 # pure-Rust with NO shared transitive types with arrow/mzdata, so they cannot fracture
@@ -117,27 +117,25 @@ env_logger = "=0.11.8"
 # CLI (Phase 06-02), never in a library module (mirrors the anyhow binary-only boundary). ---
 indicatif = "=0.17.11"
 
-# --- VENDORED PATCH + SNAPSHOT: mzdata 0.64.1 (master HEAD eb70388) is not yet published on
-# crates.io (max published 0.64.0), so we pin a snapshot here (also gives us the upstreamed
-# `ChromatogramSource::count_chromatograms`). It additionally carries ONE local patch in
-# `src/io/mzml/reader.rs`: the mzML reader's `fill_binary_data_array` left several valid PSI-MS
-# binary-array accessions unmapped (MS:1002893 generic ion-mobility; MS:1003157/1003158 SONAR
-# scanning-quadrupole bound-m/z arrays), so the array stayed `ArrayType::Unknown` and later
-# panicked in `ArrayType::as_param` on real Waters SONAR data. The patch maps them (IM array /
-# NonStandardDataArray). PR draft in /tmp/mzpeak-prs/mzdata-PR-body-DRAFT.md; drop the patch once
-# merged upstream, and drop the whole [patch] once 0.64.1 is published to crates.io. ---
+# --- VENDORED SNAPSHOT (CLEAN — no local patches): mzdata 0.64.2 (main HEAD f9abc00) is not yet
+# published on crates.io (max published 0.64.0), so we pin a snapshot here. As of mzdata main our
+# former B1 patch is FULLY UPSTREAMED: the SONAR scanning-quadrupole arrays MS:1003157/1003158 now
+# have dedicated `ArrayType::ScanningQuadrupolePosition{Lower,Upper}BoundMZ` variants + reader
+# mappings (better than our old NonStandardDataArray patch), which upstream mzpeak_prototyping HEAD
+# also requires. This snapshot is therefore unmodified. Drop the whole [patch] once mzdata 0.64.2 is
+# published to crates.io (Phase 31 / DVN-02). ---
 [patch.crates-io]
 mzdata = { path = "vendor/mzdata" }
 
-# --- VENDORED PATCH (plan 15-03): the upstream mzpeak_prototyping FileEntry enums
-# `EntityType`/`DataKind` derive `Serialize` but deserialize via `DeserializeFromStr`;
-# the derived `Serialize` emits the `Other(String)` tuple variant as a JSON object
-# (`{"other": "..."}`) that cannot be read back, so any archive containing an `Other`
-# member (e.g. our `images/image_NNNN.tiff`) wrote an `index.json` whose `FileEntry`
-# failed to deserialize — and the reader's `.ok()` silently dropped the ENTIRE
-# FileIndex (losing all `metadata.imaging`). This redirects the git dep to a minimal
-# vendored fork that serializes those enums via `Display` (symmetric with `FromStr`).
-# Same vendoring discipline as the mzdata fork above. Drop once fixed upstream
-# (see deferred-items.md upstream issue draft). ---
+# --- VENDORED FORK (mzpeak_prototyping @ HUPO-PSI/mzPeak HEAD a5c222c): now carries exactly ONE
+# local patch — `src/chunk_series.rs` (the ArrowArrayChunk intensity/mz index-desync; index the
+# filtered `arrow_arrays` by len(), not the source-map enumerate index — else profile ion-mobility
+# spectra panic). PR not yet submitted (Phase 22 / UPS-01); drop this edit + the whole [patch] once
+# merged (Phase 31 / DVN-01).
+#   The other two former patches are GONE — fixed upstream as of a5c222c: (1) the FileEntry
+#   `DataKind`/`EntityType` serde asymmetry is fixed by upstream `#[serde(untagged)]` on the `Other`
+#   variants (round-trip verified by tests/file_index_roundtrip.rs); (2) the `array_buffer.rs`
+#   empty-first-spectrum type mismatch is fixed by the upstream writer rewrite (pwiz corpus now
+#   139/139, was 138/139). ---
 [patch."https://github.com/HUPO-PSI/mzPeak"]
 mzpeak_prototyping = { path = "vendor/mzpeak_prototyping" }

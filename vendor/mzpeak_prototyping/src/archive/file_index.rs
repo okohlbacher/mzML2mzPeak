@@ -1,41 +1,22 @@
-use std::{collections::HashMap, fmt, ops::Deref, str::FromStr};
+use std::{collections::HashMap, ops::Deref, str::FromStr};
 
 use serde::{Deserialize, Serialize};
-use serde_with::{DeserializeFromStr, SerializeDisplay};
-
-// VENDORED PATCH (imzml2mzpeak v0.5): `DataKind`/`EntityType` previously derived
-// `Serialize` while deserializing via `DeserializeFromStr`. The derived `Serialize`
-// emits the `Other(String)` tuple variant as a JSON object (`{"other": "..."}`),
-// which `DeserializeFromStr` (a plain string) cannot read back — so any archive
-// containing an `Other` file member wrote an `index.json` whose `FileEntry` failed
-// to deserialize, and the reader's `.ok()` silently dropped the ENTIRE FileIndex
-// (losing all `metadata`, including `metadata.imaging`). Fix: serialize via
-// `Display` (`SerializeDisplay`) so the wire form is a plain string symmetric with
-// `FromStr`. Unit variants are unchanged (they already serialized to their string).
-// Upstream issue to be filed; drop this fork when fixed upstream.
+use serde_with::DeserializeFromStr;
 
 /// The facet of the thing being described in this file
-#[derive(Debug, SerializeDisplay, DeserializeFromStr, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, DeserializeFromStr, Clone, PartialEq, Eq)]
 pub enum DataKind {
-    // Wire form is driven by Display/FromStr (SerializeDisplay/DeserializeFromStr);
-    // the former #[serde(rename=...)] attrs were inert under those derives and removed.
+    #[serde(rename = "data arrays")]
     DataArray,
+    #[serde(rename = "peaks")]
     Peaks,
+    #[serde(rename = "metadata")]
     Metadata,
+    #[serde(rename = "proprietary")]
     Proprietary,
+    #[serde(rename = "other")]
+    #[serde(untagged)]
     Other(String),
-}
-
-impl fmt::Display for DataKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::DataArray => "data arrays",
-            Self::Peaks => "peaks",
-            Self::Metadata => "metadata",
-            Self::Proprietary => "proprietary",
-            Self::Other(s) => s.as_str(),
-        })
-    }
 }
 
 impl FromStr for DataKind {
@@ -54,25 +35,18 @@ impl FromStr for DataKind {
 }
 
 /// The things being described in one facet or another by this file
-#[derive(Debug, SerializeDisplay, DeserializeFromStr, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, DeserializeFromStr, Clone, PartialEq, Eq)]
 pub enum EntityType {
-    // Wire form driven by Display/FromStr; former #[serde(...)] attrs were inert and removed.
-    // ("mass spectrum" is still accepted on read via FromStr's alias arm.)
+    #[serde(rename = "spectrum")]
+    #[serde(alias = "mass spectrum")]
     Spectrum,
+    #[serde(rename = "chromatogram")]
     Chromatogram,
+    #[serde(rename = "wavelength spectrum")]
     WavelengthSpectrum,
+    #[serde(rename = "other")]
+    #[serde(untagged)]
     Other(String),
-}
-
-impl fmt::Display for EntityType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::Spectrum => "spectrum",
-            Self::Chromatogram => "chromatogram",
-            Self::WavelengthSpectrum => "wavelength spectrum",
-            Self::Other(s) => s.as_str(),
-        })
-    }
 }
 
 impl FromStr for EntityType {
@@ -227,6 +201,18 @@ impl FileIndex {
     pub fn push(&mut self, entry: FileEntry) {
         self.files.push(entry);
     }
+
+    pub fn add_metadata(&mut self, key: &str, value: serde_json::Value) -> Option<serde_json::Value> {
+        self.metadata.insert(key.to_string(), value)
+    }
+
+    pub fn remove_metadata(&mut self, key: &str) -> Option<serde_json::Value> {
+        self.metadata.remove(key)
+    }
+
+    pub fn iter_metadata(&self) -> std::collections::hash_map::Iter<'_, String, serde_json::Value> {
+        self.metadata.iter()
+    }
 }
 
 impl Deref for FileIndex {
@@ -237,11 +223,35 @@ impl Deref for FileIndex {
     }
 }
 
-// WR-02 (imzml2mzpeak v0.5): the Display↔FromStr round-trip for the EMITTED `DataKind`/`EntityType`
-// values is pinned by a regression test in OUR crate (`tests/file_index_roundtrip.rs`), not here —
-// this vendored crate is a `[patch]` dependency (not a workspace member), so its own `#[cfg(test)]`
-// modules are never compiled or run. KNOWN, INTENTIONAL asymmetry (NOT changed): `FromStr`
-// lowercases input, so a mixed-case `Other` payload colliding with a unit-variant name (e.g.
-// `Other("Spectrum")`) re-parses to the unit variant. This codebase never constructs such a value
-// (the only `Other` it writes is `Other("other")` for `images/*.tiff`), so it is latent; the
-// lowercasing is upstream read-time leniency and is left as-is.
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_entity_type_conversion() {
+        let spec = serde_json::to_string(&EntityType::Spectrum).unwrap();
+        let dup: EntityType = serde_json::from_str(&spec).unwrap();
+        assert_eq!(spec, r#""spectrum""#);
+        assert_eq!(dup, EntityType::Spectrum);
+
+        let src = EntityType::Other("foobarbazbang".into());
+        let other = serde_json::to_string(&src).unwrap();
+        let dup: EntityType = serde_json::from_str(&other).unwrap();
+        assert_eq!(other, r#""foobarbazbang""#);
+        assert_eq!(dup, src);
+    }
+
+    #[test]
+    fn test_data_type_conversion() {
+        let spec = serde_json::to_string(&DataKind::DataArray).unwrap();
+        let dup: DataKind = serde_json::from_str(&spec).unwrap();
+        assert_eq!(spec, r#""data arrays""#);
+        assert_eq!(dup, DataKind::DataArray);
+
+        let src = DataKind::Other("foobarbazbang".into());
+        let other = serde_json::to_string(&src).unwrap();
+        let dup: DataKind = serde_json::from_str(&other).unwrap();
+        assert_eq!(other, r#""foobarbazbang""#);
+        assert_eq!(dup, src);
+    }
+}

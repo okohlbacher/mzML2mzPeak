@@ -993,9 +993,10 @@ impl ArrowArrayChunk {
                     continue;
                 }
             }
-            // Index into `arrow_arrays` (the kept/filtered output), not the source map:
-            // schema-skipped arrays are spilled to auxiliary and never pushed here.
             if matches!(buffer_name.array_type, ArrayType::IntensityArray) {
+                // VENDORED PATCH (mzML2mzPeak): index into arrow_arrays (kept/filtered
+                // output), not the source map — schema-skipped arrays spill to auxiliary and are
+                // never pushed here. Mismatched index → panic on profile ion-mobility spectra.
                 intensity_idx = Some(arrow_arrays.len());
             } else if matches!(buffer_name.array_type, ArrayType::MZArray) {
                 mz_idx = Some(arrow_arrays.len());

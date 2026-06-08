@@ -10,17 +10,13 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
-            - uses: wranders/markdown-to-pages-action@v1
-              with:
-                  token: ${{ secrets.GITHUB_TOKEN }}
-                  files: |-
-                      doc/index.md
             - run: |-
-                cp -r ./static ./dist/static/
-                cp -r ./doc/static/ ./dist/static/
+                mkdir -p pagedist/doc/
+                cp doc/index.html pagedist/index.html
+                cp doc/index.html pagedist/doc/index.html
             - uses: actions/upload-pages-artifact@v3
               with:
-                  path: dist
+                  path: pagedist
 
     deploy:
         runs-on: ubuntu-latest

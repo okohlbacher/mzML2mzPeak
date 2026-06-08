@@ -206,27 +206,6 @@ pub trait SpectrumBuilding<'a, C: CentroidLike, D: DeconvolutedCentroidLike, S: 
                     };
                     *self.current_array_mut().unit_mut() = param.unit();
                 },
-                // === VENDORED PATCH (mzML2mzPeak) — drop once upstreamed (PR draft in
-                // /tmp/mzpeak-prs/mzdata-PR-body-DRAFT.md). Maps PSI-MS binary-array accessions the
-                // stock reader left as ArrayType::Unknown, which then panicked in as_param() on real
-                // SONAR / ion-mobility data. ===
-                1002893 => {
-                    // Generic "ion mobility array" (MS:1002893) — was unmapped, leaving the array
-                    // as ArrayType::Unknown. Map it like the other IM array accessions.
-                    self.current_array_mut().name = ArrayType::IonMobilityArray;
-                    self.current_array_mut().unit = param.unit();
-                }
-                1003157 | 1003158 => {
-                    // SONAR scanning-quadrupole position lower/upper-bound m/z arrays
-                    // (MS:1003157 / MS:1003158). mzdata has no dedicated ArrayType variant for these
-                    // yet, so without this arm they stayed ArrayType::Unknown and later panicked in
-                    // ArrayType::as_param ("Could not determine how to name for array Unknown") on
-                    // Waters SONAR data. Preserve the array + its term name as a non-standard array.
-                    self.current_array_mut().name = ArrayType::NonStandardDataArray {
-                        name: Box::new(param.name().to_string()),
-                    };
-                    *self.current_array_mut().unit_mut() = param.unit();
-                }
                 1002477 => {
                     self.current_array_mut().name = ArrayType::MeanDriftTimeArray;
                     self.current_array_mut().unit = param.unit();
@@ -262,6 +241,14 @@ pub trait SpectrumBuilding<'a, C: CentroidLike, D: DeconvolutedCentroidLike, S: 
                 1003155 => {
                     self.current_array_mut().name =
                         ArrayType::DeconvolutedInverseReducedIonMobilityArray;
+                    self.current_array_mut().unit = param.unit();
+                }
+                1003157 => {
+                    self.current_array_mut().name = ArrayType::ScanningQuadrupolePositionLowerBoundMZ;
+                    self.current_array_mut().unit = param.unit();
+                }
+                1003158 => {
+                    self.current_array_mut().name = ArrayType::ScanningQuadrupolePositionUpperBoundMZ;
                     self.current_array_mut().unit = param.unit();
                 }
                 _ => {
@@ -1291,14 +1278,14 @@ impl<
         Self::with_buffer_capacity_and_detail_level(file, BUFFER_SIZE, DetailLevel::Full)
     }
 
-    pub fn with_buffer_capacity_and_detail_level(
-        file: R,
-        capacity: usize,
-        detail_level: DetailLevel,
+    /// Create a new [`MzMLReaderType`] instance from an [`io::BufReader`] instance directly
+    /// and parses the metadata section of the file.
+    pub fn from_buffered_and_detail_level(
+        file: BufReader<R>,
+        detail_level: DetailLevel
     ) -> MzMLReaderType<R, C, D> {
-        let handle = BufReader::with_capacity(capacity, file);
         let mut inst = MzMLReaderType {
-            handle,
+            handle: file,
             state: MzMLParserState::Start,
             error: None,
             buffer: Bytes::new(),
@@ -1325,6 +1312,18 @@ impl<
             Err(_err) => {}
         }
         inst
+    }
+
+    /// Create a new [`MzMLReaderType`] instance, wrapping the [`io::Read`] handle
+    /// provided with an [`io::BufReader`] with the requested buffer size and [`DetailLevel`],
+    /// and parses the metadata section of the file.
+    pub fn with_buffer_capacity_and_detail_level(
+        file: R,
+        capacity: usize,
+        detail_level: DetailLevel,
+    ) -> MzMLReaderType<R, C, D> {
+        let handle = BufReader::with_capacity(capacity, file);
+        Self::from_buffered_and_detail_level(handle, detail_level)
     }
 
     /**Parse the metadata section of the file using [`FileMetadataBuilder`]
