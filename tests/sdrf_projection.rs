@@ -46,10 +46,15 @@ fn fixtures_available() -> bool {
 
 // ── Test A: sample_list read-back (SM-05) ─────────────────────────────────────
 
-/// (A) Convert tiny.pwiz WITH PXD020187 SDRF; assert sample_list is a 1-entry array carrying
-/// {id, name, parameters:[]} and metadata.study is still present.
+/// (A) Convert tiny.pwiz WITH PXD020187 SDRF.
+///
+/// v0.8.1 run-filter: tiny.pwiz.1.1.mzML does NOT match PXD020187's `.raw` data files
+/// (stems differ, extension differs), so `match_result.rows` is empty → `sample_list` is an
+/// EMPTY array (honest absence — the verbatim blob still carries the full-study sample list).
+/// metadata.study and metadata.sample_metadata must still be present.
+/// The `sample_metadata` provenance block must carry `projection_scope: "run"`.
 #[test]
-fn pxd020187_sample_list_reads_back_one_entry() {
+fn pxd020187_sample_list_is_empty_on_zero_run_match() {
     if !fixtures_available() {
         eprintln!("skipping sdrf_projection test A — fixtures not present");
         return;
@@ -66,7 +71,9 @@ fn pxd020187_sample_list_reads_back_one_entry() {
     let reader = MzPeakReader::new(&out)
         .expect("MzPeakReader must open the produced archive");
 
-    // ── SM-05: metadata.sample_list must be a 1-entry array ──────────────────
+    // ── SM-05: metadata.sample_list must be present and EMPTY (zero-run-match, v0.8.1) ──────
+    // The run-filter means: when tiny.pwiz.1.1.mzML stem doesn't match any PXD020187 row,
+    // the projected sample_list is [] (honest absence — verbatim blob holds full fidelity).
     let sl_val = reader
         .file_index()
         .metadata
@@ -75,46 +82,32 @@ fn pxd020187_sample_list_reads_back_one_entry() {
         .expect("metadata.sample_list must be present when --sdrf is supplied (SM-05)");
 
     let sl_arr = sl_val.as_array().expect("metadata.sample_list must be a JSON array");
-    assert_eq!(
-        sl_arr.len(),
-        1,
-        "PXD020187 has a single distinct source name 'Sample 1'; sample_list must have exactly 1 entry"
-    );
-
-    let entry = sl_arr[0].as_object().expect("sample_list entry must be a JSON object");
-
-    // Required keys: id, name, parameters (schema/sample_list.json items.required)
-    assert!(entry.contains_key("id"), "sample_list entry must have 'id' key");
-    assert!(entry.contains_key("name"), "sample_list entry must have 'name' key");
-    assert!(entry.contains_key("parameters"), "sample_list entry must have 'parameters' key");
-    assert_eq!(
-        entry.len(),
-        3,
-        "sample_list entry must have EXACTLY 3 keys (id, name, parameters) — additionalProperties:false"
-    );
-
-    // name must be "Sample 1" (the verbatim source name from PXD020187).
-    assert_eq!(
-        entry["name"].as_str().unwrap(),
-        "Sample 1",
-        "sample_list entry name must be the verbatim SDRF source name"
-    );
-
-    // id must be a non-empty string (e.g. "sample-1").
-    let id = entry["id"].as_str().expect("id must be a string");
-    assert!(!id.is_empty(), "sample_list entry id must be non-empty");
-
-    // parameters must be an EMPTY array (lean projection — RATIFIED-G; SM-07 deferred ≥v0.9).
-    let params = entry["parameters"].as_array().expect("parameters must be an array");
     assert!(
-        params.is_empty(),
-        "parameters must be [] (lean projection, RATIFIED-G; characteristics/factor_values in verbatim blob)"
+        sl_arr.is_empty(),
+        "v0.8.1 run-filter: PXD020187 data files do not match tiny.pwiz stem; \
+         sample_list must be EMPTY (honest absence, run-scoped projection). \
+         Got {} entries",
+        sl_arr.len()
     );
 
     // ── SM-05: metadata.study must still be present ───────────────────────────
     assert!(
         reader.file_index().metadata.contains_key("study"),
         "metadata.study must be present alongside sample_list (SM-05 study context retained)"
+    );
+
+    // ── metadata.sample_metadata must carry projection_scope:"run" (v0.8.1) ──
+    let sm_val = reader
+        .file_index()
+        .metadata
+        .get("sample_metadata")
+        .cloned()
+        .expect("metadata.sample_metadata must be present when --sdrf is supplied");
+    let sm_obj = sm_val.as_object().expect("metadata.sample_metadata must be a JSON object");
+    assert_eq!(
+        sm_obj.get("projection_scope").and_then(|v| v.as_str()),
+        Some("run"),
+        "metadata.sample_metadata must carry projection_scope:\"run\" (v0.8.1 run-filter provenance note)"
     );
 
     drop(reader);
@@ -196,7 +189,8 @@ fn write_temp_sdrf_matching(mzml_path: &Path) -> std::path::PathBuf {
 }
 
 /// (C) Convert tiny.pwiz WITH a synthetic SDRF that matches its stem. Assert
-/// metadata.study.run_sample_binding is present with correct phase32_shadow provenance.
+/// metadata.study.run_sample_binding is present with correct phase32_shadow provenance,
+/// AND sample_list is non-empty (v0.8.1: 1 entry for the matched source name).
 #[test]
 fn synthetic_match_emits_run_sample_binding_shadow() {
     if !Path::new(FIXTURE_MZML).exists() {
@@ -254,6 +248,36 @@ fn synthetic_match_emits_run_sample_binding_shadow() {
     assert_eq!(
         provenance, "phase32_shadow",
         "binding_provenance must be the literal \"phase32_shadow\" (pre-upstream-merge token)"
+    );
+
+    // ── v0.8.1: sample_list must be non-empty (matched rows ≥ 1) ─────────────
+    let sl_val = reader
+        .file_index()
+        .metadata
+        .get("sample_list")
+        .cloned()
+        .expect("metadata.sample_list must be present on a match");
+    let sl_arr = sl_val.as_array().expect("sample_list must be an array");
+    assert!(
+        !sl_arr.is_empty(),
+        "v0.8.1 run-filter: synthetic SDRF matched → sample_list must be non-empty"
+    );
+    // Each entry must have the required schema keys.
+    for entry_val in sl_arr {
+        let entry = entry_val.as_object().expect("sample_list entry must be a JSON object");
+        assert!(entry.contains_key("id"), "entry must have 'id'");
+        assert!(entry.contains_key("name"), "entry must have 'name'");
+        assert!(entry.contains_key("parameters"), "entry must have 'parameters'");
+    }
+
+    // ── projection_scope:"run" in sample_metadata ────────────────────────────
+    let sm_val = reader.file_index().metadata.get("sample_metadata").cloned()
+        .expect("sample_metadata must be present on a match");
+    let sm_obj = sm_val.as_object().expect("sample_metadata must be an object");
+    assert_eq!(
+        sm_obj.get("projection_scope").and_then(|v| v.as_str()),
+        Some("run"),
+        "sample_metadata must carry projection_scope:\"run\" (v0.8.1)"
     );
 
     drop(reader);

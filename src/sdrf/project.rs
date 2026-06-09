@@ -2,9 +2,11 @@
 //!
 //! # Design (RATIFIED-G + SM-05 / SM-06 / CHAN-01..03)
 //!
-//! `project_sample_list` maps `doc.samples` (one per distinct `source name`, first-seen order,
-//! produced by Phase-31 `parse_sdrf`) to the `metadata.sample_list` JSON array that lives in
-//! mzPeak's `FileIndex.metadata["sample_list"]`.
+//! `project_sample_list` maps a **run-filtered** subset of `doc.samples` to the
+//! `metadata.sample_list` JSON array that lives in mzPeak's `FileIndex.metadata["sample_list"]`.
+//! Only the distinct `source name`s that appear in the matched rows for THIS run are projected.
+//! The full-study `doc.samples` list is still accessible for un-filtered contexts (e.g. the
+//! verbatim blob embed), but the projection is always run-scoped (v0.8.1 patch).
 //!
 //! ## Phase-32 lean projection (label-free / SILAC / non-isobaric)
 //!
@@ -40,10 +42,45 @@ use crate::schema::RunSampleBinding;
 use crate::sdrf::channels::{derive_role, is_isobaric_label, resolve_reagent};
 use crate::sdrf::{MatchResult, SampleMetadataDoc};
 
+/// Return the distinct `source name` strings that appear in `match_result.rows` of `doc`,
+/// preserved in first-seen order (mirrors the resolution logic in `build_run_sample_binding`).
+///
+/// This is the single source of truth shared by `project_sample_list`, `collect_channel_refs`,
+/// and `build_run_sample_binding`. All three use this helper so the run-filtered sample set is
+/// always consistent (invariant: `project_sample_list` ids == `build_run_sample_binding` ids).
+///
+/// Returns an empty `Vec` on zero-match or when the `source name` column is absent.
+fn matched_source_names(doc: &SampleMetadataDoc, match_result: &MatchResult) -> Vec<String> {
+    if match_result.rows.is_empty() {
+        return vec![];
+    }
+    let Some(source_name_col) = doc.header_index("source name") else {
+        return vec![];
+    };
+    let mut names: Vec<String> = Vec::new();
+    for &row_idx in &match_result.rows {
+        let Some(row) = doc.verbatim.rows.get(row_idx) else { continue };
+        let name = match row.get(source_name_col) {
+            Some(n) if !n.is_empty() => n.clone(),
+            _ => continue,
+        };
+        if !names.contains(&name) {
+            names.push(name);
+        }
+    }
+    names
+}
+
 /// Project the Phase-31/34 parsed `SampleMetadataDoc` into the `metadata.sample_list` JSON array.
 ///
-/// Returns one `serde_json::Value` object per distinct `source name` (first-seen order, which is
-/// the order of `doc.samples` after Phase-31 parse). Each entry carries:
+/// **Run-filtered (v0.8.1):** only the distinct `source name`s that appear in `match_result.rows`
+/// are emitted. This guarantees that e.g. a PXD011799 fr8 archive embeds only the ~5 samples
+/// that map to fr8, not all 128 study-wide samples.
+///
+/// Zero matched rows → empty `Vec` (honest absence: "samples mixed/unknown").
+/// Do NOT fall back to all doc.samples on zero-match — the caller emits an empty array.
+///
+/// Each entry carries:
 ///   - `id`         — the sample's stable identifier (e.g. `"sample-1"`)
 ///   - `name`       — the verbatim `source name` cell value
 ///   - `parameters` — Empty `[]` for non-isobaric (lean projection — RATIFIED-G); for isobaric
@@ -51,8 +88,16 @@ use crate::sdrf::{MatchResult, SampleMetadataDoc};
 ///
 /// The `parameters` key is ALWAYS present (required by `schema/sample_list.json`); never omitted.
 ///
+/// **Invariant:** the returned `id` set equals `build_run_sample_binding(&doc, match_result, ...).sample_ids`
+/// (guaranteed by both using `matched_source_names` as the single source of truth).
+///
 /// This function is infallible — it only reads the in-memory doc.
-pub fn project_sample_list(doc: &SampleMetadataDoc) -> Vec<serde_json::Value> {
+pub fn project_sample_list(doc: &SampleMetadataDoc, match_result: &MatchResult) -> Vec<serde_json::Value> {
+    let run_names = matched_source_names(doc, match_result);
+    if run_names.is_empty() {
+        return vec![];
+    }
+
     // Pre-compute carrier/reference channel values from the doc header (CHAN-02, R1-H2).
     // Absent columns produce empty vecs; derive_role degrades to "sample" without error (T-34-07).
     let carrier_col = doc.header_index("comment[carrier channel]");
@@ -61,8 +106,11 @@ pub fn project_sample_list(doc: &SampleMetadataDoc) -> Vec<serde_json::Value> {
     let carrier_channels: Vec<String> = collect_column_values(doc, carrier_col);
     let reference_channels: Vec<String> = collect_column_values(doc, reference_col);
 
+    // Iterate only the samples whose name is in the run-filtered set (first-seen order
+    // of matched names, matching the order of doc.samples for those that are present).
     doc.samples
         .iter()
+        .filter(|s| run_names.contains(&s.name))
         .map(|s| {
             // Locate the first assay row whose sample_refs contains this sample's name.
             // In isobaric SDRFs each channel is a distinct source name, so there is typically
@@ -269,8 +317,11 @@ pub fn build_run_sample_binding(
 /// Collect [`crate::write::reporter_quant::ChannelRef`]s from the Phase-34 labeled sample entries
 /// in `doc` (Phase 35, QUANT-01).
 ///
-/// For each sample in `doc.samples`, finds the associated assay (to obtain the reagent label),
-/// resolves the label via `resolve_reagent`, and — for isobaric labels only — returns a
+/// **Run-filtered (v0.8.1):** only samples whose `source name` appears in `match_result.rows` are
+/// considered, matching the run-scope applied by `project_sample_list`.
+///
+/// For each matched sample, finds the associated assay (to obtain the reagent label), resolves the
+/// label via `resolve_reagent`, and — for isobaric labels only — returns a
 /// `ChannelRef { channel_id: sample.id, reporter_mz }`. Non-isobaric samples are SKIPPED.
 ///
 /// `reporter_mz` follows the Phase-34 honest fallback (CHAN-03):
@@ -282,9 +333,15 @@ pub fn build_run_sample_binding(
 ///
 /// This function is infallible — it only reads the in-memory doc. An empty or non-isobaric doc
 /// returns an empty Vec (no channels → caller emits a `log::warn!` and continues).
-pub fn collect_channel_refs(doc: &SampleMetadataDoc) -> Vec<crate::write::reporter_quant::ChannelRef> {
+pub fn collect_channel_refs(doc: &SampleMetadataDoc, match_result: &MatchResult) -> Vec<crate::write::reporter_quant::ChannelRef> {
+    let run_names = matched_source_names(doc, match_result);
+    // Zero-match → no channels for this run (honest absence, consistent with project_sample_list).
+    if run_names.is_empty() {
+        return vec![];
+    }
     doc.samples
         .iter()
+        .filter(|s| run_names.contains(&s.name))
         .filter_map(|s| {
             // Find the assay whose sample_refs include this sample's name.
             let assay = doc.assays.iter().find(|a| {
@@ -540,13 +597,33 @@ mod tests {
         }
     }
 
-    // ── project_sample_list tests (Phase 32 — preserved) ─────────────────────
+    // ── MatchResult helpers ───────────────────────────────────────────────────
 
-    /// PXD020187-like: 10 rows, all "Sample 1" → exactly 1 entry.
+    fn no_match() -> MatchResult {
+        MatchResult { rows: vec![], diagnostics: vec![] }
+    }
+
+    fn match_row(idx: usize) -> MatchResult {
+        MatchResult { rows: vec![idx], diagnostics: vec![] }
+    }
+
+    fn match_rows(idxs: Vec<usize>) -> MatchResult {
+        MatchResult { rows: idxs, diagnostics: vec![] }
+    }
+
+    /// Return a MatchResult that selects ALL rows in `doc`.
+    fn full_match(doc: &SampleMetadataDoc) -> MatchResult {
+        MatchResult { rows: (0..doc.verbatim.rows.len()).collect(), diagnostics: vec![] }
+    }
+
+    // ── project_sample_list tests (Phase 32 — run-filtered) ──────────────────
+
+    /// PXD020187-like: 10 rows, all "Sample 1" → exactly 1 entry (full match, dedup).
     #[test]
     fn project_sample_list_pxd020187_one_entry() {
         let doc = pxd020187_like_doc();
-        let list = project_sample_list(&doc);
+        let mr = full_match(&doc);
+        let list = project_sample_list(&doc, &mr);
         assert_eq!(
             list.len(),
             1,
@@ -554,11 +631,42 @@ mod tests {
         );
     }
 
+    /// Zero-match → empty sample_list (honest absence; do NOT fall back to all samples).
+    #[test]
+    fn project_sample_list_zero_match_returns_empty() {
+        let doc = pxd020187_like_doc();
+        let list = project_sample_list(&doc, &no_match());
+        assert!(
+            list.is_empty(),
+            "zero-match must return an empty sample_list (honest absence, not all samples)"
+        );
+    }
+
+    /// Run-filter: 3-source-name doc, only rows for "Source B" selected → 1 entry (Source B only).
+    #[test]
+    fn project_sample_list_subset_match_returns_only_matched_names() {
+        let doc = three_source_names_doc();
+        // Row 1 is "Source B" (index 1).
+        let mr = match_row(1);
+        let list = project_sample_list(&doc, &mr);
+        assert_eq!(
+            list.len(),
+            1,
+            "subset match (row 1 only = Source B) must produce exactly 1 entry, not 3"
+        );
+        assert_eq!(
+            list[0]["name"].as_str().unwrap(),
+            "Source B",
+            "the 1 entry must be Source B (the row that matched)"
+        );
+    }
+
     /// Each label-free entry must have exactly the keys {id, name, parameters} (schema/sample_list.json).
     #[test]
     fn project_sample_list_entry_has_required_keys() {
         let doc = single_sample_doc();
-        let list = project_sample_list(&doc);
+        let mr = full_match(&doc);
+        let list = project_sample_list(&doc, &mr);
         assert_eq!(list.len(), 1, "single sample doc must produce 1 entry");
         let entry = list[0].as_object().expect("entry must be a JSON object");
         assert!(entry.contains_key("id"), "entry must have 'id' key");
@@ -577,7 +685,8 @@ mod tests {
     #[test]
     fn project_sample_list_id_and_name_match_sample() {
         let doc = single_sample_doc();
-        let list = project_sample_list(&doc);
+        let mr = full_match(&doc);
+        let list = project_sample_list(&doc, &mr);
         let entry = list[0].as_object().unwrap();
         assert_eq!(entry["id"].as_str().unwrap(), "sample-1");
         assert_eq!(entry["name"].as_str().unwrap(), "Sample 1");
@@ -587,7 +696,8 @@ mod tests {
     #[test]
     fn project_sample_list_parameters_is_empty_array_for_label_free() {
         let doc = single_sample_doc();
-        let list = project_sample_list(&doc);
+        let mr = full_match(&doc);
+        let list = project_sample_list(&doc, &mr);
         let entry = list[0].as_object().unwrap();
         let params = entry["parameters"].as_array().expect("parameters must be an array");
         assert!(
@@ -596,12 +706,13 @@ mod tests {
         );
     }
 
-    /// Three distinct source names → 3 entries in first-seen order with distinct ids.
+    /// Three distinct source names, full match → 3 entries in first-seen order with distinct ids.
     #[test]
     fn project_sample_list_three_source_names_three_entries() {
         let doc = three_source_names_doc();
-        let list = project_sample_list(&doc);
-        assert_eq!(list.len(), 3, "three source names must produce 3 entries");
+        let mr = full_match(&doc);
+        let list = project_sample_list(&doc, &mr);
+        assert_eq!(list.len(), 3, "three source names (full match) must produce 3 entries");
         let names: Vec<&str> = list
             .iter()
             .map(|e| e["name"].as_str().unwrap())
@@ -616,6 +727,22 @@ mod tests {
         assert_eq!(id_set.len(), 3, "all ids must be distinct");
     }
 
+    /// Three distinct source names, only first two rows matched → 2 entries (subset).
+    #[test]
+    fn project_sample_list_three_source_names_subset_match_two_entries() {
+        let doc = three_source_names_doc();
+        // Rows 0 and 1 only (Source A and Source B); Source C is row 2 and not matched.
+        let mr = match_rows(vec![0, 1]);
+        let list = project_sample_list(&doc, &mr);
+        assert_eq!(
+            list.len(),
+            2,
+            "subset match (rows 0+1) must produce exactly 2 entries, not 3"
+        );
+        let names: Vec<&str> = list.iter().map(|e| e["name"].as_str().unwrap()).collect();
+        assert_eq!(names, vec!["Source A", "Source B"]);
+    }
+
     // ── Phase 34: isobaric projection tests ───────────────────────────────────
 
     /// Isobaric doc with 3 channels → 3 entries each with non-empty parameters array
@@ -623,7 +750,8 @@ mod tests {
     #[test]
     fn isobaric_doc_three_channels_each_has_labeled_params() {
         let doc = isobaric_tmt_doc();
-        let list = project_sample_list(&doc);
+        let mr = full_match(&doc);
+        let list = project_sample_list(&doc, &mr);
         assert_eq!(list.len(), 3, "3 isobaric channels → 3 sample_list entries");
         for entry in &list {
             let obj = entry.as_object().unwrap();
@@ -649,7 +777,8 @@ mod tests {
     #[test]
     fn isobaric_sample_label_param_value_matches_reagent() {
         let doc = isobaric_tmt_doc();
-        let list = project_sample_list(&doc);
+        let mr = full_match(&doc);
+        let list = project_sample_list(&doc, &mr);
         let expected_labels = ["TMT126", "TMT127N", "TMT130C"];
         for (entry, expected) in list.iter().zip(expected_labels.iter()) {
             let params = entry["parameters"].as_array().unwrap();
@@ -668,7 +797,8 @@ mod tests {
     #[test]
     fn label_free_doc_parameters_is_empty() {
         let doc = label_free_doc();
-        let list = project_sample_list(&doc);
+        let mr = full_match(&doc);
+        let list = project_sample_list(&doc, &mr);
         assert_eq!(list.len(), 1);
         let params = list[0]["parameters"].as_array().unwrap();
         assert!(params.is_empty(), "label-free entry must have parameters: [] (CHAN-03)");
@@ -678,7 +808,8 @@ mod tests {
     #[test]
     fn silac_doc_parameters_is_empty() {
         let doc = silac_doc();
-        let list = project_sample_list(&doc);
+        let mr = full_match(&doc);
+        let list = project_sample_list(&doc, &mr);
         assert_eq!(list.len(), 1);
         let params = list[0]["parameters"].as_array().unwrap();
         assert!(params.is_empty(), "SILAC entry must have parameters: [] (CHAN-03)");
@@ -688,7 +819,8 @@ mod tests {
     #[test]
     fn tmtpro_high_has_label_param_but_no_reporter_mz_param() {
         let doc = tmtpro_high_doc();
-        let list = project_sample_list(&doc);
+        let mr = full_match(&doc);
+        let list = project_sample_list(&doc, &mr);
         let params = list[0]["parameters"].as_array().unwrap();
         // Must have sample-label param.
         let has_label = params.iter().any(|p| {
@@ -706,7 +838,8 @@ mod tests {
     #[test]
     fn isobaric_entry_has_tag_modification_unimod_param() {
         let doc = isobaric_tmt_doc();
-        let list = project_sample_list(&doc);
+        let mr = full_match(&doc);
+        let list = project_sample_list(&doc, &mr);
         // All three entries have the same UNIMOD:737 modification.
         for entry in &list {
             let params = entry["parameters"].as_array().unwrap();
@@ -731,7 +864,8 @@ mod tests {
         let allowed_keys = ["cv_ref", "accession", "name", "value", "unit_cv_ref", "unit_accession"];
         let required_keys = ["cv_ref", "accession", "name"];
         let doc = isobaric_tmt_doc();
-        let list = project_sample_list(&doc);
+        let mr = full_match(&doc);
+        let list = project_sample_list(&doc, &mr);
         for entry in &list {
             let params = entry["parameters"].as_array().unwrap();
             for param in params {
@@ -755,7 +889,8 @@ mod tests {
     #[test]
     fn no_channel_list_or_plex_id_emitted() {
         let doc = isobaric_tmt_doc();
-        let list = project_sample_list(&doc);
+        let mr = full_match(&doc);
+        let list = project_sample_list(&doc, &mr);
         let serialized = serde_json::to_string(&list).unwrap();
         assert!(!serialized.contains("channel_list"), "channel_list must not be emitted (RATIFIED-E)");
         assert!(!serialized.contains("plex_id"), "plex_id must not be emitted (RATIFIED-E)");
@@ -766,7 +901,8 @@ mod tests {
     #[test]
     fn isobaric_entry_has_exactly_three_top_level_keys() {
         let doc = isobaric_tmt_doc();
-        let list = project_sample_list(&doc);
+        let mr = full_match(&doc);
+        let list = project_sample_list(&doc, &mr);
         for entry in &list {
             let obj = entry.as_object().unwrap();
             assert_eq!(
@@ -782,7 +918,8 @@ mod tests {
     #[test]
     fn isobaric_default_role_is_sample() {
         let doc = isobaric_tmt_doc();
-        let list = project_sample_list(&doc);
+        let mr = full_match(&doc);
+        let list = project_sample_list(&doc, &mr);
         for entry in &list {
             let params = entry["parameters"].as_array().unwrap();
             let role_param = params.iter().find(|p| {
@@ -797,14 +934,6 @@ mod tests {
     }
 
     // ── build_run_sample_binding tests ────────────────────────────────────────
-
-    fn no_match() -> MatchResult {
-        MatchResult { rows: vec![], diagnostics: vec![] }
-    }
-
-    fn match_row(idx: usize) -> MatchResult {
-        MatchResult { rows: vec![idx], diagnostics: vec![] }
-    }
 
     /// Zero-match → None (honest absence, "samples mixed" default).
     #[test]
@@ -885,13 +1014,113 @@ mod tests {
     fn build_binding_isobaric_three_channels_three_sample_ids() {
         let doc = isobaric_tmt_doc();
         // All 3 rows match (all channels from the same run file).
-        let mr = MatchResult { rows: vec![0, 1, 2], diagnostics: vec![] };
+        let mr = match_rows(vec![0, 1, 2]);
         let result = build_run_sample_binding(&doc, &mr, "run-tmt");
         let binding = result.expect("isobaric 3-channel match must return Some");
         assert_eq!(
             binding.sample_ids.len(),
             3,
             "isobaric 3-channel run must list all 3 sample-ids in the binding"
+        );
+    }
+
+    // ── INVARIANT: sample_list ids == binding.sample_ids ─────────────────────
+    //
+    // REQUIRED: the run-filtered `sample_list` id set MUST equal the `run_sample_binding`
+    // sample_ids set for the same run (v0.8.1 patch, single source of truth via
+    // `matched_source_names`).
+
+    /// Single-sample full-match: sample_list ids == binding.sample_ids.
+    #[test]
+    fn invariant_sample_list_ids_equal_binding_ids_single_sample() {
+        let doc = single_sample_doc();
+        let mr = full_match(&doc);
+
+        let list = project_sample_list(&doc, &mr);
+        let list_ids: Vec<String> = list.iter()
+            .map(|e| e["id"].as_str().unwrap().to_string())
+            .collect();
+
+        let binding = build_run_sample_binding(&doc, &mr, "run1")
+            .expect("full match must return Some");
+
+        let mut list_sorted = list_ids.clone();
+        list_sorted.sort();
+        let mut binding_sorted = binding.sample_ids.clone();
+        binding_sorted.sort();
+
+        assert_eq!(
+            list_sorted, binding_sorted,
+            "INVARIANT: sample_list id set must equal binding.sample_ids (single-sample full-match)"
+        );
+    }
+
+    /// Three-source-name subset match: only matched names → consistent across both outputs.
+    #[test]
+    fn invariant_sample_list_ids_equal_binding_ids_subset_match() {
+        let doc = three_source_names_doc();
+        // Match rows 0 and 2 → "Source A" and "Source C"; "Source B" is excluded.
+        let mr = match_rows(vec![0, 2]);
+
+        let list = project_sample_list(&doc, &mr);
+        let list_ids: Vec<String> = list.iter()
+            .map(|e| e["id"].as_str().unwrap().to_string())
+            .collect();
+
+        let binding = build_run_sample_binding(&doc, &mr, "run-x")
+            .expect("non-empty match must return Some");
+
+        let mut list_sorted = list_ids.clone();
+        list_sorted.sort();
+        let mut binding_sorted = binding.sample_ids.clone();
+        binding_sorted.sort();
+
+        assert_eq!(
+            list_sorted, binding_sorted,
+            "INVARIANT: sample_list id set must equal binding.sample_ids (subset match rows 0+2)"
+        );
+        // Verify exactly 2 entries (not 3, not 1).
+        assert_eq!(list.len(), 2, "subset match [0,2] must produce 2 sample_list entries");
+        assert_eq!(binding.sample_ids.len(), 2, "subset match [0,2] must produce 2 binding ids");
+    }
+
+    /// Zero-match: both sample_list and binding are empty/None (consistent empty absence).
+    #[test]
+    fn invariant_zero_match_both_empty() {
+        let doc = three_source_names_doc();
+        let mr = no_match();
+
+        let list = project_sample_list(&doc, &mr);
+        assert!(
+            list.is_empty(),
+            "INVARIANT: zero-match sample_list must be empty (honest absence)"
+        );
+
+        let binding = build_run_sample_binding(&doc, &mr, "run-x");
+        assert!(
+            binding.is_none(),
+            "INVARIANT: zero-match binding must be None (honest absence)"
+        );
+    }
+
+    /// Isobaric full match: invariant holds for multi-channel isobaric case.
+    #[test]
+    fn invariant_sample_list_ids_equal_binding_ids_isobaric() {
+        let doc = isobaric_tmt_doc();
+        let mr = full_match(&doc);
+
+        let list = project_sample_list(&doc, &mr);
+        let list_ids: std::collections::HashSet<String> = list.iter()
+            .map(|e| e["id"].as_str().unwrap().to_string())
+            .collect();
+
+        let binding = build_run_sample_binding(&doc, &mr, "run-tmt")
+            .expect("isobaric full match must return Some");
+        let binding_ids: std::collections::HashSet<String> = binding.sample_ids.into_iter().collect();
+
+        assert_eq!(
+            list_ids, binding_ids,
+            "INVARIANT: sample_list id set must equal binding.sample_ids (isobaric 3-channel full match)"
         );
     }
 }

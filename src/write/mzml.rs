@@ -224,37 +224,47 @@ pub fn convert_mzml(
     // Carry the source file_description / instrument / sample / software metadata across.
     writer.copy_metadata_from(&reader);
 
-    // Reporter-quant: pre-compute ChannelRefs from the SDRF doc (if --reporter-quant is set and
-    // an SDRF is provided). The SDRF is pre-parsed HERE so channels are available before the
-    // per-spectrum loop. The same doc is also consumed below in the --sdrf arm (zip phase).
-    // When no SDRF or non-isobaric, channels will be empty and a loud log::warn! is emitted.
-    let reporter_quant_channels: Vec<crate::write::reporter_quant::ChannelRef> = if reporter_quant {
+    // SDRF/reporter-quant early pre-pass: parse the SDRF once here and compute the match result
+    // so both the per-spectrum reporter-quant loop AND the post-write metadata arm share ONE
+    // consistent doc + match_result (v0.8.1 run-filter patch: channels and sample_list both
+    // use match_result rows so they are guaranteed run-scoped and consistent with the binding).
+    //
+    // `sdrf_doc_and_match` is `Some((doc, match_result))` when `--sdrf` was given and the SDRF
+    // parsed successfully. Parse error → propagated immediately (same behaviour as before, just
+    // done here instead of in the post-write arm).
+    let sdrf_doc_and_match: Option<(crate::sdrf::SampleMetadataDoc, crate::sdrf::MatchResult)> =
         if let Some(sdrf_path) = sdrf {
-            // Pre-parse the SDRF to extract isobaric channel refs. Errors here are non-fatal:
-            // emit a loud warn and proceed with no reporter_quant emit (conversion still succeeds).
-            match crate::sdrf::parse_sdrf(sdrf_path) {
-                Ok(doc) => {
-                    let channels = crate::sdrf::collect_channel_refs(&doc);
-                    if channels.is_empty() {
-                        log::warn!(
-                            "--reporter-quant: no isobaric channels found in SDRF {:?} — \
-                             reporter intensities will NOT be emitted (non-isobaric run or \
-                             SDRF carries no recognized TMT/iTRAQ labels). \
-                             Pass --sdrf with an isobaric experiment for reporter-quant output.",
-                            sdrf_path
-                        );
-                    }
-                    channels
-                }
-                Err(e) => {
-                    log::warn!(
-                        "--reporter-quant: could not pre-parse SDRF {:?} for channel refs: {e} — \
-                         reporter intensities will NOT be emitted (SDRF still embedded in archive).",
-                        sdrf_path
-                    );
-                    vec![]
-                }
+            let doc = crate::sdrf::parse_sdrf(sdrf_path)
+                .map_err(|e| MzmlConvertError::Sdrf(Box::new(e)))?;
+            let mr = crate::sdrf::match_rows_for_data_file(&doc, input);
+            for diag in &mr.diagnostics {
+                log::warn!("SDRF file-row match: {} — {}", diag.code, diag.message);
             }
+            Some((doc, mr))
+        } else {
+            None
+        };
+
+    // Reporter-quant: pre-compute ChannelRefs from the SDRF doc + match_result (if
+    // --reporter-quant is set and an SDRF is provided). Reuses the already-parsed doc and
+    // already-computed match_result (no second parse). Run-filtered (v0.8.1): only channels
+    // for THIS run's matched rows are returned — consistent with the sample_list projection.
+    let reporter_quant_channels: Vec<crate::write::reporter_quant::ChannelRef> = if reporter_quant {
+        if let Some((ref doc, ref mr)) = sdrf_doc_and_match {
+            let channels = crate::sdrf::collect_channel_refs(doc, mr);
+            if channels.is_empty() {
+                log::warn!(
+                    "--reporter-quant: no isobaric channels found in SDRF {:?} for this run — \
+                     reporter intensities will NOT be emitted (non-isobaric run, zero-match, or \
+                     SDRF carries no recognized TMT/iTRAQ labels for this data file). \
+                     Pass --sdrf with an isobaric experiment for reporter-quant output.",
+                    sdrf
+                );
+            }
+            channels
+        } else if sdrf.is_some() {
+            // SDRF was given but failed to parse (warn already emitted above).
+            vec![]
         } else {
             // --reporter-quant without --sdrf: loud warn, no channels.
             log::warn!(
@@ -439,18 +449,16 @@ pub fn convert_mzml(
     // ── SDRF verbatim embed + metadata.study back-ref (Plan 03 / SM-01..04) ────────────────
     // Only active when the caller supplies `--sdrf <PATH>` via the CLI (explicit-only, SM-01).
     // None → no-op: byte-identical output (no study/sample_metadata keys emitted at all).
+    //
+    // v0.8.1: doc + match_result were parsed/computed ONCE above (pre-pass). This arm just
+    // unwraps the result (guaranteed Some when sdrf.is_some(), since we propagated the parse
+    // error above). Single parse, single match — channels, binding, and sample_list are all
+    // derived from the same match_result rows (run-filtered consistency).
     if let Some(sdrf_path) = sdrf {
-        // 1. Parse the SDRF TSV into the unified SampleMetadataDoc model.
-        let doc = crate::sdrf::parse_sdrf(sdrf_path)
-            .map_err(|e| MzmlConvertError::Sdrf(Box::new(e)))?;
-
-        // 2. Match rows against the input mzML basename. Zero-match / multi-match emit a
-        //    LOUD log::warn! (R9/R10 / T-31-09) but never fail the conversion — spectral data
-        //    is valid regardless of SDRF binding quality (SM-03).
-        let match_result = crate::sdrf::match_rows_for_data_file(&doc, input);
-        for diag in &match_result.diagnostics {
-            log::warn!("SDRF file-row match: {} — {}", diag.code, diag.message);
-        }
+        // 1+2. Unwrap the already-parsed doc and match_result from the pre-pass.
+        //      SAFETY: sdrf.is_some() → sdrf_doc_and_match is Some (parse errors propagated above).
+        let (doc, match_result) = sdrf_doc_and_match
+            .expect("sdrf_doc_and_match must be Some when sdrf path is Some (parse errors propagated)");
 
         // 3. Embed the WHOLE source SDRF verbatim as a typed sample-metadata/sdrf member.
         //    embed_scope:"full" — the simplest byte-identical anchor (§5.1 MVP default).
@@ -541,12 +549,15 @@ pub fn convert_mzml(
         //    This carries precedence:"repo_wins" + sha256 + size_bytes + embed_scope so
         //    the staleness guard (T-31-08) is falsifiable against the live repository.
         //    Kept SEPARATE from metadata.study because schema/study.json is additionalProperties:false.
+        //    v0.8.1: adds projection_scope:"run" — the verbatim blob is full-study, but all projected
+        //    fields (sample_list, run_sample_binding) are scoped to THIS run's matched rows.
         let provenance = serde_json::json!({
             "member": embed_facts.member,
             "sha256": embed_facts.sha256,
             "size_bytes": embed_facts.size_bytes,
             "precedence": "repo_wins",
             "embed_scope": "full",
+            "projection_scope": "run",
             "dataset_accession": accession,
         });
         zip.add_index_metadata("sample_metadata", &provenance)
@@ -554,15 +565,12 @@ pub fn convert_mzml(
 
         // 7. Emit metadata.sample_list (SM-05 query surface).
         //
-        //    Project doc.samples into [{id, name, parameters:[]}] — one entry per distinct
-        //    SDRF source name (first-seen order). parameters is EMPTY (lean RATIFIED-G posture;
-        //    full characteristics→Param shaping and SM-07 factor_values are deferred ≥v0.9;
-        //    the verbatim blob holds full fidelity). The parameters key is always PRESENT (required
-        //    by schema/sample_list.json items.required).
-        //
-        //    Emitted unconditionally within the --sdrf arm (even a single-sample SDRF gets a
-        //    one-entry list). The key "sample_list" matches the contract doc §3.11.
-        let sample_list = crate::sdrf::project_sample_list(&doc);
+        //    v0.8.1 run-filtered: only the distinct source-names from match_result.rows are
+        //    projected — not the full study-wide doc.samples. Zero-match → empty list (honest
+        //    absence). The verbatim blob (embed above) retains full-study fidelity.
+        //    The parameters key is always PRESENT (required by schema/sample_list.json items.required).
+        //    The key "sample_list" matches the contract doc §3.11.
+        let sample_list = crate::sdrf::project_sample_list(&doc, &match_result);
         zip.add_index_metadata("sample_list", &sample_list)
             .map_err(MzmlConvertError::Json)?;
     }
@@ -646,19 +654,21 @@ pub fn convert_mzml(
             .map_err(MzmlConvertError::Json)?;
 
         // 7. Write metadata.sample_metadata provenance block.
+        //    v0.8.1: adds projection_scope:"run" — verbatim blob is full-study, projections are run-scoped.
         let provenance = serde_json::json!({
             "member": embed_facts.member,
             "sha256": embed_facts.sha256,
             "size_bytes": embed_facts.size_bytes,
             "precedence": "repo_wins",
             "embed_scope": "full",
+            "projection_scope": "run",
             "dataset_accession": accession,
         });
         zip.add_index_metadata("sample_metadata", &provenance)
             .map_err(MzmlConvertError::Json)?;
 
-        // 8. Emit metadata.sample_list (SM-05 query surface) — identical projection as SDRF arm.
-        let sample_list = crate::sdrf::project_sample_list(&doc);
+        // 8. Emit metadata.sample_list (SM-05 query surface) — run-filtered (v0.8.1).
+        let sample_list = crate::sdrf::project_sample_list(&doc, &match_result);
         zip.add_index_metadata("sample_list", &sample_list)
             .map_err(MzmlConvertError::Json)?;
     }

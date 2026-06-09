@@ -136,20 +136,20 @@ fn mtbls5358_isa_tab_embeds_losslessly_and_reserves_byte_identical() {
         "sample_metadata_ref for ISA-Tab must reference the investigation file, got: {smr}"
     );
 
-    // metadata.sample_list must be present and non-empty.
+    // metadata.sample_list must be present.
+    // v0.8.1 run-filter: tiny.pwiz.1.1.mzML does NOT match MTBLS5358's .raw data files
+    // (different stems), so the projected sample_list is EMPTY (honest absence per run-filter).
+    // The verbatim ISA blob still contains the full-study 19 samples.
     let sample_list_val = reader
         .file_index()
         .metadata
         .get("sample_list")
         .cloned()
         .expect("metadata.sample_list must be present in a --isa conversion (SM-05)");
-    let sample_list_arr = sample_list_val
+    let _sample_list_arr = sample_list_val
         .as_array()
         .expect("metadata.sample_list must be a JSON array");
-    assert!(
-        !sample_list_arr.is_empty(),
-        "MTBLS5358 has 19 samples; sample_list must be non-empty"
-    );
+    // Zero-match: empty list is the correct run-scoped behavior (verbatim blob holds full fidelity).
 
     // ── (c) Zero-match binding ────────────────────────────────────────────────────────────────
     // tiny.pwiz.1.1.mzML does NOT match MTBLS5358 data files (.raw suffix, different names).
@@ -250,15 +250,17 @@ fn minimal_isa_json_embeds_losslessly_and_reserves_byte_identical() {
         "ISA-JSON primary member name must be stable 'isa.json'"
     );
 
-    // metadata.sample_list present and non-empty (minimal.json has 2 samples).
+    // metadata.sample_list present.
+    // v0.8.1 run-filter: tiny.pwiz.1.1.mzML does NOT match minimal.json's data files
+    // (QC-1.raw, CTR-1.raw), so the projected sample_list is EMPTY (honest absence per run-filter).
     let sample_list = reader
         .file_index()
         .metadata
         .get("sample_list")
         .cloned()
         .expect("metadata.sample_list must be present");
-    let arr = sample_list.as_array().expect("sample_list must be array");
-    assert!(!arr.is_empty(), "minimal.json has 2 samples; sample_list must be non-empty");
+    let _arr = sample_list.as_array().expect("sample_list must be array");
+    // Zero-match: empty list is correct (verbatim blob holds the full 2-sample fidelity).
 
     // BYTE-IDENTICAL RE-SERVE.
     const ISA_JSON_MEMBER: &str = "sample_metadata/isa/isa.json";

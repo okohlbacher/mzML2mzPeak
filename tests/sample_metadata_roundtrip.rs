@@ -102,6 +102,9 @@ fn val01_label_free_sdrf_pxd020187_byte_roundtrip() {
     );
 
     // ── (b) metadata.sample_list reads back ───────────────────────────────────────────────────
+    // v0.8.1 run-filter: tiny.pwiz.1.1.mzML does NOT match PXD020187's .raw data files
+    // (different stem AND different extension), so match_result.rows is empty →
+    // sample_list is [] (honest absence). The verbatim blob holds the full-study sample list.
     let reader = MzPeakReader::new(&out)
         .expect("MzPeakReader must open the produced SDRF-bearing archive");
 
@@ -112,15 +115,13 @@ fn val01_label_free_sdrf_pxd020187_byte_roundtrip() {
         .cloned()
         .expect("metadata.sample_list must be present in a --sdrf conversion (SM-05)");
     let sl_arr = sl_val.as_array().expect("metadata.sample_list must be a JSON array");
-    assert_eq!(
-        sl_arr.len(),
-        1,
-        "PXD020187 has one distinct source name 'Sample 1'; sample_list must have exactly 1 entry"
+    // Zero-match → empty list (honest absence); verbatim blob has full fidelity.
+    assert!(
+        sl_arr.is_empty(),
+        "v0.8.1 run-filter: tiny.pwiz stem does not match PXD020187 .raw rows; \
+         sample_list must be EMPTY. Got {} entries",
+        sl_arr.len()
     );
-    let entry = sl_arr[0].as_object().expect("sample_list[0] must be a JSON object");
-    assert!(entry.contains_key("id"), "sample_list entry must have 'id'");
-    assert!(entry.contains_key("name"), "sample_list entry must have 'name'");
-    assert!(entry.contains_key("parameters"), "sample_list entry must have 'parameters'");
 
     // ── (c) metadata.study reads back ─────────────────────────────────────────────────────────
     let study_val = reader

@@ -23,8 +23,7 @@
 use std::io::Read as _;
 use std::path::Path;
 
-use mzml2mzpeak::sdrf::parse_sdrf;
-use mzml2mzpeak::sdrf::project_sample_list;
+use mzml2mzpeak::sdrf::{parse_sdrf, project_sample_list};
 use mzml2mzpeak::schema::cv::{channel_role_token, reporter_ion_mz_token, sample_label_curie};
 use mzml2mzpeak::write::{EncodingOptions, convert_mzml};
 use mzpeak_prototyping::MzPeakReader;
@@ -355,6 +354,9 @@ fn no_sdrf_output_byte_identical_and_no_study_key() {
 /// all carrying an MS:1002602 param. This proves the resolver works on real channel-expanded
 /// data from ProteomeXchange.
 ///
+/// v0.8.1: uses a full-doc MatchResult (all rows) to simulate a run that matches all samples,
+/// since the direct API now requires a match_result parameter.
+///
 /// Skips cleanly when the fixture is not present (CI / non-data environments).
 #[test]
 fn pxd011799_tmt10_sample_list_all_entries_have_sample_label_param() {
@@ -367,7 +369,16 @@ fn pxd011799_tmt10_sample_list_all_entries_have_sample_label_param() {
     let doc = parse_sdrf(sdrf_path)
         .expect("PXD011799 SDRF must parse without error");
 
-    let list = project_sample_list(&doc);
+    // Use a full-doc match (all rows) to test the full projection (study-wide).
+    // NOTE: in production the match is run-scoped; this full-match tests that the resolver
+    // correctly handles real multi-channel isobaric data when all rows are matched.
+    use mzml2mzpeak::sdrf::MatchResult;
+    let full_match = MatchResult {
+        rows: (0..doc.verbatim.rows.len()).collect(),
+        diagnostics: vec![],
+    };
+
+    let list = project_sample_list(&doc, &full_match);
     let sample_label_acc = sample_label_curie().to_string();
 
     // TMT-10 plex: 10 channels per run fraction → many entries.
@@ -389,4 +400,71 @@ fn pxd011799_tmt10_sample_list_all_entries_have_sample_label_param() {
             entry["name"].as_str().unwrap_or("<unknown>")
         );
     }
+}
+
+/// (G) Run-filter: synthetic TMT SDRF with 3 channels, all pointing to the same data file.
+/// A match_result selecting only the first row must produce a 1-entry sample_list (not 3).
+///
+/// Uses a unique temp-file path (includes thread id) to avoid collision with test A-E which
+/// also creates a synthetic SDRF. Parses inline and doesn't use convert_mzml, so the file
+/// is only needed for the parse step and is removed immediately after.
+#[test]
+fn run_filtered_sample_list_subset_match() {
+    if !Path::new(FIXTURE_MZML).exists() {
+        eprintln!("skipping sdrf_channels test G — mzML fixture not present");
+        return;
+    }
+
+    use mzml2mzpeak::sdrf::{parse_sdrf, MatchResult};
+
+    // Write to a unique path distinct from write_synthetic_tmt_sdrf's path
+    // (which uses process id only; add a thread suffix to avoid collision).
+    let thread_id: u64 = {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let mut h = DefaultHasher::new();
+        std::thread::current().id().hash(&mut h);
+        h.finish()
+    };
+    let mod_params = "NT=TMT6plex;PP=Any N-term;AC=UNIMOD:737;MT=fixed";
+    let content = format!(
+        "source name\tcomment[data file]\tcomment[label]\tcomment[modification parameters]\n\
+         Chan_A\tdummy.mzML\tTMT126\t{mod_params}\n\
+         Chan_B\tdummy.mzML\tTMT127N\t{mod_params}\n\
+         Chan_C\tdummy.mzML\tTMT130C\t{mod_params}\n"
+    );
+    let sdrf_path = std::env::temp_dir().join(format!(
+        "mzml2mzpeak_tmt_runfilter_{}_t{}.sdrf.tsv",
+        std::process::id(),
+        thread_id,
+    ));
+    std::fs::write(&sdrf_path, &content).expect("write run-filter test SDRF");
+
+    let doc = parse_sdrf(&sdrf_path).expect("synthetic TMT SDRF must parse");
+    let _ = std::fs::remove_file(&sdrf_path);
+
+    // Full match → 3 entries.
+    let full_match = MatchResult {
+        rows: (0..doc.verbatim.rows.len()).collect(),
+        diagnostics: vec![],
+    };
+    let full_list = project_sample_list(&doc, &full_match);
+    assert_eq!(full_list.len(), 3, "full-match (3 channels) must produce 3 entries");
+
+    // Single-row match → 1 entry.
+    let single_match = MatchResult { rows: vec![0], diagnostics: vec![] };
+    let single_list = project_sample_list(&doc, &single_match);
+    assert_eq!(
+        single_list.len(),
+        1,
+        "single-row match must produce exactly 1 sample_list entry (run-filter, v0.8.1)"
+    );
+
+    // Zero match → empty list.
+    let zero_match = MatchResult { rows: vec![], diagnostics: vec![] };
+    let zero_list = project_sample_list(&doc, &zero_match);
+    assert!(
+        zero_list.is_empty(),
+        "zero-match must produce an empty sample_list (honest absence)"
+    );
 }
