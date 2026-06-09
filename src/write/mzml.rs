@@ -413,10 +413,35 @@ pub fn convert_mzml(
         // `title` is informative per schema/study.json — not required to be unique.
         let title = accession.clone();
 
-        // 5. Write the metadata.study back-ref via the Phase-30 `study_metadata()` constructor.
-        //    This produces {dataset_accession, title, sample_metadata_ref} — the three-field
-        //    shape governed by schema/study.json (additionalProperties:false). T-31-10.
-        let study = crate::schema::study_metadata(&accession, &title, MEMBER_NAME);
+        // 5. Write the metadata.study back-ref.
+        //
+        //    SM-05 / SM-06 / RATIFIED-C/F: derive the run_id from the input mzML filename stem
+        //    (path-stripped, extension-stripped) — the stable run identity at this seam. Fall back
+        //    to "run" if the stem is empty.
+        //
+        //    Build the run→sample provenance shadow (Phase-32 SM-06). When ≥1 SDRF row matched
+        //    this run's data file, emit the binding under metadata.study.run_sample_binding
+        //    (schema/study.json's optional declared slot). When zero rows matched ("samples mixed"
+        //    honest default), binding is None → the key is OMITTED ENTIRELY per
+        //    schema/study.json additionalProperties:false + skip_serializing_if=None.
+        //
+        //    NOTE: the native list-valued ms_run.sample_ref field (Cornerstone F, Phase 30b) is
+        //    NOT emitted here — it is gated on the upstream merge into HUPO-PSI/mzPeak. Once Phase
+        //    30b merges, flip the shadow → native in a v0.8.x point release.
+        //
+        //    SM-07 factor_values are NOT projected (deferred ≥v0.9; verbatim blob holds them).
+        let run_id: String = input
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "run".to_string());
+
+        let binding = crate::sdrf::build_run_sample_binding(&doc, &match_result, &run_id);
+
+        let study = match binding {
+            Some(b) => crate::schema::study_metadata_with_binding(&accession, &title, MEMBER_NAME, b),
+            None => crate::schema::study_metadata(&accession, &title, MEMBER_NAME),
+        };
         zip.add_index_metadata("study", &study)
             .map_err(MzmlConvertError::Json)?;
 
@@ -433,6 +458,20 @@ pub fn convert_mzml(
             "dataset_accession": accession,
         });
         zip.add_index_metadata("sample_metadata", &provenance)
+            .map_err(MzmlConvertError::Json)?;
+
+        // 7. Emit metadata.sample_list (SM-05 query surface).
+        //
+        //    Project doc.samples into [{id, name, parameters:[]}] — one entry per distinct
+        //    SDRF source name (first-seen order). parameters is EMPTY (lean RATIFIED-G posture;
+        //    full characteristics→Param shaping and SM-07 factor_values are deferred ≥v0.9;
+        //    the verbatim blob holds full fidelity). The parameters key is always PRESENT (required
+        //    by schema/sample_list.json items.required).
+        //
+        //    Emitted unconditionally within the --sdrf arm (even a single-sample SDRF gets a
+        //    one-entry list). The key "sample_list" matches the contract doc §3.11.
+        let sample_list = crate::sdrf::project_sample_list(&doc);
+        zip.add_index_metadata("sample_list", &sample_list)
             .map_err(MzmlConvertError::Json)?;
     }
 
