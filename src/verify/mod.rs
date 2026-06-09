@@ -31,4 +31,9 @@ pub use report::{Mismatch, MismatchAxis, VerificationReport, VerifyError};
 pub use verify::{verify_against_source, verify_roundtrip, verify_streaming};
 
 pub mod geometry;
+// Public verify API (NOT test-only): `assert_declared_geometry_symmetry` + `GeometrySymmetry`
+// are the forward↔reverse declared-geometry symmetry check (GEOF-01). They are `pub` because the
+// integration test `tests/geometry_roundtrip.rs` consumes them across the crate boundary, and they
+// are a legitimate part of the verify surface a downstream consumer can call to validate a
+// reverse-converted imzML's declared geometry (FIX-6).
 pub use geometry::{GeometryFieldMismatch, GeometrySymmetry, assert_declared_geometry_symmetry};

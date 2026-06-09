@@ -41,6 +41,11 @@ use crate::schema::tolerance::ToleranceContract;
 ///
 /// Do NOT construct this struct directly — use [`numpress_linear_transform`] so the CURIE and
 /// tolerances are guaranteed to come from their single-source accessors.
+///
+/// FIX-6: the fields are `pub(crate)`, not `pub`. The record is consumed by external readers
+/// only via its SERIALIZED JSON form in `FileIndex.metadata["transform"]` (serde reads the fields
+/// regardless of visibility) — no out-of-crate code needs to construct or mutate the struct
+/// directly, so the writable surface stays crate-internal.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct TransformRecord {
@@ -48,29 +53,29 @@ pub struct TransformRecord {
     /// linear prediction m/z compression).  Sourced from
     /// [`crate::schema::cv::numpress_linear_curie`] — shared with the array-index `transform`
     /// field the vendored writer stamps.
-    pub transform: String,
+    pub(crate) transform: String,
 
     /// Human-readable name of the transform (informative).
-    pub name: String,
+    pub(crate) name: String,
 
     /// Data axis the transform applies to.  Numpress-linear is m/z-only; intensity remains
     /// lossless.
-    pub axis: String,
+    pub(crate) axis: String,
 
     /// Conformance level this transform record declares (`"L2"`).
-    pub conformance_level: String,
+    pub(crate) conformance_level: String,
 
     /// m/z maximum relative error.  Sourced from [`ToleranceContract::L2`]`.mz_rel_err`; never
     /// hard-coded.
-    pub mz_rel_err: f64,
+    pub(crate) mz_rel_err: f64,
 
     /// Intensity maximum relative error.  Sourced from [`ToleranceContract::L2`]`.intensity_rel_err`;
     /// never hard-coded.
-    pub intensity_rel_err: f64,
+    pub(crate) intensity_rel_err: f64,
 
     /// `data_processing` step id that produced this transform (references the mzPeak
     /// `data_processings` facet).
-    pub data_processing_ref: String,
+    pub(crate) data_processing_ref: String,
 }
 
 /// Build the canonical file-level transform record for a numpress-linear m/z conversion.
