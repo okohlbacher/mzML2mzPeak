@@ -160,7 +160,10 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
   2. Declared `absolute_offset_um` is populated where the source declares it.
   3. Forward↔reverse geometry symmetry is preserved (the existing reverse parser round-trips the declared values with a `src/verify/` assertion).
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+- [ ] 25-01-PLAN.md — Consistency guard: declared-vs-observed grid check in IndexAccumulator::fold_into; keep observed_max + counted warning on inconsistency (no fabrication); surface on convert + CLI (GEOF-01)
+- [ ] 25-02-PLAN.md — Declared-grid+.ibd fixture; end-to-end convert-path declared-flip + scan_settings_list test; src/verify/ forward↔reverse declared-geometry symmetry assertion; spec-suggestions consistency note (GEOF-01)
 
 ### Phase 26: Reverse `<sourceFileList>` copy (RSRC)
 
@@ -225,7 +228,7 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 | 22. Upstream PR prep | 0/? | Deferred (held) | - |
 | 23. Upstream rebase + re-verify | inline | ✅ Done | 2026-06-08 |
 | 24. Spec alignment & CV governance | 3/3 | Complete   | 2026-06-09 |
-| 25. Forward declared-geometry threading | 0/? | Not started | - |
+| 25. Forward declared-geometry threading | 0/2 | Planned | - |
 | 26. Reverse `<sourceFileList>` copy | 0/1 | Planned | - |
 | 27. SDRF sample model + channels + reporter-quant | 0/? | Not started | - |
 | 28. L2 conformance verify path | 0/? | Not started | - |
