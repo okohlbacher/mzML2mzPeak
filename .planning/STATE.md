@@ -390,6 +390,7 @@ Items deferred out of v0.7:
 | 260609-8tf | Re-check MetaboLights pub status (MTBLS13204 published → paper note; 11550/12824 still unpublished) | 2026-06-09 |
 | 260609-8wo | Reconcile dir-name vs in-file instrument model — `agilent-qtof`→6490 QqQ, `waters-xevo-g2s-qtof`→G2-XS (kept names + caveats) | 2026-06-09 |
 | 260609-hhj | S3 index: per-accordion raw/mzML/mzPeak size+% headers (imaging RAW incl. optical) + per-category compression box-scatter PNGs embedded in each subpage (examples >50 MB input) | 2026-06-09 |
+| 260609-rfp | Make SDRF/ISA projections run-filtered — sample_list and channels scoped to matched rows only (v0.8.1 patch) | 2026-06-09 |
 
 ## Session Continuity
 
