@@ -974,6 +974,16 @@ mod tests {
             text.contains("<spectrumList count=\"7\""),
             "spectrumList count matches"
         );
+        // Phase 26 (RSRC-01): when source_files is empty (new() passes &[]), the old hardcoded
+        // sf_reverse block is gone and NO <sourceFileList> is emitted at all (back-compat no-op).
+        assert!(
+            !text.contains("sf_reverse"),
+            "Phase 26: sf_reverse hardcode must be removed (replaced by write_source_file_list_to)"
+        );
+        assert!(
+            !text.contains("<sourceFileList"),
+            "Phase 26: empty source_files -> no <sourceFileList> emitted (back-compat no-op)"
+        );
 
         fs::remove_dir_all(&dir).ok();
     }
