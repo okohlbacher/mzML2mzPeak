@@ -82,12 +82,12 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
 
 ### Unified model + SDRF reader + verbatim embed = TRUE MVP (SM-01..04) — Phase 31
 
-- [ ] **SM-01** — Unified format-agnostic `StudyMetadata` model (`GlobalContext` / `Sample` / `Assay` /
+- [x] **SM-01** — Unified format-agnostic `StudyMetadata` model (`GlobalContext` / `Sample` / `Assay` /
   `TypedValue` / `Channel` / `VerbatimBundle` / `Diagnostic`) + the own `SourceCurie` type; `TypedValue`
   is the single place the cvParam/userParam decision (Cornerstone A) is made, with an `extra` slot
   preserving long-tail SDRF cell tokens (`MT/TA/PP/CT/PS/…`) verbatim.
 
-- [ ] **SM-02** — `csv` SDRF reader: `delimiter(b'\t')`, `flexible(true)`, **`quoting(false)`**; parse cells
+- [x] **SM-02** — `csv` SDRF reader: `delimiter(b'\t')`, `flexible(true)`, **`quoting(false)`**; parse cells
   on the real SDRF key grammar (`NT, AC, MT, TA, PP, CT, QY, PS, SP, CN, CV, CL, MH, ML, VV` — no `TT`);
   reserved sentinels (`not available`/`not applicable`/`anonymized`) → `is_na`; **plus the `convert_mzml`
   finalize-seam refactor** (the plain-mzML path has no post-spectrum embed seam today — refactor `finish()`
@@ -95,7 +95,7 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
   helper** (`start_for_entry(FileEntry::new(name, EntityType::Other("sample-metadata"),
   DataKind::Other("sdrf")))`, NOT `start_other`) + the net-new `--sdrf` CLI layer.
 
-- [ ] **SM-03** — File-row matching: keep rows whose **`comment[data file]`** (canonical required binding
+- [x] **SM-03** — File-row matching: keep rows whose **`comment[data file]`** (canonical required binding
   column; `comment[file uri]` is a secondary hint) matches this mzML by **path-stripped basename** across
   sibling extensions (`.raw`/`.d`/`.wiff`/`.mzML`/`.mzml`); record the matched name + a diagnostic;
   zero-match / multi-match emits a **loud diagnostic** and does **not** fail the conversion.

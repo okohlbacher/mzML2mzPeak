@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: > **RELOCATED TO v0.8 — 2026-06-09
-status: completed
+status: executing
 stopped_at: v0.7 COMPLETE — all 9 active reqs done; Phases 22 (PRs) + 27 (SDRF) + 29 (de-vendor) relocated to v0.8; ready to archive/tag
-last_updated: "2026-06-09T07:44:11.068Z"
+last_updated: "2026-06-09T08:06:11.189Z"
 last_activity: 2026-06-09 — Milestone v0.8 formalized (REQUIREMENTS/ROADMAP/PROJECT/STATE from the ratified design)
 progress:
   total_phases: 3
@@ -188,6 +188,7 @@ v0.7 decisions will be logged here per plan. v0.6 decisions are archived in
 `milestones/v0.6-ROADMAP.md` + PROJECT.md Key Decisions.
 
 **Phase 30 Plans 30-01..03 (2026-06-09):**
+
 - SMCVG-01 (30-01): SourceCurie verbatim-string passthrough type; first-colon split rule; MissingColon = userParam dispatch signal; zero ontology deps.
 - SMCVG-02/SMSPEC-02 (30-02): MS:1002602 via curie! macro; channel_role_token + reporter_ion_mz_token as stable tokens (no PSI-MS 4.1.x accession); three carve-out pub const strings for Phase 31.
 - SMSPEC-03 (30-03): StudyMetadata fields = dataset_accession / title / sample_metadata_ref (required) + optional run_sample_binding Phase-32 shadow; sample_list.json reuses v0.6 id/name/parameters (RATIFIED-E confirmed; no channel_list); inlined param shape (schema/param.json absent); pub use source_curie + pub use study wired in mod.rs.
@@ -364,7 +365,7 @@ Items deferred out of v0.7:
 
 ## Session Continuity
 
-Last session: 2026-06-09T07:44:11.065Z
+Last session: 2026-06-09T08:06:11.185Z
 Stopped at: v0.7 COMPLETE — all 9 active reqs done; Phases 22 (PRs) + 27 (SDRF) + 29 (de-vendor) relocated to v0.8; ready to archive/tag
 Resume file: None
 
