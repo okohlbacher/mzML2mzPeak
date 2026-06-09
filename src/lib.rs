@@ -20,11 +20,6 @@ pub mod write;
 pub mod verify;
 pub mod reverse;
 
-// SDRF (Sample and Data Relationship Format) module — Phase 27 (SDRF-01/SDRF-03/CHAN-01).
-// Parses SDRF TSV into a typed model; classifies isobaric vs label-free; matches rows by
-// data-file basename. Library-only (thiserror error enum; no anyhow here).
-pub mod sdrf;
-
 // Binary-only front-end (CLI-01..CLI-04, Plan 06-02). `anyhow`/`indicatif` are confined to
 // this module — the read/write/verify/schema/integrity layers stay free of both (CLAUDE.md).
 pub mod cli;
