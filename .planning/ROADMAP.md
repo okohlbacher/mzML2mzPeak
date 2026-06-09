@@ -1,40 +1,16 @@
 # Roadmap: mzML2mzPeak
 
-> **Active milestone: v0.7 — Upstream rebase, CV governance & spec-governed conformance hardening.**
-> Phases 22–29, **9 active requirements** (REB / SPEC / CVG / GEOF / RSRC / L2), **all DONE**.
-> Numbering continues from v0.6's Phase 21 (do **not** reset). v0.3 (forward), v0.4 (reverse), v0.5
-> (index enrichment + optical import), and v0.6 (spec conformance) are shipped.
+> **Active milestone: v0.8 — Sample-metadata ingestion (SDRF + ISA) AND upstreaming / de-vendoring finish.**
+> Numbering continues from v0.7's Phase 29 (do **not** reset). v0.3 (forward), v0.4 (reverse), v0.5
+> (index enrichment + optical import), v0.6 (spec conformance), and v0.7 (upstream rebase + CV governance
+> + conformance hardening) are shipped.
 >
-> **Phases 22 + 29 relocated to v0.8 — 2026-06-09 (owner, closing the v0.7 milestone).** The upstream-PR
-> prep (Phase 22 — UPS-01 chunk_series PR + UPS-03 mzPeakValidator PR) and the de-vendor (Phase 29 —
-> DVN-01 + DVN-02) are **moved to v0.8** (its upstreaming/de-vendoring finish), exactly like the SDRF
-> Phase 27 relocation. They are non-blocking external work (held PRs + de-vendor gated on chunk_series
-> upstreamed + mzdata 0.64.2 on crates.io). With them gone, **every remaining v0.7 requirement is DONE**;
-> v0.7 is a fully-complete milestone. Phases 22/27/29 become "relocated to v0.8" stubs (numbering
-> unchanged). UPS-02/UPS-04 stay as done-upstream notes.
->
-> **SDRF relocated to v0.8 + v0.7 re-themed — 2026-06-09 (owner + CODEX adversarial review).** The SDRF
-> sample-metadata + isobaric-channel cluster (Phase 27, SDRF-01..05 + CHAN-01..03) is **moved to v0.8**;
-> the SDRF code was reverted (27-01 parser misaligned with the v0.8 design draft). v0.7 is re-themed from
-> "sample-metadata modeling" to **spec-governed conformance hardening** — the Phase-23 rebase onto current
-> upstream + CV governance + declared-geometry threading + reverse provenance + L2 conformance. The
-> milestone stays **8 phases (22–29)** (Phases 22/27/29 become "relocated to v0.8" stubs; numbering
-> unchanged). **v0.7 carries NO new dependency** (the `csv` dep went with the SDRF revert).
->
-> **Re-scoped 2026-06-08 (owner decision).** The imaging-structure cluster (pixel facet, ROI polygons,
-> continuous shared-axis, `images.parquet`) is **deferred beyond v1.0** — v0.7 is not spatial/imaging
-> modeling. The 4 imaging requirements (PIX-01, ROI-01, CONT-01, IMG-01) are recorded under REQUIREMENTS
-> "Deferred beyond v1.0" and are **not** v0.7 phases.
->
-> *(Prior 2026-06-08 spec-comparison review against the newly-split
-> [`HUPO-PSI/mzPeak-specification`](https://github.com/HUPO-PSI/mzPeak-specification) repo + the impl
-> repo's "vast torrents" rewrite + PSI-committee notes added REB-01 + SPEC-01/02/03 and changed UPS-04 /
-> ROI-01. That review's findings stand.)*
->
-> **Release semantics.** v0.7 is **COMPLETE** — all 9 active requirements DONE (REB-01, SPEC-01/02/03,
-> CVG-01/02, GEOF-01, RSRC-01, L2-01); Phases 23/24/25/26/28 done. Phases 22 (held upstream PRs) and 29
-> (de-vendor, externally gated) are **RELOCATED TO v0.8** (its upstreaming/de-vendoring finish); Phase 27
-> (SDRF) relocated to v0.8. Ready to archive/tag.
+> **v0.7 shipped 2026-06-09 (tag `v0.7`).** Archived to
+> [`milestones/v0.7-ROADMAP.md`](milestones/v0.7-ROADMAP.md) +
+> [`milestones/v0.7-REQUIREMENTS.md`](milestones/v0.7-REQUIREMENTS.md). Phases **22, 27, 29 were relocated
+> to v0.8** — the upstreaming/de-vendoring work (Phase 22 held PRs / UPS-01+03; Phase 29 de-vendor /
+> DVN-01+02) and the SDRF sample-metadata + isobaric-channel cluster (Phase 27 / SDRF-01..05 + CHAN-01..03).
+> They keep their numbers and are detailed in the v0.8 section below.
 
 ## Shipped Milestones
 
@@ -52,6 +28,15 @@
   5/5 E2E). Archive: [`milestones/v0.6-ROADMAP.md`](milestones/v0.6-ROADMAP.md) ·
   [`milestones/v0.6-MILESTONE-AUDIT.md`](milestones/v0.6-MILESTONE-AUDIT.md).
 
+- **v0.7 — Upstream rebase, CV governance & spec-governed conformance hardening** ✅ 2026-06-09 — 5 phases
+  (23/24/25/26/28; 22/27/29 relocated to v0.8), 9/9 active requirements. Rebase onto current upstream
+  (mzpeak `a5c222c` + mzdata `0.64.2`, dropping 2 of 3 patches) + single-source CV governance / no-drift
+  `cvList` + declared-geometry threading + reverse `<sourceFileList>` provenance + L2 conformance + recorded
+  transform; CODEX adversarial hardening (6 fixes). **380 tests green**; audit PASSED. Archive:
+  [`milestones/v0.7-ROADMAP.md`](milestones/v0.7-ROADMAP.md) ·
+  [`milestones/v0.7-REQUIREMENTS.md`](milestones/v0.7-REQUIREMENTS.md) ·
+  [`milestones/v0.7-MILESTONE-AUDIT.md`](milestones/v0.7-MILESTONE-AUDIT.md).
+
 ## Phases
 
 > **Standing cross-cutting criterion (XRT).** Every phase that emits a NEW facet / metadata block /
@@ -59,33 +44,27 @@
 > symmetry (define the facet's reverse fate + a `src/verify/` round-trip assertion), (b) keep
 > masking-aware L1 intact, (c) pass mzPeakValidator with the new column's `sorting_rank` gating
 > recognized, (d) be modeled via the updated spec's mechanisms **and captured as a spec-extension
-> proposal to `HUPO-PSI/mzPeak-specification`** (SPEC-01/02 — submitted as a BATCH at the END of v0.7;
-> the v0.7 batch is **narrowed** to cv_list + scan_settings_list/IMS geometry + L2 transform-record —
-> the SDRF/channel proposals moved to the v0.8 batch), and (e) obey the **three-places rule** (`src/…` +
-> `docs/mzpeak-imaging-spec-suggestions.md` + the matching `schema/*.json`). The pinned stack
-> (`arrow`/`parquet` = 57.0.0, `zip` = 4.1.0, `mzpeaks` = 1.0.9) holds every phase; **v0.7 adds NO new
-> dependency** (the `csv` dep was reverted with the SDRF relocation to v0.8).
+> proposal to `HUPO-PSI/mzPeak-specification`** (submitted as a BATCH at the END of the milestone), and
+> (e) obey the **three-places rule** (`src/…` + `docs/mzpeak-imaging-spec-suggestions.md` + the matching
+> `schema/*.json`). The pinned stack (`arrow`/`parquet` = 57.0.0, `zip` = 4.1.0, `mzpeaks` = 1.0.9) holds
+> every phase; v0.8's only new dependency is `csv`.
 
-### v0.7 — Upstream rebase, CV governance & spec-governed conformance hardening (Phases 22–29)
+<details>
+<summary>✅ v0.7 Upstream rebase, CV governance & conformance hardening (Phases 22–29; 23/24/25/26/28 done, 22/27/29 → v0.8) — SHIPPED 2026-06-09</summary>
 
-> **Rebase outcome (2026-06-08, commit `5021eed`).** Phase 23 done early (owner request). Rebased onto
-> mzpeak `a5c222c` + mzdata `0.64.2`. **3 of 4 upstream issues were already fixed upstream:** mzdata
-> SONAR/IM (B1, dedicated variants), file_index serde (PR #20 → upstream `#[serde(untagged)]`), and the
-> `array_buffer` empty-spectrum bug (B2 → writer rewrite; pwiz now **139/139**). Only the **chunk_series**
-> patch remains vendored. The Phase-23 rebase (adopting current upstream + dropping 2 of 3 patches) STAYS
-> in v0.7. The remaining PR-submission (Phase 22 — UPS-01/UPS-03) and fork-removal (Phase 29 — DVN-01/02)
-> are **relocated to v0.8** (its upstreaming/de-vendoring finish): non-blocking external work — held PRs +
-> de-vendor gated on chunk_series upstreamed (DVN-01) + mzdata 0.64.2 published to crates.io (DVN-02).
-> UPS-02/UPS-04 are **done-upstream** (note, not active work). 245 lib + all integration tests green.
+- [x] Phase 23: Upstream rebase + re-verify (inline, REB-01) — 2026-06-08 (`5021eed`)
+- [x] Phase 24: Spec alignment & CV governance (3/3, SPEC-01/02/03 + CVG-01/02) — 2026-06-09
+- [x] Phase 25: Forward declared-geometry threading (2/2, GEOF-01) — 2026-06-09
+- [x] Phase 26: Reverse `<sourceFileList>` copy (1/1, RSRC-01) — 2026-06-09
+- [x] Phase 28: L2 conformance verify path (2/2, L2-01) — 2026-06-09
+- [→] Phase 22: Upstream PR prep — **RELOCATED TO v0.8** (UPS-01/03, held)
+- [→] Phase 27: SDRF sample model + isobaric channels — **RELOCATED TO v0.8** (SDRF-01..05 + CHAN-01..03)
+- [→] Phase 29: De-vendor — drop both vendored forks — **RELOCATED TO v0.8** (DVN-01/02, gated)
 
-- [ ] **Phase 22: Upstream PR prep** *(RELOCATED TO v0.8)* - **MOVED TO v0.8** (2026-06-09, owner — closing the v0.7 milestone). Submit the chunk_series PR (UPS-01) + the mzPeakValidator PR (UPS-03); non-blocking external work the owner is holding. UPS-02 (mzdata SONAR/IM) + UPS-04 (array_buffer B2) are **done-upstream** (fixed by the rebase) — no action. UPS-01/UPS-03 now live in REQUIREMENTS.md "Moved to v0.8 — upstreaming & de-vendoring" + the v0.8 upstreaming work stream. See Phase Details (prefixed RELOCATED).
-- [x] **Phase 23: Upstream rebase + re-verify** - ✅ DONE 2026-06-08 (`5021eed`). mzpeak→`a5c222c`, mzdata→`0.64.2`; 2 of 3 patches dropped (upstreamed); only chunk_series remains; build + full test suite green; pwiz 139/139.
-- [x] **Phase 24: Spec alignment & CV governance** - **✅ DONE 2026-06-09** (all 3 plans — SPEC-01/02/03 + CVG-01/02). TODO(F9) resolved; reverse `<cvList>` driven from `cv_list()` (no-drift by construction); CVG-02 guard test; imagingMS.obo confirmed current; docs/cv-requests.md created (IMS home + TMTpro 132–135 gap). SPEC-02 batch narrowed to v0.7-only items (SDRF/channel proposals moved to v0.8). 247 tests green.
-- [x] **Phase 25: Forward declared-geometry threading (GEO-F)** - Thread imzML `<scanSettings>` declared grid; flip `pixel_count_source` to "declared". **✅ DONE** (both plans complete — GEOF-01).
-- [x] **Phase 26: Reverse `<sourceFileList>` copy (RSRC)** - Re-emit `file_description.source_files[]` provenance into the reverse `.imzML`. **✅ DONE** (RSRC-01).
-- [ ] **Phase 27: SDRF sample model + isobaric channels + reporter-quant** - **MOVED TO v0.8** (2026-06-09, owner + CODEX adversarial review). SDRF code reverted (27-01 parser misaligned with the v0.8 design); the 27-CONTEXT + 27-01..06 plans are kept as v0.8 groundwork. v0.7 carries NO SDRF code/dep. See Phase Details (prefixed RELOCATED) + `.planning/milestones/v0.8-DESIGN-DRAFT.md`.
-- [x] **Phase 28: L2 conformance verify path (F10)** ✅ DONE 2026-06-09 (`6f729a3`) - `--conformance l2` value-equal-under-recorded-transform arm on `ToleranceContract::L2`; transform recorded (file-level + array-index, single CURIE source). L2-01 closed.
-- [ ] **Phase 29: De-vendor — drop both vendored forks** *(RELOCATED TO v0.8)* - **MOVED TO v0.8** (2026-06-09, owner — closing the v0.7 milestone). Remove `[patch]` blocks + `vendor/`; gated on chunk_series upstreamed (DVN-01; needs Phase 22's PR merged) + mzdata 0.64.2 published to crates.io (DVN-02). file_index serde already fixed upstream. DVN-01/DVN-02 now live in REQUIREMENTS.md "Moved to v0.8 — upstreaming & de-vendoring" + the v0.8 upstreaming/de-vendoring work stream. See Phase Details (prefixed RELOCATED).
+Full detail: [`milestones/v0.7-ROADMAP.md`](milestones/v0.7-ROADMAP.md). Phases 22/27/29 are detailed in
+the v0.8 section below (numbering unchanged).
+
+</details>
 
 <details>
 <summary>✅ v0.6 Spec conformance — dtypes + CV/geometry/provenance (Phases 16–21) — SHIPPED 2026-06-06</summary>
@@ -146,75 +125,9 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 
 **Plans**: TBD
 
-### Phase 23: Upstream rebase + re-verify
-
-**Goal**: Adopt current upstream before building any new facet — bump the vendored stack to current HEAD, re-apply only the still-needed patches onto the rewritten writer API, and re-verify green, so all new v0.7 facets are built on the current API, not the stale rev. **✅ DONE 2026-06-08 (`5021eed`).**
-**Depends on**: Nothing (executed first, out of order, by owner request). Precedes every new-facet phase.
-**Requirements**: REB-01
-**Success Criteria** (what must be TRUE):
-
-  1. ✅ The vendored `mzpeak_prototyping` rev is bumped `8435967`→`a5c222c` and `mzdata` `0.64.1`→`0.64.2`, with the hard pins (`arrow`/`parquet` = 57.0.0, `zip` = 4.1.0, `mzpeaks` = 1.0.9) unchanged.
-  2. ✅ Only the still-needed patch (chunk_series) is re-applied; the 2 patches fixed upstream (mzdata SONAR/IM; file_index serde via PR #20) are dropped with recorded reasons; the `array_buffer` B2 bug is confirmed fixed by the writer rewrite.
-  3. ✅ The full test suite + corpus e2e are green against the rebased vendored stack (245 lib + all integration; pwiz 139/139; imaging Other-member round-trip intact).
-
-**Plans**: Completed inline (rebase task).
-
-### Phase 24: Spec alignment & CV governance — ✅ DONE 2026-06-09
-
-> **SPEC-02 scope narrowed (2026-06-09).** When SDRF relocated to v0.8, the end-of-v0.7 batch was
-> narrowed to v0.7-only proposals — cv_list (P-01), scan_settings_list/IMS declared-geometry (P-06), L2
-> transform-record (P-07). The SDRF/channel write-ups (P-02..P-05) + the SDRF §5.7 committee
-> open-questions moved to the v0.8 batch (see `docs/mzpeak-spec-proposal-queue.md`). Criterion 2 below is
-> superseded by that narrowing (kept verbatim for history).
-
-**Goal**: Establish a single authoritative source of all CV facts AND align every new v0.7 facet to the rewritten spec's own mechanisms before any term lands in the already-public corpus. Resolve the v0.6 `TODO(F9)` IMS URI placeholders, reconcile the v0.6 `cv_list` with the new spec, and prepare the imaging/SDRF/channel extension write-ups for a single END-of-milestone batch submission so the format stays mergeable-by-design.
-**Depends on**: Phase 23 (rebased onto the current spec/API surface). Ordered first among emitting work so no provisional CURIE or ad-hoc structure is baked in. *(Originally "precedes every term-emitting phase (27)"; Phase 27 relocated to v0.8.)*
-**Requirements**: SPEC-01, SPEC-02 (scope narrowed), SPEC-03, CVG-01, CVG-02
-**Success Criteria** (what must be TRUE):
-
-  1. Every planned new facet/metadata block is mapped to the spec's own mechanisms — file-level metadata as JSON in the `metadata` data-kind KV, new members via the documented "Adding a new Data Kind / Entity Type" process, CV concepts via column-name inflection + `parameters` — recorded as the binding design contract (no ad-hoc structures); all built LOCALLY against stable CV tokens (no blocking on IMS URI minting).
-  2. The SDRF/sample/channel extension write-ups are prepared and **queued for a single BATCH proposal/PR to `HUPO-PSI/mzPeak-specification` at the END of v0.7** (not submitted incrementally); the committee's open questions (SDRF §5.7) are tracked.
-  3. The v0.6 `cv_list` block is kept as a file-level JSON block but reconciled with the rewritten spec's CV-declaration mechanism (the spec defines no `cv_list`) — confirmed, aligned, or queued as a proposal, with the decision recorded.
-  4. Canonical IMS CV accessions are declared once in `src/schema/cv.rs` (the `TODO(F9)` placeholders are gone), forward emit and reverse `<cvList>` read the same constants and are proven not to drift, and the vendored `imagingMS.obo` is refreshed before any new accession is referenced; missing terms use stable tokens + a filed file-level CV request.
-  5. CV decode is keyed by CURIE (not column name), closing the documented B1/B2/B3/C1/C3/D11 drift classes; the TMTpro 16/18-plex CV gap is documented and a term request is filed.
-
-**Plans**: 3 plans
-
-- [x] 24-01-PLAN.md — CV single-source hardening: resolve TODO(F9), refresh imagingMS.obo, drive reverse `<cvList>` from `cv_list()`, no-drift + decode-by-CURIE guard tests, `docs/cv-requests.md` (CVG-01, CVG-02)
-- [x] 24-02-PLAN.md — Binding extension-design-contract doc mapping every v0.7 facet to spec mechanisms + cv_list reconciliation note (SPEC-01, SPEC-03)
-- [x] 24-03-PLAN.md — End-of-v0.7 batch-proposal queue stub + SDRF §5.7 committee-questions tracker (SPEC-02, held)
-
-**UI hint**: yes
-
-### Phase 25: Forward declared-geometry threading (GEO-F)
-
-**Goal**: The forward path threads imzML `<scanSettings>` *declared* geometry beyond parsed coordinates, so a source that declares its grid is honored as authoritative.
-**Depends on**: Phase 24 (CV/spec alignment settled; reuses the existing reverse geometry parser). Parallel-able with Phase 26.
-**Requirements**: GEOF-01
-**Success Criteria** (what must be TRUE):
-
-  1. When the source `<scanSettings>` declares grid counts, the forward path emits `pixel_count_source: "declared"` (not the parsed-coordinate fallback).
-  2. Declared `absolute_offset_um` is populated where the source declares it.
-  3. Forward↔reverse geometry symmetry is preserved (the existing reverse parser round-trips the declared values with a `src/verify/` assertion).
-
-**Plans**: 2 plans
-
-- [x] 25-01-PLAN.md — Consistency guard: declared-vs-observed grid check in IndexAccumulator::fold_into; keep observed_max + counted warning on inconsistency (no fabrication); surface on convert + CLI (GEOF-01)
-- [x] 25-02-PLAN.md — Declared-grid+.ibd fixture; end-to-end convert-path declared-flip + scan_settings_list test; src/verify/ forward↔reverse declared-geometry symmetry assertion; spec-suggestions consistency note (GEOF-01)
-
-### Phase 26: Reverse `<sourceFileList>` copy (RSRC)
-
-**Goal**: The reverse path copies `file_description.source_files[]` back into the emitted `.imzML` `<sourceFileList>`, restoring original vendor-RAW provenance on the round-trip.
-**Depends on**: Phase 24 (CV/spec alignment). Parallel-able with Phase 25.
-**Requirements**: RSRC-01
-**Success Criteria** (what must be TRUE):
-
-  1. A reverse-emitted `.imzML` carries a `<sourceFileList>` reconstructed from the archive's `file_description.source_files[]`.
-  2. The original source-file provenance (id, name, params) survives a forward→reverse round-trip with a `src/verify/` assertion.
-
-**Plans**: 1 plan
-
-- [x] 26-01-PLAN.md — Wire read-back `file_description.source_files[]` into the reverse `.imzML` `<sourceFileList>` (faithful id/name/location + UUID/checksum CURIEs; absent ⇒ no list, byte-unchanged) + forward→reverse provenance round-trip assertion (RSRC-01) [TDD]
+> **Phases 23/24/25/26/28 (the completed v0.7 work) — full Phase Details archived to**
+> [`milestones/v0.7-ROADMAP.md`](milestones/v0.7-ROADMAP.md). Only the relocated-to-v0.8 stubs (22, 27, 29)
+> keep their detail blocks here.
 
 ### Phase 27: SDRF sample model + isobaric channels + reporter-quant — RELOCATED TO v0.8
 
@@ -253,24 +166,6 @@ Plans:
 - [ ] 27-06-PLAN.md — repo-SDRF-wins precedence + three-places docs + XRT validator/L1 sweep (SDRF-05)
 
 **UI hint**: yes
-
-### Phase 28: L2 conformance verify path (F10)
-
-**Goal**: Wire an L2 conformance verify path (value-equal under a recorded transform) into the CLI on top of the existing `ToleranceContract::L2`, recording the transform.
-**Depends on**: Phase 24 (transform-record CURIEs). Independent of the SDRF cluster; small and self-contained.
-**Requirements**: L2-01
-**Success Criteria** (what must be TRUE):
-
-  1. A `--conformance l2` CLI flag selects the L2 verify arm in `compare.rs`.
-  2. The applied transform (CURIE + tolerance) is recorded in the array index and `metadata`, including the array's `sorting_rank` context.
-  3. L2 value-equal-under-transform passes the acceptance comparator where L1 strict equality would not.
-
-**Plans**: 2 plans
-
-Plans:
-
-- [x] 28-01-PLAN.md — L2 transform record: TransformRecord type + single-source numpress-linear CURIE (MS:1002312) in cv.rs + schema/transform.json + file-level metadata.transform emit from convert_mzml + spec write-up (three-places) (L2-01)
-- [x] 28-02-PLAN.md — --conformance l1|l2 CLI flag (default l1, byte-unchanged) + L2 verify-arm wiring + integration test: numpress fails L1 / passes L2-within-bounds / carries transform record; --no-numpress stays L1-clean (L2-01)
 
 ### Phase 29: De-vendor — drop both vendored forks — RELOCATED TO v0.8
 
@@ -414,20 +309,10 @@ Plans:
 
 ## Progress
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 22. Upstream PR prep | — | **RELOCATED TO v0.8** | 2026-06-09 |
-| 23. Upstream rebase + re-verify | inline | ✅ Done | 2026-06-08 |
-| 24. Spec alignment & CV governance | 3/3 | ✅ Done   | 2026-06-09 |
-| 25. Forward declared-geometry threading | 2/2 | ✅ Done | 2026-06-09 |
-| 26. Reverse `<sourceFileList>` copy | 1/1 | ✅ Done   | 2026-06-09 |
-| 27. SDRF sample model + channels + reporter-quant | — | **RELOCATED TO v0.8** | 2026-06-09 |
-| 28. L2 conformance verify path | 2/2 | ✅ Done   | 2026-06-09 |
-| 29. De-vendor both forks | — | **RELOCATED TO v0.8** | 2026-06-09 |
-
-**Status:** v0.7 is **COMPLETE** — all 9 active requirements DONE (REB-01, SPEC-01/02/03, CVG-01/02,
-GEOF-01, RSRC-01, L2-01); Phases 23/24/25/26/28 done. Phases 22 (upstream PRs) + 29 (de-vendor) +
-27 (SDRF) relocated to v0.8. Ready to archive/tag.
+**v0.7 — ✅ SHIPPED 2026-06-09 (tag `v0.7`).** All 9 active requirements DONE (REB-01, SPEC-01/02/03,
+CVG-01/02, GEOF-01, RSRC-01, L2-01); Phases 23/24/25/26/28 done; Phases 22/27/29 relocated to v0.8.
+380 tests green; audit PASSED. Full breakdown:
+[`milestones/v0.7-ROADMAP.md`](milestones/v0.7-ROADMAP.md).
 
 ### v0.8 — Sample-metadata ingestion (SDRF + ISA) + upstreaming/de-vendoring finish — laid down 2026-06-09 (additive)
 
@@ -470,12 +355,13 @@ post-deposition injection (Phase 38 / INJECT-*). Canonical design:
 
 See REQUIREMENTS.md → "Deferred beyond v1.0 — imaging structure (F6/F7/F8)" for the canonical entries.
 
-## Backlog — Realized in v0.7
+## Backlog — Realized in v0.7 (shipped 2026-06-09)
 
-> The 999.x backlog below is realized across v0.7 phases 22–29 (history preserved, not deleted).
+> The 999.x backlog below was realized across the v0.7 phases (history preserved, not deleted).
 > Pointers map each open backlog item to its phase. The upstreaming/de-vendoring items (999.1/999.6/999.8
-> → Phases 22 + 29) are **relocated to v0.8** (non-blocking external work). The DONE items (999.2/3/4) are
-> kept as shipped history. The collapsed sections retain the original analysis for provenance.
+> → Phases 22 + 29) are **relocated to v0.8** (non-blocking external work, carried open). The DONE items
+> (999.2/3/4) are kept as shipped history. The collapsed sections retain the original analysis for
+> provenance. Full v0.7 phase detail: [`milestones/v0.7-ROADMAP.md`](milestones/v0.7-ROADMAP.md).
 
 **Backlog → v0.7 phase rollup:**
 

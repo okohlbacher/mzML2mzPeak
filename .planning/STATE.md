@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v0.7
 milestone_name: — Upstream rebase, CV governance & spec-governed conformance hardening
-status: in_progress
-stopped_at: v0.7 COMPLETE — all 9 active reqs done; Phases 22 (upstream PRs) + 27 (SDRF) + 29 (de-vendor) relocated to v0.8; ready to archive/tag (run /gsd:complete-milestone)
+status: complete
+stopped_at: v0.7 SHIPPED (tag v0.7) — archived to milestones/v0.7-ROADMAP.md + v0.7-REQUIREMENTS.md; run /gsd:new-milestone for v0.8 (SDRF + de-vendor finish)
 last_updated: "2026-06-09T05:48:07.393Z"
-last_activity: 2026-06-09 — Relocated Phases 22 (PRs) + 29 (de-vendor) to v0.8 + re-themed v0.7 (owner, closing milestone); v0.7 now 9 active reqs ALL DONE (REB/SPEC/CVG/GEOF/RSRC/L2); 22/27/29 → v0.8 stubs.
+last_activity: 2026-06-09 — Archived v0.7 milestone (complete-milestone): created v0.7 archive files, collapsed ROADMAP, git-rm'd active REQUIREMENTS.md, updated MILESTONES/PROJECT/STATE. v0.7 SHIPPED (9/9 reqs done); 22/27/29 → v0.8.
 progress:
   total_phases: 8
   completed_phases: 5
@@ -39,15 +39,16 @@ DONE**; **v0.7 carries NO new dependency** (the `csv` dep went with the SDRF rev
 
 ## Current Position
 
-Phase: **v0.7 COMPLETE — ready to archive/tag; 22/27/29 → v0.8.**
+**v0.7 SHIPPED (tag v0.7) — run /gsd:new-milestone for v0.8 (SDRF + de-vendor finish).**
 Plan: —
-Status: All 9 active reqs DONE (REB-01, SPEC-01/02/03, CVG-01/02, GEOF-01, RSRC-01, L2-01); Phases
-23/24/25/26/28 done. Phase 22 (UPS-01/03 — chunk_series + validator PRs, held), Phase 29 (DVN-01/02 —
-de-vendor, gated), and Phase 27 (SDRF) are all **relocated to v0.8** — none gated the v0.7 release. Full
-suite: 380 tests green; milestone audit PASS (`.planning/v0.7-MILESTONE-AUDIT.md`).
-Next: run `/gsd:complete-milestone` to archive/tag v0.7 → then v0.8 (`.planning/milestones/v0.8-DESIGN-DRAFT.md`,
-Phases 22/29 relocated + 30–37).
-Last activity: 2026-06-09 — Relocated Phases 22 (PRs) + 29 (de-vendor) to v0.8; v0.7 closed as COMPLETE (9/9 reqs done).
+Status: v0.7 **archived** — all 9 active reqs DONE (REB-01, SPEC-01/02/03, CVG-01/02, GEOF-01, RSRC-01,
+L2-01); Phases 23/24/25/26/28 done; Phases 22/27/29 relocated to v0.8. Archive files written
+(`milestones/v0.7-ROADMAP.md` + `milestones/v0.7-REQUIREMENTS.md`); active `REQUIREMENTS.md` git-rm'd
+(fresh one written when v0.8 is scoped). 380 tests green; milestone audit PASS
+(`.planning/v0.7-MILESTONE-AUDIT.md`).
+Next: v0.8 (`.planning/milestones/v0.8-DESIGN-DRAFT.md`, Phases 22/29 relocated + 30–37). Next buildable:
+Phase 30 (deps met — v0.7 Phase 24 ✅).
+Last activity: 2026-06-09 — Archived v0.7 milestone (created archive files, collapsed ROADMAP, git-rm'd active REQUIREMENTS.md, updated MILESTONES/PROJECT/STATE).
 
 
 ## v0.7 Roadmap (Phases 22–29)
@@ -290,10 +291,17 @@ None yet.
 
 ## Deferred Items
 
+> **Stale open-item acknowledgement (v0.7 close, 2026-06-09).** `gsd-sdk query audit-open` flags 2 quick
+> tasks — `260606-90y` (checksum-escape-hatch `--ignore-incorrect-checksum`) and `260606-a8f`
+> (sorting-rank `--sort-peaks` + validator handoff). **Both features already SHIPPED** (v0.6/v0.7 — see
+> "Quick Tasks Completed" below); these are **stale task records**, not real open work. No real deferral —
+> recorded here + in the MILESTONES v0.7 entry for traceability.
+
 Items deferred out of v0.7:
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
+| Stale records | **260606-90y** + **260606-a8f** — checksum-escape-hatch + sorting-rank quick tasks | 2 stale quick-task records (features already shipped) — no real deferral | v0.7 close (2026-06-09) |
 | Upstreaming | **UPS-01, UPS-03** — chunk_series PR + mzPeakValidator non-Parquet-skip PR (Phase 22, held by owner) | Relocated to v0.8 | Phase 22/29 relocation (2026-06-09) |
 | De-vendoring | **DVN-01, DVN-02** — drop `vendor/mzpeak_prototyping` + `vendor/mzdata` patches (Phase 29, gated) | Relocated to v0.8 | Phase 22/29 relocation (2026-06-09) |
 | Sample-metadata | **SDRF-01..05** — `--sdrf` ingest, verbatim embed, `sample_list`, `assay_ref`/run-binding, repo-wins precedence | Relocated to v0.8 | SDRF relocation (2026-06-09) |

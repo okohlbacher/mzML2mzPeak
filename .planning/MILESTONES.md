@@ -1,5 +1,60 @@
 # Milestones
 
+## v0.7 Upstream rebase, CV governance & spec-governed conformance hardening (Shipped: 2026-06-09)
+
+**Delivered:** Hardened the spec-governed round trip on a current-upstream base — rebase onto current
+upstream (dropping 2 of 3 patches), single-source CV governance, declared-geometry threading, reverse
+`<sourceFileList>` provenance, and L2 conformance with a recorded transform — then CODEX-hardened.
+
+**Phases completed:** 5 phases (23/24/25/26/28; Phases 22/27/29 relocated to v0.8), 8 plans, **9 active
+requirements (ALL DONE)**. **380 tests green.** Audit PASSED (buildable scope) + adversarially reviewed
+(CODEX) + hardened.
+
+**Key accomplishments:**
+
+- **Rebased onto current upstream, dropping 2 of 3 patches (Phase 23):** bumped vendored
+  `mzpeak_prototyping` `8435967`→`a5c222c` (the "vast torrents" writer rewrite) + `mzdata`
+  `0.64.1`→`0.64.2`; mzdata SONAR/IM + the `array_buffer` empty-spectrum bug + file_index serde all fixed
+  upstream, leaving only chunk_series vendored; pwiz 139/139; hard pins held (`5021eed`).
+- **Single-source CV governance / no-drift `cvList` (Phase 24):** `cv_list()` is the sole CV-fact source;
+  the reverse `<cvList>` now reads from it (no-drift by construction, guard-tested); the v0.6 `TODO(F9)`
+  IMS-URI placeholders are resolved (stable token + filed `docs/cv-requests.md`); CV decode proven keyed by
+  CURIE, not column name (closes the B1/B2/B3/C1/C3/D11 drift classes).
+- **Declared-geometry threading + consistency guard (Phase 25):** the forward path honours an imzML
+  `<scanSettings>`-declared grid as authoritative (`pixel_count_source: "declared"`); observed_max + warn on
+  inconsistency (never fabricates); forward↔reverse symmetry assertion.
+- **Reverse `<sourceFileList>` provenance (Phase 26):** reconstructs `<sourceFileList>` from
+  `file_description.source_files[]` on the reverse `.imzML` (id/name/location + UUID/checksum CURIEs);
+  absent ⇒ byte-unchanged.
+- **L2 conformance + recorded transform (Phase 28):** `--conformance l2` value-equal-under-recorded-transform
+  arm; transform recorded file-level + array-index from a single CURIE source (`MS:1002312`), backed by a
+  real `data_processing` step; L1 stays the default.
+- **Adversarial hardening (CODEX) — 6 fixes applied + regression-tested**, incl. the reverse
+  declared-geometry fabrication fix (reverse re-emitted OBSERVED extents as DECLARED `<scanSettings>` →
+  emit only when `pixel_count_source == Declared`; new `Synthetic_InconsistentGrid` fixture + tests).
+
+**Stats:**
+
+- 37 files changed (src/ + tests/), ~4,273 insertions / ~423 deletions
+- 5 phases done (8 plans), 9 active requirements (ALL DONE); 3 phases relocated to v0.8
+- 380 tests green; audit PASSED
+
+**Git range:** `5021eed` (Phase 23 rebase) → `8f96d39` (close + re-theme)
+
+**Tag:** `v0.7`
+
+**Relocated to v0.8:** SDRF (Phase 27 / SDRF-01..05 + CHAN-01..03) + upstream PRs (Phase 22 / UPS-01+03) +
+de-vendor (Phase 29 / DVN-01+02).
+
+**Known deferred at close:** 2 stale quick-task records (`260606-90y` checksum-escape-hatch, `260606-a8f`
+sorting-rank) — both features already SHIPPED (v0.6/v0.7); they are stale task records flagged by
+`audit-open`, not real deferred work. No real deferral.
+
+**What's next:** v0.8 — sample-metadata ingestion (SDRF + ISA → mzPeak) + the upstreaming/de-vendoring
+finish (Phases 22/29 relocated + 30–37).
+
+---
+
 ## v0.6 Spec conformance — dtypes + CV/geometry/provenance (Shipped: 2026-06-06)
 
 **Phases completed:** 6 phases (16–21), 16 plans, 21 requirements. **335 tests green.** Audit PASSED
