@@ -199,8 +199,8 @@ pub struct ConvertCli {
     /// writes it to the output path. This re-serves the embedded bytes (NOT a regeneration from
     /// projections — Q10 RATIFIED / VAL-01 lossless anchor).
     ///
-    /// Its own mode — mutually exclusive with `--sdrf`, `--isa`, `--reverse`, `--verify`,
-    /// `--dry-run`. The positional `output` is REQUIRED (error actionably if absent).
+    /// Its own mode — mutually exclusive with forward/reverse path flags.
+    /// The positional `output` is REQUIRED (error actionably if absent).
     #[arg(long = "reconstruct-sdrf", value_name = "ARCHIVE", conflicts_with_all = ["reconstruct_isa"])]
     pub reconstruct_sdrf: Option<PathBuf>,
 
@@ -211,8 +211,8 @@ pub struct ConvertCli {
     /// output path. For ISA-Tab bundles, tries `sample_metadata/isa/i_Investigation.txt` first;
     /// falls back to the first `sample_metadata/isa/` member found.
     ///
-    /// Its own mode — mutually exclusive with `--sdrf`, `--isa`, `--reverse`, `--verify`,
-    /// `--dry-run`. The positional `output` is REQUIRED (error actionably if absent).
+    /// Its own mode — mutually exclusive with forward/reverse path flags.
+    /// The positional `output` is REQUIRED (error actionably if absent).
     #[arg(long = "reconstruct-isa", value_name = "ARCHIVE", conflicts_with_all = ["reconstruct_sdrf"])]
     pub reconstruct_isa: Option<PathBuf>,
 }
