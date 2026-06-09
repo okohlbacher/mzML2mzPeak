@@ -265,7 +265,11 @@ Plans:
   2. The SDRF is embedded **verbatim** as a typed `sample-metadata`/`sdrf` ZIP member + a `metadata.sample_metadata` back-ref (`accession`, `source_uri`, `sha256`, `retrieved_at`).
   3. Round-trip re-serves the embedded bytes byte-for-byte; the spectral L1 round-trip is unchanged (XRT).
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+- [ ] 31-01-PLAN.md — csv dep + format-agnostic `SampleMetadataDoc`/`TypedValue` model (SourceCurie-based cvParam/userParam dispatch) + csv SDRF reader (tab/flexible/quoting(false), real key grammar) + file-row matching (SM-01..03)
+- [ ] 31-02-PLAN.md — `convert_mzml` finalize-seam refactor (finish_parquet → zip → finish) + typed-member embed helper (`start_for_entry`, carve-out tokens); byte-identical no-SDRF output (SM-02, SM-04)
+- [ ] 31-03-PLAN.md — `--sdrf` CLI + parse→match→embed wiring + `metadata.study` back-ref (Phase-30 contract) + repo-wins precedence + PXD020187 byte-identical re-serve acceptance test (SM-01..04)
 
 ### Phase 32: Lean `sample_list`/study projection + list-valued run binding
 
