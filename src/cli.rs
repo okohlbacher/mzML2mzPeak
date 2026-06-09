@@ -179,6 +179,30 @@ pub struct ConvertCli {
     /// (flag absent ⇒ `false` ⇒ no reporter-quant emit considered).
     #[arg(long = "reporter-quant")]
     pub reporter_quant: bool,
+
+    /// Re-serve the embedded SDRF member from a `.mzpeak` archive BYTE-FOR-BYTE to `<output>`.
+    ///
+    /// This is the REVERSE extract path for SDRF metadata: `mzml2mzpeak --reconstruct-sdrf
+    /// <archive.mzpeak> <out.tsv>` reads the `sample_metadata/sdrf.tsv` ZIP member verbatim and
+    /// writes it to the output path. This re-serves the embedded bytes (NOT a regeneration from
+    /// projections — Q10 RATIFIED / VAL-01 lossless anchor).
+    ///
+    /// Its own mode — mutually exclusive with `--sdrf`, `--isa`, `--reverse`, `--verify`,
+    /// `--dry-run`. The positional `output` is REQUIRED (error actionably if absent).
+    #[arg(long = "reconstruct-sdrf", value_name = "ARCHIVE", conflicts_with_all = ["reconstruct_isa"])]
+    pub reconstruct_sdrf: Option<PathBuf>,
+
+    /// Re-serve the embedded ISA member(s) from a `.mzpeak` archive BYTE-FOR-BYTE to `<output>`.
+    ///
+    /// This is the REVERSE extract path for ISA metadata: `mzml2mzpeak --reconstruct-isa
+    /// <archive.mzpeak> <out>` reads the primary ISA ZIP member verbatim and writes it to the
+    /// output path. For ISA-Tab bundles, tries `sample_metadata/isa/i_Investigation.txt` first;
+    /// falls back to the first `sample_metadata/isa/` member found.
+    ///
+    /// Its own mode — mutually exclusive with `--sdrf`, `--isa`, `--reverse`, `--verify`,
+    /// `--dry-run`. The positional `output` is REQUIRED (error actionably if absent).
+    #[arg(long = "reconstruct-isa", value_name = "ARCHIVE", conflicts_with_all = ["reconstruct_sdrf"])]
+    pub reconstruct_isa: Option<PathBuf>,
 }
 
 impl ConvertCli {
@@ -219,6 +243,14 @@ pub fn init_logging(log_file: Option<&std::path::Path>) -> anyhow::Result<()> {
 /// Drive the CLI: dry-run report (CLI-03) or convert + optional verify (CLI-01/02), returning
 /// the typed library errors wrapped with `anyhow` context so [`classify_exit`] can map them.
 pub fn run(cli: ConvertCli) -> anyhow::Result<()> {
+    // --reconstruct-sdrf / --reconstruct-isa: their OWN mode, dispatched BEFORE extension
+    // inference (T-10-DISP). These flags are mutually exclusive with --sdrf, --isa, --reverse,
+    // --verify, --dry-run (enforced with actionable messages rather than clap-level rejection so
+    // the error text names the correct constraint).
+    if cli.reconstruct_sdrf.is_some() || cli.reconstruct_isa.is_some() {
+        return run_reconstruct(&cli);
+    }
+
     // Direction policy (T-10-DISP): `--reverse` is the explicit override; otherwise infer from
     // the input extension. `.imzML`/`.imzml` → forward IMAGING (the UNCHANGED v0.3 path);
     // `.mzML`/`.mzml` → forward PLAIN (non-imaging) conversion; `.mzpeak` → reverse. Anything
@@ -235,6 +267,141 @@ pub fn run(cli: ConvertCli) -> anyhow::Result<()> {
              forward conversion, or a .mzpeak input (or --reverse) for reverse",
             cli.input
         )),
+    }
+}
+
+/// Reconstruct path: re-serve the embedded sample-metadata member BYTE-FOR-BYTE from a .mzpeak
+/// archive. Dispatched BEFORE extension inference; its own independent mode (T-10-DISP).
+///
+/// `--reconstruct-sdrf <ARCHIVE>` → reads `"sample_metadata/sdrf.tsv"` and writes it to
+/// the positional `output`. `--reconstruct-isa <ARCHIVE>` → tries the primary ISA member
+/// (`sample_metadata/isa/i_Investigation.txt`) then falls back to listing the
+/// `sample_metadata/isa/` prefix for the first member found, and writes that to `output`.
+///
+/// Reuses the existing 5-code [`classify_exit`] contract — extract failures route through
+/// EXIT_GENERIC (no new exit code — T-37-EXIT / T-10-EXIT).
+fn run_reconstruct(cli: &ConvertCli) -> anyhow::Result<()> {
+    // Reject combinations with forward-only or direction-setting flags (actionable messages).
+    if cli.sdrf.is_some() {
+        return Err(anyhow!(
+            "--reconstruct-sdrf/--reconstruct-isa is its own mode and cannot be combined with \
+             --sdrf; reconstruct re-serves the embedded member, it does not embed a new one"
+        ));
+    }
+    if cli.isa.is_some() {
+        return Err(anyhow!(
+            "--reconstruct-sdrf/--reconstruct-isa is its own mode and cannot be combined with \
+             --isa; reconstruct re-serves the embedded member, it does not embed a new one"
+        ));
+    }
+    if cli.reverse {
+        return Err(anyhow!(
+            "--reconstruct-sdrf/--reconstruct-isa is its own mode and cannot be combined with \
+             --reverse"
+        ));
+    }
+    if cli.verify {
+        return Err(anyhow!(
+            "--reconstruct-sdrf/--reconstruct-isa is its own mode and cannot be combined with \
+             --verify"
+        ));
+    }
+    if cli.dry_run {
+        return Err(anyhow!(
+            "--reconstruct-sdrf/--reconstruct-isa is its own mode and cannot be combined with \
+             --dry-run"
+        ));
+    }
+
+    // The positional output in reconstruct mode is captured as `cli.input` (the archive path is
+    // in the flag, so the first positional is the output destination). If `cli.output` is also
+    // present, prefer it (explicit -o stem). Otherwise use `cli.input` as the output path.
+    // Error actionably if neither is present.
+    let out: &Path = if let Some(ref o) = cli.output {
+        o.as_path()
+    } else {
+        // cli.input is the positional output destination in reconstruct mode.
+        // Clap guarantees `input` is always present (required positional).
+        &cli.input
+    };
+
+    // Dispatch to the correct member name based on which flag was set.
+    let (archive, member_bytes) = if let Some(archive) = &cli.reconstruct_sdrf {
+        let bytes = crate::sdrf::extract_sample_metadata_member(archive, "sample_metadata/sdrf.tsv")
+            .map_err(|e| anyhow!("failed to extract SDRF member from {}: {e}", archive.display()))?;
+        (archive, bytes)
+    } else if let Some(archive) = &cli.reconstruct_isa {
+        // For ISA: try the primary investigation member name; if not found, try the canonical
+        // isa.json; if still not found, list all `sample_metadata/isa/` members and take the first.
+        let bytes = extract_isa_member(archive)
+            .map_err(|e| anyhow!("failed to extract ISA member from {}: {e}", archive.display()))?;
+        (archive, bytes)
+    } else {
+        unreachable!("run_reconstruct called with neither reconstruct_sdrf nor reconstruct_isa");
+    };
+
+    // WR-02-style guard: refuse to write the output onto the input archive.
+    reject_output_collision(archive, out, "reconstruct output")?;
+
+    // Write the extracted bytes to the output path.
+    std::fs::write(out, &member_bytes).map_err(|e| {
+        anyhow!("failed to write extracted member to {}: {e}", out.display())
+    })?;
+
+    log::info!(
+        "reconstructed {} bytes → {}",
+        member_bytes.len(),
+        out.display()
+    );
+    Ok(())
+}
+
+/// Try to extract the primary ISA member from a .mzpeak archive: first the canonical
+/// investigation file (`sample_metadata/isa/i_Investigation.txt`), then `sample_metadata/isa/isa.json`,
+/// then the first `sample_metadata/isa/` member found in the archive.
+fn extract_isa_member(archive: &std::path::Path) -> Result<Vec<u8>, crate::sdrf::EmbedError> {
+
+    // Try the canonical ISA-Tab investigation member name first.
+    let investigation_name = "sample_metadata/isa/i_Investigation.txt";
+    if let Ok(bytes) = crate::sdrf::extract_sample_metadata_member(archive, investigation_name) {
+        return Ok(bytes);
+    }
+
+    // Try the canonical ISA-JSON member name next.
+    let json_name = "sample_metadata/isa/isa.json";
+    if let Ok(bytes) = crate::sdrf::extract_sample_metadata_member(archive, json_name) {
+        return Ok(bytes);
+    }
+
+    // Fall back to the first `sample_metadata/isa/` member in the ZIP.
+    let file = std::fs::File::open(archive).map_err(|e| crate::sdrf::EmbedError::Io {
+        path: archive.display().to_string(),
+        source: e,
+    })?;
+    let reader = std::io::BufReader::new(file);
+    let mut zip = zip::ZipArchive::new(reader).map_err(|e| crate::sdrf::EmbedError::Io {
+        path: archive.display().to_string(),
+        source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+    })?;
+
+    // Collect all member names first (avoid borrow conflicts), then find the first ISA member.
+    let all_names: Vec<String> = (0..zip.len())
+        .filter_map(|i| zip.by_index(i).ok().map(|e| e.name().to_string()))
+        .collect();
+    let isa_member = all_names
+        .into_iter()
+        .find(|name| name.starts_with("sample_metadata/isa/"));
+
+    if let Some(member_name) = isa_member {
+        // Re-open; use the helper for the actual read.
+        crate::sdrf::extract_sample_metadata_member(archive, &member_name)
+    } else {
+        // No ISA member found at all — report as MemberNotFound.
+        Err(crate::sdrf::EmbedError::MemberNotFound {
+            member: "sample_metadata/isa/*".to_string(),
+            archive: archive.display().to_string(),
+            source: std::io::Error::new(std::io::ErrorKind::NotFound, "no ISA member in archive"),
+        })
     }
 }
 
@@ -1516,6 +1683,126 @@ mod tests {
         assert_eq!(
             format!("{:?}", classify_exit(&e)),
             format!("{:?}", ExitCode::from(EXIT_GENERIC))
+        );
+    }
+
+    // --- Task 2 (Plan 37-01): --reconstruct-sdrf / --reconstruct-isa parse + rejection guards ---
+
+    #[test]
+    fn reconstruct_sdrf_parses() {
+        // --reconstruct-sdrf <ARCHIVE> must parse with a positional output destination.
+        // In reconstruct mode the archive path is in the flag; the positional `input` captures
+        // the output destination (first positional after the flags).
+        let cli = ConvertCli::try_parse_from([
+            "mzml2mzpeak", "--reconstruct-sdrf", "archive.mzpeak", "out.tsv",
+        ])
+        .expect("--reconstruct-sdrf must parse");
+        assert_eq!(
+            cli.reconstruct_sdrf,
+            Some(PathBuf::from("archive.mzpeak")),
+            "--reconstruct-sdrf must capture the archive path"
+        );
+        // The first positional after the flags is the output destination (captured as cli.input).
+        assert_eq!(
+            cli.input,
+            PathBuf::from("out.tsv"),
+            "positional output destination captured as cli.input in reconstruct mode"
+        );
+        assert!(cli.reconstruct_isa.is_none(), "reconstruct_isa must be None when reconstruct_sdrf is set");
+    }
+
+    #[test]
+    fn reconstruct_isa_parses() {
+        // --reconstruct-isa <ARCHIVE> must parse with a positional output destination.
+        let cli = ConvertCli::try_parse_from([
+            "mzml2mzpeak", "--reconstruct-isa", "archive.mzpeak", "out.txt",
+        ])
+        .expect("--reconstruct-isa must parse");
+        assert_eq!(
+            cli.reconstruct_isa,
+            Some(PathBuf::from("archive.mzpeak")),
+            "--reconstruct-isa must capture the archive path"
+        );
+        assert_eq!(
+            cli.input,
+            PathBuf::from("out.txt"),
+            "positional output destination captured as cli.input in reconstruct-isa mode"
+        );
+        assert!(cli.reconstruct_sdrf.is_none(), "reconstruct_sdrf must be None when reconstruct_isa is set");
+    }
+
+    #[test]
+    fn reconstruct_sdrf_and_isa_together_are_rejected_by_clap() {
+        // --reconstruct-sdrf and --reconstruct-isa are mutually exclusive at the clap level
+        // (conflicts_with_all enforced).
+        let result = ConvertCli::try_parse_from([
+            "mzml2mzpeak",
+            "--reconstruct-sdrf", "arch.mzpeak",
+            "--reconstruct-isa", "arch.mzpeak",
+            "out.tsv",
+        ]);
+        assert!(
+            result.is_err(),
+            "--reconstruct-sdrf and --reconstruct-isa together must be rejected by clap"
+        );
+    }
+
+    #[test]
+    fn reconstruct_sdrf_with_sdrf_is_rejected() {
+        // --reconstruct-sdrf combined with --sdrf is rejected (reconstruct is its own mode).
+        let cli = ConvertCli::try_parse_from([
+            "mzml2mzpeak",
+            "--reconstruct-sdrf", "arch.mzpeak",
+            "--sdrf", "some.tsv",
+            "out.tsv",
+        ])
+        .expect("parse succeeds (runtime guard)");
+        let err = run(cli).expect_err("--reconstruct-sdrf + --sdrf must be rejected at runtime");
+        assert!(
+            err.to_string().contains("own mode"),
+            "--reconstruct-sdrf + --sdrf rejection names the mode conflict, got: {err}"
+        );
+    }
+
+    #[test]
+    fn reconstruct_sdrf_with_reverse_is_rejected() {
+        // --reconstruct-sdrf combined with --reverse is rejected.
+        let cli = ConvertCli::try_parse_from([
+            "mzml2mzpeak",
+            "--reconstruct-sdrf", "arch.mzpeak",
+            "--reverse",
+            "out.tsv",
+        ])
+        .expect("parse succeeds (runtime guard)");
+        let err = run(cli).expect_err("--reconstruct-sdrf + --reverse must be rejected at runtime");
+        assert!(
+            err.to_string().contains("own mode"),
+            "--reconstruct-sdrf + --reverse rejection names the mode conflict, got: {err}"
+        );
+    }
+
+    #[test]
+    fn reconstruct_sdrf_dispatches_before_extension_inference() {
+        // --reconstruct-sdrf is dispatched BEFORE extension inference: a non-existent archive
+        // returns an extract error (not an "unknown extension" error), proving dispatch happened
+        // in run_reconstruct rather than the extension branch.
+        let cli = ConvertCli::try_parse_from([
+            "mzml2mzpeak",
+            "--reconstruct-sdrf", "nonexistent_archive_xyz.mzpeak",
+            "out.tsv",
+        ])
+        .expect("parse succeeds");
+        let err = run(cli).expect_err("nonexistent archive must error");
+        // The error must NOT be the extension-inference message ("cannot infer direction").
+        assert!(
+            !err.to_string().contains("cannot infer direction"),
+            "--reconstruct-sdrf must dispatch before extension inference; got: {err}"
+        );
+        // It must mention the extract/reconstruct path.
+        assert!(
+            err.to_string().contains("extract") || err.to_string().contains("reconstruct")
+                || err.to_string().contains("failed") || err.to_string().contains("No such file"),
+            "error must mention extract failure or missing file, got: {err}"
         );
     }
 }
