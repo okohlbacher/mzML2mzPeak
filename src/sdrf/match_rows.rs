@@ -13,6 +13,18 @@
 //! The known sibling extensions are `.raw`, `.d`, `.wiff`, `.mzML`, `.mzml` (plus any
 //! other extension — only stems are compared so unknown extensions also match).
 //!
+//! # ISA path (structural resolution)
+//!
+//! ISA-Tab and ISA-JSON docs carry the run→sample link STRUCTURALLY in `doc.assays`.
+//! For these formats `match_rows_for_data_file` iterates `doc.assays` instead of verbatim rows:
+//! for each assay whose ANY `data_files` entry (path-stripped, stem-compared) equals the
+//! input mzML stem, the assay's `sample_refs` are collected into `MatchResult.sample_names`.
+//! `MatchResult.rows` stays empty for ISA matches (the verbatim bundle is s_* rows, not a_* rows,
+//! and does NOT carry a `comment[data file]` column).
+//!
+//! The same `strip_path_prefix` + `file_stem` logic is reused for both SDRF and ISA data_files
+//! so the matching rule is identical and the two paths cannot drift.
+//!
 //! # Diagnostics (never errors)
 //!
 //! - Zero match → `Diagnostic { code: "sdrf-zero-match" }` — LOUD, not fatal (R9).
@@ -22,7 +34,7 @@
 
 use std::path::Path;
 
-use super::model::{Diagnostic, MatchResult, SampleMetadataDoc};
+use super::model::{Diagnostic, MatchResult, SampleMetadataDoc, SourceFormat};
 
 /// Strip a path prefix from an SDRF `comment[data file]` value and return the filename only.
 ///
@@ -48,25 +60,31 @@ fn file_stem(filename: &str) -> &str {
     }
 }
 
-/// Match SDRF rows to an mzML file by path-stripped basename across sibling extensions.
+/// Match SDRF/ISA rows to an mzML file by path-stripped basename across sibling extensions.
 ///
 /// # Arguments
 ///
-/// - `doc` — the parsed `SampleMetadataDoc` (must contain verbatim rows + header).
-/// - `mzml_path` — the mzML file path whose rows we want to find.
+/// - `doc` — the parsed `SampleMetadataDoc` (SDRF, ISA-Tab, or ISA-JSON).
+/// - `mzml_path` — the mzML file path whose rows / assays we want to find.
 ///
 /// # Returns
 ///
-/// A `MatchResult` with:
-/// - `rows` — the indices (0-based into `doc.verbatim.rows`) of matching rows.
-/// - `diagnostics` — zero or more advisory messages.
+/// A `MatchResult` with either:
+/// - `rows` populated (SDRF path): indices (0-based into `doc.verbatim.rows`) of matching rows.
+/// - `sample_names` populated (ISA path): resolved `Sample Name` strings from matching assays.
+/// - `diagnostics` — zero or more advisory messages (zero-match, multi-match).
 ///
 /// # Matching rule
 ///
-/// For each row: take `comment[data file]`, strip path prefix, compare stem to
-/// `mzml_path`'s stem (case-sensitive, verbatim). This is intentionally simple —
-/// the SDRF spec and our threat model (T-31-02) require directory components to be
-/// discarded to prevent a crafted `comment[data file]` path from widening the match.
+/// **SDRF** (`SourceFormat::Sdrf`): for each verbatim row, take `comment[data file]`, strip
+/// path prefix, compare stem to `mzml_path`'s stem (case-sensitive, verbatim). This is
+/// intentionally simple — the SDRF spec and threat model (T-31-02) require directory components
+/// to be discarded to prevent a crafted `comment[data file]` path from widening the match.
+///
+/// **ISA** (`SourceFormat::IsaTab` / `SourceFormat::IsaJson`): iterate `doc.assays`; for each
+/// assay whose ANY `data_files` entry (path-stripped, stem-compared) equals the mzML stem,
+/// collect that assay's `sample_refs` into `sample_names` (deduplicated, first-seen order).
+/// Uses the SAME `strip_path_prefix` + `file_stem` logic as the SDRF path. `rows` stays empty.
 pub fn match_rows_for_data_file(doc: &SampleMetadataDoc, mzml_path: &Path) -> MatchResult {
     // Extract the stem of the input mzML path.
     let mzml_filename = mzml_path
@@ -75,6 +93,79 @@ pub fn match_rows_for_data_file(doc: &SampleMetadataDoc, mzml_path: &Path) -> Ma
         .unwrap_or("");
     let mzml_stem = file_stem(mzml_filename);
 
+    match doc.source_format {
+        // ── ISA path: structural assay-based resolution ───────────────────────
+        SourceFormat::IsaTab | SourceFormat::IsaJson => {
+            match_isa_assays(doc, mzml_stem)
+        }
+        // ── SDRF path: verbatim-row column matching ───────────────────────────
+        SourceFormat::Sdrf => {
+            match_sdrf_rows(doc, mzml_stem)
+        }
+    }
+}
+
+/// ISA assay-based match: iterate `doc.assays`, compare each assay's `data_files` entries by
+/// stem, collect `sample_refs` from matching assays into `sample_names`.
+fn match_isa_assays(doc: &SampleMetadataDoc, mzml_stem: &str) -> MatchResult {
+    let mut sample_names: Vec<String> = Vec::new();
+    let mut matched_assay_count = 0usize;
+
+    for assay in &doc.assays {
+        // Check if any of this assay's data_files matches the mzML stem.
+        let assay_matches = assay.data_files.iter().any(|df| {
+            let filename = strip_path_prefix(df);
+            let stem = file_stem(filename);
+            stem == mzml_stem
+        });
+
+        if assay_matches {
+            matched_assay_count += 1;
+            // Collect each sample_ref into sample_names (deduplicated, first-seen order).
+            for sample_ref in &assay.sample_refs {
+                if !sample_ref.is_empty() && !sample_names.contains(sample_ref) {
+                    sample_names.push(sample_ref.clone());
+                }
+            }
+        }
+    }
+
+    // Build diagnostics (mirror SDRF diagnostic style).
+    let mut diagnostics: Vec<Diagnostic> = Vec::new();
+    match matched_assay_count {
+        0 => {
+            diagnostics.push(Diagnostic {
+                code: "sdrf-zero-match".to_owned(),
+                message: format!(
+                    "No ISA assay data_file matched mzML stem {:?}; check that the assay file \
+                     contains a 'Raw Spectral Data File' (or 'Derived Spectral Data File') column \
+                     with a filename whose stem matches the input mzML.",
+                    mzml_stem
+                ),
+            });
+        }
+        n if n > 1 => {
+            diagnostics.push(Diagnostic {
+                code: "sdrf-multi-match".to_owned(),
+                message: format!(
+                    "{} ISA assay rows matched mzML stem {:?}; this may indicate a multiplexed \
+                     run with multiple assay entries for the same data file.",
+                    n, mzml_stem
+                ),
+            });
+        }
+        _ => {}
+    }
+
+    MatchResult {
+        rows: vec![],
+        sample_names,
+        diagnostics,
+    }
+}
+
+/// SDRF row-based match: for each verbatim row, compare `comment[data file]` stem to mzML stem.
+fn match_sdrf_rows(doc: &SampleMetadataDoc, mzml_stem: &str) -> MatchResult {
     // Find the `comment[data file]` column index.
     let data_file_idx = doc.header_index("comment[data file]");
 
@@ -129,6 +220,7 @@ pub fn match_rows_for_data_file(doc: &SampleMetadataDoc, mzml_path: &Path) -> Ma
 
     MatchResult {
         rows: matched_rows,
+        sample_names: vec![],
         diagnostics,
     }
 }
@@ -270,5 +362,173 @@ mod tests {
         let result = match_rows_for_data_file(&doc, Path::new("run_B.mzML"));
         assert_eq!(result.rows, vec![0], "bare stem in SDRF must match by stem");
         assert!(result.diagnostics.is_empty());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ISA run-matching tests (structural assay-based resolution, v0.8.2)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// Helper: build a minimal ISA-Tab SampleMetadataDoc (source_format=IsaTab).
+    fn make_isa_doc(
+        samples: Vec<(&str, &str)>,   // (id, name)
+        assays: Vec<(Vec<&str>, Vec<&str>)>,  // (data_files, sample_refs)
+    ) -> SampleMetadataDoc {
+        use crate::sdrf::model::{Assay, Sample, VerbatimBundle};
+        SampleMetadataDoc {
+            source_format: SourceFormat::IsaTab,
+            samples: samples.iter().enumerate().map(|(i, (id, name))| Sample {
+                id: if id.is_empty() { format!("sample-{}", i + 1) } else { id.to_string() },
+                name: name.to_string(),
+                characteristics: vec![],
+            }).collect(),
+            assays: assays.iter().enumerate().map(|(i, (data_files, sample_refs))| Assay {
+                id: format!("assay-{}", i + 1),
+                sample_refs: sample_refs.iter().map(|s| s.to_string()).collect(),
+                data_files: data_files.iter().map(|f| f.to_string()).collect(),
+                parameters: vec![],
+                label: None,
+            }).collect(),
+            factor_levels: vec![],
+            verbatim: VerbatimBundle {
+                header: vec!["Source Name".to_string()],
+                rows: samples.iter().map(|(_, name)| vec![name.to_string()]).collect(),
+            },
+            diagnostics: vec![],
+        }
+    }
+
+    // ── ISA-7: mzML stem matches assay data_file → sample_names non-empty ────
+    #[test]
+    fn isa_match_stem_matches_assay_data_file() {
+        // MTBLS5358-style: assay data_file = "FILES/RAW_FILES/QC-1.raw", sample_ref = "QC-1"
+        let doc = make_isa_doc(
+            vec![("sample-1", "QC-1"), ("sample-2", "CTR-1")],
+            vec![
+                (vec!["FILES/RAW_FILES/QC-1.raw"], vec!["QC-1"]),
+                (vec!["FILES/RAW_FILES/CTR-1.raw"], vec!["CTR-1"]),
+            ],
+        );
+        // "QC-1.mzML" stem = "QC-1"; assay 0 has "FILES/RAW_FILES/QC-1.raw" → stem "QC-1" → match.
+        let result = match_rows_for_data_file(&doc, Path::new("QC-1.mzML"));
+        assert!(
+            result.rows.is_empty(),
+            "ISA match must leave rows empty (structural path)"
+        );
+        assert_eq!(
+            result.sample_names,
+            vec!["QC-1"],
+            "ISA match must resolve sample_names = [\"QC-1\"] for QC-1.mzML"
+        );
+        assert!(result.diagnostics.is_empty(), "single clean match must produce no diagnostics");
+        assert!(result.is_matched(), "is_matched() must return true for ISA hit");
+    }
+
+    // ── ISA-8: no assay matches → zero-match diagnostic, sample_names empty ──
+    #[test]
+    fn isa_no_match_produces_zero_match_diagnostic() {
+        let doc = make_isa_doc(
+            vec![("sample-1", "QC-1")],
+            vec![(vec!["FILES/RAW_FILES/QC-1.raw"], vec!["QC-1"])],
+        );
+        let result = match_rows_for_data_file(&doc, Path::new("NOT_PRESENT.mzML"));
+        assert!(result.sample_names.is_empty(), "zero-match ISA: sample_names must be empty");
+        assert!(result.rows.is_empty(), "zero-match ISA: rows must be empty");
+        assert!(!result.is_matched(), "zero-match ISA: is_matched() must return false");
+        assert_eq!(result.diagnostics.len(), 1, "zero-match must produce exactly one diagnostic");
+        assert_eq!(result.diagnostics[0].code, "sdrf-zero-match",
+            "ISA zero-match diagnostic code must still be 'sdrf-zero-match'");
+    }
+
+    // ── ISA-9: path-stripped stem matching (FILES/RAW_FILES/ prefix) ─────────
+    #[test]
+    fn isa_match_strips_path_prefix_from_data_file() {
+        // Assay data_file has a deep path prefix; mzML input uses bare filename.
+        let doc = make_isa_doc(
+            vec![("sample-1", "G-1")],
+            vec![(vec!["FILES/RAW_FILES/G-1.raw"], vec!["G-1"])],
+        );
+        let result = match_rows_for_data_file(&doc, Path::new("/some/dir/G-1.mzML"));
+        assert_eq!(result.sample_names, vec!["G-1"],
+            "ISA match must strip FILES/RAW_FILES/ prefix before stem comparison");
+        assert!(result.diagnostics.is_empty());
+    }
+
+    // ── ISA-10: SDRF path unchanged (regression) ─────────────────────────────
+    //    A doc with source_format=Sdrf must still use the verbatim-row path.
+    #[test]
+    fn sdrf_path_unchanged_after_isa_branch_added() {
+        let doc = make_doc(
+            vec!["source name", "comment[data file]"],
+            vec![
+                vec!["QC-1", "QC-1.raw"],
+                vec!["CTR-1", "CTR-1.raw"],
+            ],
+        );
+        // source_format == Sdrf (from_rows defaults to Sdrf).
+        let result = match_rows_for_data_file(&doc, Path::new("QC-1.mzML"));
+        // Must use rows path, not sample_names path.
+        assert_eq!(result.rows, vec![0], "SDRF path must still populate rows (regression)");
+        assert!(result.sample_names.is_empty(), "SDRF path must leave sample_names empty");
+        assert!(result.diagnostics.is_empty());
+    }
+
+    // ── ISA-11: MTBLS5358-style fixture (requires fixtures) ──────────────────
+    //    Drive the ISA-Tab parser against the real MTBLS5358 fixture and verify
+    //    that QC-1.mzML resolves to sample_names=["QC-1"].
+    #[test]
+    fn isa_mtbls5358_qc1_matches_assay_data_file() {
+        let base = std::path::Path::new("data/sdrf-examples/MTBLS5358");
+        if !base.join("a_MTBLS5358_GC-MS_positive__metabolite_profiling.txt").exists() {
+            return; // Skip gracefully when fixtures not present.
+        }
+        let bundle = crate::isa::tab::IsaBundle {
+            investigation: base.join("i_Investigation.txt"),
+            study: base.join("s_MTBLS5358.txt"),
+            assays: vec![base.join("a_MTBLS5358_GC-MS_positive__metabolite_profiling.txt")],
+        };
+        let doc = crate::isa::tab::parse_isa_tab(&bundle)
+            .expect("MTBLS5358 ISA-Tab must parse");
+        // QC-1.mzML stem = "QC-1"; assay row has "FILES/RAW_FILES/QC-1.raw" → stem "QC-1".
+        let result = match_rows_for_data_file(&doc, Path::new("QC-1.mzML"));
+        assert!(
+            !result.sample_names.is_empty(),
+            "QC-1.mzML must match MTBLS5358 assay → non-empty sample_names; \
+             assays[0].data_files: {:?}",
+            doc.assays.get(0).map(|a| &a.data_files)
+        );
+        assert!(
+            result.sample_names.iter().any(|n| n == "QC-1"),
+            "sample_names must contain 'QC-1'; got: {:?}",
+            result.sample_names
+        );
+        assert!(result.rows.is_empty(), "ISA match must leave rows empty");
+    }
+
+    // ── ISA-12: ISA-JSON minimal fixture — QC-1.mzML → QC-1, CTR-1.mzML → CTR-1 ──
+    #[test]
+    fn isa_json_minimal_fixture_qc1_and_ctr1_match() {
+        let json_path = std::path::Path::new("tests/fixtures/isa/minimal.json");
+        if !json_path.exists() {
+            return;
+        }
+        let doc = crate::isa::json::parse_isa_json(json_path)
+            .expect("minimal.json must parse");
+        // QC-1.mzML stem = "QC-1"; processSequence maps QC-1 → QC-1.raw.
+        let result_qc1 = match_rows_for_data_file(&doc, Path::new("QC-1.mzML"));
+        assert_eq!(
+            result_qc1.sample_names,
+            vec!["QC-1"],
+            "QC-1.mzML must resolve to sample_names=[\"QC-1\"] in minimal.json"
+        );
+        // CTR-1.mzML stem = "CTR-1"; processSequence maps CTR-1 → CTR-1.raw.
+        let result_ctr1 = match_rows_for_data_file(&doc, Path::new("CTR-1.mzML"));
+        assert_eq!(
+            result_ctr1.sample_names,
+            vec!["CTR-1"],
+            "CTR-1.mzML must resolve to sample_names=[\"CTR-1\"] in minimal.json"
+        );
+        // Non-matching stem → zero-match.
+        let result_none = match_rows_for_data_file(&doc, Path::new("NOT_PRESENT.mzML"));
+        assert!(!result_none.is_matched(), "non-matching stem must produce zero-match");
     }
 }

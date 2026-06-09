@@ -375,6 +375,7 @@ fn pxd011799_tmt10_sample_list_all_entries_have_sample_label_param() {
     use mzml2mzpeak::sdrf::MatchResult;
     let full_match = MatchResult {
         rows: (0..doc.verbatim.rows.len()).collect(),
+        sample_names: vec![],
         diagnostics: vec![],
     };
 
@@ -446,13 +447,14 @@ fn run_filtered_sample_list_subset_match() {
     // Full match → 3 entries.
     let full_match = MatchResult {
         rows: (0..doc.verbatim.rows.len()).collect(),
+        sample_names: vec![],
         diagnostics: vec![],
     };
     let full_list = project_sample_list(&doc, &full_match);
     assert_eq!(full_list.len(), 3, "full-match (3 channels) must produce 3 entries");
 
     // Single-row match → 1 entry.
-    let single_match = MatchResult { rows: vec![0], diagnostics: vec![] };
+    let single_match = MatchResult { rows: vec![0], sample_names: vec![], diagnostics: vec![] };
     let single_list = project_sample_list(&doc, &single_match);
     assert_eq!(
         single_list.len(),
@@ -461,7 +463,7 @@ fn run_filtered_sample_list_subset_match() {
     );
 
     // Zero match → empty list.
-    let zero_match = MatchResult { rows: vec![], diagnostics: vec![] };
+    let zero_match = MatchResult { rows: vec![], sample_names: vec![], diagnostics: vec![] };
     let zero_list = project_sample_list(&doc, &zero_match);
     assert!(
         zero_list.is_empty(),

@@ -297,12 +297,34 @@ pub struct Diagnostic {
 /// `rows` is the set of row indices (in document order) whose `comment[data file]`
 /// matched the query mzML path. `diagnostics` collects zero-match / multi-match
 /// messages; the conversion is never failed from here (SM-03).
+///
+/// For ISA-format docs (`SourceFormat::IsaTab` / `SourceFormat::IsaJson`) the match
+/// is resolved STRUCTURALLY through `doc.assays` rather than verbatim rows. Those paths
+/// fill `sample_names` (the resolved `Sample Name` values for the matching assay) and
+/// leave `rows` empty. SDRF paths always fill `rows` and leave `sample_names` empty.
+///
+/// Call [`MatchResult::is_matched`] to test either field, and read sample names via
+/// [`crate::sdrf::matched_source_names`] which is the single source of truth for both paths.
 #[derive(Debug, Clone)]
 pub struct MatchResult {
-    /// Indices into `SampleMetadataDoc.verbatim.rows` of matching rows.
+    /// Indices into `SampleMetadataDoc.verbatim.rows` of matching rows (SDRF path).
+    /// Empty for ISA matches (use `sample_names` instead).
     pub rows: Vec<usize>,
+    /// Resolved `Sample Name` values for the matching assay (ISA path).
+    /// Empty for SDRF matches (use `rows` instead).
+    /// Deduplicated, first-seen order, verbatim as they appear in the assay file.
+    pub sample_names: Vec<String>,
     /// Advisory diagnostics (zero-match, multi-match). Empty on a clean single match.
     pub diagnostics: Vec<Diagnostic>,
+}
+
+impl MatchResult {
+    /// Return `true` if at least one row OR sample_name was matched (i.e. the match is non-empty).
+    ///
+    /// Use this instead of `rows.is_empty()` so callers work correctly for both SDRF and ISA.
+    pub fn is_matched(&self) -> bool {
+        !self.rows.is_empty() || !self.sample_names.is_empty()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

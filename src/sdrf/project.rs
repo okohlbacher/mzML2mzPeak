@@ -42,15 +42,32 @@ use crate::schema::RunSampleBinding;
 use crate::sdrf::channels::{derive_role, is_isobaric_label, resolve_reagent};
 use crate::sdrf::{MatchResult, SampleMetadataDoc};
 
-/// Return the distinct `source name` strings that appear in `match_result.rows` of `doc`,
-/// preserved in first-seen order (mirrors the resolution logic in `build_run_sample_binding`).
+/// Return the distinct `source name` / `Sample Name` strings for the matched run.
 ///
-/// This is the single source of truth shared by `project_sample_list`, `collect_channel_refs`,
+/// This is the **single source of truth** shared by `project_sample_list`, `collect_channel_refs`,
 /// and `build_run_sample_binding`. All three use this helper so the run-filtered sample set is
 /// always consistent (invariant: `project_sample_list` ids == `build_run_sample_binding` ids).
 ///
-/// Returns an empty `Vec` on zero-match or when the `source name` column is absent.
+/// ## ISA path
+///
+/// When `match_result.sample_names` is non-empty (filled by the ISA assay-based matcher),
+/// those names are returned directly — they are already deduplicated and in first-seen order.
+/// This covers both ISA-Tab and ISA-JSON formats where the run→sample link is structural.
+///
+/// ## SDRF path
+///
+/// When `match_result.sample_names` is empty, falls back to the SDRF verbatim-row path:
+/// resolves `source name` column values for the matched `rows` indices (existing behavior,
+/// byte-identical for all SDRF callers).
+///
+/// Returns an empty `Vec` on zero-match (no `rows` and no `sample_names`).
 fn matched_source_names(doc: &SampleMetadataDoc, match_result: &MatchResult) -> Vec<String> {
+    // ISA path: sample_names already resolved by the assay matcher — use directly.
+    if !match_result.sample_names.is_empty() {
+        return match_result.sample_names.clone();
+    }
+
+    // SDRF path: resolve from verbatim rows (existing behavior, byte-identical).
     if match_result.rows.is_empty() {
         return vec![];
     }
@@ -280,21 +297,21 @@ pub fn build_run_sample_binding(
     match_result: &MatchResult,
     run_id: &str,
 ) -> Option<RunSampleBinding> {
-    if match_result.rows.is_empty() {
+    if !match_result.is_matched() {
         return None;
     }
 
-    // Locate the "source name" column index in the verbatim header.
-    let source_name_col = doc.header_index("source name")?;
+    // Use matched_source_names as the single source of truth (ISA + SDRF both covered).
+    let source_names = matched_source_names(doc, match_result);
+    if source_names.is_empty() {
+        return None;
+    }
 
-    // Collect distinct sample ids in first-seen order for the matched rows.
+    // Resolve each source name → Sample.id by lookup in doc.samples (match on Sample.name).
+    // Deduplicated, first-seen order — consistent with project_sample_list via matched_source_names.
     let mut sample_ids: Vec<String> = Vec::new();
-    for &row_idx in &match_result.rows {
-        // Guard against a row that has fewer columns than the header (malformed SDRF).
-        let row = doc.verbatim.rows.get(row_idx)?;
-        let source_name = row.get(source_name_col).map(|s| s.as_str()).unwrap_or("");
-        // Resolve source name → Sample.id by lookup in doc.samples (match on Sample.name).
-        if let Some(sample) = doc.samples.iter().find(|s| s.name == source_name) {
+    for source_name in &source_names {
+        if let Some(sample) = doc.samples.iter().find(|s| &s.name == source_name) {
             if !sample_ids.contains(&sample.id) {
                 sample_ids.push(sample.id.clone());
             }
@@ -600,20 +617,20 @@ mod tests {
     // ── MatchResult helpers ───────────────────────────────────────────────────
 
     fn no_match() -> MatchResult {
-        MatchResult { rows: vec![], diagnostics: vec![] }
+        MatchResult { rows: vec![], sample_names: vec![], diagnostics: vec![] }
     }
 
     fn match_row(idx: usize) -> MatchResult {
-        MatchResult { rows: vec![idx], diagnostics: vec![] }
+        MatchResult { rows: vec![idx], sample_names: vec![], diagnostics: vec![] }
     }
 
     fn match_rows(idxs: Vec<usize>) -> MatchResult {
-        MatchResult { rows: idxs, diagnostics: vec![] }
+        MatchResult { rows: idxs, sample_names: vec![], diagnostics: vec![] }
     }
 
     /// Return a MatchResult that selects ALL rows in `doc`.
     fn full_match(doc: &SampleMetadataDoc) -> MatchResult {
-        MatchResult { rows: (0..doc.verbatim.rows.len()).collect(), diagnostics: vec![] }
+        MatchResult { rows: (0..doc.verbatim.rows.len()).collect(), sample_names: vec![], diagnostics: vec![] }
     }
 
     // ── project_sample_list tests (Phase 32 — run-filtered) ──────────────────
@@ -998,7 +1015,7 @@ mod tests {
     fn build_binding_deduplicates_sample_ids() {
         let doc = pxd020187_like_doc();
         // Match rows 0 and 1 — both belong to "Sample 1" → should deduplicate to 1 id.
-        let mr = MatchResult { rows: vec![0, 1], diagnostics: vec![] };
+        let mr = MatchResult { rows: vec![0, 1], sample_names: vec![], diagnostics: vec![] };
         let result = build_run_sample_binding(&doc, &mr, "run1");
         let binding = result.unwrap();
         assert_eq!(
@@ -1122,5 +1139,234 @@ mod tests {
             list_ids, binding_ids,
             "INVARIANT: sample_list id set must equal binding.sample_ids (isobaric 3-channel full match)"
         );
+    }
+
+    // ── ISA path: project_sample_list + build_run_sample_binding invariant ────
+    //
+    // These tests drive the ISA-path (sample_names filled by the assay matcher).
+    // The MatchResult.sample_names field is set directly to simulate the ISA matcher output.
+
+    /// Build a minimal ISA-Tab SampleMetadataDoc (source_format=IsaTab).
+    fn isa_doc_with_samples(
+        sample_id_names: Vec<(&str, &str)>,   // (id, name)
+        assay_data: Vec<(Vec<&str>, Vec<&str>)>, // (data_files, sample_refs)
+    ) -> SampleMetadataDoc {
+        SampleMetadataDoc {
+            source_format: SourceFormat::IsaTab,
+            samples: sample_id_names.iter().map(|(id, name)| Sample {
+                id: id.to_string(),
+                name: name.to_string(),
+                characteristics: vec![],
+            }).collect(),
+            assays: assay_data.iter().enumerate().map(|(i, (dfs, srs))| Assay {
+                id: format!("assay-{}", i + 1),
+                sample_refs: srs.iter().map(|s| s.to_string()).collect(),
+                data_files: dfs.iter().map(|f| f.to_string()).collect(),
+                parameters: vec![],
+                label: None,
+            }).collect(),
+            factor_levels: vec![],
+            verbatim: VerbatimBundle {
+                // ISA verbatim = s_* rows; no comment[data file] column here.
+                header: vec!["Source Name".to_string()],
+                rows: sample_id_names.iter().map(|(_, n)| vec![n.to_string()]).collect(),
+            },
+            diagnostics: vec![],
+        }
+    }
+
+    /// ISA MatchResult with sample_names set (rows empty — ISA structural path).
+    fn isa_match(names: Vec<&str>) -> MatchResult {
+        MatchResult {
+            rows: vec![],
+            sample_names: names.iter().map(|s| s.to_string()).collect(),
+            diagnostics: vec![],
+        }
+    }
+
+    /// ISA zero-match: sample_list is empty, binding is None.
+    #[test]
+    fn isa_zero_match_sample_list_empty_and_binding_none() {
+        let doc = isa_doc_with_samples(
+            vec![("sample-1", "QC-1"), ("sample-2", "CTR-1")],
+            vec![
+                (vec!["QC-1.raw"], vec!["QC-1"]),
+                (vec!["CTR-1.raw"], vec!["CTR-1"]),
+            ],
+        );
+        // Zero-match: stem doesn't match any assay data_file.
+        let mr = MatchResult { rows: vec![], sample_names: vec![], diagnostics: vec![] };
+
+        let list = project_sample_list(&doc, &mr);
+        assert!(list.is_empty(), "ISA zero-match: sample_list must be empty (honest absence)");
+        let binding = build_run_sample_binding(&doc, &mr, "run-x");
+        assert!(binding.is_none(), "ISA zero-match: binding must be None (honest absence)");
+    }
+
+    /// ISA single-match: sample_list has exactly the matched sample, binding has its id.
+    /// Invariant: sample_list ids == binding.sample_ids for ISA too.
+    #[test]
+    fn isa_single_match_sample_list_and_binding_invariant() {
+        let doc = isa_doc_with_samples(
+            vec![("sample-1", "QC-1"), ("sample-2", "CTR-1")],
+            vec![
+                (vec!["QC-1.raw"], vec!["QC-1"]),
+                (vec!["CTR-1.raw"], vec!["CTR-1"]),
+            ],
+        );
+        // ISA matcher resolved "QC-1.mzML" → sample_names=["QC-1"].
+        let mr = isa_match(vec!["QC-1"]);
+
+        let list = project_sample_list(&doc, &mr);
+        assert_eq!(list.len(), 1, "ISA single-match: sample_list must have exactly 1 entry");
+        assert_eq!(
+            list[0]["name"].as_str().unwrap(), "QC-1",
+            "ISA single-match: sample_list[0].name must be 'QC-1'"
+        );
+
+        let binding = build_run_sample_binding(&doc, &mr, "QC-1")
+            .expect("ISA single-match: binding must be Some");
+        assert_eq!(binding.sample_ids, vec!["sample-1"],
+            "ISA single-match: binding.sample_ids must be ['sample-1']");
+
+        // INVARIANT: sample_list id == binding.sample_ids.
+        let list_id = list[0]["id"].as_str().unwrap().to_string();
+        assert_eq!(
+            vec![list_id], binding.sample_ids,
+            "INVARIANT: ISA sample_list id must equal binding.sample_ids (single-match)"
+        );
+    }
+
+    /// ISA multi-match (e.g. replicate rows sharing a data file): sample_list + binding consistent.
+    #[test]
+    fn isa_multi_sample_match_sample_list_and_binding_invariant() {
+        // MTBLS5358-style: QC-1 and G-1 are different samples.
+        let doc = isa_doc_with_samples(
+            vec![
+                ("sample-1", "QC-1"),
+                ("sample-2", "G-1"),
+                ("sample-3", "CTR-1"),
+            ],
+            vec![
+                (vec!["QC-1.raw"], vec!["QC-1"]),
+                (vec!["G-1.raw"], vec!["G-1"]),
+                (vec!["CTR-1.raw"], vec!["CTR-1"]),
+            ],
+        );
+        // ISA matcher resolved to two samples (unusual but possible — e.g. combined run).
+        let mr = isa_match(vec!["QC-1", "G-1"]);
+
+        let list = project_sample_list(&doc, &mr);
+        assert_eq!(list.len(), 2, "ISA 2-sample match: sample_list must have 2 entries");
+
+        let binding = build_run_sample_binding(&doc, &mr, "run-combined")
+            .expect("ISA 2-sample match: binding must be Some");
+        assert_eq!(binding.sample_ids.len(), 2,
+            "ISA 2-sample match: binding must list 2 sample_ids");
+
+        // INVARIANT.
+        let mut list_ids: Vec<String> = list.iter()
+            .map(|e| e["id"].as_str().unwrap().to_string())
+            .collect();
+        let mut binding_ids = binding.sample_ids.clone();
+        list_ids.sort();
+        binding_ids.sort();
+        assert_eq!(list_ids, binding_ids,
+            "INVARIANT: ISA sample_list ids must equal binding.sample_ids (2-sample match)");
+    }
+
+    /// ISA match with MTBLS5358 fixture: QC-1.mzML → sample_list non-empty, ids == binding ids.
+    #[test]
+    fn isa_mtbls5358_qc1_run_filtered_sample_list_nonempty() {
+        let base = std::path::Path::new("data/sdrf-examples/MTBLS5358");
+        if !base.join("a_MTBLS5358_GC-MS_positive__metabolite_profiling.txt").exists() {
+            return; // Skip gracefully when fixtures not present.
+        }
+        let bundle = crate::isa::tab::IsaBundle {
+            investigation: base.join("i_Investigation.txt"),
+            study: base.join("s_MTBLS5358.txt"),
+            assays: vec![base.join("a_MTBLS5358_GC-MS_positive__metabolite_profiling.txt")],
+        };
+        let doc = crate::isa::tab::parse_isa_tab(&bundle)
+            .expect("MTBLS5358 ISA-Tab must parse");
+
+        // Drive the full match_rows_for_data_file → project/bind pipeline.
+        let mr = crate::sdrf::match_rows_for_data_file(&doc, std::path::Path::new("QC-1.mzML"));
+
+        // The ISA assay matcher should have resolved QC-1.mzML → QC-1.
+        assert!(
+            mr.is_matched(),
+            "QC-1.mzML must match MTBLS5358 ISA assays (non-empty)"
+        );
+        assert!(
+            mr.sample_names.iter().any(|n| n == "QC-1"),
+            "sample_names must contain 'QC-1'; got: {:?}",
+            mr.sample_names
+        );
+
+        // project_sample_list must be non-empty.
+        let list = project_sample_list(&doc, &mr);
+        assert!(
+            !list.is_empty(),
+            "ISA run-filtered sample_list for QC-1.mzML must be non-empty; was empty before fix"
+        );
+        assert!(
+            list.iter().any(|e| e["name"].as_str() == Some("QC-1")),
+            "sample_list must contain an entry with name 'QC-1'"
+        );
+
+        // build_run_sample_binding must return Some.
+        let binding = build_run_sample_binding(&doc, &mr, "QC-1")
+            .expect("binding must be Some for ISA single-match");
+
+        // INVARIANT: sample_list ids == binding.sample_ids.
+        let mut list_ids: Vec<String> = list.iter()
+            .map(|e| e["id"].as_str().unwrap().to_string())
+            .collect();
+        let mut binding_ids = binding.sample_ids.clone();
+        list_ids.sort();
+        binding_ids.sort();
+        assert_eq!(
+            list_ids, binding_ids,
+            "INVARIANT: MTBLS5358 QC-1 ISA sample_list ids must equal binding.sample_ids"
+        );
+    }
+
+    /// ISA-JSON minimal fixture: QC-1.mzML → non-empty sample_list, invariant holds.
+    #[test]
+    fn isa_json_minimal_qc1_sample_list_nonempty_and_invariant() {
+        let json_path = std::path::Path::new("tests/fixtures/isa/minimal.json");
+        if !json_path.exists() {
+            return;
+        }
+        let doc = crate::isa::json::parse_isa_json(json_path)
+            .expect("minimal.json must parse");
+
+        let mr = crate::sdrf::match_rows_for_data_file(&doc, std::path::Path::new("QC-1.mzML"));
+        assert!(
+            mr.is_matched(),
+            "QC-1.mzML must match minimal.json ISA assays (non-empty)"
+        );
+        assert!(
+            mr.sample_names.iter().any(|n| n == "QC-1"),
+            "sample_names must contain 'QC-1'; got: {:?}", mr.sample_names
+        );
+
+        let list = project_sample_list(&doc, &mr);
+        assert!(!list.is_empty(), "ISA-JSON QC-1 sample_list must be non-empty");
+        assert!(list.iter().any(|e| e["name"].as_str() == Some("QC-1")),
+            "sample_list must contain QC-1");
+
+        let binding = build_run_sample_binding(&doc, &mr, "QC-1")
+            .expect("binding must be Some for ISA-JSON QC-1 match");
+
+        let mut list_ids: Vec<String> = list.iter()
+            .map(|e| e["id"].as_str().unwrap().to_string())
+            .collect();
+        let mut binding_ids = binding.sample_ids.clone();
+        list_ids.sort();
+        binding_ids.sort();
+        assert_eq!(list_ids, binding_ids,
+            "INVARIANT: ISA-JSON QC-1 sample_list ids == binding.sample_ids");
     }
 }
