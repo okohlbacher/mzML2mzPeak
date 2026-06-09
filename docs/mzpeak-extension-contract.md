@@ -484,6 +484,42 @@ A Phase 35 spike MUST confirm `channel_id` survives the `add_spectrum_array_over
 in the **Rust reader** before committing the storage contract (R2-M3 — third-party read-back is a
 known-blocker). Phase 35 is the **first-to-cut** if the milestone overruns.
 
+### 3.14 SDRF Precedence Rule (Phase 31 / SM-04)
+
+**Authority rule (RATIFIED-Q1):** when the SDRF snapshot embedded in a mzPeak archive disagrees
+with the live repository copy of the same SDRF, **the repository copy is authoritative**. The
+embedded member is a point-in-time snapshot included for portability and reproducibility, not for
+authority.
+
+**Rationale:** the SDRF in the source repository (PRIDE/ProteomeXchange, MetaboLights, etc.) is
+the canonical record under curation control. The embedded snapshot captures the SDRF as it
+existed at conversion time and travels with the archive for offline use. When a repository
+correction, annotation update, or sample-group reclassification changes the repository SDRF
+after the mzPeak file was produced, the repository version supersedes the embedded copy.
+
+**Staleness detection:** staleness is detectable without re-downloading the SDRF:
+1. `metadata.study.dataset_accession` identifies the repository dataset (e.g. `"PXD020187"`).
+2. `metadata.study.sample_metadata_ref` names the embedded member
+   (e.g. `"sample_metadata/sdrf.tsv"`).
+3. `metadata.sample_metadata.sha256` is the SHA-256 hex digest of the embedded bytes at the
+   time of conversion. A reader that has access to the live repository SDRF can re-hash it and
+   compare — a mismatch means the embedded snapshot is stale.
+4. `metadata.sample_metadata.embed_scope` records whether the full source SDRF was embedded
+   (`"full"`) or only the applicable rows (`"applicable_rows"` — a future refinement).
+
+**Implementation:** the three-places rule for this fact:
+1. **`src/schema/study.rs`** — `StudyMetadata` + `study_metadata()` constructor (Phase 30); the
+   `sample_metadata_ref` field points to the embedded member.
+2. **`schema/study.json`** — JSON schema (`additionalProperties: false`, draft-07); the three
+   required fields are `dataset_accession`, `title`, `sample_metadata_ref` (Phase 30).
+3. **This section (§3.14)** — the doc-half of the three-places rule for the precedence fact. The
+   `src/write/mzml.rs` SDRF arm (Phase 31) and `metadata.sample_metadata` KV (Phase 31) are the
+   implementation halves.
+
+**Non-goal:** the converter does NOT attempt to detect or resolve staleness at read-time; that is
+a downstream consumer responsibility. The converter records the sha256 + accession so staleness
+IS detectable, but produces no warning or error on its own.
+
 ---
 
 ## 4. Stable-Token Register
