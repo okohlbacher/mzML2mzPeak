@@ -4,7 +4,7 @@ milestone: v0.8
 milestone_name: > **RELOCATED TO v0.8 — 2026-06-09
 status: completed
 stopped_at: v0.7 COMPLETE — all 9 active reqs done; Phases 22 (PRs) + 27 (SDRF) + 29 (de-vendor) relocated to v0.8; ready to archive/tag
-last_updated: "2026-06-09T07:30:24.829Z"
+last_updated: "2026-06-09T07:36:52.534Z"
 last_activity: 2026-06-09 — Milestone v0.8 formalized (REQUIREMENTS/ROADMAP/PROJECT/STATE from the ratified design)
 progress:
   total_phases: 3
@@ -359,7 +359,7 @@ Items deferred out of v0.7:
 
 ## Session Continuity
 
-Last session: 2026-06-09T07:30:24.825Z
+Last session: 2026-06-09T07:36:52.531Z
 Stopped at: v0.7 COMPLETE — all 9 active reqs done; Phases 22 (PRs) + 27 (SDRF) + 29 (de-vendor) relocated to v0.8; ready to archive/tag
 Resume file: None
 

@@ -240,7 +240,7 @@ Plans:
   - [x] 30-01-PLAN.md — `SourceCurie` passthrough type (shape-only validation, verbatim CURIE round-trip) — SMCVG-01 [W1]
   - [x] 30-02-PLAN.md — `src/schema/cv.rs` structural terms (MS:1002602 + role/reporter-m/z) + Phase-31 carve-out tokens (sample-metadata/sdrf|isa) + cv-requests rows — SMCVG-02, SMSPEC-02 [W1]
   - [ ] 30-03-PLAN.md — `metadata.study` + reused `metadata.sample_list` KV-JSON contracts + `schema/study.json`/`schema/sample_list.json` — SMSPEC-03 [W2]
-  - [ ] 30-04-PLAN.md — ratify Q1–Q10 + queue (not submit) the v0.8 sample-metadata spec batch + extend the extension-contract — SMSPEC-01, SMSPEC-02 [W1]
+  - [x] 30-04-PLAN.md — ratify Q1–Q10 + queue (not submit) the v0.8 sample-metadata spec batch + extend the extension-contract — SMSPEC-01, SMSPEC-02 [W1]
 
 ### Phase 30b: Upstream list-valued `ms_run.sample_ref` PR prep
 
@@ -350,7 +350,7 @@ CVG-01/02, GEOF-01, RSRC-01, L2-01); Phases 23/24/25/26/28 done; Phases 22/27/29
 |-------|-------|--------|-------|
 | 22. Upstream PR prep (relocated from v0.7) | 0/? | **Relocated — held (owner-gated)** | UPS-01 chunk_series + UPS-03 validator PRs |
 | 29. De-vendor both forks (relocated from v0.7) | 0/? | **Relocated — gated** | DVN-01 (chunk_series merged) + DVN-02 (mzdata 0.64.2 on crates.io); LAST |
-| 30. Sample-metadata spec alignment & CV governance | 2/4 | In Progress|  |
+| 30. Sample-metadata spec alignment & CV governance | 3/4 | In Progress|  |
 | 30b. Upstream list-valued `ms_run.sample_ref` PR | 0/? | Not started | early/parallel, owner-gated |
 | 31. Unified model + SDRF reader + verbatim embed (MVP) | 0/? | Not started | upstream-independent |
 | 32. Lean `sample_list`/study projection + run binding | 0/? | Not started | native binding gated on 30b |

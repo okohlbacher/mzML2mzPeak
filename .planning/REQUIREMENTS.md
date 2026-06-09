@@ -53,7 +53,7 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
 
 ### Sample-metadata spec alignment & CV governance (SMSPEC) — Phase 30
 
-- [ ] **SMSPEC-01** — Ratify the Q1–Q10 positions against the canonical
+- [x] **SMSPEC-01** — Ratify the Q1–Q10 positions against the canonical
   [`HUPO-PSI/mzPeak-specification`](https://github.com/HUPO-PSI/mzPeak-specification) (v0.9); record the
   precedence rule (repo-SDRF-wins), the `entity_type: sample-metadata` / `data_kind: sdrf|isa` open-enum
   tokens, and Q2 (`sample`/`SDRF`) agreement.
