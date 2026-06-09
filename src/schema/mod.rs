@@ -26,9 +26,10 @@ pub mod metadata;
 pub mod optical;
 pub mod scan_settings;
 pub mod tolerance;
+pub mod transform;
 
 pub use columns::{ImagingColumnSpec, imaging_scan_fields};
-pub use cv::{CvEntry, cv_list};
+pub use cv::{CvEntry, cv_list, numpress_linear_curie};
 pub use geometry::{GeometryParseError, ImagingRunMetadata, parse_scan_settings};
 pub use metadata::ImagingMetadata;
 pub use optical::{
@@ -36,3 +37,4 @@ pub use optical::{
 };
 pub use scan_settings::{ScanSettings, ScanSettingsParam, scan_settings_list_from_geometry};
 pub use tolerance::{ConformanceLevel, ToleranceContract};
+pub use transform::{TransformRecord, numpress_linear_transform};

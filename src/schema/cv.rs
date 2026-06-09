@@ -16,7 +16,30 @@
 //! path (no-drift-by-construction, asserted by `no_drift_reverse_cvlist_reads_cv_list`).
 //! To update a CV string, change ONLY this function.
 
+use mzdata::spectrum::bindata::BinaryCompressionType;
 use serde::{Deserialize, Serialize};
+
+/// The single-source accessor for the numpress-linear m/z compression CURIE (`MS:1002312`).
+///
+/// This is the **one place** the CURIE string for numpress-linear m/z compression is resolved.
+/// It is shared by:
+///
+///   - The file-level `metadata.transform` block ([`crate::schema::transform::TransformRecord`]),
+///     which this converter writes into `FileIndex.metadata["transform"]` when `opts.lossy_mz` is
+///     true.
+///   - The array-index `transform` field stamped per-column by the vendored writer
+///     (`buffer_descriptors.rs` `BufferTransform::NumpressLinear.curie()`), which resolves the
+///     same mzdata `BinaryCompressionType::NumpressLinear` source.
+///
+/// No independent `"MS:1002312"` literals exist in the converter — single-source,
+/// no-drift-by-construction (T-28-01).
+pub fn numpress_linear_curie() -> mzdata::params::CURIE {
+    BinaryCompressionType::NumpressLinear
+        .as_param()
+        .expect("NumpressLinear has a PSI-MS param")
+        .curie()
+        .expect("NumpressLinear param has a CURIE")
+}
 
 /// One controlled-vocabulary declaration in the file-level `cv_list`.
 ///
@@ -81,9 +104,35 @@ pub fn cv_list() -> Vec<CvEntry> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mzdata::spectrum::bindata::BinaryCompressionType;
     use serde_json::Value;
     use std::collections::BTreeSet;
     use std::path::Path;
+
+    /// `numpress_linear_curie()` must return the canonical PSI-MS CURIE for numpress-linear m/z
+    /// compression, and it must match the `BinaryCompressionType::NumpressLinear` accessor so the
+    /// file-level `metadata.transform` block cannot drift from the array-index `transform` field
+    /// the vendored writer stamps (T-28-01).
+    #[test]
+    fn numpress_linear_curie_is_ms_1002312() {
+        let curie = numpress_linear_curie();
+        assert_eq!(
+            curie.to_string(),
+            "MS:1002312",
+            "numpress_linear_curie() must return MS:1002312"
+        );
+        // Cross-check against the mzdata accessor directly — single source, no-drift.
+        let from_mzdata = BinaryCompressionType::NumpressLinear
+            .as_param()
+            .unwrap()
+            .curie()
+            .unwrap();
+        assert_eq!(
+            curie.to_string(),
+            from_mzdata.to_string(),
+            "numpress_linear_curie() must equal BinaryCompressionType::NumpressLinear CURIE"
+        );
+    }
 
     /// Load and parse `schema/cv_list.json` at test time (no validator crate pinned — mirrors
     /// the `metadata.rs` `load_schema` pattern).
