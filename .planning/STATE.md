@@ -4,13 +4,13 @@ milestone: v0.7
 milestone_name: — Upstreaming, de-vendoring & sample-metadata modeling
 status: completed
 stopped_at: v0.7 reshaped to 8 phases (22–29); imaging-structure cluster deferred beyond v1.0; re-themed; REQUIREMENTS traceability mapped 21 active
-last_updated: "2026-06-09T04:19:20.721Z"
-last_activity: 2026-06-08 — v0.7 reshaped 10→8 phases; imaging-structure cluster deferred beyond v1.0; re-themed to "Upstreaming, de-vendoring & sample-metadata modeling"
+last_updated: "2026-06-09T04:43:03.044Z"
+last_activity: "2026-06-09 — Completed quick task 260609-8wo: reconciled two corpus dir-name vs in-file instrument mismatches (agilent-qtof→6490 QqQ, waters-xevo-g2s-qtof→G2-XS); kept dir names, added caveats"
 progress:
   total_phases: 8
   completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 12
+  completed_plans: 7
   percent: 38
 ---
 
@@ -258,6 +258,7 @@ Items deferred out of v0.7:
 | Channels | CHAN-04 — TMTpro 16/18-plex full CV modeling (blocked on PSI-MS terms) | Deferred (v2) | v0.7 scoping |
 | Imaging | F8c — true multi-modal co-registration (computing transforms) | Out of scope | v0.7 scoping |
 | Schema | Admit 32-bit m/z / 64-bit intensity into data-facet schema (HUPO-PSI #11 other horn) | Out of scope (upstream) | v0.7 scoping |
+| Phase 27-sdrf-sample-model P01 | 7 | 2 tasks | 6 files |
 
 ## Quick Tasks Completed
 
@@ -270,7 +271,7 @@ Items deferred out of v0.7:
 
 ## Session Continuity
 
-Last session: 2026-06-09T04:08:23.802Z
+Last session: 2026-06-09T04:43:03.040Z
 Stopped at: v0.7 reshaped to 8 phases (22–29); imaging-structure cluster deferred beyond v1.0; re-themed; REQUIREMENTS traceability mapped 21 active
 Resume file: None
 
