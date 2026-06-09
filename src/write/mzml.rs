@@ -344,9 +344,97 @@ pub fn convert_mzml(
         .finish_parquet()
         .map_err(|e| MzmlConvertError::Finish(Box::new(e)))?;
 
-    // SDRF verbatim embed + metadata.study back-ref — wired in Task 2 (Plan 03).
-    // The `sdrf` parameter carries the caller-supplied SDRF path (None → no-op, byte-identical).
-    let _ = sdrf; // used in Task 2; reference here avoids unused-variable warning
+    // ── SDRF verbatim embed + metadata.study back-ref (Plan 03 / SM-01..04) ────────────────
+    // Only active when the caller supplies `--sdrf <PATH>` via the CLI (explicit-only, SM-01).
+    // None → no-op: byte-identical output (no study/sample_metadata keys emitted at all).
+    if let Some(sdrf_path) = sdrf {
+        // 1. Parse the SDRF TSV into the unified SampleMetadataDoc model.
+        let doc = crate::sdrf::parse_sdrf(sdrf_path)
+            .map_err(|e| MzmlConvertError::Sdrf(Box::new(e)))?;
+
+        // 2. Match rows against the input mzML basename. Zero-match / multi-match emit a
+        //    LOUD log::warn! (R9/R10 / T-31-09) but never fail the conversion — spectral data
+        //    is valid regardless of SDRF binding quality (SM-03).
+        let match_result = crate::sdrf::match_rows_for_data_file(&doc, input);
+        for diag in &match_result.diagnostics {
+            log::warn!("SDRF file-row match: {} — {}", diag.code, diag.message);
+        }
+
+        // 3. Embed the WHOLE source SDRF verbatim as a typed sample-metadata/sdrf member.
+        //    embed_scope:"full" — the simplest byte-identical anchor (§5.1 MVP default).
+        //    The fixed constant "sample_metadata/sdrf.tsv" is the deterministic archive name
+        //    per the §3.9 contract (mzpeak-extension-contract.md §3.9).
+        const MEMBER_NAME: &str = "sample_metadata/sdrf.tsv";
+        let embed_facts = crate::sdrf::embed_sdrf_member(&mut zip, sdrf_path, MEMBER_NAME)
+            .map_err(|e| MzmlConvertError::Sdrf(Box::new(e)))?;
+
+        // 4. Derive the dataset_accession hint from the SDRF:
+        //    a) Look for characteristics[proteomexchange accession number] in any sample.
+        //    b) If not found, try the SDRF filename stem if it matches PXD…/MTBLS… pattern.
+        //    c) Fallback: use the filename stem verbatim (always informative).
+        let accession: String = {
+            let px_col = "characteristics[proteomexchange accession number]";
+            let from_sdrf: Option<String> = doc.header_index(px_col).and_then(|col_idx| {
+                // Pick the first non-empty, non-NA value from that column across all rows.
+                doc.verbatim.rows.iter().find_map(|row| {
+                    row.get(col_idx)
+                        .filter(|v| !v.trim().is_empty())
+                        .map(|v| v.trim().to_owned())
+                })
+            });
+            if let Some(a) = from_sdrf {
+                a
+            } else {
+                // Try filename stem matching PXD… / MTBLS… / MSV… patterns.
+                let stem = sdrf_path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("");
+                // Strip off common filename suffixes like ".sdrf", leaving just the accession.
+                let bare = if let Some(pos) = stem.rfind('.') {
+                    &stem[..pos]
+                } else {
+                    stem
+                };
+                // Accept well-known accession prefixes; otherwise use the whole stem.
+                if bare.starts_with("PXD")
+                    || bare.starts_with("MTBLS")
+                    || bare.starts_with("MSV")
+                {
+                    bare.to_owned()
+                } else {
+                    // The whole stem is informative.
+                    stem.to_owned()
+                }
+            }
+        };
+
+        // The SDRF carries no clean study title; use the accession as an informative title.
+        // `title` is informative per schema/study.json — not required to be unique.
+        let title = accession.clone();
+
+        // 5. Write the metadata.study back-ref via the Phase-30 `study_metadata()` constructor.
+        //    This produces {dataset_accession, title, sample_metadata_ref} — the three-field
+        //    shape governed by schema/study.json (additionalProperties:false). T-31-10.
+        let study = crate::schema::study_metadata(&accession, &title, MEMBER_NAME);
+        zip.add_index_metadata("study", &study)
+            .map_err(MzmlConvertError::Json)?;
+
+        // 6. Write the free-form metadata.sample_metadata provenance block (design §5.1).
+        //    This carries precedence:"repo_wins" + sha256 + size_bytes + embed_scope so
+        //    the staleness guard (T-31-08) is falsifiable against the live repository.
+        //    Kept SEPARATE from metadata.study because schema/study.json is additionalProperties:false.
+        let provenance = serde_json::json!({
+            "member": embed_facts.member,
+            "sha256": embed_facts.sha256,
+            "size_bytes": embed_facts.size_bytes,
+            "precedence": "repo_wins",
+            "embed_scope": "full",
+            "dataset_accession": accession,
+        });
+        zip.add_index_metadata("sample_metadata", &provenance)
+            .map_err(MzmlConvertError::Json)?;
+    }
 
     // Move the transform KV onto the ZIP handle (same FileIndex.metadata map, written index-last
     // by zip.finish() below). Emitted ONLY for lossy (numpress-linear) conversions.
