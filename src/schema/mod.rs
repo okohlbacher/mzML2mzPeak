@@ -21,6 +21,7 @@
 
 pub mod columns;
 pub mod cv;
+pub mod source_curie;
 pub mod geometry;
 pub mod metadata;
 pub mod optical;
