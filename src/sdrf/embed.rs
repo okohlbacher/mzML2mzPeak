@@ -73,11 +73,75 @@ pub enum EmbedError {
     },
 }
 
+/// Core embed helper: stream `bytes_path` BYTE-FOR-BYTE into `zip` as a TYPED member
+/// at `member_name`, with the given `entity_type` and `data_kind` strings.
+///
+/// This is the shared implementation used by both [`embed_sdrf_member`] (which passes
+/// `SDRF_DATA_KIND`) and the ISA embed loop (which passes `ISA_DATA_KIND`). The caller
+/// chooses the `data_kind` so different metadata flavors get correctly typed members.
+///
+/// # Arguments
+///
+/// - `zip` — the open [`ZipArchiveWriter`] returned by `finish_parquet()`.
+/// - `bytes_path` — path to the file to embed (bytes copied verbatim, no transform).
+/// - `member_name` — the deterministic archive member path (no path-injection surface).
+/// - `entity_type` — e.g. `SAMPLE_METADATA_ENTITY_TYPE`.
+/// - `data_kind` — e.g. `SDRF_DATA_KIND` or `ISA_DATA_KIND`.
+///
+/// # Errors
+///
+/// Returns [`EmbedError`] on any I/O failure (open, stream, or digest pass).
+pub fn embed_member(
+    zip: &mut ZipArchiveWriter<File>,
+    bytes_path: &Path,
+    member_name: &str,
+    entity_type: &str,
+    data_kind: &str,
+) -> Result<EmbedFacts, EmbedError> {
+    let path_str = bytes_path.display().to_string();
+
+    // Build the TYPED FileEntry using the caller-supplied tokens.
+    let entry = FileEntry::new(
+        member_name.to_string(),
+        EntityType::Other(entity_type.to_string()),
+        DataKind::Other(data_kind.to_string()),
+    );
+
+    // Stream the bytes into the ZIP via the TYPED start_for_entry path.
+    // `add_file_from_read` with `entry=Some(...)` routes through `start_for_entry` (TYPED) and
+    // then the 64 KiB byte-copy loop — never a whole-file load.
+    let mut src = File::open(bytes_path).map_err(|e| EmbedError::Io {
+        path: path_str.clone(),
+        source: e,
+    })?;
+    zip.add_file_from_read(&mut src, None::<&String>, Some(entry))
+        .map_err(|e| EmbedError::Embed {
+            member: member_name.to_string(),
+            source: e,
+        })?;
+
+    // Second bounded pass: SHA-256 + exact byte count for the provenance back-ref.
+    let (sha256, size_bytes) =
+        crate::write::image::sha256_and_size(bytes_path).map_err(|e| EmbedError::Digest {
+            path: path_str,
+            source: e,
+        })?;
+
+    Ok(EmbedFacts {
+        member: member_name.to_string(),
+        sha256,
+        size_bytes,
+    })
+}
+
 /// Stream `sdrf_bytes_path` BYTE-FOR-BYTE into `zip` as a TYPED `sample-metadata`/`sdrf`
 /// member at `member_name`, using `start_for_entry` (NOT `start_other`).
 ///
 /// The caller is responsible for calling `zip.finish()` after this returns. This function only
 /// adds the member and records its SHA-256 + size; it does NOT finalize the archive.
+///
+/// This is a thin wrapper over [`embed_member`] that passes `SAMPLE_METADATA_ENTITY_TYPE`
+/// and `SDRF_DATA_KIND` — keeping existing SDRF callers byte-identical (no API change).
 ///
 /// # Arguments
 ///
@@ -95,42 +159,13 @@ pub fn embed_sdrf_member(
     sdrf_bytes_path: &Path,
     member_name: &str,
 ) -> Result<EmbedFacts, EmbedError> {
-    let path_str = sdrf_bytes_path.display().to_string();
-
-    // Build the TYPED FileEntry using the Phase-30 carve-out token constants.
-    // DO NOT restate the string literals — import from cv.rs to avoid drift (T-31-05).
-    let entry = FileEntry::new(
-        member_name.to_string(),
-        EntityType::Other(crate::schema::cv::SAMPLE_METADATA_ENTITY_TYPE.to_string()),
-        DataKind::Other(crate::schema::cv::SDRF_DATA_KIND.to_string()),
-    );
-
-    // Stream the SDRF bytes into the ZIP via the TYPED start_for_entry path.
-    // `add_file_from_read` with `entry=Some(...)` routes through `start_for_entry` (TYPED) and
-    // then the 64 KiB byte-copy loop — never a whole-file load (T-31-04 / T-31-05).
-    let mut src = File::open(sdrf_bytes_path).map_err(|e| EmbedError::Io {
-        path: path_str.clone(),
-        source: e,
-    })?;
-    zip.add_file_from_read(&mut src, None::<&String>, Some(entry))
-        .map_err(|e| EmbedError::Embed {
-            member: member_name.to_string(),
-            source: e,
-        })?;
-
-    // Second bounded pass: SHA-256 + exact byte count for the provenance back-ref.
-    // Reuse the shipped bounded-pass helper from write::image — never a whole-file load.
-    let (sha256, size_bytes) =
-        crate::write::image::sha256_and_size(sdrf_bytes_path).map_err(|e| EmbedError::Digest {
-            path: path_str,
-            source: e,
-        })?;
-
-    Ok(EmbedFacts {
-        member: member_name.to_string(),
-        sha256,
-        size_bytes,
-    })
+    embed_member(
+        zip,
+        sdrf_bytes_path,
+        member_name,
+        crate::schema::cv::SAMPLE_METADATA_ENTITY_TYPE,
+        crate::schema::cv::SDRF_DATA_KIND,
+    )
 }
 
 #[cfg(test)]
