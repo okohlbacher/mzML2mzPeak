@@ -56,9 +56,11 @@ pub fn cv_list() -> Vec<CvEntry> {
         CvEntry {
             id: "IMS".to_string(),
             full_name: "Mass Spectrometry Imaging controlled vocabulary".to_string(),
-            // TODO(F9): canonical IMS imagingMS.obo URI unconfirmed — CV governance gate.
-            // The imaging CV is not yet in OLS/OBO Foundry; this placeholder MUST equal the
-            // reverse <cv id="IMS" URI=...> literal until a governed home is minted.
+            // The IMS imaging CV has no OBO-Foundry PURL yet (CVG-01 — resolved 2026-06-09).
+            // This stable imzML/imzML raw URL is the recorded local token used until a canonical
+            // home is minted; the canonical-CURIE request is tracked in docs/cv-requests.md.
+            // The reverse <cvList> reads this value from cv_list() so forward and reverse are
+            // guaranteed to agree (no independent literal in imzml_writer.rs).
             uri: "https://raw.githubusercontent.com/imzML/imzML/master/imagingMS.obo".to_string(),
             version: Some("1.1.x".to_string()),
         },
