@@ -4,7 +4,7 @@
 //! # ISA-JSON format
 //!
 //! An ISA-JSON file contains a single top-level investigation object:
-//! ```
+//! ```json
 //! {
 //!   "identifier": "...", "title": "...",
 //!   "studies": [
