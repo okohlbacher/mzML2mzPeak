@@ -211,11 +211,53 @@ mod tests {
     }
 
     /// The set of CV ids declared here equals the set the reverse `<cvList count="3">` emits.
+    /// After CVG-01: the reverse emitter reads cv_list() rather than carrying independent literals,
+    /// so both sets derive from the same source (no frozen comparison needed here).
     #[test]
     fn ids_match_reverse_cvlist_set() {
         let ids: BTreeSet<String> = cv_list().into_iter().map(|e| e.id).collect();
         let reverse: BTreeSet<String> =
             ["MS", "IMS", "UO"].iter().map(|s| s.to_string()).collect();
         assert_eq!(ids, reverse, "forward cv_list ids must equal reverse <cvList> ids");
+    }
+
+    /// CVG-01 no-drift: the reverse imzML `<cvList>` is generated from `cv_list()` — there are no
+    /// independent CV literals in `imzml_writer.rs`. Asserts by source-scan that:
+    /// 1. `imzml_writer.rs` contains a call to `cv_list()` (it reads from the single source).
+    /// 2. `imzml_writer.rs` does NOT contain the CV `fullName` strings as independent
+    ///    raw literals (they must not exist outside of a comment or doc-comment).
+    ///
+    /// "No-drift by construction": changing a CV full_name or URI requires changing ONLY cv.rs;
+    /// the reverse path has no copy to keep in sync.
+    #[test]
+    fn no_drift_reverse_cvlist_reads_cv_list() {
+        let source = std::fs::read_to_string(
+            std::path::Path::new("src/reverse/imzml_writer.rs")
+        ).expect("src/reverse/imzml_writer.rs must be readable");
+
+        // Strip comment lines (lines beginning with optional whitespace + //) so doc-comment
+        // mentions of the cv strings do not self-invalidate the gate.
+        let non_comment: String = source
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        // The reverse emitter MUST call cv_list() (reads from the single source).
+        assert!(
+            non_comment.contains("cv_list()"),
+            "imzml_writer.rs must call cv_list() to generate the <cvList> block (CVG-01 no-drift)"
+        );
+
+        // The CV full_name strings must NOT appear as independent raw literals in non-comment code.
+        // If they did, a change to cv.rs::cv_list() would not propagate to the reverse path.
+        for entry in cv_list() {
+            assert!(
+                !non_comment.contains(&format!("\"{}\"", entry.full_name)),
+                "imzml_writer.rs must not contain '{}' as an independent raw string literal \
+                 (CVG-01: read from cv_list() instead)",
+                entry.full_name
+            );
+        }
     }
 }
