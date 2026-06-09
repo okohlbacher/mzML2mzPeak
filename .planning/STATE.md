@@ -38,7 +38,7 @@ request); Phase 22 (PRs) and Phase 29 (de-vendor) are DEFERRED/held; the next bu
 Phase: **25 (Forward declared-geometry threading)** — Plans 01–02 ✅ DONE
 Plan: 02 complete (`b9d1541`)
 Status: Phase 23 (upstream rebase) ✅ DONE (`5021eed`). Phase 22 (PRs) DEFERRED — held by owner (UPS-02/04 done-upstream). Phase 29 (de-vendor) DEFERRED — gated on external merges. Phase 24 Plan 01 DONE — CVG-01/CVG-02 gates closed. Phase 25 Plans 01–02 DONE — GEOF-01 fully proven end-to-end. Next: Phase 26 (RSRC) or Phase 27 (SDRF).
-Last activity: 2026-06-09 — Phase 25 Plans 01–02 complete; GEOF-01 closed; declared-geometry fixture + symmetry assertion + integration test committed
+Last activity: 2026-06-09 — Completed quick task 260609-8wo: reconciled two corpus dir-name vs in-file instrument mismatches (agilent-qtof→6490 QqQ, waters-xevo-g2s-qtof→G2-XS); kept dir names, added caveats
 
 ### Rebase findings (2026-06-08, commit 5021eed)
 
@@ -266,6 +266,7 @@ Items deferred out of v0.7:
 | 260606-90y | Expose checksum-mismatch escape hatch as `--ignore-incorrect-checksum` | 2026-06-06 |
 | 260606-a8f | Data-derive `sorting_rank` + `--sort-peaks` repair + validator handoff doc | 2026-06-06 |
 | 260609-8tf | Re-check MetaboLights pub status (MTBLS13204 published → paper note; 11550/12824 still unpublished) | 2026-06-09 |
+| 260609-8wo | Reconcile dir-name vs in-file instrument model — `agilent-qtof`→6490 QqQ, `waters-xevo-g2s-qtof`→G2-XS (kept names + caveats) | 2026-06-09 |
 
 ## Session Continuity
 
