@@ -42,6 +42,59 @@ pub fn numpress_linear_curie() -> mzdata::params::CURIE {
         .expect("NumpressLinear param has a CURIE")
 }
 
+/// The single-source accessor for the "sample label" umbrella CURIE (`MS:1002602`).
+///
+/// `MS:1002602` "sample label" — the PSI-MS umbrella term for reagents used in labeled
+/// quantification methods (SMCVG-02, RATIFIED-E). Its children (TMT reagent 126…131,
+/// iTRAQ reagent 113…121, etc.) are the per-channel labels Phase 34 will use to model
+/// isobaric channels as labeled `sample_list` entries. This plan confirms the umbrella;
+/// Phase 34 enumerates the children.
+///
+/// This is the **one place** the `MS:1002602` string is resolved in the converter.
+/// No independent `"1002602"` literal may exist in any other module (T-30-01,
+/// asserted by `no_drift_sample_label_curie`).
+pub fn sample_label_curie() -> mzdata::params::CURIE {
+    mzdata::curie!(MS:1002602)
+}
+
+/// The single-source stable token for the channel **role** structural attribute.
+///
+/// The role attribute records whether a sample-list entry is a biological sample,
+/// a pooled QC, a carrier, or a reference channel
+/// (values: `"sample"` / `"pooled"` / `"carrier"` / `"reference"`).
+///
+/// PSI-MS CV 4.1.x has no canonical accession for a "channel role" or
+/// "isobaric channel role" attribute parameter. Accordingly this accessor returns
+/// a **documented stable free-text token** (`"mzml2mzpeak:channel-role"`) rather
+/// than a minted accession. The canonical CURIE request is filed in
+/// `docs/cv-requests.md` under "v0.8 sample-metadata structural terms" (T-30-02,
+/// SMCVG-02 Locked Rule 5 — stable tokens, no minting).
+///
+/// No independent `"mzml2mzpeak:channel-role"` literal may exist outside cv.rs
+/// (T-30-01, asserted by `no_drift_channel_role_token`).
+pub fn channel_role_token() -> &'static str {
+    "mzml2mzpeak:channel-role"
+}
+
+/// The single-source stable token for the **reporter-ion m/z** structural attribute.
+///
+/// The reporter-ion m/z attribute records the nominal m/z of the reporter ion for
+/// a labeled-quant channel in a `sample_list` entry (Phase 34).
+///
+/// PSI-MS CV 4.1.x has no canonical accession for a standalone "reporter ion m/z"
+/// attribute parameter at the sample/channel level (the existing reporter-ion terms
+/// — `MS:1002307` "reporter ion intensity" etc. — are scan-level fragment ions, not
+/// sample-metadata attributes). Accordingly this accessor returns a **documented
+/// stable free-text token** (`"mzml2mzpeak:reporter-ion-mz"`) rather than a minted
+/// accession. The canonical CURIE request is filed in `docs/cv-requests.md` under
+/// "v0.8 sample-metadata structural terms" (T-30-02, SMCVG-02 Locked Rule 5).
+///
+/// No independent `"mzml2mzpeak:reporter-ion-mz"` literal may exist outside cv.rs
+/// (T-30-01, asserted by `no_drift_reporter_ion_mz_token`).
+pub fn reporter_ion_mz_token() -> &'static str {
+    "mzml2mzpeak:reporter-ion-mz"
+}
+
 /// One controlled-vocabulary declaration in the file-level `cv_list`.
 ///
 /// Serializes to `{id, full_name, uri, version?}`; `version` is OPTIONAL and OMITTED from the
