@@ -217,7 +217,7 @@ Plans:
 - [x] **Phase 30: Sample-metadata spec alignment & CV governance** — Q1–Q10 ratified vs canonical spec; `SourceCurie` + CV passthrough strategy; `metadata.study`/`metadata.sample_list` KV + `sample-metadata`/`sdrf|isa` member contracts + `schema/*.json`; confirm `MS:1002602` "sample label" (NO `channel_list`). *(SMSPEC-01..03, SMCVG-01..02.)* **COMPLETE 2026-06-09**
 - [ ] **Phase 30b: Upstream list-valued `ms_run.sample_ref` PR prep** *(EARLY, owner-gated, parallel)* — draft spec + reference-impl + open PR so the merge clock overlaps non-blocked phases. Gates only Phase 32's native binding. *(UPSTREAM-BIND-01.)*
 - [ ] **Phase 31: Unified model + SDRF reader + verbatim embed (MVP)** — `StudyMetadata`+`SourceCurie`+`csv` reader + the `convert_mzml` finalize-seam refactor + typed-member helper + `--sdrf` CLI + verbatim member + back-ref + precedence + file-row matching. *(SM-01..04.)*
-- [ ] **Phase 32: Lean `sample_list`/study projection + list-valued run binding** — minimal `sample_list` + `metadata.study`; native list-valued `ms_run.sample_ref` (gated on Phase 30b; `run_sample_binding` shadow interim). *(SM-05..07.)*
+- [x] **Phase 32: Lean `sample_list`/study projection + list-valued run binding** — minimal `sample_list` + `metadata.study`; native list-valued `ms_run.sample_ref` (gated on Phase 30b; `run_sample_binding` shadow interim). *(SM-05..07.)* **DONE 2026-06-09** (SM-05/SM-06 shipped; SM-07 deferred ≥v0.9)
 - [ ] **Phase 33: ISA reader (Tab + JSON)** — pure-Rust hand parser (no Python) + ISA-JSON deserialize; whole-bundle verbatim embed (`data_kind: isa`); protocol-graph preserved in blob. *(SM-08..10.)*
 - [ ] **Phase 34: Isobaric channels as labeled samples (NO new construct)** — `sample label` cvParam (MS:1002602) + reporter-m/z/role/tag params on `sample_list`; bound via list-valued `sample_ref`. *(CHAN-01..03.)*
 - [ ] **Phase 35: Reporter-ion quantitation** *(optional, off by default; first-to-cut)* — `auxiliary` array `channel_id` column; own-reader read-back spike; `--reporter-quant`. *(QUANT-01..02.)*
@@ -285,7 +285,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 32-01-PLAN.md — sample_list projection (one entry per source name, lean id+name) + metadata.study retained + run_sample_binding provenance shadow (native ms_run.sample_ref gated on Phase 30b) + PXD020187 read-back
+- [x] 32-01-PLAN.md — sample_list projection (one entry per source name, lean id+name) + metadata.study retained + run_sample_binding provenance shadow (native ms_run.sample_ref gated on Phase 30b) + PXD020187 read-back **DONE 2026-06-09** (SM-05/SM-06 shipped; SM-07 deferred ≥v0.9)
 
 ### Phase 33: ISA reader (Tab + JSON)
 

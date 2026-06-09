@@ -110,19 +110,19 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
 
 ### Lean projections + run binding (SM-05..07) — Phase 32
 
-- [ ] **SM-05** — Lean `sample_list` projection (reuse `sample.json`): one entry per `source name`, carrying
+- [x] **SM-05** — Lean `sample_list` projection (reuse `sample.json`): one entry per `source name`, carrying
   **id + name + a minimal identifying param set**; full `characteristics→Param` shaping is **demoted** (the
   verbatim blob holds it). Plus `metadata.study` global context (accession / title / back-ref) — **un-gated,
-  ships immediately**.
+  ships immediately**. **DONE Phase 32 (2026-06-09):** project_sample_list() + add_index_metadata("sample_list").
 
-- [ ] **SM-06** — Run→sample binding via the **native list-valued `ms_run.sample_ref`** field — **GATED on
+- [x] **SM-06** — Run→sample binding via the **native list-valued `ms_run.sample_ref`** field — **GATED on
   Phase 30b's upstream merge**; until then write the `metadata.study.run_sample_binding` index.json
   **provenance shadow** so the slice still roundtrips. Documented **repo-SDRF-wins** precedence rule resolves
-  embedded-vs-repo conflicts.
+  embedded-vs-repo conflicts. **DONE (shadow) Phase 32 (2026-06-09):** build_run_sample_binding() + study_metadata_with_binding(); binding_provenance:"phase32_shadow"; native ms_run.sample_ref gated Phase 30b.
 
 - [ ] **SM-07** — `factor_values` slice (this file's `factor value[*]` levels) — **DEMOTED / DEFERRED ≥v0.9**
   (RATIFIED-G): held losslessly in the verbatim blob, not natively projected in v0.8. *(Recorded as an
-  active-milestone requirement only to track its deferral; no v0.8 emit work.)*
+  active-milestone requirement only to track its deferral; no v0.8 emit work.) CONFIRMED DEFERRED Phase 32.*
 
 ### ISA reader (SM-08..10) — Phase 33
 
@@ -224,13 +224,13 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
 | SMCVG-01 | 30 | ⬜ Not started | v0.7 Phase 24 (✅) |
 | SMCVG-02 | 30 | ⬜ Not started | v0.7 Phase 24 (✅) |
 | UPSTREAM-BIND-01 | 30b | ⬜ Not started (owner-gated) | Phase 30; gates Phase 32 native binding |
-| SM-01 | 31 | ⬜ Not started | Phase 30 |
-| SM-02 | 31 | ⬜ Not started | Phase 30 |
-| SM-03 | 31 | ⬜ Not started | Phase 30 |
-| SM-04 | 31 | ⬜ Not started | Phase 30 |
-| SM-05 | 32 | ⬜ Not started | Phase 31 |
-| SM-06 | 32 | ⬜ Not started | Phase 31; native binding gated on Phase 30b |
-| SM-07 | 32 | ⬜ Deferred ≥v0.9 (blob holds it) | Phase 31 |
+| SM-01 | 31 | ✅ Done (2026-06-09) | Phase 30 |
+| SM-02 | 31 | ✅ Done (2026-06-09) | Phase 30 |
+| SM-03 | 31 | ✅ Done (2026-06-09) | Phase 30 |
+| SM-04 | 31 | ✅ Done (2026-06-09) | Phase 30 |
+| SM-05 | 32 | ✅ Done (2026-06-09) | Phase 31 |
+| SM-06 | 32 | ✅ Done shadow (2026-06-09); native gated 30b | Phase 31; native binding gated on Phase 30b |
+| SM-07 | 32 | ⬜ Deferred ≥v0.9 confirmed (blob holds it) | Phase 31 |
 | SM-08 | 33 | ⬜ Not started | Phases 31, 32 |
 | SM-09 | 33 | ⬜ Not started | Phases 31, 32 |
 | SM-10 | 33 | ⬜ Not started | Phases 31, 32 |

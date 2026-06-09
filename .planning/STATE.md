@@ -4,14 +4,14 @@ milestone: v0.8
 milestone_name: > **RELOCATED TO v0.8 — 2026-06-09
 status: executing
 stopped_at: v0.7 COMPLETE — all 9 active reqs done; Phases 22 (PRs) + 27 (SDRF) + 29 (de-vendor) relocated to v0.8; ready to archive/tag
-last_updated: "2026-06-09T08:34:57.158Z"
-last_activity: 2026-06-09 — Milestone v0.8 formalized (REQUIREMENTS/ROADMAP/PROJECT/STATE from the ratified design)
+last_updated: "2026-06-09T09:26:00Z"
+last_activity: 2026-06-09 — Phase 32 Plan 01 complete (SM-05/SM-06 shipped; SM-07 deferred ≥v0.9)
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 6
-  completed_plans: 0
-  percent: 0
+  completed_plans: 4
+  percent: 67
 ---
 
 # Project State
@@ -40,10 +40,10 @@ dep: **`csv`** (re-added) + `serde_json` (already present). v0.7 is **shipped** 
 
 ## Current Position
 
-Phase: Not started
-Plan: —
-Status: **v0.8 scoped — next buildable = Phase 30 (sample-metadata spec alignment & CV governance)**
-Last activity: 2026-06-09 — Milestone v0.8 formalized (REQUIREMENTS/ROADMAP/PROJECT/STATE from the ratified design)
+Phase: 32-sample-list-projection
+Plan: 01 (complete)
+Status: **Phases 30, 31, 32 complete. Next buildable = Phase 33 (ISA reader) or Phase 34 (isobaric channels)**
+Last activity: 2026-06-09 — Phase 32 Plan 01 complete — SM-05/SM-06 shipped (sample_list projection + phase32_shadow run binding); SM-07 deferred ≥v0.9
 
 ## v0.8 Roadmap (Phases 22, 29, 30, 30b, 31–37)
 
@@ -61,15 +61,15 @@ BATCH proposal to `HUPO-PSI/mzPeak-specification` at the END of v0.8. Pinned sta
 | 29 | De-vendor both forks (relocated from v0.7) | DVN-01, DVN-02 | **Gated** | UPS-01 merged + mzdata 0.64.2 on crates.io; LAST |
 | 30 | Sample-metadata spec alignment & CV governance | SMSPEC-01..03, SMCVG-01..02 | ✅ Complete (2026-06-09) | v0.7 Phase 24 (✅) — precedes 32+ |
 | 30b | Upstream list-valued `ms_run.sample_ref` PR | UPSTREAM-BIND-01 | ⬜ Not started (owner-gated) | 30 — early/parallel; gates 32 native binding |
-| 31 | Unified model + SDRF reader + verbatim embed (TRUE MVP) | SM-01..04 | ⬜ Not started | 30 — nothing upstream |
-| 32 | Lean `sample_list`/study projection + run binding | SM-05..07 | ⬜ Not started | 31; native binding gated on 30b |
+| 31 | Unified model + SDRF reader + verbatim embed (TRUE MVP) | SM-01..04 | ✅ Complete (2026-06-09) | 30 — nothing upstream |
+| 32 | Lean `sample_list`/study projection + run binding | SM-05..07 | ✅ Complete (2026-06-09; SM-07 deferred ≥v0.9) | 31; native binding gated on 30b |
 | 33 | ISA reader (Tab + JSON) | SM-08..10 | ⬜ Not started | 31, 32 — pure-Rust, no Python |
 | 34 | Isobaric channels as labeled samples | CHAN-01..03 | ⬜ Not started | 32 — MS:1002602, no channel_list |
 | 35 | Reporter-ion quantitation (optional) | QUANT-01..02 | ⬜ Not started (first-to-cut) | 34 |
 | 36 | comment-scope + factor-value completeness | SCOPE-01..02 | **DEFERRED ≥v0.9** | (blob holds fidelity) |
 | 37 | Round-trip + validation + batch submission | VAL-01..02, UPSTREAM-PR | ⬜ Not started | 31–34 (35 optional) |
 
-**Status:** v0.8 in progress; **Phase 30 complete (2026-06-09)**. Next buildable = **Phase 31** (SM-01..04 — unified model + SDRF reader + verbatim embed).
+**Status:** v0.8 in progress; **Phases 30, 31, 32 complete (2026-06-09)**. Next buildable = **Phase 33** (ISA reader) or **Phase 34** (isobaric channels as labeled samples).
 Critical path: 30 → 31 → 32 → 34 → (36 deferred) → 37. The upstream-gated native-binding sub-step (30b →
 32-binding) and the ISA track (33) run *off* the critical path.
 
@@ -186,6 +186,19 @@ release — the milestone is **not hard-blocked**, only its run-binding *queryab
 
 v0.7 decisions will be logged here per plan. v0.6 decisions are archived in
 `milestones/v0.6-ROADMAP.md` + PROJECT.md Key Decisions.
+
+**Phase 32 Plan 32-01 (2026-06-09):**
+
+- SM-05 (32-01): project_sample_list() = one entry per distinct SDRF source name; id+name+parameters:[] (lean RATIFIED-G; characteristics/factor_values in verbatim blob). Phase 30b gate honored: parameters=[] for v0.8.
+- SM-06 (32-01): build_run_sample_binding() = phase32_shadow token; non-empty match → Some(RunSampleBinding), zero-match → None (honest "samples mixed" absence). Overwrites upstream mzpeak_prototyping sample_list key via add_index_metadata HashMap::insert (SDRF-derived is authoritative).
+- SM-07 (32-01): DEFERRED ≥v0.9 — factor_values not projected; verbatim blob holds them. Documented in module + wiring comments + REQUIREMENTS.md.
+- Test D deviation: upstream writer always emits sample_list from copy_metadata_from; test D checks study/sample_metadata absence only (not sample_list absence). Deviation documented in test comments.
+
+**Phase 31 Plans 31-01..03 (2026-06-09):**
+
+- SM-01/SM-02 (31-01): SampleMetadataDoc keystone model; parse_sdrf csv-backed reader; TypedValue cvParam/userParam decision point; VerbatimBundle lossless anchor.
+- SM-03 (31-02): match_rows_for_data_file basename matching across sibling extensions; zero-/multi-match → Diagnostic, never fail.
+- SM-04 (31-03): embed_sdrf_member verbatim embed; study_metadata back-ref; finish_parquet→zip seam refactor; PXD020187 byte-identical roundtrip test.
 
 **Phase 30 Plans 30-01..03 (2026-06-09):**
 
@@ -366,8 +379,8 @@ Items deferred out of v0.7:
 
 ## Session Continuity
 
-Last session: 2026-06-09T08:34:57.154Z
-Stopped at: v0.7 COMPLETE — all 9 active reqs done; Phases 22 (PRs) + 27 (SDRF) + 29 (de-vendor) relocated to v0.8; ready to archive/tag
+Last session: 2026-06-09T09:26:00Z
+Stopped at: Phase 32 Plan 01 COMPLETE — SM-05/SM-06 shipped (sample_list projection + phase32_shadow binding); SM-07 confirmed deferred ≥v0.9; 456 tests green
 Resume file: None
 
 ## Operator Next Steps
