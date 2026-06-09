@@ -60,7 +60,7 @@
 
 ### Conformance (L2)
 
-- [ ] **L2-01**: An L2 conformance verify path (value-equal under a recorded transform) is wired into the CLI on top of the existing `ToleranceContract::L2`, recording the transform. *(F10 · Phase 28.)*
+- [x] **L2-01**: An L2 conformance verify path (value-equal under a recorded transform) is wired into the CLI on top of the existing `ToleranceContract::L2`, recording the transform. *(F10 · Phase 28.)*
 
 > **Spec-engagement decision:** build all extensions locally against the spec's mechanisms + stable
 > tokens; submit the write-ups as a **batch of proposals to `HUPO-PSI/mzPeak-specification` at the END of
@@ -139,7 +139,7 @@ These are **NOT** v0.7 phases. PSI-committee notes to carry forward: ROI as a sp
 | CVG-02 | Phase 24 Plan 01 | ✅ Done 2026-06-09 |
 | GEOF-01 | Phase 25 | ✅ Done |
 | RSRC-01 | Phase 26 | ✅ Done |
-| L2-01 | Phase 28 (next buildable) | Pending |
+| L2-01 | Phase 28 (next buildable) | Complete |
 | DVN-01 | Phase 29 (DEFERRED — gated) | Pending |
 | DVN-02 | Phase 29 (DEFERRED — gated) | Pending |
 
