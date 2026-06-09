@@ -312,6 +312,151 @@ mod tests {
         }
     }
 
+    // ──────────────────────────────────────────────────────────────────────────
+    // Task 1 (TDD RED): sample-metadata structural CV terms (30-02, SMCVG-02)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /// `sample_label_curie()` must return the canonical PSI-MS CURIE `MS:1002602`
+    /// ("sample label" — the umbrella term for labeled-quant reagents; its children
+    /// TMT126, iTRAQ 114, etc. are the per-channel labels Phase 34 uses).
+    /// Asserts the accessor Display and that no independent "1002602" literal exists
+    /// in the converter modules (single-source no-drift, SMCVG-02 / T-30-01).
+    #[test]
+    fn sample_label_curie_is_ms_1002602() {
+        let curie = sample_label_curie();
+        assert_eq!(
+            curie.to_string(),
+            "MS:1002602",
+            "sample_label_curie() must return MS:1002602"
+        );
+    }
+
+    /// `channel_role_token()` returns the declared stable token for the channel-role
+    /// structural attribute (sample/pooled/carrier/reference). PSI-MS 4.1.x has no
+    /// canonical accession for this attribute; the token is a documented free-text
+    /// stable string, and the request is filed in docs/cv-requests.md.
+    #[test]
+    fn channel_role_token_is_stable() {
+        let token = channel_role_token();
+        // Must be non-empty — an empty token is not a stable contract.
+        assert!(!token.is_empty(), "channel_role_token() must return a non-empty string");
+        // Must be the documented stable local token (value-pinning).
+        assert_eq!(
+            token,
+            "mzml2mzpeak:channel-role",
+            "channel_role_token() must return the pinned stable token"
+        );
+    }
+
+    /// `reporter_ion_mz_token()` returns the declared stable token for the
+    /// reporter-ion m/z structural attribute. PSI-MS 4.1.x has no canonical
+    /// accession for a channel-level "reporter m/z" attribute param; the token
+    /// is a documented free-text stable string, request filed in cv-requests.md.
+    #[test]
+    fn reporter_ion_mz_token_is_stable() {
+        let token = reporter_ion_mz_token();
+        assert!(!token.is_empty(), "reporter_ion_mz_token() must return a non-empty string");
+        assert_eq!(
+            token,
+            "mzml2mzpeak:reporter-ion-mz",
+            "reporter_ion_mz_token() must return the pinned stable token"
+        );
+    }
+
+    /// No-drift gate: the string "1002602" (the accession for `sample_label_curie()`)
+    /// must NOT appear as an independent raw literal in any converter source file
+    /// OUTSIDE of `src/schema/cv.rs` itself. Any consumer must call `sample_label_curie()`.
+    ///
+    /// Mirrors the CVG-01 pattern: source-scan strips comment lines before checking.
+    #[test]
+    fn no_drift_sample_label_curie() {
+        let sentinel = "1002602";
+        // Files to scan for independent occurrences (the single source is cv.rs).
+        let scan_files = [
+            "src/write/writer.rs",
+            "src/write/convert.rs",
+            "src/reverse/imzml_writer.rs",
+            "src/reverse/source.rs",
+            "src/reverse/convert.rs",
+            "src/verify/verify.rs",
+        ];
+        for path in &scan_files {
+            let source = std::fs::read_to_string(std::path::Path::new(path))
+                .unwrap_or_else(|_| String::new());
+            let non_comment: String = source
+                .lines()
+                .filter(|line| !line.trim_start().starts_with("//"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert!(
+                !non_comment.contains(sentinel),
+                "module {} contains '{}' as an independent literal — use sample_label_curie() instead \
+                 (SMCVG-02 single-source no-drift / T-30-01)",
+                path, sentinel
+            );
+        }
+    }
+
+    /// No-drift gate: the stable token string `"mzml2mzpeak:channel-role"` must not
+    /// appear as an independent raw literal outside cv.rs (single-source, T-30-01).
+    #[test]
+    fn no_drift_channel_role_token() {
+        let sentinel = "mzml2mzpeak:channel-role";
+        let scan_files = [
+            "src/write/writer.rs",
+            "src/write/convert.rs",
+            "src/reverse/imzml_writer.rs",
+            "src/reverse/source.rs",
+            "src/reverse/convert.rs",
+            "src/verify/verify.rs",
+        ];
+        for path in &scan_files {
+            let source = std::fs::read_to_string(std::path::Path::new(path))
+                .unwrap_or_else(|_| String::new());
+            let non_comment: String = source
+                .lines()
+                .filter(|line| !line.trim_start().starts_with("//"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert!(
+                !non_comment.contains(sentinel),
+                "module {} contains '{}' as an independent literal — use channel_role_token() \
+                 (SMCVG-02 single-source no-drift / T-30-01)",
+                path, sentinel
+            );
+        }
+    }
+
+    /// No-drift gate: the stable token `"mzml2mzpeak:reporter-ion-mz"` must not appear
+    /// as an independent raw literal outside cv.rs (single-source, T-30-01).
+    #[test]
+    fn no_drift_reporter_ion_mz_token() {
+        let sentinel = "mzml2mzpeak:reporter-ion-mz";
+        let scan_files = [
+            "src/write/writer.rs",
+            "src/write/convert.rs",
+            "src/reverse/imzml_writer.rs",
+            "src/reverse/source.rs",
+            "src/reverse/convert.rs",
+            "src/verify/verify.rs",
+        ];
+        for path in &scan_files {
+            let source = std::fs::read_to_string(std::path::Path::new(path))
+                .unwrap_or_else(|_| String::new());
+            let non_comment: String = source
+                .lines()
+                .filter(|line| !line.trim_start().starts_with("//"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert!(
+                !non_comment.contains(sentinel),
+                "module {} contains '{}' as an independent literal — use reporter_ion_mz_token() \
+                 (SMCVG-02 single-source no-drift / T-30-01)",
+                path, sentinel
+            );
+        }
+    }
+
     /// CVG-02: the converter decodes CV concepts by CURIE, not by inflected column name.
     ///
     /// Context: the mzPeak reference readers (Python/R) in the spec conformance issue list have
