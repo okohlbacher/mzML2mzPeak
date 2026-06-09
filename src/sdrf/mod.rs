@@ -23,6 +23,7 @@
 pub mod model;
 pub mod parse;
 pub mod match_rows;
+pub mod embed;
 
 // Curated re-exports so callers can write `use mzml2mzpeak::sdrf::{SampleMetadataDoc, ...}`
 pub use model::{
@@ -31,3 +32,4 @@ pub use model::{
 };
 pub use match_rows::match_rows_for_data_file;
 pub use parse::parse_sdrf;
+pub use embed::{embed_sdrf_member, EmbedFacts};
