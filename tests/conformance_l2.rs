@@ -258,6 +258,67 @@ fn numpress_archive_carries_transform_record_in_both_places() {
     let _ = std::fs::remove_file(&out);
 }
 
+/// 2b. FIX-1 (dangling `data_processing_ref`): the file-level `metadata.transform` record's
+///     `data_processing_ref` must resolve to a `data_processing` step that is ACTUALLY PRESENT in
+///     the archive's run metadata — not a dangling string. A numpress archive registers a real
+///     `mzml2mzpeak_numpress_linear` step (CURIE MS:1002312); the transform record references it.
+#[test]
+fn numpress_transform_data_processing_ref_resolves_to_present_step() {
+    let input = Path::new("tests/fixtures/mzml/tiny.pwiz.1.1.mzML");
+    assert!(input.exists(), "fixture must exist: {}", input.display());
+
+    let out = tmp("dpref", "mzpeak");
+    let _ = std::fs::remove_file(&out);
+    convert_mzml(input, &out, &EncodingOptions::compact()).expect("numpress conversion");
+
+    let reader = MzPeakReader::new(&out).expect("open mzpeak reader");
+
+    // The file-level transform record's data_processing_ref.
+    let transform_val = reader
+        .file_index()
+        .metadata
+        .get("transform")
+        .cloned()
+        .expect("file-level metadata.transform must be present for a numpress archive");
+    let dp_ref = transform_val
+        .as_object()
+        .and_then(|o| o.get("data_processing_ref"))
+        .and_then(|v| v.as_str())
+        .expect("metadata.transform.data_processing_ref must be a string")
+        .to_string();
+
+    // The registered data_processing ids in the archive's run metadata.
+    let present_ids: Vec<String> = reader
+        .data_processings()
+        .iter()
+        .map(|dp| dp.id.clone())
+        .collect();
+
+    assert!(
+        present_ids.iter().any(|id| id == &dp_ref),
+        "transform.data_processing_ref ({dp_ref}) must resolve to a registered data_processing \
+         step — present ids: {present_ids:?} (FIX-1: no dangling reference)"
+    );
+
+    // And that step carries the numpress-linear CURIE (single-source no-drift).
+    let step = reader
+        .data_processings()
+        .iter()
+        .find(|dp| dp.id == dp_ref)
+        .expect("referenced data_processing step present");
+    let single_source = numpress_linear_curie();
+    let carries_curie = step
+        .methods
+        .iter()
+        .any(|m| m.params.iter().any(|p| p.curie() == Some(single_source)));
+    assert!(
+        carries_curie,
+        "the numpress data_processing step must carry the MS:1002312 numpress-linear CURIE"
+    );
+
+    let _ = std::fs::remove_file(&out);
+}
+
 /// 3. --no-numpress (lossless Delta): m/z round-trips L1-clean on the profile spectrum
 ///    and the file-level `metadata.transform` block is ABSENT.
 #[test]

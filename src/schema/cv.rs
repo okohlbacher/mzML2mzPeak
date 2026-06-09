@@ -25,8 +25,9 @@ use serde::{Deserialize, Serialize};
 /// It is shared by:
 ///
 ///   - The file-level `metadata.transform` block ([`crate::schema::transform::TransformRecord`]),
-///     which this converter writes into `FileIndex.metadata["transform"]` when `opts.lossy_mz` is
-///     true.
+///     which this converter writes into `FileIndex.metadata["transform"]` when `opts.mz_is_lossy()`
+///     is true (numpress-linear m/z actually applied), plus the `mzml2mzpeak_numpress_linear`
+///     `data_processing` step its `data_processing_ref` points at.
 ///   - The array-index `transform` field stamped per-column by the vendored writer
 ///     (`buffer_descriptors.rs` `BufferTransform::NumpressLinear.curie()`), which resolves the
 ///     same mzdata `BinaryCompressionType::NumpressLinear` source.

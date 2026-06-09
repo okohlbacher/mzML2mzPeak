@@ -8,8 +8,11 @@
 //!      We do NOT touch the vendored writer.
 //!
 //!   2. **File-level `metadata.transform` block** (this module) — a single JSON object written
-//!      into `FileIndex.metadata["transform"]` by `convert_mzml` when `opts.lossy_mz` is true.
-//!      Omitted entirely for lossless (`--no-numpress` / L1-clean) archives.
+//!      into `FileIndex.metadata["transform"]` by `convert_mzml` when `opts.mz_is_lossy()` is true
+//!      (i.e. numpress-linear m/z is actually applied — derived from the chunking strategy, the
+//!      single source of truth). Omitted entirely for lossless (`--no-numpress` / L1-clean)
+//!      archives. Its `data_processing_ref` resolves to the real `mzml2mzpeak_numpress_linear`
+//!      `data_processing` step that `convert_mzml` registers alongside it.
 //!
 //! ## Single source — no drift by construction (T-28-01)
 //!

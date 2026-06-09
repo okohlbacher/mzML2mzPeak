@@ -320,7 +320,13 @@ pub fn convert_mzml(
     // of truth, FIX-2) — not a standalone bool that could drift — so the `metadata.transform`
     // block emits iff numpress-linear m/z is genuinely in effect. For lossless (`--no-numpress` /
     // Delta / legacy) archives the key is OMITTED entirely; a lossless file carries no claim.
+    //
+    // FIX-1: register a real `mzml2mzpeak_numpress_linear` data_processing step (CURIE MS:1002312)
+    // so the transform record's `data_processing_ref` resolves to an actually-present id instead
+    // of dangling. Mirror the `mzml2mzpeak_sort_peaks` pattern. Done BEFORE `finish()` so the step
+    // lands in the same metadata facet the index references.
     if opts.mz_is_lossy() {
+        record_numpress_linear(&mut writer);
         writer
             .add_index_metadata("transform", &crate::schema::numpress_linear_transform())
             .map_err(MzmlConvertError::Json)?;
@@ -356,6 +362,35 @@ fn record_sort_peaks(writer: &mut MzPeakWriterType<File>) {
                 "sort_peaks",
                 "m/z sorted ascending on write (conformance: point.mz sorting_rank 0)",
             )],
+        }],
+    });
+}
+
+/// Record the applied numpress-linear m/z compression as a real `mzml2mzpeak_numpress_linear`
+/// data_processing step (FIX-1). The file-level `metadata.transform` record's `data_processing_ref`
+/// points at THIS id (`mzml2mzpeak_numpress_linear`), so registering the step here resolves what
+/// was previously a dangling reference. The step carries the PSI-MS numpress-linear CURIE
+/// (`MS:1002312`) as a cvParam — sourced from the single-source [`crate::schema::cv::numpress_linear_curie`],
+/// the SAME accessor the transform record and the vendored writer's array-index field use, so the
+/// processing step, the file-level block, and the per-column transform field cannot drift.
+///
+/// Mirrors [`record_sort_peaks`]'s shape (software entry + data_processing). Called once per file,
+/// only when numpress-linear m/z was actually applied (`opts.mz_is_lossy()`).
+fn record_numpress_linear(writer: &mut MzPeakWriterType<File>) {
+    writer.softwares_mut().push(Software::new(
+        "mzml2mzpeak".into(),
+        env!("CARGO_PKG_VERSION").into(),
+        vec![],
+    ));
+    writer.data_processings_mut().push(DataProcessing {
+        id: "mzml2mzpeak_numpress_linear".to_string(),
+        methods: vec![ProcessingMethod {
+            order: 1,
+            software_reference: "mzml2mzpeak".to_string(),
+            params: vec![Param::builder()
+                .curie(crate::schema::cv::numpress_linear_curie())
+                .name("MS-Numpress linear prediction compression")
+                .build()],
         }],
     });
 }
