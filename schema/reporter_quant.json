@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "reporter_quant",
+  "title": "Reporter-ion quantitation auxiliary array contract",
+  "description": "Schema for the per-MS2 reporter-intensity auxiliary array carrier (Phase 35, QUANT-01..02). The aux-array contract stores reporter-ion intensities as a NonStandardDataArray named 'reporter_intensity' in the spectrum's auxiliary_arrays Parquet column. The channel_id param (semicolon-separated for multi-channel) on the DataArray identifies which Phase-34 labeled sample_list channels produced each intensity value.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["array_name", "channel_id_param_key", "data_type", "carrier"],
+  "properties": {
+    "array_name": {
+      "type": "string",
+      "const": "reporter_intensity",
+      "description": "The NonStandardDataArray name. The mzPeak writer routes this to the auxiliary_arrays Parquet column (not a registered POINT column). Recovered via BinaryArrayMap.get(ArrayType::NonStandardDataArray { name: 'reporter_intensity' })."
+    },
+    "channel_id_param_key": {
+      "type": "string",
+      "const": "channel_id",
+      "description": "The Param name on the DataArray that carries the Phase-34 channel id(s). For single-channel this is a plain id (e.g. 'sample-1::TMT126'); for multi-channel it is a semicolon-separated list in the same order as the intensity values (e.g. 'sample-1::TMT126;sample-2::TMT127N')."
+    },
+    "data_type": {
+      "type": "string",
+      "const": "Float64",
+      "description": "Each intensity value is stored as a Float64 (8 bytes, little-endian IEEE 754). The values are in channel order (matching the order of channel_ids in the channel_id param)."
+    },
+    "carrier": {
+      "type": "string",
+      "const": "aux-array",
+      "description": "The chosen carrier contract (from the Phase 35-01 decision gate): aux-array. The channel_id Param survives write→finish→read-back via MzPeakReader::get_spectrum_arrays (confirmed by spike test channel_id_survives_own_reader_readback)."
+    },
+    "channel_id_format": {
+      "type": "string",
+      "description": "Encoding rule for multi-channel: ids are joined with ';' in the order of the intensity vector. Recoverable by: channel_ids = channel_id_param.value.split(';'), then zip(channel_ids, decoded_f64_array).",
+      "examples": ["sample-1::TMT126", "sample-1::TMT126;sample-2::TMT127N"]
+    },
+    "missing_intensity_sentinel": {
+      "type": "number",
+      "const": 0.0,
+      "description": "A channel whose reporter_mz has no peak within tolerance yields 0.0 (recorded absence). A channel whose reporter_mz is null (TMTpro high channel, CHAN-03) is OMITTED entirely (no entry, no sentinel)."
+    },
+    "scope": {
+      "type": "string",
+      "const": "ms2-only",
+      "description": "Reporter intensities are emitted only for MS2 spectra (ms_level == 2). MS1 spectra are unchanged."
+    },
+    "flag": {
+      "type": "string",
+      "const": "--reporter-quant",
+      "description": "CLI flag that activates reporter-quant emit. OFF by default. Only meaningful with --sdrf on an isobaric (Phase-34) run. Absent flag => byte-identical output (no reporter_intensity array, no channel_id param)."
+    }
+  }
+}

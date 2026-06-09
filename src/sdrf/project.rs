@@ -266,6 +266,44 @@ pub fn build_run_sample_binding(
     })
 }
 
+/// Collect [`crate::write::reporter_quant::ChannelRef`]s from the Phase-34 labeled sample entries
+/// in `doc` (Phase 35, QUANT-01).
+///
+/// For each sample in `doc.samples`, finds the associated assay (to obtain the reagent label),
+/// resolves the label via `resolve_reagent`, and — for isobaric labels only — returns a
+/// `ChannelRef { channel_id: sample.id, reporter_mz }`. Non-isobaric samples are SKIPPED.
+///
+/// `reporter_mz` follows the Phase-34 honest fallback (CHAN-03):
+/// - `Some(mz)` for entries in the shipped PSI-MS reagent table.
+/// - `None` for TMTpro high channels (≥132N) not yet in PSI-MS CV 4.1.x.
+///
+/// Channels with `reporter_mz = None` will be skipped by `extract_reporter_intensities` (never
+/// a sentinel value, per design R8 / CHAN-03).
+///
+/// This function is infallible — it only reads the in-memory doc. An empty or non-isobaric doc
+/// returns an empty Vec (no channels → caller emits a `log::warn!` and continues).
+pub fn collect_channel_refs(doc: &SampleMetadataDoc) -> Vec<crate::write::reporter_quant::ChannelRef> {
+    doc.samples
+        .iter()
+        .filter_map(|s| {
+            // Find the assay whose sample_refs include this sample's name.
+            let assay = doc.assays.iter().find(|a| {
+                a.sample_refs.iter().any(|sr| sr == &s.name)
+            });
+            let label = assay.and_then(|a| a.label.as_deref()).unwrap_or("");
+            if !is_isobaric_label(label) {
+                return None; // Skip non-isobaric (label-free, SILAC, unknown).
+            }
+            let reporter_mz = resolve_reagent(label)
+                .and_then(|r| r.reporter_mz); // None for TMTpro high channels (CHAN-03).
+            Some(crate::write::reporter_quant::ChannelRef {
+                channel_id: s.id.clone(),
+                reporter_mz,
+            })
+        })
+        .collect()
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Tests
 // ─────────────────────────────────────────────────────────────────────────────

@@ -281,6 +281,7 @@ fn run_forward_mzml(cli: ConvertCli) -> anyhow::Result<()> {
         &cli.encoding_options(),
         cli.sdrf.as_deref(),
         cli.isa.as_deref(),
+        cli.reporter_quant,
     )
     .with_context(|| format!("plain-mzML conversion failed for {}", cli.input.display()))?;
     log::info!(

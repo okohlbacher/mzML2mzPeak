@@ -649,3 +649,57 @@ How the viewer backlog additions (`mzPeak-imaging-additions.md`, ADD-01–05) ma
 | ADD-03 `pixel` facet coordinate source | Edit 4 | coordinate-source chain step 0 + multi-spectra aggregation (Edit 6 [V2], D.1) |
 | ADD-04 `scan_settings_list` geometry source | Edit 3 / Edit 8 | geometry-source chain: `scan_settings` authoritative, `metadata.imaging` fast path (D.2) |
 | ADD-05 shared-axis grid layout reader | Edit 9 | concrete `shared_mz_axis` array + detection contract (D.4) |
+
+---
+
+## Part F — Reporter-ion quantitation auxiliary array contract (Phase 35, QUANT-01/02)
+
+**Status:** implemented in `src/write/reporter_quant.rs`; JSON schema at `schema/reporter_quant.json`. Suggested for upstream mzPeak spec discussion as a non-imaging complement to the imaging extension.
+
+### F.1 Motivation
+
+Isobaric-labelling workflows (TMT, iTRAQ, SILAC) require per-MS2 reporter-ion intensities to be preserved alongside spectral data. This section proposes a concrete aux-array carrier contract so that reporter intensities are stored in a machine-readable, recoverable form rather than as opaque annotations.
+
+### F.2 Contract
+
+The reporter-ion quantitation contract stores per-MS2 reporter intensities as a `NonStandardDataArray` (name: `"reporter_intensity"`) in the spectrum's `auxiliary_arrays` Parquet column. The array carries a `channel_id` `Param` that encodes the labeled-sample identities in channel order.
+
+| Field | Value | Notes |
+|---|---|---|
+| `array_name` | `"reporter_intensity"` | Routes to `auxiliary_arrays` via mzPeak's `array_map_to_schema_arrays_and_excess` |
+| `channel_id_param_key` | `"channel_id"` | `Param` name on the `DataArray` |
+| `data_type` | `Float64` | 8-byte little-endian IEEE 754, channel-ordered |
+| `carrier` | `aux-array` | Confirmed survivor of write→finish→read-back via `MzPeakReader::get_spectrum_arrays` |
+| `scope` | MS2-only | Emitted only for `ms_level == 2` spectra; MS1 spectra are unchanged |
+| `missing_intensity_sentinel` | `0.0` | No peak within tolerance: recorded as 0.0. Channel with null `reporter_mz` (e.g. TMTpro high channel): omitted entirely |
+
+### F.3 `channel_id` encoding
+
+For single-channel isobaric experiments:
+
+```
+channel_id = "sample-1::TMT126"
+```
+
+For multi-channel, the param value is a semicolon-joined list in the same order as the Float64 intensity array:
+
+```
+channel_id = "sample-1::TMT126;sample-2::TMT127N;sample-3::TMT128C"
+intensity_array = [8000.0, 5000.0, 3200.0]
+```
+
+Recovery: `channel_ids = channel_id_param.value.split(';')`, then `zip(channel_ids, decoded_f64_array)`.
+
+### F.4 CLI activation
+
+The `--reporter-quant` flag activates emission (off by default). Absent flag => byte-identical output (no `reporter_intensity` array, no `channel_id` param). Only valid with `--sdrf` on an isobaric Phase-34 run; rejected on the `--imaging` (imzML) and `--reverse` paths.
+
+### F.5 Spike outcome
+
+The `channel_id_survives_own_reader_readback` spike test in `src/write/reporter_quant.rs` confirmed empirically (Phase 35-01) that a `channel_id`-tagged `NonStandardDataArray` survives `MzPeakWriter::write_spectrum` → `finish` → `MzPeakReader::get_spectrum_arrays`. The `AuxiliaryArray::from_data_array` → `AuxiliaryArray::into_data_array` roundtrip preserves `DataArray::params`. No sidecar map required.
+
+### F.6 Suggested spec text
+
+> **Auxiliary reporter-ion quantitation arrays**
+>
+> An archive that carries isobaric-labelling quantitation data _SHOULD_ store per-MS2 reporter intensities as a `NonStandardDataArray` named `reporter_intensity` in the spectrum's `auxiliary_arrays` column. The array _MUST_ be of type `Float64`. The `DataArray` _MUST_ carry a `Param` with key `channel_id` whose value is the semicolon-joined ordered list of channel identifiers (one per intensity element). A missing peak _MUST_ be represented by `0.0`; a channel with no defined reporter m/z _MUST_ be omitted. This array _MUST_ be emitted only for MS level 2 spectra. Readers _SHOULD_ recover the array via `get_spectrum_arrays` (the aux-array merge path) and reconstruct the channel→intensity mapping by splitting `channel_id` on `;` and zipping with the decoded Float64 array.
