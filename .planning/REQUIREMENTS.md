@@ -46,7 +46,7 @@
 ### Geometry & provenance round-trip (GEOF / RSRC)
 
 - [x] **GEOF-01**: The forward path threads imzML `<scanSettings>` *declared* geometry (flipping `pixel_count_source` to the declared branch) beyond parsed coordinates. *(Phase 25.)*
-- [ ] **RSRC-01**: The reverse path copies `file_description.source_files[]` back into the emitted `.imzML` `<sourceFileList>`. *(Phase 26.)*
+- [x] **RSRC-01**: The reverse path copies `file_description.source_files[]` back into the emitted `.imzML` `<sourceFileList>`. *(Phase 26.)*
 
 ### SDRF sample modeling (SDRF) — 999.5 core
 
@@ -119,7 +119,7 @@ These are **NOT** v0.7 phases. PSI-committee notes to carry forward: ROI as a sp
 | CVG-01 | Phase 24 Plan 01 | Done 2026-06-09 |
 | CVG-02 | Phase 24 Plan 01 | Done 2026-06-09 |
 | GEOF-01 | Phase 25 | Complete |
-| RSRC-01 | Phase 26 | Pending |
+| RSRC-01 | Phase 26 | Complete |
 | SDRF-01 | Phase 27 | Pending |
 | SDRF-02 | Phase 27 | Pending |
 | SDRF-03 | Phase 27 | Pending |

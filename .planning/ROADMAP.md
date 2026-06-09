@@ -177,7 +177,7 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 
 **Plans**: 1 plan
 
-- [ ] 26-01-PLAN.md — Wire read-back `file_description.source_files[]` into the reverse `.imzML` `<sourceFileList>` (faithful id/name/location + UUID/checksum CURIEs; absent ⇒ no list, byte-unchanged) + forward→reverse provenance round-trip assertion (RSRC-01) [TDD]
+- [x] 26-01-PLAN.md — Wire read-back `file_description.source_files[]` into the reverse `.imzML` `<sourceFileList>` (faithful id/name/location + UUID/checksum CURIEs; absent ⇒ no list, byte-unchanged) + forward→reverse provenance round-trip assertion (RSRC-01) [TDD]
 
 ### Phase 27: SDRF sample model + isobaric channels + reporter-quant
 
@@ -229,7 +229,7 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 | 23. Upstream rebase + re-verify | inline | ✅ Done | 2026-06-08 |
 | 24. Spec alignment & CV governance | 3/3 | Complete   | 2026-06-09 |
 | 25. Forward declared-geometry threading | 1/2 | In Progress|  |
-| 26. Reverse `<sourceFileList>` copy | 0/1 | Planned | - |
+| 26. Reverse `<sourceFileList>` copy | 1/1 | Complete   | 2026-06-09 |
 | 27. SDRF sample model + channels + reporter-quant | 0/? | Not started | - |
 | 28. L2 conformance verify path | 0/? | Not started | - |
 | 29. De-vendor both forks | 0/? | Deferred (gated) | - |
