@@ -23,6 +23,7 @@
 - **v0.5 — Index enrichment & optical-image import** ✅ 2026-06-05 — 4 phases (12–15), 13/13 requirements.
   Archive: [`milestones/v0.5-ROADMAP.md`](milestones/v0.5-ROADMAP.md) ·
   [`milestones/v0.5-MILESTONE-AUDIT.md`](milestones/v0.5-MILESTONE-AUDIT.md).
+
 - **v0.6 — Spec conformance — dtypes + CV/geometry/provenance** ✅ 2026-06-06 — 6 phases (16–21), 21/21
   requirements; canonical-width dtype conformance (relaxed L1 → value-equal-at-canonical-width) +
   `cv_list` + authoritative `scan_settings_list` (index geometry now a derived copy) + `source_files[]`
@@ -101,92 +102,118 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 ## Phase Details
 
 ### Phase 22: Upstream PR prep
+
 **Goal**: Open the remaining upstream surface — the two still-needed prepared fixes — so merge latency overlaps the rest of v0.7 and the de-vendor merge clock (Phase 29) starts ticking. **DEFERRED / HELD:** the owner is holding PR submission for now and will write the final PR text when ready; the phase stays in the milestone as deferred/blocked. No forks are removed here.
 **Depends on**: Phase 23 (rebase already done; the rebase determined which patches survived — only chunk_series remains vendored). Runs early so PRs age while later phases proceed.
 **Requirements**: UPS-01, UPS-03
 **Note**: UPS-02 (mzdata SONAR/IM accessions) and UPS-04 (`array_buffer` empty-first-spectrum, B2) are **DONE-UPSTREAM** — both were fixed by the rebase (mzdata `0.64.2` dedicated `ScanningQuadrupolePosition{Lower,Upper}BoundMZ` variants; the writer rewrite `a5c222c` took pwiz 138→139/139). No PR / no issue to file; they are not mapped to active work.
 **Success Criteria** (process success — what must be TRUE):
+
   1. The `chunk_series` intensity/mz index-desync fix is an open PR against HUPO-PSI/mzPeak (URL recorded), from the prepared `okohlbacher/mzPeak` branch — OR an explicit recorded "held" determination by the owner.
   2. The mzPeakValidator `index_files_present` non-Parquet-skip fix is an open PR against the validator repo (URL recorded) — OR an explicit recorded "held" determination by the owner.
   3. The Phase-29 de-vendor gate is confirmed and recorded: DVN-01 needs the chunk_series PR merged (file_index serde already upstream); DVN-02 needs mzdata 0.64.2 on crates.io.
+
 **Plans**: TBD
 
 ### Phase 23: Upstream rebase + re-verify
+
 **Goal**: Adopt current upstream before building any new facet — bump the vendored stack to current HEAD, re-apply only the still-needed patches onto the rewritten writer API, and re-verify green, so all new v0.7 facets are built on the current API, not the stale rev. **✅ DONE 2026-06-08 (`5021eed`).**
 **Depends on**: Nothing (executed first, out of order, by owner request). Precedes every new-facet phase.
 **Requirements**: REB-01
 **Success Criteria** (what must be TRUE):
+
   1. ✅ The vendored `mzpeak_prototyping` rev is bumped `8435967`→`a5c222c` and `mzdata` `0.64.1`→`0.64.2`, with the hard pins (`arrow`/`parquet` = 57.0.0, `zip` = 4.1.0, `mzpeaks` = 1.0.9) unchanged.
   2. ✅ Only the still-needed patch (chunk_series) is re-applied; the 2 patches fixed upstream (mzdata SONAR/IM; file_index serde via PR #20) are dropped with recorded reasons; the `array_buffer` B2 bug is confirmed fixed by the writer rewrite.
   3. ✅ The full test suite + corpus e2e are green against the rebased vendored stack (245 lib + all integration; pwiz 139/139; imaging Other-member round-trip intact).
+
 **Plans**: Completed inline (rebase task).
 
 ### Phase 24: Spec alignment & CV governance
+
 **Goal**: Establish a single authoritative source of all CV facts AND align every new v0.7 facet to the rewritten spec's own mechanisms before any term lands in the already-public corpus. Resolve the v0.6 `TODO(F9)` IMS URI placeholders, reconcile the v0.6 `cv_list` with the new spec, and prepare the imaging/SDRF/channel extension write-ups for a single END-of-milestone batch submission so the format stays mergeable-by-design.
 **Depends on**: Phase 23 (rebased onto the current spec/API surface). Ordered first among emitting work so no provisional CURIE or ad-hoc structure is baked in. **Precedes every term-emitting phase (27).**
 **Requirements**: SPEC-01, SPEC-02, SPEC-03, CVG-01, CVG-02
 **Success Criteria** (what must be TRUE):
+
   1. Every planned new facet/metadata block is mapped to the spec's own mechanisms — file-level metadata as JSON in the `metadata` data-kind KV, new members via the documented "Adding a new Data Kind / Entity Type" process, CV concepts via column-name inflection + `parameters` — recorded as the binding design contract (no ad-hoc structures); all built LOCALLY against stable CV tokens (no blocking on IMS URI minting).
   2. The SDRF/sample/channel extension write-ups are prepared and **queued for a single BATCH proposal/PR to `HUPO-PSI/mzPeak-specification` at the END of v0.7** (not submitted incrementally); the committee's open questions (SDRF §5.7) are tracked.
   3. The v0.6 `cv_list` block is kept as a file-level JSON block but reconciled with the rewritten spec's CV-declaration mechanism (the spec defines no `cv_list`) — confirmed, aligned, or queued as a proposal, with the decision recorded.
   4. Canonical IMS CV accessions are declared once in `src/schema/cv.rs` (the `TODO(F9)` placeholders are gone), forward emit and reverse `<cvList>` read the same constants and are proven not to drift, and the vendored `imagingMS.obo` is refreshed before any new accession is referenced; missing terms use stable tokens + a filed file-level CV request.
   5. CV decode is keyed by CURIE (not column name), closing the documented B1/B2/B3/C1/C3/D11 drift classes; the TMTpro 16/18-plex CV gap is documented and a term request is filed.
+
 **Plans**: 3 plans
+
 - [ ] 24-01-PLAN.md — CV single-source hardening: resolve TODO(F9), refresh imagingMS.obo, drive reverse `<cvList>` from `cv_list()`, no-drift + decode-by-CURIE guard tests, `docs/cv-requests.md` (CVG-01, CVG-02)
-- [ ] 24-02-PLAN.md — Binding extension-design-contract doc mapping every v0.7 facet to spec mechanisms + cv_list reconciliation note (SPEC-01, SPEC-03)
+- [x] 24-02-PLAN.md — Binding extension-design-contract doc mapping every v0.7 facet to spec mechanisms + cv_list reconciliation note (SPEC-01, SPEC-03)
 - [ ] 24-03-PLAN.md — End-of-v0.7 batch-proposal queue stub + SDRF §5.7 committee-questions tracker (SPEC-02, held)
+
 **UI hint**: yes
 
 ### Phase 25: Forward declared-geometry threading (GEO-F)
+
 **Goal**: The forward path threads imzML `<scanSettings>` *declared* geometry beyond parsed coordinates, so a source that declares its grid is honored as authoritative.
 **Depends on**: Phase 24 (CV/spec alignment settled; reuses the existing reverse geometry parser). Parallel-able with Phase 26.
 **Requirements**: GEOF-01
 **Success Criteria** (what must be TRUE):
+
   1. When the source `<scanSettings>` declares grid counts, the forward path emits `pixel_count_source: "declared"` (not the parsed-coordinate fallback).
   2. Declared `absolute_offset_um` is populated where the source declares it.
   3. Forward↔reverse geometry symmetry is preserved (the existing reverse parser round-trips the declared values with a `src/verify/` assertion).
+
 **Plans**: TBD
 
 ### Phase 26: Reverse `<sourceFileList>` copy (RSRC)
+
 **Goal**: The reverse path copies `file_description.source_files[]` back into the emitted `.imzML` `<sourceFileList>`, restoring original vendor-RAW provenance on the round-trip.
 **Depends on**: Phase 24 (CV/spec alignment). Parallel-able with Phase 25.
 **Requirements**: RSRC-01
 **Success Criteria** (what must be TRUE):
+
   1. A reverse-emitted `.imzML` carries a `<sourceFileList>` reconstructed from the archive's `file_description.source_files[]`.
   2. The original source-file provenance (id, name, params) survives a forward→reverse round-trip with a `src/verify/` assertion.
+
 **Plans**: TBD
 
 ### Phase 27: SDRF sample model + isobaric channels + reporter-quant
+
 **Goal**: mzPeak carries SDRF-compliant sample metadata, isobaric (TMT/iTRAQ) channel assignment, AND per-MS2 reporter-ion quantitation, ingested from a user-specified sibling SDRF. The verbatim embed is the lossless anchor; the structured blocks are projections; reporter-quant is the payoff of the channel model (folded in here — it was previously a separate phase).
 **Depends on**: Phase 24 (channel-label CURIEs + spec-aligned member mechanism). Adds the only new dependency this milestone: `csv` (SDRF TSV).
 **Requirements**: SDRF-01, SDRF-02, SDRF-03, SDRF-04, SDRF-05, CHAN-01, CHAN-02, CHAN-03
 **Success Criteria** (what must be TRUE):
+
   1. A new `--sdrf <PATH>` flag ingests a sibling SDRF during conversion (explicitly NOT auto-discovered); the SDRF is embedded **verbatim** as a typed `sample-metadata`/`sdrf` ZIP member with a `metadata.sdrf` dataset back-ref (embed lands before any projection).
   2. `sample_list` carries `characteristics[*]` projected from the SDRF, keyed by SDRF `source name`; a file-level `channel_list` maps each isobaric channel → sample(s) + reporter m/z + role (sample/pooled/carrier/reference) + `sdrf_row_ref`, and is the authoritative channel→sample/reporter-m/z map.
   3. Per-spectrum `assay_ref` + run→sample binding are emitted; `ms_run.channel_set` / `plex_id` bind each run to its channel set; a documented repo-SDRF-wins precedence rule resolves embedded-vs-repo conflicts.
   4. Reporter-ion quantitation is stored as an `auxiliary` array with a `channel_id` column; `channel_id` is proven to survive read-back (confirm via a read-back spike) and resolves to `channel_list`.
   5. Round-trip validates with `sdrf-pipelines` on a label-free fixture (MTBLS1129) and a TMT 10-plex fixture (PXD011799).
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 28: L2 conformance verify path (F10)
+
 **Goal**: Wire an L2 conformance verify path (value-equal under a recorded transform) into the CLI on top of the existing `ToleranceContract::L2`, recording the transform.
 **Depends on**: Phase 24 (transform-record CURIEs). Independent of the SDRF cluster; small and self-contained.
 **Requirements**: L2-01
 **Success Criteria** (what must be TRUE):
+
   1. A `--conformance l2` CLI flag selects the L2 verify arm in `compare.rs`.
   2. The applied transform (CURIE + tolerance) is recorded in the array index and `metadata`, including the array's `sorting_rank` context.
   3. L2 value-equal-under-transform passes the acceptance comparator where L1 strict equality would not.
+
 **Plans**: TBD
 
 ### Phase 29: De-vendor — drop both vendored forks
+
 **Goal**: Fully de-vendor — remove both `[patch]` blocks and the `vendor/` trees, depending on upstream directly with zero fork divergence. **DEFERRED — gated on external merges.** Sequenced LAST so the gate exercises the worst case (every new `Other`-typed ZIP member — embedded TIFF + embedded SDRF — exists).
 **Depends on**: Phases 22–28 (all `Other`-typed members in existence) + upstream merges. DVN-01 gated on Phase 22's chunk_series PR being merged; DVN-02 gated on mzdata 0.64.2 published to crates.io. (file_index serde is already fixed upstream — so DVN-01 only needs chunk_series.) Non-negotiable gate.
 **Requirements**: DVN-01, DVN-02
 **Success Criteria** (process success — what must be TRUE):
+
   1. The chunk_series fix is MERGED upstream and a full `Other`-member round-trip (embedded TIFF + embedded SDRF) passes against the un-forked build before `vendor/mzpeak_prototyping` + its `[patch]` redirect are dropped.
   2. mzdata 0.64.2 is published to crates.io before `vendor/mzdata` + the `[patch.crates-io] mzdata` redirect are dropped.
   3. The fully un-forked build is green (full test + e2e), with zero fork divergence and the hard pins unchanged.
+
 **Plans**: TBD
 
 ## Progress
@@ -195,7 +222,7 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 |-------|----------------|--------|-----------|
 | 22. Upstream PR prep | 0/? | Deferred (held) | - |
 | 23. Upstream rebase + re-verify | inline | ✅ Done | 2026-06-08 |
-| 24. Spec alignment & CV governance | 0/3 | Planned | - |
+| 24. Spec alignment & CV governance | 1/3 | In Progress|  |
 | 25. Forward declared-geometry threading | 0/? | Not started | - |
 | 26. Reverse `<sourceFileList>` copy | 0/? | Not started | - |
 | 27. SDRF sample model + channels + reporter-quant | 0/? | Not started | - |
@@ -275,8 +302,10 @@ ProteoWizard pwiz vendor-reader sweep from 123/139 → 136/139. **Upstream PR br
 `d1aaaf84 → 8435967` (upstream HEAD "fix compatibility with imzML core feature set"), and the
 **vendored mzdata fork was DELETED** (mzdata 0.64.0 published with `count_chromatograms` upstream).
 Per-PR outcome:
+
 - **#1 serde symmetry — [PR #20](https://github.com/HUPO-PSI/mzPeak/pull/20) — fixed upstream on rebase**
   (upstream `#[serde(untagged)]`; round-trip verified 2026-06-08). Vendored patch dropped.
+
 - **#2 reader null-guard — [PR #21](https://github.com/HUPO-PSI/mzPeak/pull/21) — NOW STOCK in 8435967.**
 - **#3 ms_level-0 default — [PR #22](https://github.com/HUPO-PSI/mzPeak/pull/22) — NOW STOCK in 8435967.**
 - **#4 sorting_rank — [PR #23](https://github.com/HUPO-PSI/mzPeak/pull/23) — SUPERSEDED by sort-on-write.**
@@ -314,10 +343,12 @@ assignment**, ingested from an existing SDRF during conversion. Design is worked
 v1.0** (ROI-01) — it needs the pixel keystone (PIX-01), also deferred.
 
 **Proposed additions (none exist yet):**
+
 - Reuse `sample_list` for `characteristics[*]` (key by SDRF `source name`).
 - New **`channel_list`** (file-level footer JSON): isobaric channel → sample(s) + reporter m/z + role
   + `sdrf_row_ref`; `ms_run.channel_set` + `plex_id` bind the run; reporter quant via an
   `auxiliary` array whose columns carry `channel_id`.
+
 - Per-spectrum `assay_ref`. (MSI ROI→sample deferred beyond v1.0.)
 - Embed the file's SDRF rows **verbatim** as the lossless source + dataset back-ref.
 

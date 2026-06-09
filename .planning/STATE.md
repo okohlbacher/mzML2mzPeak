@@ -1,16 +1,17 @@
 ---
 gsd_state_version: 1.0
 milestone: v0.7
-milestone_name: Upstreaming, de-vendoring & sample-metadata modeling
+milestone_name: — Upstreaming, de-vendoring & sample-metadata modeling
 status: planning
-last_updated: "2026-06-08T05:00:00.000Z"
-last_activity: 2026-06-08
+stopped_at: v0.7 reshaped to 8 phases (22–29); imaging-structure cluster deferred beyond v1.0; re-themed; REQUIREMENTS traceability mapped 21 active
+last_updated: "2026-06-09T03:40:49.022Z"
+last_activity: 2026-06-08 — v0.7 reshaped 10→8 phases; imaging-structure cluster deferred beyond v1.0; re-themed to "Upstreaming, de-vendoring & sample-metadata modeling"
 progress:
   total_phases: 8
-  completed_phases: 1
-  total_plans: 0
-  completed_plans: 0
-  percent: 12
+  completed_phases: 0
+  total_plans: 3
+  completed_plans: 1
+  percent: 0
 ---
 
 # Project State
@@ -45,9 +46,11 @@ Last activity: 2026-06-08 — v0.7 reshaped 10→8 phases; imaging-structure clu
 - **Fixed upstream (patches dropped):** mzdata SONAR/IM accessions (dedicated ArrayType variants → UPS-02
   done-upstream); file_index FileEntry serde (PR #20 → upstream `#[serde(untagged)]`, round-trip verified);
   array_buffer empty-first-spectrum (B2 → writer rewrite; pwiz 138→139/139 → UPS-04 done-upstream).
+
 - **Remaining vendored patch:** chunk_series intensity/mz index-desync only (PR pending = UPS-01, held).
 - **De-vendor (Phase 29) now gated only on:** chunk_series upstreamed (DVN-01) + mzdata 0.64.2 on
   crates.io (DVN-02). file_index serde blocker already fixed upstream — DVN-01 only needs chunk_series.
+
 - Spec moved to `HUPO-PSI/mzPeak-specification` (rewritten 2026-06-08; defines none of our extensions but
   provides the Data-Kind/Entity-Type + file-level-JSON + CV-inflection extension mechanisms).
 
@@ -84,6 +87,7 @@ polygon; pixel = coords + scan-PK (`scan.scan_index` + `scan.spectrum_reference`
 - **Upstream rebase (Phase 23) before any new-facet phase — ✅ DONE.** All new v0.7 facets build on
   current upstream HEAD (`a5c222c` + mzdata `0.64.2`), not the stale rev. Only chunk_series remains
   vendored.
+
 - **Spec alignment & CV governance (Phase 24) before any accession-emitting phase (27).** The StackIT
   corpus is already public; recalled URIs are unrecoverable. Every facet is modeled via the rewritten
   spec's own mechanisms (file-level JSON in `metadata` KV; "Adding a new Data Kind / Entity Type"
@@ -92,16 +96,19 @@ polygon; pixel = coords + scan-PK (`scan.scan_index` + `scan.spectrum_reference`
   v0.7. Single constants module (`src/schema/cv.rs`) is the mandatory emit path; honest free-text for
   genuinely missing terms (TMTpro 132–135 gap). The v0.6 `cv_list` is kept as a file-level JSON block
   but reconciled against the new spec (which defines no `cv_list`). Don't block on IMS URI minting.
+
 - **SDRF model + channels + reporter-quant all land together (Phase 27).** Reporter-quant (CHAN-03)
   is folded in here (was a separate phase). Within Phase 27: embed verbatim FIRST, projections second
   (the embed is the lossless anchor). CHAN-03 keying decision: reporter intensities in an `auxiliary`
   array with a `channel_id` column; `channel_list` is the authoritative channel→sample/reporter-m/z map
   (confirm via a read-back spike).
+
 - **De-vendor LAST (Phase 29) — DEFERRED, gated.** DVN-01 needs the chunk_series PR merged (file_index
   serde already upstream); DVN-02 needs mzdata 0.64.2 published to crates.io. Gate exercises the worst
   case (TIFF + SDRF `Other`-typed members). Dropping the fork while an `Other`-typed member exists and
   the patch is unmerged causes silent total FileIndex loss with no compile error / no forward-only test
   failure.
+
 - **All new columns use `Int64` baseline** (`assay_ref`) — `visitor.rs` `CustomBuilderFromParameter`
   `unimplemented!()`s anything but Null/Bool/Int64/Float64/LargeUtf8.
 
@@ -111,6 +118,7 @@ polygon; pixel = coords + scan-PK (`scan.scan_index` + `scan.spectrum_reference`
   topology is non-trivial; validate with `sdrf-pipelines` on MTBLS1129 (label-free) + PXD011799 (TMT
   10-plex) before done. ALSO spike `add_spectrum_array_override` aux-array keying to confirm `channel_id`
   survives read-back before committing the reporter-quant storage contract.
+
 - LOW / standard pattern: Phase 22 (PR submission — held), Phase 23 (rebase + re-verify — done),
   Phase 24 (string + governance + spec-proposal prep), Phases 25–26 (existing parsers/seams), Phase 28
   (existing scaffolding), Phase 29 (Cargo.toml edit + dep tracking — gated).
@@ -153,14 +161,18 @@ submit the write-ups as a **batch of proposals to `HUPO-PSI/mzPeak-specification
   The most de-vendor-safe seam (prefer over new FileEntry types). Used by v0.6 for `cv_list`,
   `scan_settings_list`. v0.7: `channel_list`, `sample_list`, `sdrf` back-ref, transform record.
   Read-back surface: `MzPeakReader.file_index().metadata["KEY"]`.
+
 - **Promoted-column seam** — `add_spectrum_scan_field` (Int64 baseline). v0.7: `assay_ref`.
 - **Aux-array seam** — `add_spectrum_array_override(from, to)`. v0.7: reporter-ion quant with a
   `channel_id` column (spike keying first — Phase 27).
+
 - **Supplementary-Parquet/`Other`-member seam** — `start_other` + `FileIndex` `Other` entry (the v0.5
   TIFF path). v0.7: verbatim SDRF embed (Phase 27). This is exactly the seam the de-vendor gate
   (Phase 29) must exercise.
+
 - **Geometry-threading seam** — `parse_scan_settings` → `convert_with(.., Some(geom))` (v0.6 Phase 18
   built reverse parser + threading). v0.7: GEO-F flips `pixel_count_source:"declared"` (Phase 25).
+
 - **Reverse-header seam** — `write_header_to` in `src/reverse/imzml_writer.rs`. v0.7: RSRC
   `<sourceFileList>` re-emit (Phase 26); sample/channel re-emit (Phase 27).
 
@@ -168,12 +180,15 @@ submit the write-ups as a **batch of proposals to `HUPO-PSI/mzPeak-specification
 
 - `MzPeakReader`: `new` / `len` / `get_spectrum` / `get_spectrum_arrays` / `get_spectrum_metadata` /
   `load_all_spectrum_metadata` (call once — avoid O(n²)) / `file_index().metadata["KEY"]`.
+
 - CV facts single-sourced in `src/schema/cv.rs` (`cv_list()`); forward emit == reverse `<cvList>`
   literals (anti-drift, asserted in cv.rs tests). **Phase 24 resolves the `TODO(F9)` IMS URI here +
   reconciles `cv_list` against the new spec.**
+
 - Coordinate read: `get_param_by_curie(IMS:1000050…)` via `src/verify/verify.rs::build_index_coords`.
 - `src/integrity` UUID/checksum preflight; checksum CURIE keying (MD5 IMS:1000090 / SHA-1 1000091 /
   SHA-256 1000092). `source_files[]` reuses these — no re-hash.
+
 - L1 = value-equal-at-canonical-width (mz=f64, intensity=f32); `ToleranceContract::{L1,L2}` exists —
   **Phase 28 wires L2 into `--conformance l2` + `compare.rs` L2 arm.**
 
@@ -182,10 +197,13 @@ submit the write-ups as a **batch of proposals to `HUPO-PSI/mzPeak-specification
 - `src/sdrf/` (NEW) — SDRF TSV parse (`csv = "=1.4.0"`, `Delimiter(b'\t')` + `flexible(true)`) +
   reagent lookup (TMT/TMTpro/iTRAQ reporter m/z `const` table) + role derivation; threaded into
   `convert_with` as `Option<&SdrfProjection>` via `--sdrf <PATH>`. (Phase 27)
+
 - `src/schema/` — `cv.rs` F9 URI fix (lockstep reverse `<cvList>`) + `cv_list` reconciliation; NEW
   `channel.rs`, `sample.rs`; widen `columns.rs`, `metadata.rs`, `geometry.rs`. (Phases 24/27)
+
 - `src/write/convert.rs` + `writer.rs` — thread `Option<&SdrfProjection>`; new `add_index_metadata`
   calls; register `assay_ref` promoted col; aux reporter-quant array (`channel_id`). (Phase 27)
+
 - `src/reverse/imzml_writer.rs` + `source.rs` — RSRC sourceFileList; sample/channel re-emit. (Phases 26/27)
 - `src/verify/compare.rs` — F10 L2 relative-error arm wired to `--conformance l2`. (Phase 28)
 
@@ -200,13 +218,17 @@ None yet.
   on crates.io. The file_index serde `Other`-member serde bug is already fixed upstream (PR #20 →
   `#[serde(untagged)]`, verified on the rebase) — so it is no longer a de-vendor blocker. Phase 29 is
   sequenced LAST so the gate exercises the worst case (TIFF + SDRF `Other` members).
+
 - **Phase 22 / Phase 29 are DEFERRED:** owner is holding PR submission (Phase 22) and de-vendor is gated
   on external merges (Phase 29). Both remain in the milestone as deferred/blocked.
+
 - **CV minting risk:** the StackIT corpus is already public — provisional/non-canonical CURIEs are
   unrecoverable. Phase 24 must precede every facet that emits new IMS/PSI-MS accessions; build locally
   against stable tokens.
+
 - **Reporter-quant keying spike (Phase 27):** confirm `channel_id` survives `add_spectrum_array_override`
   read-back before committing the storage contract.
+
 - **mzPeak Python reader crashes on `IMS:*` params (C1):** do not validate output via the Python
   binding — use the Rust reader + mzPeakValidator. Out of our repo's control.
 
@@ -234,7 +256,7 @@ Items deferred out of v0.7:
 
 ## Session Continuity
 
-Last session: 2026-06-08T05:00:00.000Z
+Last session: 2026-06-09T03:40:49.019Z
 Stopped at: v0.7 reshaped to 8 phases (22–29); imaging-structure cluster deferred beyond v1.0; re-themed; REQUIREMENTS traceability mapped 21 active
 Resume file: None
 
@@ -243,10 +265,14 @@ Resume file: None
 - **v0.7 reshaped** to 8 phases (22–29), **21 active requirements** mapped, after the 2026-06-08 owner
   decision to defer the imaging-structure cluster beyond v1.0 and re-theme to "Upstreaming, de-vendoring
   & sample-metadata modeling". Next: `/gsd:plan-phase 24` (Phase 23 already done; 22 + 29 are deferred).
+
 - **Phase 22 (PRs) is DEFERRED — held by owner:** submit the chunk_series PR (UPS-01) + the
   mzPeakValidator PR (UPS-03) when ready; UPS-02/UPS-04 are done-upstream. Drafts in `/tmp/mzpeak-prs/`.
+
 - **Phase 24 is the next buildable phase** — spec alignment + CV governance; precedes the SDRF phase.
   Build locally against stable CV tokens; batch the spec proposals to END of v0.7.
+
 - **Phase 29 (de-vendor) is DEFERRED — gated** on chunk_series upstreamed (DVN-01) + mzdata 0.64.2 on
   crates.io (DVN-02). file_index serde already fixed upstream.
+
 - **Backlog DONE history retained:** 999.2 (PNG/JPEG dims), 999.3 (benchmark), 999.4 (S3 corpus).
