@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use anyhow::{Context, anyhow};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::integrity::header::{IntegrityError, parse_imzml_header};
@@ -36,6 +36,38 @@ const EXIT_UNSUPPORTED: u8 = 3; // unsupported input (dtype / .ibd compression)
 const EXIT_COORDINATE: u8 = 4; // coordinate-extraction failure (no scan / missing coord)
 const EXIT_VERIFY: u8 = 5; // a converted file failed --verify
 const EXIT_GENERIC: u8 = 1; // anything else
+
+/// Conformance level for the `--verify` numeric comparison (L1 = strict / L2 = bounded).
+///
+/// `l1` (default) — value-equal at CANONICAL mzPeak width, Δ = 0 (the v1 strict bar).
+/// `l2` — opt-in bounded compare: m/z rel-err ≤ 1e-7, intensity rel-err ≤ 1e-3 (allows
+/// numpress-written files to pass where L1 would legitimately mismatch).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
+pub enum Conformance {
+    /// L1 bit-for-bit (default, byte-unchanged behavior).
+    #[default]
+    L1,
+    /// L2 bounded (opt-in; numpress-written files pass within spec §8 bounds).
+    L2,
+}
+
+impl std::fmt::Display for Conformance {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Conformance::L1 => write!(f, "l1"),
+            Conformance::L2 => write!(f, "l2"),
+        }
+    }
+}
+
+impl From<Conformance> for ConformanceLevel {
+    fn from(c: Conformance) -> Self {
+        match c {
+            Conformance::L1 => ConformanceLevel::L1BitForBit,
+            Conformance::L2 => ConformanceLevel::L2Transformed,
+        }
+    }
+}
 
 /// Convert an imzML imaging file into an imaging mzPeak file.
 ///
@@ -104,6 +136,13 @@ pub struct ConvertCli {
     /// a bit larger but bit-exact. (Imaging mzPeak always stays lossless regardless of this flag.)
     #[arg(long = "no-numpress")]
     pub no_numpress: bool,
+
+    /// Conformance level for `--verify`: `l1` (default) is the strict bar (value-equal at
+    /// canonical mzPeak width, Δ = 0); `l2` is opt-in bounded verify (m/z rel-err ≤ 1e-7,
+    /// intensity rel-err ≤ 1e-3 — allows numpress-written files to pass where L1 would
+    /// legitimately mismatch). A bare invocation (no flag) stays L1 / byte-unchanged.
+    #[arg(long = "conformance", value_name = "LEVEL", default_value_t = Conformance::L1)]
+    pub conformance: Conformance,
 
     /// ZSTD compression level (1–22). Higher = smaller output, slower. Default 19.
     #[arg(long = "zstd-level", value_name = "N", default_value_t = 19)]
@@ -226,6 +265,13 @@ fn run_forward_mzml(cli: ConvertCli) -> anyhow::Result<()> {
     if cli.verify {
         // Plain mzML has no imaging L1 contract; verify by reading the archive back and checking
         // the spectrum count survives the round-trip (a structural read-back, distinct exit 5).
+        // The active conformance level is named in the log so the operator knows which contract
+        // was selected (L1 = strict default; L2 = opt-in bounded, for numpress-written archives).
+        let level: ConformanceLevel = cli.conformance.into();
+        let level_name = match level {
+            ConformanceLevel::L1BitForBit => "L1",
+            ConformanceLevel::L2Transformed => "L2",
+        };
         let reader = mzpeak_prototyping::MzPeakReader::new(out).with_context(|| {
             format!("failed to re-open written archive for --verify: {}", out.display())
         })?;
@@ -240,7 +286,7 @@ fn run_forward_mzml(cli: ConvertCli) -> anyhow::Result<()> {
             )));
         }
         log::info!(
-            "verification passed (read-back spectrum count {read_back}) for {}",
+            "verification passed ({level_name} read-back spectrum count {read_back}) for {}",
             out.display()
         );
     }
@@ -388,14 +434,19 @@ fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
                     cli.input.display()
                 )
             })?;
-        // Numpress (lossy m/z) cannot satisfy bit-for-bit; verify at L2 tolerance instead. The
-        // lossless path (`--no-numpress`) keeps the strict L1 contract.
-        let level = if enc.lossy_mz {
-            log::info!("verifying at L2 (tolerance) — Numpress m/z encoding is lossy; use --no-numpress for L1 bit-for-bit");
-            ConformanceLevel::L2Transformed
-        } else {
-            ConformanceLevel::L1BitForBit
+        // The explicit `--conformance` flag selects the verify level. L1 (default) is the
+        // strict bar; L2 is opt-in. Imaging mzPeak always stays lossless (m/z chunking is
+        // forced OFF above), so L1 is always correct for imaging regardless of the flag.
+        // Note: a numpress file verified at L1 legitimately mismatches (numpress is lossy on
+        // m/z); use `--no-numpress` for exact L1 or `--conformance l2` to accept the bounded
+        // numpress error. The previous implicit auto-pick (enc.lossy_mz ⇒ L2) is replaced by
+        // this explicit selection so the chosen level is always visible to the operator.
+        let level: ConformanceLevel = cli.conformance.into();
+        let level_name = match level {
+            ConformanceLevel::L1BitForBit => "L1",
+            ConformanceLevel::L2Transformed => "L2",
         };
+        log::info!("verifying at {level_name} for {}", out.display());
         let report = verify_streaming(reader2, out, level)
             .context("verification failed to run")?;
         if !report.passed() {
@@ -406,7 +457,7 @@ fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
             })
             .context("verification reported a fidelity failure"));
         }
-        log::info!("verification passed (L1 bit-for-bit) for {}", out.display());
+        log::info!("verification passed ({level_name}) for {}", out.display());
     }
 
     Ok(())
@@ -799,6 +850,67 @@ mod tests {
         assert!(!cli.reverse, "default direction must remain forward");
         // IMG-01: an absent --image collects no paths (empty Vec, never None/panic).
         assert!(cli.images.is_empty(), "absent --image ⇒ empty Vec");
+    }
+
+    // --- T-28-04: --conformance l1|l2 parse tests (default l1; invalid rejected) ----------
+
+    #[test]
+    fn conformance_absent_defaults_to_l1() {
+        // T-28-04: a bare invocation (no --conformance) stays L1 — byte-unchanged behavior.
+        let cli = ConvertCli::try_parse_from(["mzml2mzpeak", "in.mzML", "out.mzpeak"])
+            .expect("bare invocation parses");
+        assert_eq!(
+            cli.conformance,
+            Conformance::L1,
+            "absent --conformance ⇒ L1 (strict default)"
+        );
+        // Verify the mapping from CLI enum → ConformanceLevel is correct.
+        assert_eq!(
+            ConformanceLevel::from(cli.conformance),
+            ConformanceLevel::L1BitForBit,
+            "L1 conformance flag maps to L1BitForBit"
+        );
+    }
+
+    #[test]
+    fn conformance_l2_parses_and_maps_to_l2_transformed() {
+        // `--conformance l2` parses and maps to ConformanceLevel::L2Transformed.
+        let cli = ConvertCli::try_parse_from([
+            "mzml2mzpeak", "in.mzML", "out.mzpeak", "--conformance", "l2",
+        ])
+        .expect("--conformance l2 must parse");
+        assert_eq!(
+            cli.conformance,
+            Conformance::L2,
+            "--conformance l2 parses as L2"
+        );
+        assert_eq!(
+            ConformanceLevel::from(cli.conformance),
+            ConformanceLevel::L2Transformed,
+            "L2 conformance flag maps to L2Transformed"
+        );
+    }
+
+    #[test]
+    fn conformance_l1_explicit_parses() {
+        // Explicit `--conformance l1` parses identically to the default.
+        let cli = ConvertCli::try_parse_from([
+            "mzml2mzpeak", "in.mzML", "out.mzpeak", "--conformance", "l1",
+        ])
+        .expect("--conformance l1 must parse");
+        assert_eq!(cli.conformance, Conformance::L1);
+    }
+
+    #[test]
+    fn conformance_invalid_value_is_rejected() {
+        // `--conformance l3` (unknown value) must be a clap parse error.
+        let result = ConvertCli::try_parse_from([
+            "mzml2mzpeak", "in.mzML", "out.mzpeak", "--conformance", "l3",
+        ]);
+        assert!(
+            result.is_err(),
+            "--conformance l3 (unknown) must be rejected by clap"
+        );
     }
 
     #[test]
