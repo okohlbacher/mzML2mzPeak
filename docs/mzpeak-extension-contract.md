@@ -1,9 +1,9 @@
 # mzPeak Imaging Extension — Design Contract
 
-**Version:** v0.7 binding contract (2026-06-09)
+**Version:** v0.7 binding contract + v0.8 sample-metadata section (2026-06-09)
 **Spec source:** HUPO-PSI/mzPeak-specification, nominal v0.9 (prose `index.md`, 10 JSON schemas)
-**Status:** BINDING — Phases 25, 26, 28 implement against this contract. Changes require cross-phase review.
-**Requirement coverage:** SPEC-01 (all facets via spec mechanisms) + SPEC-03 (cv_list reconciliation)
+**Status:** BINDING — Phases 25, 26, 28 implement against the v0.7 contract; Phases 30–34 implement against the v0.8 sample-metadata section (§3.9–§3.13). Changes require cross-phase review.
+**Requirement coverage:** SPEC-01 (all facets via spec mechanisms) + SPEC-03 (cv_list reconciliation) + SMSPEC-01/02 (v0.8 sample-metadata facet→mechanism ratification)
 
 > **SDRF/channel facets deferred to v0.8 — 2026-06-09 (owner + CODEX adversarial review).** The SDRF
 > embed + sample_list + channel_list + reporter-quant facets (§3.4–§3.7 below) were Phase 27 work; that
@@ -13,6 +13,11 @@
 > entries (MS:1002602) and drops the `channel_list` construct** (§3.6 is superseded). The **v0.7** facets
 > — cv_list (§3.1), declared geometry / scan_settings_list (§3.2), source_files[] reverse copy (§3.3),
 > and L2 transform record (§3.8) — remain BINDING.
+>
+> **v0.8 sample-metadata binding contract added — 2026-06-09 (Phase 30, Plan 04 — SMSPEC-01/02).** The
+> v0.8 facets (verbatim SDRF/ISA embed, metadata.study, metadata.sample_list, samples-as-channels) are
+> now bound to existing spec mechanisms in §3.9–§3.13 below. Phases 31–34 MUST implement against those
+> sections. The §3.6 channel_list/plex_id/channel_set construct is **SUPERSEDED + DROPPED** (RATIFIED-E).
 
 ---
 
@@ -131,6 +136,11 @@ subsections that follow give the detailed binding contract for each facet.
 | channel_list + ms_run.channel_set/plex_id **— deferred to v0.8 (superseded: v0.8 drops `channel_list`)** | CHAN-01, CHAN-02 | ~~27~~ → v0.8 | File-Level Metadata JSON | `metadata` KV, new `"channel_list"` key |
 | Reporter-ion quant **— deferred to v0.8** | CHAN-03 | ~~27~~ → v0.8 | Auxiliary Data Arrays (spec section "Auxiliary Data Arrays") | `auxiliary_arrays` column in `spectra_metadata.parquet` |
 | L2 transform record | L2-01 | 28 | Array Index `transform` field + File-Level Metadata JSON | `spectrum_array_index` `entries[].transform` CURIE + `metadata` transform record |
+| **v0.8 — Verbatim SDRF/ISA embed** | SM-01, SM-02 | **31** | **Adding a new Data Kind + Adding a new Entity Type** | ZIP typed member; `data_kind: "sdrf"` or `"isa"`, `entity_type: "sample-metadata"`; retrieved by deterministic archive name |
+| **v0.8 — metadata.study global context** | SM-05 | **32** | **File-Level Metadata JSON** | `metadata` KV, key `"study"` (accession/title/back-ref + run_sample_binding shadow) |
+| **v0.8 — metadata.sample_list (reused shape)** | SM-05 | **32** | **File-Level Metadata JSON** | `metadata` KV, key `"sample_list"` (existing spec member, reused: id/name/parameters) |
+| **v0.8 — Samples-as-channels (isobaric)** | CHAN-01, CHAN-02 | **34** | **File-Level Metadata JSON (sample_list) + upstream `ms_run.sample_ref`** | labeled `sample_list` entries with MS:1002602 cvParam + reporter-mz/role/tag params; list-valued `ms_run.sample_ref` binding |
+| **v0.8 — Reporter-ion quant (optional)** | QUANT-01, QUANT-02 | **35** | **Auxiliary Data Arrays** | `auxiliary_arrays` column in `spectra_metadata.parquet`; `channel_id` in auxiliary array `parameters` |
 
 ### 3.1 cv_list (Phase 24 / SPEC-03)
 
@@ -303,25 +313,201 @@ is the array index `transform` CURIE + the file-level JSON `"transform"` metadat
 
 ---
 
+## v0.8 Sample-Metadata Facet Bindings
+
+> **Ratified 2026-06-09 (Phase 30, Plan 04 — SMSPEC-01/02).** This section is the binding contract for
+> all v0.8 sample-metadata facets. Phases 31–34 MUST implement against these sections; they MUST NOT
+> re-derive the mechanism independently (Locked Rule 4). All facets bind to the EXISTING five spec
+> mechanisms enumerated in §2 above — no new mechanisms are introduced.
+>
+> **CV single source of truth:** `src/schema/cv.rs` — all structural CV terms (MS:1002602 sample label +
+> reagent children; channel role tokens; reporter-ion m/z attribute token) are declared there. All
+> pending CURIEs are tracked in `docs/cv-requests.md` (Plan 30-02).
+>
+> **KV-JSON contracts:** `schema/study.json` + `schema/sample_list.json` (Plan 30-03) define the
+> `metadata.study` and `metadata.sample_list` JSON schemas (draft-07, `additionalProperties: false`).
+>
+> **Open-enum tokens (Plan 30-02):** `entity_type: "sample-metadata"` and `data_kind: "sdrf"` / `"isa"`
+> are the carve-out tokens that land with Phase 31 (the minimum governance Phase 31 needs). These are
+> **descriptive-only open-enum strings** — no reader dispatches on them; retrieval is by the deterministic
+> archive name recorded in the index block (see §3.9 below). They are stable tokens in use as of Phase 31,
+> not mere fallbacks.
+
+### 3.9 Verbatim SDRF / ISA Embed (Phase 31 / SM-01, SM-02) — v0.8 BINDING
+
+**Mechanism 1 — Adding a new Data Kind (§2.4):** The SDRF or ISA source document is added as a typed
+ZIP member registered in `mzpeak_index.json` with:
+- `data_kind: "sdrf"` (for SDRF-Proteomics TSV input) or `data_kind: "isa"` (for ISA-Tab / ISA-JSON input).
+- `entity_type: "sample-metadata"` (the Phase 31 carve-out token, in use from Plan 30-02 onward).
+
+These values are **descriptive-only open-enum strings** — any unknown value degrades gracefully to
+`other` in existing readers (backward-compatible). **No reader dispatches on the token.** Retrieval is
+by the deterministic archive name (see below), exactly the shipped imaging-TIFF precedent
+(`metadata.imaging.images[].archive_path`).
+
+**Deterministic archive names:**
+- SDRF: `sample_metadata/sdrf.tsv`
+- ISA-Tab bundle: `sample_metadata/isa/i_Investigation.txt` (+ sibling `s_*.txt` / `a_*.txt` in the same
+  virtual directory)
+- ISA-JSON: `sample_metadata/isa.json`
+
+**Layout:** raw bytes (verbatim source file content). For ISA the whole bundle (investigation + applicable
+study + applicable assay files) is the embed unit — a single assay file is meaningless without its
+investigation.
+
+**Mechanism 2 — File-Level Metadata JSON (§2.1) — back-reference and provenance:**
+A `"sample_metadata"` key in the file-level `metadata` KV records:
+```json
+{
+  "dataset_accession": "PXD… | MTBLS…",
+  "source_uri": "https://…",
+  "format": "sdrf | isa-tab | isa-json",
+  "embed_scope": "applicable_rows | full",
+  "precedence": "repo_wins",
+  "sha256": "<hex>",
+  "retrieved_at": "<ISO-8601>",
+  "archive_name": "sample_metadata/sdrf.tsv"
+}
+```
+The `sha256` + `retrieved_at` guard against the embedded snapshot going stale vs. a later repository
+correction. `precedence: "repo_wins"` is the ratified authority rule (Q1 — RATIFIED).
+
+**Implementation note (Phase 31 cost):** the typed-member insert requires
+`start_for_entry(FileEntry::new(name, EntityType::Other("sample-metadata"), DataKind::Other("sdrf")))` +
+a manual byte-copy loop. The convenience helpers `start_other` / `add_file_from_read` hardcode
+`Other("other")` and MUST NOT be used for this facet. The `convert_mzml` finalize-seam refactor
+(opening the lower-level `finish_parquet()` / embed / `zip.finish()` seam) is a Phase 31 prerequisite.
+
+**Pending CURIEs:** none — `sample-metadata`/`sdrf`/`isa` are open-enum tokens, not minted accessions.
+Governance tracking in `docs/cv-requests.md` (the carve-out token registration).
+
+### 3.10 metadata.study — Global Study Context (Phase 32 / SM-05) — v0.8 BINDING
+
+**Mechanism:** File-Level Metadata JSON (§2.1) — `metadata` KV, key `"study"`.
+
+Written via `add_index_metadata("study", &serde_value)` after `finish_parquet()`.
+Read-back: `MzPeakReader.file_index().metadata["study"]`.
+
+**Minimal schema** (contract; full JSON Schema in `schema/study.json` — Plan 30-03):
+```json
+{
+  "accession": "PXD… | MTBLS… | null",
+  "title": "string | null",
+  "source_uri": "https://…",
+  "format": "sdrf | isa-tab | isa-json",
+  "run_sample_binding": {
+    "sample_ids": ["<source_name_1>", …],
+    "note": "provenance shadow — native list-valued ms_run.sample_ref binding gated on Phase 30b merge"
+  }
+}
+```
+
+The `run_sample_binding` sub-block is the **interim provenance shadow**: it records the run→sample
+association in the index.json KV until the upstream `ms_run.sample_ref` list-valued field (Phase 30b)
+lands in HUPO-PSI/mzPeak. When the native field is available, the shadow is kept for
+backward-compatibility but the native field is authoritative.
+
+**No new spec mechanism needed.** This is a new key in the existing File-Level Metadata JSON carrier —
+the mechanism the spec already defines for run-constant facts.
+
+**Schema file:** `schema/study.json` (Plan 30-03, `additionalProperties: false`, draft-07).
+
+### 3.11 metadata.sample_list — Sample List (Phase 32 / SM-05) — v0.8 BINDING (REUSED MEMBER)
+
+**Mechanism:** File-Level Metadata JSON (§2.1) — `metadata` KV, key `"sample_list"`. **This key is an
+already-documented spec member.** v0.8 fills it with sample entries derived from the SDRF/ISA source.
+
+**Shape (reused from v0.6 `sample.json`):** `[{id: String, name: String, parameters: [...]}]`
+- `id` = SDRF `source name` / ISA Source-or-Sample Name — the SDRF uniqueness key.
+- `name` = display name (equals `id` unless a separate display name exists).
+- `parameters` = list of `{value, accession?, name, unit?}` items (the spec's existing `parameters` list
+  type). In v0.8 each entry carries **id + name only** (lean posture, RATIFIED-G — full
+  `characteristics→Param` shaping deferred ≥v0.9 / Phase 36). Isobaric channel entries carry
+  additional CV params (§3.12).
+
+**Schema file:** `schema/sample_list.json` (Plan 30-03, reuses `sample.json` shape with
+`additionalProperties: false`, draft-07).
+
+**Per-spectrum `assay_ref`** is **deferred ≥v0.9** (run-level binding only in v0.8 per RATIFIED-D).
+
+### 3.12 Samples-as-Channels — Isobaric Channels as Labeled sample_list Entries (Phase 34 / CHAN-01, CHAN-02) — v0.8 BINDING
+
+> **RATIFIED-E (2026-06-09):** the `channel_list` / `plex_id` / `channel_set` construct (§3.6 above) is
+> **SUPERSEDED AND DROPPED**. Phase 34 MUST NOT implement a `channel_list`. Channels are modeled as
+> labeled `sample_list` entries. The §3.6 schema is preserved for provenance only.
+
+**Mechanism:** File-Level Metadata JSON (§2.1) — `metadata` KV, key `"sample_list"` (same member as
+§3.11, extended for isobaric entries). No new file-level key; no new spec mechanism.
+
+Each isobaric channel = one `sample_list` entry whose `parameters` list carries:
+1. **`MS:1002602` "sample label" cvParam** — the PSI-MS umbrella term for labeled-quantification
+   reagents (confirmed via OLS). The specific reagent (e.g. TMT126, TMTpro131C, iTRAQ114) is a child
+   term of MS:1002602 and also stored as a cvParam in the `parameters` list.
+2. **Reporter-ion m/z** — a cvParam with the numeric value; `reporter_mz_source` (reagent-table |
+   vendor-method | unresolved) recorded alongside. `reporter_mz: Option<f64>` — `null` when unresolved
+   (TMTpro 16/18-plex gap); NEVER a sentinel float (RATIFIED, R1-M4).
+3. **Channel role** — one of `experimental | reference | carrier | normalization | empty`, stored as a
+   cvParam / userParam. Derived from SDRF `comment[carrier channel]` / `comment[reference channel]`
+   (primary, R1-H2); pooled via `pool_member_refs`.
+4. **`tag_modification` (Unimod)** — e.g. `UNIMOD:737` (TMT6plex). Stored as a cvParam when accession
+   known, else a userParam keyed by the exact column (Cornerstone A passthrough).
+
+**Run → sample binding:** the **list-valued `ms_run.sample_ref`** upstream field (Phase 30b) carries the
+run→channel binding. Until Phase 30b merges, the `metadata.study.run_sample_binding` shadow (§3.10) holds
+the association. The `channel_set` / `plex_id` KV extensions to the `"run"` block (§3.6) are **dropped**.
+
+**CV single source:** `src/schema/cv.rs` is the single-source for MS:1002602 + reagent children + the
+small additional structural-term set (role tokens, reporter-ion m/z attribute). All pending CURIEs for
+TMTpro 16/18-plex labels tracked in `docs/cv-requests.md`.
+
+**Non-isobaric runs** (label-free, SILAC/MS1) MUST NOT emit isobaric-channel entries. SILAC labels
+are recorded as a run/assay metadata `Diagnostic` only — the verbatim blob holds the fidelity.
+
+**Constraint:** the `channel_list` JSON key MUST NOT appear in any v0.8 output. `plex_id` and
+`channel_set` MUST NOT be emitted. This is an absolute constraint (RATIFIED-E + Locked Rule 4).
+
+### 3.13 Reporter-Ion Quant Auxiliary Array Binding (Phase 35 / QUANT-01, QUANT-02) — v0.8 BINDING (OPTIONAL)
+
+> This section is the v0.8 binding for the reporter-quant facet. It supersedes the note in §3.7 (which
+> referenced §3.6's dropped `channel_list`). The mechanism is unchanged; the channel binding reference
+> is updated to §3.12.
+
+**Mechanism:** Auxiliary Data Arrays — a per-MS2 auxiliary array attached to the `auxiliary_arrays`
+list column in `spectra_metadata.parquet`. Mechanism is unchanged from §3.7.
+
+The `channel_id` in `auxiliary_arrays[].parameters` now points to a `sample_list` entry by `id`
+(§3.12) rather than to a `channel_list` entry. The join **peak → sample_list entry (channel) → sample**
+is resolvable without schema changes.
+
+**Gated + optional:** reporter-quant is off by default (RATIFIED, `--reporter-quant` flag required).
+A Phase 35 spike MUST confirm `channel_id` survives the `add_spectrum_array_override` read-back path
+in the **Rust reader** before committing the storage contract (R2-M3 — third-party read-back is a
+known-blocker). Phase 35 is the **first-to-cut** if the milestone overruns.
+
+---
+
 ## 4. Stable-Token Register
 
 Every CURIE used locally that lacks a canonical home MUST be tracked in `docs/cv-requests.md` (the
 single source for pending-CURIE tracking). Implementing phases MUST NOT invent canonical accessions
-inline. The current known gaps (as of Phase 24):
+inline. The current known gaps (as of Phase 30):
 
-| Gap | Stable token in use | Tracking |
-|-----|---------------------|----------|
-| IMS CV URI (`TODO(F9)`) | `imagingMS.obo` PURL placeholder | `docs/cv-requests.md` |
-| TMTpro 132–135 (18-plex) channel labels *(→ v0.8)* | Free-text fallback | `docs/cv-requests.md` (v0.8) |
-| SDRF `sample-metadata` entity type *(→ v0.8)* | `"other"` fallback | v0.8 batch proposal |
-| SDRF `sdrf` data kind *(→ v0.8)* | `"other"` fallback | v0.8 batch proposal |
+| Gap | Stable token in use | Status | Tracking |
+|-----|---------------------|--------|----------|
+| IMS CV URI (`TODO(F9)`) | `imagingMS.obo` PURL placeholder | v0.7 open | `docs/cv-requests.md` |
+| TMTpro 132–135 (18-plex) channel labels | Free-text fallback | v0.8 open | `docs/cv-requests.md` (v0.8) |
+| `sample-metadata` entity type | **`"sample-metadata"` — v0.8 stable token in use (docs/cv-requests.md)** | **v0.8 stable token (Plan 30-02)** | `docs/cv-requests.md` — queued in v0.8 spec batch (Phase 37) |
+| `sdrf` data kind | **`"sdrf"` — v0.8 stable token in use (docs/cv-requests.md)** | **v0.8 stable token (Plan 30-02)** | `docs/cv-requests.md` — queued in v0.8 spec batch (Phase 37) |
+| `isa` data kind | **`"isa"` — v0.8 stable token in use (docs/cv-requests.md)** | **v0.8 stable token (Plan 30-02)** | `docs/cv-requests.md` — queued in v0.8 spec batch (Phase 37) |
+| Channel role terms (experimental/reference/carrier/normalization/empty) | `src/schema/cv.rs` structural tokens | v0.8 — queue in Phase 37 batch | `docs/cv-requests.md` |
+| Reporter-ion m/z attribute structural term | `src/schema/cv.rs` structural token | v0.8 — queue in Phase 37 batch | `docs/cv-requests.md` |
 
 ---
 
 ## 5. Consumed By
 
-Phases 25, 26, 27, and 28 reference this contract. Before those phases plan or implement, any change to
-this document requires cross-phase review. The contract is archived at
+Phases 25, 26, 27, 28, and v0.8 Phases 30–34 reference this contract. Before those phases plan or
+implement, any change to this document requires cross-phase review. The contract is archived at
 `docs/mzpeak-extension-contract.md` and referenced from each phase's SUMMARY.
 
 | Phase | Facets consumed |
@@ -330,6 +516,11 @@ this document requires cross-phase review. The contract is archived at
 | 26 | Section 3.3 (source_files[] reverse copy) |
 | ~~27~~ → v0.8 | Sections 3.4–3.7 (SDRF embed, sample_list, channel_list, reporter-quant) — **deferred to v0.8** |
 | 28 | Section 3.8 (L2 transform record) |
+| **30** | v0.8 sample-metadata contract ratification (this section, §3.9–§3.13) — SMSPEC-01/02 |
+| **31** | §3.9 — verbatim SDRF/ISA embed (SM-01, SM-02); carve-out token registration |
+| **32** | §3.10 (metadata.study) + §3.11 (metadata.sample_list); lean projection un-gated; native binding gated on Phase 30b |
+| **34** | §3.12 — isobaric channels as labeled sample_list entries (CHAN-01..03); NO channel_list |
+| **35** | §3.13 — reporter-ion quant auxiliary array (QUANT-01..02); optional/gated |
 
 ---
 

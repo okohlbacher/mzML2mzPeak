@@ -43,6 +43,26 @@ Next check: re-fetch before referencing any new IMS accession not already in the
 
 ---
 
+## v0.8 sample-metadata structural terms
+
+Added: 2026-06-09 as part of Phase 30, Plan 02 (SMCVG-02 / T-30-02).
+
+The following tokens are used by mzml2mzpeak's sample-metadata extension (v0.8). They are
+declared as stable `pub const` strings in `src/schema/cv.rs`. Each term lacking a canonical
+PSI-MS or other OBO accession is listed here; their requests should be directed to
+HUPO-PSI/mzPeak-specification (for the mzPeak-native attribute) and to the PSI-MS CV GitHub
+issues (for any term that belongs in PSI-MS proper).
+
+| Token | Description | Local stable value | Where to file | Status |
+|-------|-------------|-------------------|---------------|--------|
+| sample-metadata entity_type | Open-enum `entity_type` string for the sample-metadata mzPeak extension block (design §5.1); DESCRIPTIVE-ONLY — no reader dispatch, retrieval is by archive member name. | `"sample-metadata"` (constant `SAMPLE_METADATA_ENTITY_TYPE`) | HUPO-PSI/mzPeak-specification (entity_type registry) | **Stable token in use** — Open; pending spec ratification |
+| sdrf data_kind | Open-enum `data_kind` string for an embedded SDRF-Proteomics metadata block; DESCRIPTIVE-ONLY. | `"sdrf"` (constant `SDRF_DATA_KIND`) | HUPO-PSI/mzPeak-specification (data_kind registry) | **Stable token in use** — Open; pending spec ratification |
+| isa data_kind | Open-enum `data_kind` string for an embedded ISA-Tab or ISA-JSON metadata block; DESCRIPTIVE-ONLY. | `"isa"` (constant `ISA_DATA_KIND`) | HUPO-PSI/mzPeak-specification (data_kind registry) | **Stable token in use** — Open; pending spec ratification |
+| channel role attribute | Structural attribute recording the role of a labeled-quant channel in a `sample_list` entry (values: `sample`, `pooled`, `carrier`, `reference`). PSI-MS CV 4.1.x has no canonical "channel role" or "isobaric channel role" attribute term. | `"mzml2mzpeak:channel-role"` (accessor `channel_role_token()`) | PSI-MS CV GitHub issues + HUPO-PSI/mzPeak-specification | **Gap** — no PSI-MS accession as of 2026-06-09; stable token in use |
+| reporter-ion m/z attribute | Structural attribute recording the nominal m/z of the reporter ion for a labeled-quant channel (sample-metadata level, distinct from MS2 fragment reporter ions). PSI-MS CV 4.1.x has no canonical "reporter ion m/z" attribute at the sample/channel-metadata level. | `"mzml2mzpeak:reporter-ion-mz"` (accessor `reporter_ion_mz_token()`) | PSI-MS CV GitHub issues + HUPO-PSI/mzPeak-specification | **Gap** — no PSI-MS accession as of 2026-06-09; stable token in use |
+
+---
+
 ## Notes
 
 - **TMTpro gap context (CHAN-04):** PSI-MS CV 4.1.x defines TMTpro 16-plex channels up to 131C

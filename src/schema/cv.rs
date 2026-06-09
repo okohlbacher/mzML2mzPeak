@@ -42,6 +42,33 @@ pub fn numpress_linear_curie() -> mzdata::params::CURIE {
         .expect("NumpressLinear param has a CURIE")
 }
 
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// Phase-31 carve-out: open-enum token constants for entity_type / data_kind (30-02, R4-M6)
+//
+// These are DESCRIPTIVE-ONLY open-enum strings. No reader dispatches on them at runtime;
+// the mzPeak archive retrieval path uses the deterministic archive member name recorded in
+// the index block (design §5.1). They are stable contracts Phase 31 imports directly —
+// the value is pinned here so any future rename is a BREAKING change that fails the test.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/// The `entity_type` open-enum string for the sample-metadata extension block.
+///
+/// Declared as a stable token so Phase 31 imports a pinned contract rather than re-stating
+/// the string. **DESCRIPTIVE-ONLY** — no reader dispatches on this value; retrieval is by the
+/// deterministic archive member name in the `FileIndex` (design §5.1). Changing this value
+/// is a breaking contract change and will fail the `carve_out_token_values` test.
+pub const SAMPLE_METADATA_ENTITY_TYPE: &str = "sample-metadata";
+
+/// The `data_kind` open-enum string for an SDRF-Proteomics embedded metadata block.
+///
+/// **DESCRIPTIVE-ONLY** open-enum — same governance as [`SAMPLE_METADATA_ENTITY_TYPE`].
+pub const SDRF_DATA_KIND: &str = "sdrf";
+
+/// The `data_kind` open-enum string for an ISA-Tab or ISA-JSON embedded metadata block.
+///
+/// **DESCRIPTIVE-ONLY** open-enum — same governance as [`SAMPLE_METADATA_ENTITY_TYPE`].
+pub const ISA_DATA_KIND: &str = "isa";
+
 /// The single-source accessor for the "sample label" umbrella CURIE (`MS:1002602`).
 ///
 /// `MS:1002602` "sample label" — the PSI-MS umbrella term for reagents used in labeled
@@ -363,6 +390,35 @@ mod tests {
                 entry.full_name
             );
         }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Task 2: Phase-31 carve-out token value-pinning test (30-02)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /// Value-pinning test for the Phase-31 carve-out token constants.
+    ///
+    /// Asserts the EXACT string values of `SAMPLE_METADATA_ENTITY_TYPE`,
+    /// `SDRF_DATA_KIND`, and `ISA_DATA_KIND`. These are descriptive-only open-enum
+    /// strings (no reader dispatch); any change to these values is a breaking
+    /// contract change (Phase 31 imports them directly).
+    #[test]
+    fn carve_out_token_values() {
+        assert_eq!(
+            SAMPLE_METADATA_ENTITY_TYPE,
+            "sample-metadata",
+            "SAMPLE_METADATA_ENTITY_TYPE must be exactly \"sample-metadata\""
+        );
+        assert_eq!(
+            SDRF_DATA_KIND,
+            "sdrf",
+            "SDRF_DATA_KIND must be exactly \"sdrf\""
+        );
+        assert_eq!(
+            ISA_DATA_KIND,
+            "isa",
+            "ISA_DATA_KIND must be exactly \"isa\""
+        );
     }
 
     // ──────────────────────────────────────────────────────────────────────────
