@@ -1210,6 +1210,105 @@ mod tests {
         fs::remove_dir_all(&dir).ok();
     }
 
+    // ---- Phase 26 (RSRC-01): write_source_file_list_to unit tests ----
+
+    use mzdata::meta::SourceFile;
+    use mzdata::params::{ControlledVocabulary, Param, ParamValue, CURIE};
+
+    /// Build a minimal SourceFile with no params, file_format, or id_format.
+    fn make_sf(id: &str, name: &str, location: &str) -> SourceFile {
+        SourceFile {
+            id: id.to_string(),
+            name: name.to_string(),
+            location: location.to_string(),
+            file_format: None,
+            id_format: None,
+            params: mzdata::params::ParamList::default(),
+        }
+    }
+
+    /// Build a Param carrying the given CURIE accession code and value.
+    fn make_cv_param(cv: ControlledVocabulary, accession: u32, name: &str, value: &str) -> Param {
+        let curie = CURIE::new(cv, accession);
+        cv.param_val(curie.accession, name, value.to_string())
+    }
+
+    /// T-26-A (back-compat no-op): an empty slice emits NOTHING.
+    #[test]
+    fn source_file_list_empty_emits_nothing() {
+        let mut buf: Vec<u8> = Vec::new();
+        write_source_file_list_to(&mut buf, &[]).unwrap();
+        let text = String::from_utf8(buf).unwrap();
+        assert!(
+            !text.contains("<sourceFileList"),
+            "empty source_files must emit nothing (no <sourceFileList>)"
+        );
+        assert!(text.is_empty(), "empty source_files must emit zero bytes");
+    }
+
+    /// T-26-B (faithful copy): two entries emit correct <sourceFileList count="2"> with params.
+    #[test]
+    fn source_file_list_two_entries_faithful_copy() {
+        // imzml entry: no params
+        let sf_imzml = make_sf("imzml", "X.imzML", "file:///d");
+        // ibd entry: IMS:1000080 UUID + IMS:1000090 MD5
+        let mut sf_ibd = make_sf("ibd", "X.ibd", "file:///d");
+        let uuid_param = make_cv_param(ControlledVocabulary::IMS, 1000080, "universally unique identifier", "test-uuid-1234");
+        let md5_param = make_cv_param(ControlledVocabulary::IMS, 1000090, "ibd MD5", "deadbeefcafe");
+        sf_ibd.params.push(uuid_param);
+        sf_ibd.params.push(md5_param);
+
+        let mut buf: Vec<u8> = Vec::new();
+        write_source_file_list_to(&mut buf, &[sf_imzml, sf_ibd]).unwrap();
+        let text = String::from_utf8(buf).unwrap();
+
+        assert!(text.contains("<sourceFileList count=\"2\">"), "count=2");
+        assert!(text.contains("id=\"imzml\""), "imzml entry id");
+        assert!(text.contains("id=\"ibd\""), "ibd entry id");
+        assert!(text.contains("name=\"X.imzML\""), "imzml name");
+        assert!(text.contains("name=\"X.ibd\""), "ibd name");
+        assert!(text.contains("accession=\"IMS:1000080\""), "UUID accession");
+        assert!(text.contains("value=\"test-uuid-1234\""), "UUID value");
+        assert!(text.contains("accession=\"IMS:1000090\""), "MD5 accession");
+        assert!(text.contains("value=\"deadbeefcafe\""), "MD5 value");
+        assert!(text.contains("</sourceFileList>"), "closing tag");
+    }
+
+    /// T-26-C (escaping, T-26-INJ): a name containing `&` and `<` is entity-escaped.
+    #[test]
+    fn source_file_list_name_escaped() {
+        let sf = make_sf("sf1", "bad&name<here>", "file://");
+        let mut buf: Vec<u8> = Vec::new();
+        write_source_file_list_to(&mut buf, &[sf]).unwrap();
+        let text = String::from_utf8(buf).unwrap();
+        // Escaped forms present
+        assert!(text.contains("&amp;"), "& must be escaped to &amp;");
+        assert!(text.contains("&lt;"), "< must be escaped to &lt;");
+        // Raw metacharacters absent in the name attribute value
+        assert!(!text.contains("bad&name"), "raw & in name must be escaped");
+        assert!(!text.contains("name<here"), "raw < in name must be escaped");
+    }
+
+    /// T-26-D (format terms): file_format + id_format are emitted as cvParams (params() omits them).
+    #[test]
+    fn source_file_list_format_terms_emitted() {
+        let mut sf = make_sf("sf1", "file.mzML", "file:///d");
+        // file_format: MS:1000584 "mzML format"
+        sf.file_format = Some(
+            ControlledVocabulary::MS.param_val(1000584, "mzML format", "".to_string())
+        );
+        // id_format: MS:1000824 "no nativeID format"
+        sf.id_format = Some(
+            ControlledVocabulary::MS.param_val(1000824, "no nativeID format", "".to_string())
+        );
+
+        let mut buf: Vec<u8> = Vec::new();
+        write_source_file_list_to(&mut buf, &[sf]).unwrap();
+        let text = String::from_utf8(buf).unwrap();
+        assert!(text.contains("accession=\"MS:1000584\""), "file_format accession emitted");
+        assert!(text.contains("accession=\"MS:1000824\""), "id_format accession emitted");
+    }
+
     /// FID-02: when `absolute_offset_um = Some({x,y})`, IMS:1000053/54 are emitted with the value
     /// AND the UO:0000017 µm unit; when `None`, NEITHER offset term is emitted (never fabricated).
     #[test]
