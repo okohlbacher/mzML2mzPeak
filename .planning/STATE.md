@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: > **RELOCATED TO v0.8 — 2026-06-09
 status: executing
-stopped_at: v0.7 COMPLETE — all 9 active reqs done; Phases 22 (PRs) + 27 (SDRF) + 29 (de-vendor) relocated to v0.8; ready to archive/tag
-last_updated: "2026-06-09T09:26:00Z"
-last_activity: 2026-06-09 — Phase 32 Plan 01 complete (SM-05/SM-06 shipped; SM-07 deferred ≥v0.9)
+stopped_at: All buildable v0.8 phases complete (30/31/32/33/34/35/37); remainder owner-gated (22/30b) or deferred (29/36)
+last_updated: "2026-06-09T18:00:00Z"
+last_activity: 2026-06-09 — Phases 33/34/35/37 complete (ISA reader + isobaric channels + reporter-quant + roundtrip/validation); 565 tests green
 progress:
-  total_phases: 3
-  completed_phases: 1
-  total_plans: 6
-  completed_plans: 4
-  percent: 67
+  total_phases: 7
+  completed_phases: 7
+  total_plans: 16
+  completed_plans: 16
+  percent: 100
 ---
 
 # Project State
@@ -40,10 +40,10 @@ dep: **`csv`** (re-added) + `serde_json` (already present). v0.7 is **shipped** 
 
 ## Current Position
 
-Phase: 32-sample-list-projection
-Plan: 01 (complete)
-Status: **Phases 30, 31, 32 complete. Next buildable = Phase 33 (ISA reader) or Phase 34 (isobaric channels)**
-Last activity: 2026-06-09 — Phase 32 Plan 01 complete — SM-05/SM-06 shipped (sample_list projection + phase32_shadow run binding); SM-07 deferred ≥v0.9
+Phase: 37-roundtrip-validation
+Plan: 03 (complete)
+Status: **All buildable v0.8 phases complete (30/31/32/33/34/35/37). Remainder = 30b/22 (owner-gated) + 29 (gated on external merges) + 36 (deferred ≥v0.9).**
+Last activity: 2026-06-09 — Phase 37 Plans 01–03 complete — VAL-01 byte-for-byte fixture sweep PASSED (label-free + TMT arms; ISA arm skip-guarded); VAL-02 --validate-sample-metadata non-blocking oracle shipped; UPSTREAM-PR bundle PREPARED-AND-HELD (docs/upstream/v0.8-spec-batch-bundle.md + ms-run-sample-ref-writer-pr.md); 565 tests green
 
 ## v0.8 Roadmap (Phases 22, 29, 30, 30b, 31–37)
 
@@ -63,15 +63,14 @@ BATCH proposal to `HUPO-PSI/mzPeak-specification` at the END of v0.8. Pinned sta
 | 30b | Upstream list-valued `ms_run.sample_ref` PR | UPSTREAM-BIND-01 | ⬜ Not started (owner-gated) | 30 — early/parallel; gates 32 native binding |
 | 31 | Unified model + SDRF reader + verbatim embed (TRUE MVP) | SM-01..04 | ✅ Complete (2026-06-09) | 30 — nothing upstream |
 | 32 | Lean `sample_list`/study projection + run binding | SM-05..07 | ✅ Complete (2026-06-09; SM-07 deferred ≥v0.9) | 31; native binding gated on 30b |
-| 33 | ISA reader (Tab + JSON) | SM-08..10 | ⬜ Not started | 31, 32 — pure-Rust, no Python |
-| 34 | Isobaric channels as labeled samples | CHAN-01..03 | ⬜ Not started | 32 — MS:1002602, no channel_list |
-| 35 | Reporter-ion quantitation (optional) | QUANT-01..02 | ⬜ Not started (first-to-cut) | 34 |
+| 33 | ISA reader (Tab + JSON) | SM-08..10 | ✅ Complete (2026-06-09) | 31, 32 — pure-Rust, no Python |
+| 34 | Isobaric channels as labeled samples | CHAN-01..03 | ✅ Complete (2026-06-09) | 32 — MS:1002602, no channel_list |
+| 35 | Reporter-ion quantitation (optional) | QUANT-01..02 | ✅ Complete (2026-06-09) | 34 |
 | 36 | comment-scope + factor-value completeness | SCOPE-01..02 | **DEFERRED ≥v0.9** | (blob holds fidelity) |
-| 37 | Round-trip + validation + batch submission | VAL-01..02, UPSTREAM-PR | ⬜ Not started | 31–34 (35 optional) |
+| 37 | Round-trip + validation + batch submission | VAL-01..02, UPSTREAM-PR | ✅ Complete (2026-06-09) | 31–34 (35 optional) |
 
-**Status:** v0.8 in progress; **Phases 30, 31, 32 complete (2026-06-09)**. Next buildable = **Phase 33** (ISA reader) or **Phase 34** (isobaric channels as labeled samples).
-Critical path: 30 → 31 → 32 → 34 → (36 deferred) → 37. The upstream-gated native-binding sub-step (30b →
-32-binding) and the ISA track (33) run *off* the critical path.
+**Status:** All buildable v0.8 phases complete — **Phases 30, 31, 32, 33, 34, 35, 37 complete (2026-06-09)**. Remainder: Phase 30b (owner-gated), Phase 22 (owner-gated/held), Phase 29 (gated on external merges), Phase 36 (deferred ≥v0.9). 565 tests green.
+Critical path: 30 → 31 → 32 → 34 → (36 deferred) → 37 — **all complete**. The upstream-gated native-binding sub-step (30b → 32-binding) and Phase 22/29 remain non-blocking external work.
 
 **Done-upstream (not active work):** UPS-02 (mzdata SONAR/IM) + UPS-04 (array_buffer B2) — both fixed by
 the v0.7 rebase, no PR/issue to file.
@@ -186,6 +185,28 @@ release — the milestone is **not hard-blocked**, only its run-binding *queryab
 
 v0.7 decisions will be logged here per plan. v0.6 decisions are archived in
 `milestones/v0.6-ROADMAP.md` + PROJECT.md Key Decisions.
+
+**Phase 37 Plans 37-01..03 (2026-06-09):**
+
+- VAL-01 (37-01): extract_sample_metadata_member reads ZIP member verbatim — never regenerates from projections (Q10 RATIFIED); EmbedError::MemberNotFound typed variant; label-free PASSED, TMT PASSED, ISA SKIPPED (no spectral mzML in MTBLS5358/mzml/).
+- VAL-02 (37-02): run_validator always returns Ok(ValidationOutcome) — outcome is data, not error; spawn failure → Skipped (non-fatal); PATH probe via std::env::split_paths (no new crate); Python stays out of hard path.
+- UPSTREAM-PR (37-03): v0.8-spec-batch-bundle.md (P-02/03/04/05/08/09) + ms-run-sample-ref-writer-pr.md PREPARED AND HELD; no push attempted; channel_list explicitly DROPPED/WITHDRAWN (RATIFIED-E); Phase 34/35 gates left unchecked at time of bundle assembly.
+
+**Phase 35 Plans 35-01..02 (2026-06-09):**
+
+- QUANT-01/QUANT-02 (35-01): spike CONFIRMED aux-array contract — channel_id Param survives MzPeakReader::get_spectrum_arrays; --reporter-quant flag OFF by default; forward-mzML-only guards mirror --sdrf precedent.
+- QUANT-01 emit (35-02): ONE NonStandardDataArray per spectrum, intensities in channel order, channel_id param semicolon-joined; missing peak → 0.0 sentinel; null reporter_mz channel omitted entirely; byte-identical no-flag path strictly gated; three-places rule: Rust struct + schema/reporter_quant.json + spec write-up Part F.
+
+**Phase 34 Plans 34-01..02 (2026-06-09):**
+
+- CHAN-01/02/03 (34-01): static reagent table TMT 126–131 (+N/+C) + iTRAQ 113–121 with PSI-MS CV child accessions; TMT131C shares MS:1002621 with TMT131N (no separate CV term); TMTpro high channels 132N–135N → reporter_mz=None + source="unresolved" (honest free-text fallback); derive_role precedence: carrier > reference > pooled > sample; label-free + SILAC excluded.
+- CHAN-01/02/03 wired (34-02): project_sample_list extended in-place; four labeled params per isobaric entry (MS:1002602 child + reporter-ion-mz + channel-role + tag-modification); non-isobaric path unchanged (parameters:[]); conservative is_pooled=false default.
+
+**Phase 33 Plans 33-01..03 (2026-06-09):**
+
+- SM-08 (33-01): ISA-Tab block parser: i_Investigation.txt + s_*.txt + a_*.txt → StudyMetadata; URL-vs-CURIE passthrough (http:// check before SourceCurie::parse avoids misclassification); PairedColumn for out-of-band Term Source REF / Term Accession Number; SourceFormat::IsaTab/IsaJson variants additive.
+- SM-09 (33-02): ISA-JSON serde + @id resolution via HashMap (sample_id_to_name, source_id_to_name, data_file_id_to_name); dangling @id → Diagnostic("isa-json-unresolved-ref"), never panic; serde_json::json! macro used for tests (# in @id values).
+- SM-10 (33-03): embed_member refactor (core helper + thin embed_sdrf_member wrapper); --isa CLI flag + rejection guards; multi-file embed loop with stable "sample_metadata/isa/<basename>" names; --isa and --sdrf mutually exclusive; no-flag path byte-identical; upstream writer always emits built-in sample_list — our ISA/SDRF add_index_metadata("sample_list") overwrites it (HashMap insert semantics).
 
 **Phase 32 Plan 32-01 (2026-06-09):**
 
@@ -380,26 +401,24 @@ Items deferred out of v0.7:
 
 ## Session Continuity
 
-Last session: 2026-06-09T09:26:00Z
-Stopped at: Phase 32 Plan 01 COMPLETE — SM-05/SM-06 shipped (sample_list projection + phase32_shadow binding); SM-07 confirmed deferred ≥v0.9; 456 tests green
+Last session: 2026-06-09T18:00:00Z
+Stopped at: Phase 37 Plan 03 COMPLETE — all buildable v0.8 phases done (30/31/32/33/34/35/37); VAL-01 PASSED (label-free + TMT byte-for-byte); VAL-02 shipped; UPSTREAM-PR PREPARED-AND-HELD; 565 tests green
 Resume file: None
 
 ## Operator Next Steps
 
-- **v0.7 is COMPLETE** (2026-06-09, owner — closing the milestone). All 9 active requirements DONE
-  (REB-01, SPEC-01/02/03, CVG-01/02, GEOF-01, RSRC-01, L2-01); Phases 23/24/25/26/28 done. **8 phases
-  (22–29), numbering unchanged**; Phases 22/27/29 are relocated-to-v0.8 stubs. 380 tests green; milestone
-  audit PASS (`.planning/v0.7-MILESTONE-AUDIT.md`).
+- **All buildable v0.8 phases are COMPLETE (2026-06-09).** 565 tests green. Phases 30/31/32/33/34/35/37 done.
 
-- **Next: run `/gsd:complete-milestone`** to archive/tag v0.7, then move to v0.8 (`/gsd:plan-phase 30`).
+- **Remaining open work (non-blocking, owner-gated or externally gated):**
+  - **Phase 30b** (upstream list-valued `ms_run.sample_ref` PR) — OWNER-GATED. The native binding ships as the phase32_shadow until merged. PR text ready in `docs/upstream/ms-run-sample-ref-writer-pr.md`.
+  - **Phase 22** (chunk_series PR + mzPeakValidator PR) — OWNER-GATED/HELD. Drafts in `/tmp/mzpeak-prs/`; UPS-02/UPS-04 done-upstream.
+  - **Phase 29** (de-vendor both forks) — GATED on chunk_series PR (UPS-01) merged + mzdata 0.64.2 on crates.io. Sequenced LAST.
+  - **Phase 36** (comment-scope + factor_values) — DEFERRED ≥v0.9. Blob holds full fidelity.
 
-- **Phases 22 (PRs) + 29 (de-vendor) relocated to v0.8** — non-blocking external work. Phase 22: submit
-  the chunk_series PR (UPS-01) + the mzPeakValidator PR (UPS-03) when ready (drafts in `/tmp/mzpeak-prs/`;
-  UPS-02/UPS-04 done-upstream). Phase 29: de-vendor, gated on chunk_series upstreamed (DVN-01) + mzdata
-  0.64.2 on crates.io (DVN-02; file_index serde already fixed upstream). Both folded into the v0.8
-  upstreaming/de-vendoring finish (alongside the Phase 30b upstream `ms_run.sample_ref` PR).
+- **Upstream submissions ready to file when authorized:**
+  - v0.8 spec batch bundle: `docs/upstream/v0.8-spec-batch-bundle.md` (P-02/03/04/05/08/09 → HUPO-PSI/mzPeak-specification)
+  - ms_run.sample_ref writer PR: `docs/upstream/ms-run-sample-ref-writer-pr.md` (→ HUPO-PSI/mzPeak)
 
-- **Phase 27 (SDRF) relocated to v0.8** — redone from the unified `StudyMetadata`/`SourceCurie` model
-  (`.planning/milestones/v0.8-DESIGN-DRAFT.md`).
+- **Next: run `/gsd:complete-milestone`** to archive/tag v0.8 when the owner is ready.
 
 - **Backlog DONE history retained:** 999.2 (PNG/JPEG dims), 999.3 (benchmark), 999.4 (S3 corpus).

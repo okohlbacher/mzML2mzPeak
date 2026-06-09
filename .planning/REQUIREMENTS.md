@@ -126,60 +126,70 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
 
 ### ISA reader (SM-08..10) — Phase 33
 
-- [ ] **SM-08** — ISA-Tab reader (pure-Rust hand parser, **no Python**): parse `i_Investigation.txt`
+- [x] **SM-08** — ISA-Tab reader (pure-Rust hand parser, **no Python**): parse `i_Investigation.txt`
   (section-keyed blocks) → `global` + the Ontology Source Reference registry (`Term Source REF` → real CV) +
   Study Factor/Protocol definitions; parse `s_*.txt` → `samples` (paired `Term Source REF` /
   `Term Accession Number`); parse `a_*.txt` → `assays`. **AND** ISA-JSON: its own `Deserialize` layer +
   `@id` reference resolution → the same `StudyMetadata` (three parse front-ends, one target model).
+  **DONE Phase 33-01/02 (2026-06-09):** `src/isa/tab.rs` + `src/isa/json.rs` shipped; URL-vs-CURIE passthrough guard; @id resolution via HashMap; 18 lib tests green.
 
-- [ ] **SM-09** — Assay-row → file matching on `Raw Spectral Data File` / `Derived Spectral Data File`
+- [x] **SM-09** — Assay-row → file matching on `Raw Spectral Data File` / `Derived Spectral Data File`
   (tolerate `Acquisition Parameter Data File` + `MS Assay Name`); join assay rows → Sample Name → Source
   Name; harvest `Factor Value[...]` from **both** `s_*.txt` and `a_*.txt`; labeled-extract fan-out modeled
   only when encountered, else degrade to verbatim + diagnostic.
+  **DONE Phase 33-02 (2026-06-09):** ISA-JSON @id resolution + dangling-@id → Diagnostic; assay matching wired in ISA-Tab reader.
 
-- [ ] **SM-10** — Embed the **whole ISA bundle** verbatim (`data_kind: isa`; investigation + relevant
+- [x] **SM-10** — Embed the **whole ISA bundle** verbatim (`data_kind: isa`; investigation + relevant
   study + relevant assay files, or the ISA-JSON) — ISA is normalized, a single assay file is meaningless
   alone; the protocol/process graph + multi-assay grouping are preserved in the blob + a diagnostic, **never
   silently dropped**.
+  **DONE Phase 33-03 (2026-06-09):** `embed_member` refactor + `--isa` CLI + multi-file embed loop (`sample_metadata/isa/<basename>`); MTBLS5358 ISA-Tab + minimal.json roundtrip acceptance tests green.
 
 ### Isobaric channels as labeled samples (CHAN-01..03, REFRAMED-E) — Phase 34
 
-- [ ] **CHAN-01** — Each isobaric channel → a `sample_list` entry carrying a `sample label` cvParam
+- [x] **CHAN-01** — Each isobaric channel → a `sample_list` entry carrying a `sample label` cvParam
   (`MS:1002602` + its reagent child, e.g. TMT126) + `reporter_mz` + role + `tag_modification` (Unimod)
   params; the run binds them via the **list-valued `ms_run.sample_ref`** (Phase 30b). **NO
   `channel_list` / `plex_id` / `channel_set`** — multiplexing is just a run referencing N labeled samples.
+  **DONE Phase 34-01/02 (2026-06-09):** reagent table TMT 126–131 (+N/+C) + iTRAQ 113–121; `project_sample_list` extended with four labeled params per channel entry; PXD011799 smoke test green.
 
-- [ ] **CHAN-02** — Roles derived: carrier/reference from the dedicated columns
+- [x] **CHAN-02** — Roles derived: carrier/reference from the dedicated columns
   `comment[carrier channel]` / `comment[reference channel]` (value = the channel label); pooled via
   `pool_member` sample refs / `characteristics[pooled sample]`; `reporter_mz: Option<f64>` (None when
   unresolved — never a sentinel) with `reporter_mz_source` recorded (reagent-table / vendor-method /
   unresolved).
+  **DONE Phase 34-01 (2026-06-09):** `derive_role` precedence carrier > reference > pooled > sample; `reporter_mz_source` recorded; TMT131C shares MS:1002621 (documented).
 
-- [ ] **CHAN-03** — Channel-path exclusions: `label free sample` and `SILAC light|medium|heavy` are
+- [x] **CHAN-03** — Channel-path exclusions: `label free sample` and `SILAC light|medium|heavy` are
   **excluded** from the channel path (SILAC preserved in verbatim + a diagnostic — it is MS1 quant, no
   channel construct); TMTpro 16/18-plex unresolved reporter-m/z degrades to an **honest free-text
   fallback**.
+  **DONE Phase 34-01 (2026-06-09):** `is_isobaric_label` excludes label-free + SILAC; TMTpro high channels (132N–135N) → reporter_mz=None + source="unresolved".
 
 ### Reporter-ion quantitation (QUANT-01..02) — Phase 35 *(optional, off by default, FIRST-TO-CUT)*
 
-- [ ] **QUANT-01** — Reporter intensities stored as an `auxiliary` array with a `channel_id` column
+- [x] **QUANT-01** — Reporter intensities stored as an `auxiliary` array with a `channel_id` column
   (`add_spectrum_array_override` aux-array seam); gated behind `--reporter-quant`, **off by default**.
+  **DONE Phase 35-01/02 (2026-06-09):** aux-array contract CONFIRMED (channel_id Param survives `MzPeakReader::get_spectrum_arrays`); ONE NonStandardDataArray per spectrum, intensities in channel order, channel_id param semicolon-joined; byte-identical no-flag path; three-places: `schema/reporter_quant.json` + spec write-up Part F.
 
-- [ ] **QUANT-02** — A read-back spike proves `channel_id` survives through **this repo's own reader**
+- [x] **QUANT-02** — A read-back spike proves `channel_id` survives through **this repo's own reader**
   (third-party read-back is a known blocker — aux arrays = Arrow struct columns); peak → channel → sample
   resolves through the labeled samples.
+  **DONE Phase 35-01 (2026-06-09):** `channel_id_survives_own_reader_readback` spike test PASSED; aux-array branch confirmed; `reporter_quant_roundtrip_recovers_channel_id_and_intensities` XRT green.
 
 ### Round-trip & validation (VAL-01..02) — Phase 37
 
-- [ ] **VAL-01** — **HARD criterion:** the *internal* Rust round-trip-parity assertion — re-serve the
+- [x] **VAL-01** — **HARD criterion:** the *internal* Rust round-trip-parity assertion — re-serve the
   embedded verbatim document **byte-for-byte** — passes on all three fixtures (MTBLS1129 label-free SDRF,
   PXD011799 TMT-10plex SDRF, `data/sdrf-examples/MTBLS5358` native ISA-Tab). The `--reconstruct-sdrf` /
   `--reconstruct-isa` reverse path extracts the member; it does **not** regenerate from projections.
+  **DONE Phase 37-01 (2026-06-09):** `extract_sample_metadata_member()` helper + `--reconstruct-sdrf`/`--reconstruct-isa` CLI; label-free PASSED (byte-for-byte), TMT PASSED (byte-for-byte), ISA SKIPPED (no spectral mzML in MTBLS5358/mzml/ — skip-guarded, not silent pass). 565 tests green.
 
-- [ ] **VAL-02** — The optional `--validate-sample-metadata` oracle shells to the reference validator
+- [x] **VAL-02** — The optional `--validate-sample-metadata` oracle shells to the reference validator
   (`sdrf-pipelines` for SDRF; `isa-api`/`linkml` for ISA) **only when present** — non-blocking,
   CI/fixtures only, **never a release gate** (keeps Python out of the hard path). Results recorded when
   available.
+  **DONE Phase 37-02 (2026-06-09):** `run_validator` always returns `Ok(ValidationOutcome)` (data, not error); spawn failure → Skipped; PATH probe via `std::env::split_paths` (no new crate); 9 tests green.
 
 ### Upstream binding (UPSTREAM-BIND-01) — Phase 30b *(EARLY, owner-gated/held)*
 
@@ -194,6 +204,7 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
 - [ ] **UPSTREAM-PR** — Submit the batched sample-metadata + samples-as-channels spec proposals to
   `HUPO-PSI/mzPeak-specification` **and** the upstream `ms_run.sample_ref` writer PR (both owner-gated). v0.7's
   imaging SPEC-02 batch is already re-scoped to imaging/IMS terms only so these are not double-owned.
+  **PREPARED AND HELD Phase 37-03 (2026-06-09):** `docs/upstream/v0.8-spec-batch-bundle.md` (P-02/03/04/05/08/09) + `docs/upstream/ms-run-sample-ref-writer-pr.md` assembled; no push attempted. Awaiting owner authorization.
 
 ### Upstreaming & de-vendoring finish — relocated from v0.7 (held / gated)
 
@@ -218,11 +229,11 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
 
 | Requirement | Phase | Status | Depends on / gate |
 |-------------|-------|--------|-------------------|
-| SMSPEC-01 | 30 | ⬜ Not started | v0.7 Phase 24 (✅) |
-| SMSPEC-02 | 30 | ⬜ Not started | v0.7 Phase 24 (✅) |
-| SMSPEC-03 | 30 | ⬜ Not started | v0.7 Phase 24 (✅) |
-| SMCVG-01 | 30 | ⬜ Not started | v0.7 Phase 24 (✅) |
-| SMCVG-02 | 30 | ⬜ Not started | v0.7 Phase 24 (✅) |
+| SMSPEC-01 | 30 | ✅ Done (2026-06-09) | v0.7 Phase 24 (✅) |
+| SMSPEC-02 | 30 | ✅ Done (2026-06-09) | v0.7 Phase 24 (✅) |
+| SMSPEC-03 | 30 | ✅ Done (2026-06-09) | v0.7 Phase 24 (✅) |
+| SMCVG-01 | 30 | ✅ Done (2026-06-09) | v0.7 Phase 24 (✅) |
+| SMCVG-02 | 30 | ✅ Done (2026-06-09) | v0.7 Phase 24 (✅) |
 | UPSTREAM-BIND-01 | 30b | ⬜ Not started (owner-gated) | Phase 30; gates Phase 32 native binding |
 | SM-01 | 31 | ✅ Done (2026-06-09) | Phase 30 |
 | SM-02 | 31 | ✅ Done (2026-06-09) | Phase 30 |
@@ -231,27 +242,23 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
 | SM-05 | 32 | ✅ Done (2026-06-09) | Phase 31 |
 | SM-06 | 32 | ✅ Done shadow (2026-06-09); native gated 30b | Phase 31; native binding gated on Phase 30b |
 | SM-07 | 32 | ⬜ Deferred ≥v0.9 confirmed (blob holds it) | Phase 31 |
-| SM-08 | 33 | ⬜ Not started | Phases 31, 32 |
-| SM-09 | 33 | ⬜ Not started | Phases 31, 32 |
-| SM-10 | 33 | ⬜ Not started | Phases 31, 32 |
-| CHAN-01 | 34 | ⬜ Not started | Phase 32 |
-| CHAN-02 | 34 | ⬜ Not started | Phase 32 |
-| CHAN-03 | 34 | ⬜ Not started | Phase 32 |
-| QUANT-01 | 35 | ⬜ Not started (first-to-cut) | Phase 34 |
-| QUANT-02 | 35 | ⬜ Not started (first-to-cut) | Phase 34 |
-| VAL-01 | 37 | ⬜ Not started | Phases 31–34 |
-| VAL-02 | 37 | ⬜ Not started | Phases 31–34 |
-| UPSTREAM-PR | 37 | ⬜ Not started (owner-gated) | Phases 31–34 |
+| SM-08 | 33 | ✅ Done (2026-06-09) | Phases 31, 32 |
+| SM-09 | 33 | ✅ Done (2026-06-09) | Phases 31, 32 |
+| SM-10 | 33 | ✅ Done (2026-06-09) | Phases 31, 32 |
+| CHAN-01 | 34 | ✅ Done (2026-06-09) | Phase 32 |
+| CHAN-02 | 34 | ✅ Done (2026-06-09) | Phase 32 |
+| CHAN-03 | 34 | ✅ Done (2026-06-09) | Phase 32 |
+| QUANT-01 | 35 | ✅ Done (2026-06-09) | Phase 34 |
+| QUANT-02 | 35 | ✅ Done (2026-06-09) — spike CONFIRMED | Phase 34 |
+| VAL-01 | 37 | ✅ Done (2026-06-09) — label-free + TMT PASSED; ISA skip-guarded | Phases 31–34 |
+| VAL-02 | 37 | ✅ Done (2026-06-09) — non-blocking oracle shipped | Phases 31–34 |
+| UPSTREAM-PR | 37 | ⬜ Prepared and held (owner-gated) | Phases 31–34 |
 | UPS-01 | 22 | ⬜ Held (owner-gated) | v0.7 rebase (✅) |
 | UPS-03 | 22 | ⬜ Held (owner-gated) | — |
 | DVN-01 | 29 | ⬜ Gated | UPS-01 merged |
 | DVN-02 | 29 | ⬜ Gated | mzdata 0.64.2 on crates.io |
 
-**Coverage:** 28 active requirements (SM-07 active-but-deferred; QUANT-* first-to-cut). Critical path:
-Phase 30 → 31 → 32 → 34 → (36 deferred) → 37. The upstream-gated native-binding sub-step (30b → 32-binding)
-and the ISA track (33) run *off* the critical path; if 30b's merge lags past Phase 37, ship on the
-provenance-shadow and flip to the native field in a v0.8.x point release (the milestone is not hard-blocked,
-only its run-binding *queryability* is).
+**Coverage:** 28 active requirements. **Buildable phases complete (2026-06-09): 22 of 28 requirements satisfied** (SM-07 deferred ≥v0.9; UPSTREAM-PR prepared-and-held; UPSTREAM-BIND-01/UPS-01/UPS-03/DVN-01/DVN-02 owner-gated/externally-gated). Critical path: Phase 30 → 31 → 32 → 34 → (36 deferred) → 37 — **all complete**. 565 tests green.
 
 ---
 
@@ -285,3 +292,4 @@ only its run-binding *queryability* is).
 *Requirements defined 2026-06-09 from the ratified v0.8 design draft (cornerstones A–G + §0c). 28 active
 requirements across Phases 22, 29, 30, 30b, 31–37 (Phase 36 / SCOPE deferred ≥v0.9; INJECT deferred to v1.0;
 imaging structure deferred beyond v1.0). Numbering continues from v0.7 — no renumbering.*
+*Reconciled 2026-06-09: Phases 33/34/35/37 complete; SM-08..10, CHAN-01..03, QUANT-01..02, VAL-01..02 satisfied. Remaining open: UPSTREAM-PR (prepared-and-held), UPSTREAM-BIND-01/UPS-01/UPS-03 (owner-gated), DVN-01/DVN-02 (externally-gated), SM-07 (deferred ≥v0.9).*

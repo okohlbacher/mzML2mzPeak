@@ -216,13 +216,13 @@ Plans:
 
 - [x] **Phase 30: Sample-metadata spec alignment & CV governance** — Q1–Q10 ratified vs canonical spec; `SourceCurie` + CV passthrough strategy; `metadata.study`/`metadata.sample_list` KV + `sample-metadata`/`sdrf|isa` member contracts + `schema/*.json`; confirm `MS:1002602` "sample label" (NO `channel_list`). *(SMSPEC-01..03, SMCVG-01..02.)* **COMPLETE 2026-06-09**
 - [ ] **Phase 30b: Upstream list-valued `ms_run.sample_ref` PR prep** *(EARLY, owner-gated, parallel)* — draft spec + reference-impl + open PR so the merge clock overlaps non-blocked phases. Gates only Phase 32's native binding. *(UPSTREAM-BIND-01.)*
-- [ ] **Phase 31: Unified model + SDRF reader + verbatim embed (MVP)** — `StudyMetadata`+`SourceCurie`+`csv` reader + the `convert_mzml` finalize-seam refactor + typed-member helper + `--sdrf` CLI + verbatim member + back-ref + precedence + file-row matching. *(SM-01..04.)*
-- [x] **Phase 32: Lean `sample_list`/study projection + list-valued run binding** — minimal `sample_list` + `metadata.study`; native list-valued `ms_run.sample_ref` (gated on Phase 30b; `run_sample_binding` shadow interim). *(SM-05..07.)* **DONE 2026-06-09** (SM-05/SM-06 shipped; SM-07 deferred ≥v0.9)
-- [ ] **Phase 33: ISA reader (Tab + JSON)** — pure-Rust hand parser (no Python) + ISA-JSON deserialize; whole-bundle verbatim embed (`data_kind: isa`); protocol-graph preserved in blob. *(SM-08..10.)*
-- [ ] **Phase 34: Isobaric channels as labeled samples (NO new construct)** — `sample label` cvParam (MS:1002602) + reporter-m/z/role/tag params on `sample_list`; bound via list-valued `sample_ref`. *(CHAN-01..03.)*
-- [ ] **Phase 35: Reporter-ion quantitation** *(optional, off by default; first-to-cut)* — `auxiliary` array `channel_id` column; own-reader read-back spike; `--reporter-quant`. *(QUANT-01..02.)*
+- [x] **Phase 31: Unified model + SDRF reader + verbatim embed (MVP)** — `StudyMetadata`+`SourceCurie`+`csv` reader + the `convert_mzml` finalize-seam refactor + typed-member helper + `--sdrf` CLI + verbatim member + back-ref + precedence + file-row matching. *(SM-01..04.)* **COMPLETE 2026-06-09**
+- [x] **Phase 32: Lean `sample_list`/study projection + list-valued run binding** — minimal `sample_list` + `metadata.study`; native list-valued `ms_run.sample_ref` (gated on Phase 30b; `run_sample_binding` shadow interim). *(SM-05..07.)* **COMPLETE 2026-06-09** (SM-05/SM-06 shipped; SM-07 deferred ≥v0.9)
+- [x] **Phase 33: ISA reader (Tab + JSON)** — pure-Rust hand parser (no Python) + ISA-JSON deserialize; whole-bundle verbatim embed (`data_kind: isa`); protocol-graph preserved in blob. *(SM-08..10.)* **COMPLETE 2026-06-09**
+- [x] **Phase 34: Isobaric channels as labeled samples (NO new construct)** — `sample label` cvParam (MS:1002602) + reporter-m/z/role/tag params on `sample_list`; bound via list-valued `sample_ref`. *(CHAN-01..03.)* **COMPLETE 2026-06-09**
+- [x] **Phase 35: Reporter-ion quantitation** *(optional, off by default; first-to-cut)* — `auxiliary` array `channel_id` column; own-reader read-back spike; `--reporter-quant`. *(QUANT-01..02.)* **COMPLETE 2026-06-09**
 - [ ] **Phase 36: `comment[…]` scope decomposition + factor-value/CV completeness** — **DEFERRED ≥v0.9** (blob holds fidelity; lean posture). *(SCOPE-01..02.)*
-- [ ] **Phase 37: Round-trip + validation + batch spec/upstream submission** — internal Rust roundtrip-parity = hard gate; optional `--validate-sample-metadata` oracle (never required); submit the batched spec proposals + the upstream `sample_ref` PR (owner-gated). *(VAL-01..02.)*
+- [x] **Phase 37: Round-trip + validation + batch spec/upstream submission** — internal Rust roundtrip-parity = hard gate; optional `--validate-sample-metadata` oracle (never required); spec batch + upstream `sample_ref` PR PREPARED AND HELD (owner-gated). *(VAL-01..02, UPSTREAM-PR.)* **COMPLETE 2026-06-09**
 
 ### Phase 30: Sample-metadata spec alignment & CV governance
 
@@ -287,10 +287,10 @@ Plans:
 Plans:
 - [x] 32-01-PLAN.md — sample_list projection (one entry per source name, lean id+name) + metadata.study retained + run_sample_binding provenance shadow (native ms_run.sample_ref gated on Phase 30b) + PXD020187 read-back **DONE 2026-06-09** (SM-05/SM-06 shipped; SM-07 deferred ≥v0.9)
 
-### Phase 33: ISA reader (Tab + JSON)
+### Phase 33: ISA reader (Tab + JSON) — COMPLETE 2026-06-09
 
 **Goal**: A native MetaboLights ISA bundle ingests + roundtrips. Pure-Rust hand parser (NO Python) for ISA-Tab `i_/s_/a_` (+ Ontology Source Reference registry) and a separate ISA-JSON deserialize (`@id` resolution), both into the one `StudyMetadata`; the protocol/process graph is preserved in the verbatim bundle + a diagnostic, never dropped.
-**Depends on**: Phase 31 (model + embed) + Phase 32 (projection plumbing). Independent of channels. *Consider splitting ISA-Tab and ISA-JSON.*
+**Depends on**: Phase 31 (model + embed) + Phase 32 (projection plumbing). Independent of channels.
 **Requirements**: SM-08, SM-09, SM-10
 **Success Criteria**:
 
@@ -298,9 +298,13 @@ Plans:
   2. The whole ISA bundle embeds verbatim (`data_kind: isa`) + roundtrips byte-for-byte; ISA-JSON deserializes into the same model.
   3. The protocol/process graph + multi-assay grouping are preserved (in the blob) with a diagnostic — never silently dropped.
 
-**Plans**: TBD
+**Plans**: 3 plans
 
-### Phase 34: Isobaric channels as labeled samples (NO new construct)
+- [x] 33-01-PLAN.md — ISA-Tab block parser (i_Investigation.txt + s_*.txt + a_*.txt) → StudyMetadata; URL-vs-CURIE passthrough; SourceFormat::IsaTab/IsaJson variants (SM-08) **DONE 2026-06-09**
+- [x] 33-02-PLAN.md — ISA-JSON serde + @id resolution via HashMap; dangling @id → Diagnostic; byte-equivalent lossless passthrough (SM-09) **DONE 2026-06-09**
+- [x] 33-03-PLAN.md — --isa CLI flag + rejection guards + embed_member refactor + multi-file embed loop + MTBLS5358 roundtrip acceptance tests (SM-10) **DONE 2026-06-09**
+
+### Phase 34: Isobaric channels as labeled samples (NO new construct) — COMPLETE 2026-06-09
 
 **Goal**: TMT/iTRAQ multiplexing modeled by reusing `sample_list` + PSI-MS CV — no new `channel_list`. Each isobaric channel is a `sample_list` entry with a `sample label` cvParam (MS:1002602 + reagent child) + reporter-m/z + role + `tag_modification` (Unimod); the run references them via the list-valued `ms_run.sample_ref`.
 **Depends on**: Phase 32 (sample_list + list-valued binding). Independent breadth-track with Phase 33.
@@ -311,9 +315,12 @@ Plans:
   2. Carrier/reference/pooled roles derived from `comment[carrier/reference channel]` + pooled flags; `reporter_mz: Option<f64>` with source recorded; TMTpro 16/18-plex honest free-text fallback.
   3. No `channel_list`/`plex_id`/`channel_set` is emitted; channel→sample resolves through the labeled samples.
 
-**Plans**: TBD
+**Plans**: 2 plans
 
-### Phase 35: Reporter-ion quantitation (optional, off by default)
+- [x] 34-01-PLAN.md — Reagent constant table (TMT 126–131 incl. +N/+C, iTRAQ 113–121) + is_isobaric_label + resolve_reagent + derive_role; TMT131C shares MS:1002621; TMTpro high channels → reporter_mz=None (CHAN-01/02/03) **DONE 2026-06-09**
+- [x] 34-02-PLAN.md — Extend project_sample_list with labeled params (MS:1002602 child + reporter-ion-mz + channel-role + tag-modification); byte-identical XRT gate; PXD011799 smoke test (CHAN-01/02/03) **DONE 2026-06-09**
+
+### Phase 35: Reporter-ion quantitation (optional, off by default) — COMPLETE 2026-06-09
 
 **Goal**: Optional per-MS2 reporter quant, channel-keyed. **First-to-cut if the milestone overruns** (serves breadth, not the core sample↔file value).
 **Depends on**: Phase 34.
@@ -323,7 +330,10 @@ Plans:
   1. With `--reporter-quant`, reporter intensities are stored as an `auxiliary` array with a `channel_id` column.
   2. A read-back spike proves `channel_id` survives through **this repo's own reader**; peak → channel → sample resolves.
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+- [x] 35-01-PLAN.md — Own-reader spike: channel_id Param CONFIRMED to survive MzPeakReader::get_spectrum_arrays; aux-array contract CONFIRMED; --reporter-quant CLI flag OFF by default; forward-mzML-only guards (QUANT-01/02) **DONE 2026-06-09**
+- [x] 35-02-PLAN.md — Emit wiring: collect_channel_refs + ONE NonStandardDataArray per spectrum (intensities in channel order, channel_id param semicolon-joined); byte-identical no-flag path; three-places: schema/reporter_quant.json + spec write-up Part F (QUANT-01) **DONE 2026-06-09**
 
 ### Phase 36: `comment[…]` scope decomposition + factor-value/CV completeness — DEFERRED ≥v0.9
 
@@ -331,18 +341,22 @@ Plans:
 **Requirements**: SCOPE-01, SCOPE-02 *(deferred ≥v0.9)*
 **Plans**: deferred
 
-### Phase 37: Round-trip + validation + batch spec/upstream submission
+### Phase 37: Round-trip + validation + batch spec/upstream submission — COMPLETE 2026-06-09
 
 **Goal**: Close the milestone — prove the roundtrip, run optional external validation, and submit the batched spec proposal + upstream PR.
 **Depends on**: Phases 31–34 (the emitted facets). Phase 35 optional.
-**Requirements**: VAL-01, VAL-02 (+ SMSPEC-02 batch, UPSTREAM-BIND-01 submission)
+**Requirements**: VAL-01, VAL-02, UPSTREAM-PR
 **Success Criteria**:
 
   1. The internal Rust round-trip-parity assertion (re-serve embedded bytes byte-for-byte) passes on all three fixtures (MTBLS1129 label-free SDRF, PXD011799 TMT-10plex SDRF, MTBLS5358 native ISA-Tab) — the hard gate.
   2. The optional `--validate-sample-metadata` oracle (sdrf-pipelines/isa-api) runs only when present, non-blocking, never required at runtime (no Python dependency); results recorded when available.
   3. The batched sample-metadata + samples-as-channels spec proposals are submitted to `HUPO-PSI/mzPeak-specification` and the upstream `ms_run.sample_ref` PR is submitted (both owner-gated).
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+- [x] 37-01-PLAN.md — extract_sample_metadata_member() helper + --reconstruct-sdrf/--reconstruct-isa CLI reverse path + VAL-01 fixture-sweep: label-free PASSED (byte-for-byte), TMT PASSED (byte-for-byte), ISA SKIPPED (no spectral mzML in MTBLS5358/mzml/) **DONE 2026-06-09**
+- [x] 37-02-PLAN.md — VAL-02 --validate-sample-metadata non-blocking oracle: PATH detection + ValidationOutcome as data + spawn failure → Skipped; never gates conversion; Python out of hard path **DONE 2026-06-09**
+- [x] 37-03-PLAN.md — UPSTREAM-PR PREPARED AND HELD: docs/upstream/v0.8-spec-batch-bundle.md (P-02/03/04/05/08/09) + docs/upstream/ms-run-sample-ref-writer-pr.md; channel_list explicitly DROPPED (RATIFIED-E); no push attempted **DONE 2026-06-09**
 
 ## Progress
 
@@ -357,20 +371,17 @@ CVG-01/02, GEOF-01, RSRC-01, L2-01); Phases 23/24/25/26/28 done; Phases 22/27/29
 |-------|-------|--------|-------|
 | 22. Upstream PR prep (relocated from v0.7) | 0/? | **Relocated — held (owner-gated)** | UPS-01 chunk_series + UPS-03 validator PRs |
 | 29. De-vendor both forks (relocated from v0.7) | 0/? | **Relocated — gated** | DVN-01 (chunk_series merged) + DVN-02 (mzdata 0.64.2 on crates.io); LAST |
-| 30. Sample-metadata spec alignment & CV governance | 4/4 | Complete   | 2026-06-09 |
-| 30b. Upstream list-valued `ms_run.sample_ref` PR | 0/? | Not started | early/parallel, owner-gated |
-| 31. Unified model + SDRF reader + verbatim embed (MVP) | 3/3 | Complete   | 2026-06-09 |
-| 32. Lean `sample_list`/study projection + run binding | 0/? | Not started | native binding gated on 30b |
-| 33. ISA reader (Tab + JSON) | 0/? | Not started | pure-Rust, no Python |
-| 34. Isobaric channels as labeled samples | 0/? | Not started | MS:1002602, no channel_list |
-| 35. Reporter-ion quantitation (optional) | 0/? | Not started | first-to-cut |
+| 30. Sample-metadata spec alignment & CV governance | 4/4 | ✅ Complete | 2026-06-09 |
+| 30b. Upstream list-valued `ms_run.sample_ref` PR | 0/? | ⬜ Not started | early/parallel, owner-gated |
+| 31. Unified model + SDRF reader + verbatim embed (MVP) | 3/3 | ✅ Complete | 2026-06-09 |
+| 32. Lean `sample_list`/study projection + run binding | 1/1 | ✅ Complete | 2026-06-09 (SM-07 deferred ≥v0.9) |
+| 33. ISA reader (Tab + JSON) | 3/3 | ✅ Complete | 2026-06-09 |
+| 34. Isobaric channels as labeled samples | 2/2 | ✅ Complete | 2026-06-09 |
+| 35. Reporter-ion quantitation (optional) | 2/2 | ✅ Complete | 2026-06-09 |
 | 36. comment-scope + factor-value | — | **Deferred ≥v0.9** | blob holds fidelity |
-| 37. Round-trip + validation + batch submission | 0/? | Not started | internal roundtrip = hard gate |
+| 37. Round-trip + validation + batch submission | 3/3 | ✅ Complete | 2026-06-09 (UPSTREAM-PR HELD) |
 
-**v0.8 next buildable:** Phase 30 (deps met — v0.7 Phase 24 done). **Relocated from v0.7 (non-blocking
-external work):** Phase 22 (upstream PRs — held) + Phase 29 (de-vendor — gated). **Deferred to v1.0:**
-post-deposition injection (Phase 38 / INJECT-*). Canonical design:
-[`milestones/v0.8-DESIGN-DRAFT.md`](milestones/v0.8-DESIGN-DRAFT.md).
+**v0.8 status:** All buildable phases complete (30/31/32/33/34/35/37). **565 tests green.** Remainder (non-blocking): Phase 30b + Phase 22 (owner-gated) + Phase 29 (gated on external merges) + Phase 36 (deferred ≥v0.9). **Relocated from v0.7 (non-blocking external work):** Phase 22 (upstream PRs — held) + Phase 29 (de-vendor — gated). **Deferred to v1.0:** post-deposition injection (Phase 38 / INJECT-*). Canonical design: [`milestones/v0.8-DESIGN-DRAFT.md`](milestones/v0.8-DESIGN-DRAFT.md).
 
 ## Backlog
 
