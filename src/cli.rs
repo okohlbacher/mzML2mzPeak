@@ -180,6 +180,18 @@ pub struct ConvertCli {
     #[arg(long = "reporter-quant")]
     pub reporter_quant: bool,
 
+    /// Run the reference sample-metadata oracle (VAL-02, NON-BLOCKING BONUS).
+    ///
+    /// When paired with `--sdrf`, shells to `sdrf-pipelines` (`parse_sdrf --validate`) ONLY if
+    /// it is present on PATH; when paired with `--isa`, shells to `isatools validate` ONLY if it
+    /// is present on PATH. The oracle outcome is RECORDED (logged) but NEVER changes the process
+    /// exit code. Absent oracle → logged as "skipped"; failing oracle → logged as a warning.
+    ///
+    /// Without `--sdrf`/`--isa`, emits a single actionable warning and proceeds.
+    /// Never gates the conversion; never fails the build. Opt-in (off by default).
+    #[arg(long = "validate-sample-metadata")]
+    pub validate_sample_metadata: bool,
+
     /// Re-serve the embedded SDRF member from a `.mzpeak` archive BYTE-FOR-BYTE to `<output>`.
     ///
     /// This is the REVERSE extract path for SDRF metadata: `mzml2mzpeak --reconstruct-sdrf
@@ -473,6 +485,38 @@ fn run_forward_mzml(cli: ConvertCli) -> anyhow::Result<()> {
             shown.join(", "),
             suffix
         );
+    }
+
+    // VAL-02 (NON-BLOCKING BONUS): --validate-sample-metadata shells to the reference oracle
+    // ONLY when it is present on PATH. The outcome is RECORDED (log::info/warn) but NEVER
+    // changes the process exit code — a failing or absent oracle still yields exit 0.
+    if cli.validate_sample_metadata {
+        let source_for_validation = cli.sdrf.as_deref().or(cli.isa.as_deref());
+        if let Some(source) = source_for_validation {
+            let fmt = if cli.sdrf.is_some() {
+                crate::sdrf::SampleMetadataFormat::Sdrf
+            } else {
+                crate::sdrf::SampleMetadataFormat::Isa
+            };
+            let outcome = crate::sdrf::run_validator(fmt, source);
+            match &outcome {
+                crate::sdrf::ValidationOutcome::Skipped { .. }
+                | crate::sdrf::ValidationOutcome::Passed => {
+                    log::info!("--validate-sample-metadata: {outcome}");
+                }
+                crate::sdrf::ValidationOutcome::Failed { .. } => {
+                    log::warn!(
+                        "--validate-sample-metadata: {outcome} (non-blocking — VAL-02 BONUS; \
+                         conversion exit code is unchanged)"
+                    );
+                }
+            }
+        } else {
+            log::warn!(
+                "--validate-sample-metadata has no effect without --sdrf/--isa; \
+                 supply a sample-metadata source to enable oracle validation"
+            );
+        }
     }
 
     if cli.verify {
