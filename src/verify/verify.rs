@@ -717,37 +717,54 @@ fn compare_profile_masked(
     let mz_rel = tol.mz_rel_err;
     let int_rel = tol.intensity_rel_err as f32;
 
-    let mz_mismatch = move |a: f64, b: f64| match level {
-        ConformanceLevel::L1BitForBit => a != b,
-        ConformanceLevel::L2Transformed => {
-            if b == 0.0 {
-                a != b
-            } else {
-                ((a - b).abs() / b.abs()) > mz_rel
+    // FIX-4: `a` is the SOURCE value, `b` the OUTPUT. The L2 relative error is computed against
+    // the SOURCE (`|out - src| / |src|`), guarding `src == 0` with exact equality, and is
+    // fail-closed on any non-finite (NaN/±inf) in either operand. This mirrors `first_mismatch_*`.
+    let mz_mismatch = move |a: f64, b: f64| {
+        if !a.is_finite() || !b.is_finite() {
+            return true;
+        }
+        match level {
+            ConformanceLevel::L1BitForBit => a != b,
+            ConformanceLevel::L2Transformed => {
+                if a == 0.0 {
+                    a != b
+                } else {
+                    ((b - a).abs() / a.abs()) > mz_rel
+                }
             }
         }
     };
     // m/z point IDENTITY at the merge boundary. WR-05: this MUST track the same level-aware
-    // tolerance as the m/z *mismatch* predicate. Under L1 identity is exact (`==`). Under L2 two
-    // m/z within `mz_rel_err` are the SAME surviving point — the NEGATION of the L2 mismatch
-    // predicate — so the identity tie accepts them too.
-    let mz_eq = move |a: f64, b: f64| match level {
-        ConformanceLevel::L1BitForBit => a == b,
-        ConformanceLevel::L2Transformed => {
-            if b == 0.0 {
-                a == b
-            } else {
-                ((a - b).abs() / b.abs()) <= mz_rel
+    // tolerance as the m/z *mismatch* predicate (the exact NEGATION, including the source-relative
+    // bound and the fail-closed non-finite handling). A non-finite m/z is never an identity match.
+    let mz_eq = move |a: f64, b: f64| {
+        if !a.is_finite() || !b.is_finite() {
+            return false;
+        }
+        match level {
+            ConformanceLevel::L1BitForBit => a == b,
+            ConformanceLevel::L2Transformed => {
+                if a == 0.0 {
+                    a == b
+                } else {
+                    ((b - a).abs() / a.abs()) <= mz_rel
+                }
             }
         }
     };
-    let int_mismatch = move |a: f32, b: f32| match level {
-        ConformanceLevel::L1BitForBit => a != b,
-        ConformanceLevel::L2Transformed => {
-            if b == 0.0_f32 {
-                a != b
-            } else {
-                ((a - b).abs() / b.abs()) > int_rel
+    let int_mismatch = move |a: f32, b: f32| {
+        if !a.is_finite() || !b.is_finite() {
+            return true;
+        }
+        match level {
+            ConformanceLevel::L1BitForBit => a != b,
+            ConformanceLevel::L2Transformed => {
+                if a == 0.0_f32 {
+                    a != b
+                } else {
+                    ((b - a).abs() / a.abs()) > int_rel
+                }
             }
         }
     };

@@ -30,8 +30,14 @@ use crate::schema::{ConformanceLevel, ToleranceContract};
 /// A length mismatch is itself reported as a mismatch at `src.len().min(out.len())` (the
 /// first position where one slice would run past the other). For `L1BitForBit` the
 /// predicate is exact inequality (`a != b`) — NO widening. For `L2Transformed` the
-/// predicate is the relative-error bound `|a - b| / |b| > rel_err`, with a `b == 0.0` guard
-/// falling back to exact inequality.
+/// predicate is the relative-error bound `|out - src| / |src| > rel_err` computed against the
+/// SOURCE value (FIX-4: the source is the reference truth, not the output), with a `src == 0.0`
+/// guard falling back to exact equality.
+///
+/// FIX-4 (fail-closed): any NON-FINITE value (NaN or ±inf) in EITHER `src` or `out` is treated
+/// as a MISMATCH at both levels. Without this, `NaN > rel_err` is `false`, so a NaN/inf in the
+/// output would silently PASS L2 — a fidelity hole. A non-finite value can never be a faithful
+/// transform of a finite source (or vice versa), so it is always a mismatch.
 pub fn first_mismatch_f64(
     src: &[f64],
     out: &[f64],
@@ -41,13 +47,22 @@ pub fn first_mismatch_f64(
     if src.len() != out.len() {
         return Some(src.len().min(out.len()));
     }
-    src.iter().zip(out).position(|(&a, &b)| match level {
-        ConformanceLevel::L1BitForBit => a != b,
-        ConformanceLevel::L2Transformed => {
-            if b == 0.0 {
-                a != b
-            } else {
-                ((a - b).abs() / b.abs()) > rel_err
+    src.iter().zip(out).position(|(&a, &b)| {
+        // Fail-closed: any non-finite (NaN/±inf) in source OR output is ALWAYS a mismatch, at
+        // every level — a non-finite value is never a faithful numeric round-trip.
+        if !a.is_finite() || !b.is_finite() {
+            return true;
+        }
+        match level {
+            ConformanceLevel::L1BitForBit => a != b,
+            ConformanceLevel::L2Transformed => {
+                if a == 0.0 {
+                    // Source is zero: require exact equality (no relative bound is meaningful).
+                    a != b
+                } else {
+                    // Relative error against the SOURCE value (the reference truth).
+                    ((b - a).abs() / a.abs()) > rel_err
+                }
             }
         }
     })
@@ -59,7 +74,11 @@ pub fn first_mismatch_f64(
 /// This is the load-bearing "compare at stored width" twin (CONTEXT Area 2; the
 /// NON-CANONICAL `as_f64()` warning in `src/read/record.rs`). For `L1BitForBit` the
 /// predicate is exact f32 inequality — the values are NEVER widened to f64. For
-/// `L2Transformed` the relative error is computed and compared in f32.
+/// `L2Transformed` the relative error is computed in f32 against the SOURCE value (FIX-4:
+/// `|out - src| / |src|`, with a `src == 0.0` exact-equality guard).
+///
+/// FIX-4 (fail-closed): any non-finite (NaN/±inf) in EITHER `src` or `out` is a MISMATCH at
+/// every level — see [`first_mismatch_f64`].
 pub fn first_mismatch_f32(
     src: &[f32],
     out: &[f32],
@@ -69,13 +88,18 @@ pub fn first_mismatch_f32(
     if src.len() != out.len() {
         return Some(src.len().min(out.len()));
     }
-    src.iter().zip(out).position(|(&a, &b)| match level {
-        ConformanceLevel::L1BitForBit => a != b,
-        ConformanceLevel::L2Transformed => {
-            if b == 0.0 {
-                a != b
-            } else {
-                ((a - b).abs() / b.abs()) > rel_err
+    src.iter().zip(out).position(|(&a, &b)| {
+        if !a.is_finite() || !b.is_finite() {
+            return true;
+        }
+        match level {
+            ConformanceLevel::L1BitForBit => a != b,
+            ConformanceLevel::L2Transformed => {
+                if a == 0.0 {
+                    a != b
+                } else {
+                    ((b - a).abs() / a.abs()) > rel_err
+                }
             }
         }
     })
@@ -361,6 +385,57 @@ mod tests {
         assert_eq!(
             first_mismatch_f64(&[100.0], &[beyond], rel, ConformanceLevel::L2Transformed),
             Some(0)
+        );
+    }
+
+    #[test]
+    fn l2_nonfinite_in_output_fails_closed() {
+        // FIX-4: a NaN or ±inf in the OUTPUT must FAIL L2 (fail-closed). Without the guard
+        // `NaN > rel_err` is false, so the bad value would silently pass.
+        let rel = ToleranceContract::L2.mz_rel_err;
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(
+                first_mismatch_f64(&[100.0], &[bad], rel, ConformanceLevel::L2Transformed),
+                Some(0),
+                "a non-finite output ({bad}) must fail L2 (fail-closed)"
+            );
+            // Also fail-closed when the SOURCE is non-finite.
+            assert_eq!(
+                first_mismatch_f64(&[bad], &[100.0], rel, ConformanceLevel::L2Transformed),
+                Some(0),
+                "a non-finite source ({bad}) must fail L2 (fail-closed)"
+            );
+        }
+        // f32 path: same fail-closed behavior.
+        assert_eq!(
+            first_mismatch_f32(&[100.0_f32], &[f32::NAN], rel as f32, ConformanceLevel::L2Transformed),
+            Some(0),
+            "a non-finite f32 output must fail L2 (fail-closed)"
+        );
+    }
+
+    #[test]
+    fn l2_rel_err_is_computed_against_source() {
+        // FIX-4: the relative error is |out - src| / |src| (SOURCE base), not |out - src| / |out|.
+        // Construct a case where the two bases differ enough to flip the verdict. With src = 1e6
+        // and rel_err = 1e-7, the source-relative bound is an absolute delta of 0.1.
+        let rel = ToleranceContract::L2.mz_rel_err; // 1e-7
+        let src = 1_000_000.0_f64;
+
+        // Just UNDER the source-relative bound: delta = 0.09 → 0.09/1e6 = 9e-8 < 1e-7 → passes.
+        let just_under = src + 0.09;
+        assert_eq!(
+            first_mismatch_f64(&[src], &[just_under], rel, ConformanceLevel::L2Transformed),
+            None,
+            "a perturbation just under the SOURCE-relative bound must pass L2"
+        );
+
+        // Just OVER the source-relative bound: delta = 0.11 → 0.11/1e6 = 1.1e-7 > 1e-7 → fails.
+        let just_over = src + 0.11;
+        assert_eq!(
+            first_mismatch_f64(&[src], &[just_over], rel, ConformanceLevel::L2Transformed),
+            Some(0),
+            "a perturbation just over the SOURCE-relative bound must fail L2"
         );
     }
 
