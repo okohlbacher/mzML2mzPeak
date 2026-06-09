@@ -23,7 +23,7 @@ are **not** annotated with SDRF.
 
 | Dataset | Rows | Labels | Pairs with | Source repo |
 |---|--:|---|---|---|
-| `MTBLS1129` | 264 | label-free (metabolomics, Waters Xevo G2-S) | **`data/mzML-examples/waters-xevo-g2s-qtof/QC01.mzML`** (the SDRF lists `FILES/QC01.mzML`) | bigbio **proteomics-sample-metadata** (old repo) |
+| `MTBLS1129` | 264 | label-free (metabolomics, Waters Xevo G2-XS QTof) | **`data/mzML-examples/waters-xevo-g2s-qtof/QC01.mzML`** (the SDRF lists `FILES/QC01.mzML`; dir slug says `g2s` but the MTBLS1129 record names a **G2-XS**) | bigbio **proteomics-sample-metadata** (old repo) |
 | `PXD011799` | 480 | **TMT 10-plex** (TMT126…TMT131; Orbitrap Fusion Lumos) | **`PXD011799/…TiO2_TMT_fr8.mzML`** (PRIDE's conversion of the SDRF-referenced `TiO2_TMT_fr8.raw`, 10 channels) | bigbio **sdrf-annotated-datasets** (new repo) |
 
 - **MTBLS1129** = a ready, clean **SDRF ↔ mzML pair** (we already have the mzML) → baseline SDRF-ingestion fixture. Non-TMT.

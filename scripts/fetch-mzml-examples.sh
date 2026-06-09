@@ -31,7 +31,8 @@ M=https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile
 # Ordered smallest-first so a smoke-test subset lands quickly and the multi-GB Astral/timsTOF
 # runs come last. Each line: instrument — source — approx size.
 
-# Agilent Q-TOF — MassHunter DMRM (Zenodo 18502866) ~2.4 MB (tiny smoke test)
+# Agilent 6490 triple quad (QqQ) — MassHunter dMRM, chromatogram-only (Zenodo 18502866) ~2.4 MB
+# NB: dir name "agilent-qtof" is a misnomer (in-file model = TandemQuadrupole); kept to preserve S3 layout.
 dl "https://zenodo.org/api/records/18502866/files/MRM-standmix-5.mzML/content" \
    "agilent-qtof/MRM-standmix-5.mzML"
 
@@ -39,7 +40,8 @@ dl "https://zenodo.org/api/records/18502866/files/MRM-standmix-5.mzML/content" \
 dl "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS520/FILES/neg_01_Fistax_1-A,2_01_5715.mzML" \
    "bruker-microtof-q2/neg_01_Fistax_1-A,2_01_5715.mzML"
 
-# Waters Xevo G2-S QTof — MetaboLights MTBLS1129 ~86 MB
+# Waters Xevo G2-XS QTof — MetaboLights MTBLS1129 ~86 MB
+# NB: dir name "...g2s..." is off by one sub-model (record = G2-XS; in-file model field is empty); kept for S3 layout.
 dl "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS1129/FILES/QC01.mzML" \
    "waters-xevo-g2s-qtof/QC01.mzML"
 
@@ -110,7 +112,7 @@ du -sh "$BASE"/*/ 2>/dev/null
 echo
 echo "Expected: 18 instruments, 18 .mzML files (~10.0 GB total)."
 echo "  Core 9 (~9.6 GB): Astral, Fusion Lumos, Q Exactive Plus, LTQ Orbitrap Velos, timsTOF Pro,"
-echo "    micrOTOF-Q II, TripleTOF 6600, Xevo G2-S, Agilent QTOF DMRM."
+echo "    micrOTOF-Q II, TripleTOF 6600, Xevo G2-XS QTof, Agilent 6490 QqQ dMRM (chromatogram-only)."
 echo "  Extended 9 (~407 MB): Shimadzu LCMS-9030 (new vendor), Agilent GC-EI (GC-MS modality),"
 echo "    Agilent 6490 QqQ (SRM), Sciex QTRAP 6500 (QqLIT), Agilent 6560 DTIMS, LTQ FT Ultra (FT-ICR),"
 echo "    LTQ XL (ion trap), Bruker impact II (UHR-QTOF), Sciex ZenoTOF 7600."

@@ -9,7 +9,7 @@ BASE="$ROOT/data/sdrf-examples"; mkdir -p "$BASE"; cd "$BASE"
 
 dl() { if [ -s "$2" ]; then echo "  exists: $2"; else echo "  fetch : $2"; curl -fL --retry 3 -o "$2" "$1"; fi; }
 
-# MTBLS1129 — metabolomics, Waters Xevo G2-S QTof, label-free. 264-sample SDRF that references
+# MTBLS1129 — metabolomics, Waters Xevo G2-XS QTof, label-free. 264-sample SDRF that references
 # FILES/QC01.mzML — and we already have that mzML at data/mzML-examples/waters-xevo-g2s-qtof/QC01.mzML.
 # Lives in the OLD bigbio repo (proteomics-sample-metadata/annotated-projects).
 mkdir -p MTBLS1129

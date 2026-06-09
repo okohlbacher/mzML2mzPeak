@@ -41,6 +41,11 @@ record.
 | bruker-timstof-pro | 2106 | 1386.5 | 677.2 | 0.49× | 0.32× | MassIVE `.d`, 52 files (size) |
 | thermo-orbitrap-astral † | 8638 | 7481.3 | 3566.4 | 0.48× | 0.41× | MassIVE `.raw` on disk |
 
+**Directory-slug caveat:** the `dataset` column is the corpus *directory name*, not the verified
+instrument. Two slugs are misnomers (kept to avoid S3-layout churn — see `docs/mzml-examples.md`):
+`agilent-qtof` is an Agilent **6490 triple quad (QqQ)**, not a Q-TOF; `waters-xevo-g2s-qtof` is a
+Waters Xevo **G2-XS** QTof, not G2-S.
+
 † **Astral is PROFILE.** Unlike the other rows (whose mzML is the published *centroided* file), the
 Astral mzML/mzPeak here are the **profile** re-conversion of the `.raw` (ThermoRawFileParser
 `--noPeakPicking`, 307,590 scans), which replaces the centroided published mzML on the bucket. This

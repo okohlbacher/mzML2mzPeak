@@ -35,9 +35,9 @@ dominated by the Astral DIA run (~6.1 GB) and the timsTOF run (~1.45 GB). On com
 
 | Directory | Instrument (model) | Source | Approx size |
 |---|---|---|--:|
-| `agilent-qtof` | Agilent Q-TOF (MassHunter DMRM; chromatogram-only) | Zenodo 18502866 | 2.4 MB |
+| `agilent-qtof` | Agilent 6490 triple quad (QqQ; MassHunter dMRM; chromatogram-only) — dir name `…-qtof` is a misnomer, see [caveat](#directory-name-caveats) | Zenodo 18502866 | 2.4 MB |
 | `bruker-microtof-q2` | Bruker micrOTOF-Q II (QTOF) | MetaboLights MTBLS520 | 59 MB |
-| `waters-xevo-g2s-qtof` | Waters Xevo G2-S QTof | MetaboLights MTBLS1129 | 86 MB |
+| `waters-xevo-g2s-qtof` | Waters Xevo G2-XS QTof — dir name says G2-S, see [caveat](#directory-name-caveats) | MetaboLights MTBLS1129 | 86 MB |
 | `thermo-qexactive-plus` | Thermo Q Exactive Plus (Orbitrap) | Zenodo 17549994 | 254 MB |
 | `sciex-tripletof-6600` | Sciex TripleTOF 6600 | Zenodo 17416537 | 255 MB |
 | `thermo-ltq-orbitrap-velos` | Thermo LTQ Orbitrap Velos | PRIDE PXD000001 | 450 MB |
@@ -67,9 +67,9 @@ dataset description.
 
 | Instrument | Direct .mzML URL |
 |---|---|
-| Agilent Q-TOF | `https://zenodo.org/api/records/18502866/files/MRM-standmix-5.mzML/content` |
+| Agilent 6490 triple quad (dMRM) | `https://zenodo.org/api/records/18502866/files/MRM-standmix-5.mzML/content` |
 | Bruker micrOTOF-Q II | `https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS520/FILES/neg_01_Fistax_1-A,2_01_5715.mzML` |
-| Waters Xevo G2-S QTof | `https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS1129/FILES/QC01.mzML` |
+| Waters Xevo G2-XS QTof | `https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS1129/FILES/QC01.mzML` |
 | Thermo Q Exactive Plus | `https://zenodo.org/api/records/17549994/files/160920_SM-AKTWT_509.mzML/content` |
 | Sciex TripleTOF 6600 | `https://zenodo.org/api/records/17416537/files/12_80.mzML/content` |
 | Thermo LTQ Orbitrap Velos | `https://ftp.pride.ebi.ac.uk/pride/data/archive/2012/03/PXD000001/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01-20141210.mzML` |
@@ -106,11 +106,25 @@ mzml2mzpeak data/mzML-examples/thermo-qexactive-plus/160920_SM-AKTWT_509.mzML --
   Agilent 6560 **DTIMS**), high-throughput **DIA** (Astral), **GC-MS / electron ionization**, and a
   chromatogram-only DMRM run.
 - Acquisition edge cases worth knowing:
-  - `agilent-qtof` — **chromatogram-only** DMRM (0 spectra, 138 chromatograms).
+  - `agilent-qtof` — Agilent **6490 triple quad** (QqQ), **chromatogram-only** dMRM (0 spectra, 138
+    chromatograms). The directory name says "qtof" but the in-file analyzer is a triple quadrupole —
+    see [Directory-name caveats](#directory-name-caveats).
   - `agilent-6490-triplequad` / `sciex-qtrap-6500` — **SRM/MRM transition chromatograms**, two
     different vendor → ProteoWizard converter paths.
   - `agilent-6560-dtims-imqtof` — carries per-spectrum `ion mobility drift time` arrays.
   - `agilent-8890-gc-ei` — electron-ionization (`MS:1000389`), unit-resolution GC nativeIDs.
+- <a id="directory-name-caveats"></a>**Directory-name caveats (label predates the in-file check):**
+  two directory names disagree with the verified in-file instrument model. The names are **kept** as-is
+  (the `data/` tree is git-ignored and the StackIT S3 layout + `agilent-6490-triplequad` slot already
+  occupy those prefixes — renaming would orphan S3 objects and collide), but the true models are:
+  - `agilent-qtof` → **Agilent 6490 triple quadrupole (QqQ)**, *not* a Q-TOF. In-file proof:
+    `userParam instrument model="TandemQuadrupole"` + three `MS:1000081 quadrupole` analyzers +
+    MassHunter 7.0; 0 spectra / 138 chromatograms (dMRM). The "6490" model number is from the Zenodo
+    18502866 deposit (the file itself names only "TandemQuadrupole").
+  - `waters-xevo-g2s-qtof` → **Waters Xevo G2-XS QTof**, *not* G2-S. The in-file
+    `MS:1000126 "Waters instrument model"` value is **empty** (MassLynx 4.1; 2281 spectra), so the
+    file does not encode the sub-model — the **G2-XS** identity comes from the MetaboLights MTBLS1129
+    record. The QTof analyzer axis the corpus tests is unaffected.
 - **Known gap — Waters ion mobility (Synapt TWIMS / Cyclic IMS):** no public mzML preserves the
   mobility dimension; it is distributed as vendor RAW, and the rare converted mzML (e.g. PXD073126
   Synapt XS) has drift collapsed. A true TWIMS mzML would require running ProteoWizard `msconvert`
