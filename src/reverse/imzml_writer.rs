@@ -41,6 +41,7 @@ use quick_xml::escape::escape;
 use crate::read::record::Representation;
 use crate::reverse::error::ReverseError;
 use crate::reverse::optical_fold::RecoveredOptical;
+use crate::schema::cv;
 use crate::schema::metadata::ImagingMetadata;
 use crate::schema::optical::{
     OPTICAL_ADJACENT_SECTION, OPTICAL_ALIGNMENT, OPTICAL_LOCATION, OPTICAL_MORPHOLOGY,
@@ -310,28 +311,30 @@ impl ImzmlWriter {
             "\n<mzML xmlns=\"http://psi.hupo.org/ms/mzml\" version=\"1.1.0\">\n",
         )?;
 
-        // cvList — MUST contain <cv id="IMS"> so the reader recognizes IMS accessions
+        // cvList — driven by crate::schema::cv::cv_list() (CVG-01 single-source-of-truth).
+        // MUST contain <cv id="IMS"> so the reader recognizes IMS accessions
         // (reader.rs is_imzml + ControlledVocabulary::IMS). The UO (Unit Ontology) CV is declared
-        // too (count=3) so every `unitCvRef="UO" unitAccession="UO:0000017"` on the µm geometry
-        // terms (IMS:1000044/45/46/47/53/54) resolves to a declared CV rather than dangling
+        // too so every `unitCvRef="UO" unitAccession="UO:0000017"` on the µm geometry terms
+        // (IMS:1000044/45/46/47/53/54) resolves to a declared CV rather than dangling
         // (FID-01 / checker WR-1).
-        emit_raw(sink, "<cvList count=\"3\">")?;
-        emit_raw(
-            sink,
-            "<cv id=\"MS\" fullName=\"PSI-MS controlled vocabulary\" \
-             URI=\"https://raw.githubusercontent.com/HUPO-PSI/psi-ms-CV/master/psi-ms.obo\"/>",
-        )?;
-        emit_raw(
-            sink,
-            "<cv id=\"IMS\" fullName=\"Mass Spectrometry Imaging controlled vocabulary\" \
-             URI=\"https://raw.githubusercontent.com/imzML/imzML/master/imagingMS.obo\"/>",
-        )?;
-        emit_raw(
-            sink,
-            "<cv id=\"UO\" fullName=\"Unit Ontology\" \
-             URI=\"https://raw.githubusercontent.com/bio-ontology-research-group/unit-ontology/master/unit.obo\"/>",
-        )?;
-        emit_raw(sink, "</cvList>\n")?;
+        // The count and the per-entry id/fullName/URI are read from cv_list() so forward emit
+        // and reverse <cvList> can never drift — changing a CV string requires changing ONLY cv.rs.
+        {
+            let entries = cv::cv_list();
+            emit_raw(sink, "<cvList count=\"")?;
+            emit_raw(sink, &entries.len().to_string())?;
+            emit_raw(sink, "\">")?;
+            for entry in &entries {
+                emit_raw(sink, "<cv id=\"")?;
+                emit_escaped(sink, &entry.id)?;
+                emit_raw(sink, "\" fullName=\"")?;
+                emit_escaped(sink, &entry.full_name)?;
+                emit_raw(sink, "\" URI=\"")?;
+                emit_escaped(sink, &entry.uri)?;
+                emit_raw(sink, "\"/>")?;
+            }
+            emit_raw(sink, "</cvList>\n")?;
+        }
 
         // fileDescription / fileContent — the three HARD-required imzML terms.
         emit_raw(sink, "<fileDescription>")?;

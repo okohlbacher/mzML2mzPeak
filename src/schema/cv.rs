@@ -8,13 +8,13 @@
 //! mzPeak's open `FileIndex.metadata` map under the `"cv_list"` key (see
 //! [`crate::write::convert`]), governed by `schema/cv_list.json`.
 //!
-//! ## Single source of CV identity facts
+//! ## Single source of CV identity facts (CVG-01)
 //!
 //! [`cv_list`] is the ONE place the MS/IMS/UO id / full_name / uri / version strings live for
-//! the FORWARD direction. The REVERSE imzML emitter (`src/reverse/imzml_writer.rs`) emits the
-//! same three CVs as an XML `<cvList count="3">`; the id / full_name / uri literals here are
-//! kept EQUAL to the reverse path's strings so the two directions can never disagree (T-17-02).
-//! If the reverse literals ever change, this constant MUST change in lockstep.
+//! BOTH directions. The REVERSE imzML emitter (`src/reverse/imzml_writer.rs`) iterates this
+//! function to emit `<cvList count="N">` — there are NO independent CV literals in the reverse
+//! path (no-drift-by-construction, asserted by `no_drift_reverse_cvlist_reads_cv_list`).
+//! To update a CV string, change ONLY this function.
 
 use serde::{Deserialize, Serialize};
 
@@ -41,9 +41,10 @@ pub struct CvEntry {
 /// controlled vocabularies the converter always references — **MS** (PSI-MS column-name
 /// inflection), **IMS** (imaging coordinate columns), and **UO** (µm units `UO:0000017`).
 ///
-/// The `id` / `full_name` / `uri` strings are EQUAL to those the reverse imzML `<cvList>`
-/// emits (`src/reverse/imzml_writer.rs`) so forward and reverse declarations can never drift
-/// (T-17-02). Do NOT invent new strings here — change them only alongside the reverse path.
+/// The reverse imzML emitter (`src/reverse/imzml_writer.rs`) generates the `<cvList count="N">`
+/// block by ITERATING this function (CVG-01 no-drift-by-construction). To change a CV string,
+/// change ONLY this function — the change propagates automatically to the reverse path.
+/// No independent CV literals exist in `imzml_writer.rs` (asserted by `no_drift_reverse_cvlist_reads_cv_list`).
 pub fn cv_list() -> Vec<CvEntry> {
     vec![
         CvEntry {
