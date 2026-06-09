@@ -255,6 +255,29 @@ where
     INT: Copy,
 {
     let mut outcome = MergeOutcome::default();
+
+    // FIX-5 (length preflight): the merge pairs `*_mz[k]` with `*_int[k]` per axis. If an
+    // intensity array is SHORTER than its m/z array, the per-point `.get()` on intensity would
+    // silently return `None`, so an output m/z LONGER than its intensity array could evade the
+    // intensity check entirely (a dropped/absent intensity for a present m/z slipping through). A
+    // length divergence between m/z and intensity is itself a HARD intensity mismatch — the arrays
+    // are not validly paired — so flag it up front against the first offending element. (The
+    // source-side guard is defense-in-depth alongside the caller's `compare_profile_masked`
+    // SOURCE-length check; the OUTPUT-side guard is the one this fix adds.)
+    if src_mz.len() != src_int.len() {
+        outcome.intensity = Some(AxisMismatch {
+            src_element: src_int.len().min(src_mz.len()),
+        });
+        return outcome;
+    }
+    if out_mz.len() != out_int.len() {
+        // Attribute at the source index where the output intensity first runs short of its m/z
+        // (clamped into the source array so the reporter has a valid offset).
+        let elem = out_int.len().min(out_mz.len()).min(src_mz.len().saturating_sub(1));
+        outcome.intensity = Some(AxisMismatch { src_element: elem });
+        return outcome;
+    }
+
     let mut i = 0usize; // source pointer
     let mut j = 0usize; // output pointer
 
@@ -609,6 +632,35 @@ mod tests {
             &[10.0, 20.0, 30.0],
         );
         assert!(out.mz.is_some(), "output-not-in-source is an m/z failure");
+    }
+
+    #[test]
+    fn merge_output_mz_longer_than_intensity_is_flagged() {
+        // FIX-5: an output m/z array LONGER than its intensity array must NOT silently pass — the
+        // arrays are not validly paired, so the merge flags an intensity mismatch instead of
+        // `.get()`-skipping the missing intensity.
+        let out = l1_f64mz_f32int(
+            &[100.0, 200.0, 300.0],
+            &[1.0, 2.0, 3.0],
+            &[100.0, 200.0, 300.0], // output m/z has 3 elements …
+            &[1.0, 2.0],            // … but only 2 intensities (one short)
+        );
+        assert!(
+            out.intensity.is_some(),
+            "an output m/z longer than its intensity array must be an intensity mismatch (FIX-5)"
+        );
+
+        // Symmetric guard: a SOURCE m/z longer than its intensity array is also flagged.
+        let out2 = l1_f64mz_f32int(
+            &[100.0, 200.0, 300.0],
+            &[1.0, 2.0], // source intensity one short
+            &[100.0, 200.0, 300.0],
+            &[1.0, 2.0, 3.0],
+        );
+        assert!(
+            out2.intensity.is_some(),
+            "a source m/z longer than its intensity array must be an intensity mismatch (FIX-5)"
+        );
     }
 
     #[test]
