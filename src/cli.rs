@@ -156,6 +156,17 @@ pub struct ConvertCli {
     /// `sample_metadata/sdrf.tsv` ZIP member; a `metadata.study` provenance back-ref is written.
     #[arg(long = "sdrf", value_name = "PATH")]
     pub sdrf: Option<PathBuf>,
+
+    /// Embed an ISA (Investigation/Study/Assay) bundle into the produced mzPeak archive.
+    /// Accepts an ISA-Tab investigation file (`i_*.txt`), any sibling ISA-Tab file, a directory
+    /// containing an ISA-Tab bundle, or a single ISA-JSON (`.json`) file.
+    /// EXPLICIT only — the converter NEVER auto-discovers ISA bundles; you must name the file.
+    /// Valid on the plain-mzML forward path (`.mzML` input) only; rejected on `.imzML` inputs
+    /// and on the reverse path. Mutually exclusive with `--sdrf`.
+    /// All ISA files are embedded verbatim as typed `sample_metadata/isa/<name>` ZIP members
+    /// with `data_kind:"isa"`; a `metadata.study` provenance back-ref is written.
+    #[arg(long = "isa", value_name = "PATH")]
+    pub isa: Option<PathBuf>,
 }
 
 impl ConvertCli {
@@ -227,6 +238,13 @@ fn run_forward_mzml(cli: ConvertCli) -> anyhow::Result<()> {
         ));
     }
 
+    // --sdrf and --isa are mutually exclusive (SM-10 / T-33c-02).
+    if cli.sdrf.is_some() && cli.isa.is_some() {
+        return Err(anyhow!(
+            "--sdrf and --isa are mutually exclusive; supply at most one metadata bundle"
+        ));
+    }
+
     if cli.dry_run {
         let report = crate::write::inspect_mzml(&cli.input)
             .with_context(|| format!("failed to inspect {}", cli.input.display()))?;
@@ -250,6 +268,7 @@ fn run_forward_mzml(cli: ConvertCli) -> anyhow::Result<()> {
         out,
         &cli.encoding_options(),
         cli.sdrf.as_deref(),
+        cli.isa.as_deref(),
     )
     .with_context(|| format!("plain-mzML conversion failed for {}", cli.input.display()))?;
     log::info!(
@@ -318,6 +337,14 @@ fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
         return Err(anyhow!(
             "--sdrf accompanies plain proteomics .mzML, not imaging .imzML \
              (use a .mzML input for SDRF embedding)"
+        ));
+    }
+
+    // `--isa` accompanies plain proteomics .mzML, NOT imaging .imzML (SM-10).
+    if cli.isa.is_some() {
+        return Err(anyhow!(
+            "--isa accompanies plain proteomics .mzML, not imaging .imzML \
+             (use a .mzML input for ISA embedding)"
         ));
     }
 
@@ -516,6 +543,14 @@ fn run_reverse(cli: &ConvertCli) -> anyhow::Result<()> {
         return Err(anyhow!(
             "--sdrf is forward-only (.mzML → .mzpeak); the reverse path writes .imzML + .ibd \
              and cannot embed an SDRF member (use a .mzML input for SDRF embedding)"
+        ));
+    }
+
+    // `--isa` is forward-only (SM-10 / T-33c-rev) — same rationale as --sdrf above.
+    if cli.isa.is_some() {
+        return Err(anyhow!(
+            "--isa is forward-only (.mzML → .mzpeak); the reverse path writes .imzML + .ibd \
+             and cannot embed an ISA member (use a .mzML input for ISA embedding)"
         ));
     }
 
@@ -1020,6 +1055,74 @@ mod tests {
         assert!(
             err.to_string().contains("forward-only"),
             "reverse --image rejection names it forward-only, got: {err}"
+        );
+    }
+
+    // --- Task 2 (Plan 33-03): --isa flag parse + rejection guards -------------------
+
+    #[test]
+    fn isa_flag_parses_on_mzml_input() {
+        // --isa <PATH> must parse for a plain .mzML input.
+        let cli = ConvertCli::try_parse_from([
+            "mzml2mzpeak", "in.mzML", "out.mzpeak", "--isa", "path/to/i_Investigation.txt",
+        ])
+        .expect("--isa must parse on a plain .mzML input");
+        assert_eq!(
+            cli.isa,
+            Some(PathBuf::from("path/to/i_Investigation.txt")),
+            "--isa path must be captured"
+        );
+    }
+
+    #[test]
+    fn isa_absent_is_none() {
+        // No --isa → None (the no-ISA path must be byte-identical to prior behavior).
+        let cli = ConvertCli::try_parse_from(["mzml2mzpeak", "in.mzML", "out.mzpeak"])
+            .expect("absent --isa parses");
+        assert_eq!(cli.isa, None, "absent --isa ⇒ None");
+    }
+
+    #[test]
+    fn isa_rejected_on_reverse_path() {
+        // --isa is forward-only: rejected when the reverse path is taken (.mzpeak input).
+        let cli = ConvertCli::try_parse_from([
+            "mzml2mzpeak", "in.mzpeak", "-o", "out", "--isa", "isa_dir",
+        ])
+        .expect("reverse invocation with --isa parses (rejection is a runtime guard)");
+        let err = run(cli).expect_err("reverse + --isa must be rejected");
+        assert!(
+            err.to_string().contains("forward-only"),
+            "reverse --isa rejection names it forward-only, got: {err}"
+        );
+    }
+
+    #[test]
+    fn isa_rejected_on_imaging_imzml_path() {
+        // --isa is not valid on .imzML input (imaging path): rejected with clear message.
+        let cli = ConvertCli::try_parse_from([
+            "mzml2mzpeak", "in.imzML", "out.mzpeak", "--isa", "isa_dir",
+        ])
+        .expect("imaging invocation with --isa parses (rejection is a runtime guard)");
+        let err = run(cli).expect_err(".imzML + --isa must be rejected");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("mzML") || msg.contains("isa") || msg.contains("imaging"),
+            ".imzML --isa rejection message should mention the constraint, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn sdrf_and_isa_together_are_rejected() {
+        // --sdrf and --isa are mutually exclusive.
+        let cli = ConvertCli::try_parse_from([
+            "mzml2mzpeak", "in.mzML", "out.mzpeak",
+            "--sdrf", "sdrf.tsv", "--isa", "isa_dir",
+        ])
+        .expect("--sdrf + --isa together parse (rejection is a runtime guard)");
+        let err = run(cli).expect_err("--sdrf + --isa together must be rejected");
+        assert!(
+            err.to_string().contains("mutually exclusive"),
+            "--sdrf + --isa rejection names mutual exclusivity, got: {err}"
         );
     }
 

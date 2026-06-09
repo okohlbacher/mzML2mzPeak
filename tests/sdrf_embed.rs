@@ -61,7 +61,7 @@ fn pxd020187_sdrf_embeds_losslessly_and_reserves_byte_identical() {
     let _ = std::fs::remove_file(&out);
 
     // Convert with SDRF.
-    convert_mzml(input, &out, &EncodingOptions::lossless(), Some(sdrf))
+    convert_mzml(input, &out, &EncodingOptions::lossless(), Some(sdrf), None)
         .expect("convert_mzml with SDRF must succeed");
 
     // ── (a) FileIndex SURVIVAL ─────────────────────────────────────────────────────────────
@@ -216,9 +216,9 @@ fn no_sdrf_conversion_has_no_study_or_sample_metadata_key() {
     let _ = std::fs::remove_file(&out_b);
 
     // Two consecutive no-SDRF conversions.
-    convert_mzml(input, &out_a, &EncodingOptions::lossless(), None)
+    convert_mzml(input, &out_a, &EncodingOptions::lossless(), None, None)
         .expect("first no-SDRF conversion must succeed");
-    convert_mzml(input, &out_b, &EncodingOptions::lossless(), None)
+    convert_mzml(input, &out_b, &EncodingOptions::lossless(), None, None)
         .expect("second no-SDRF conversion must succeed");
 
     for (label, path) in [("A", &out_a), ("B", &out_b)] {

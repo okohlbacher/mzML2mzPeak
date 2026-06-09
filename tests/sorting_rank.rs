@@ -140,6 +140,7 @@ fn descending_centroid_mz_is_sorted_and_declares_rank_zero() {
         &out,
         &mzml2mzpeak::write::EncodingOptions::default(),
         None,
+        None,
     )
     .expect("convert descending fixture");
     assert_eq!(report.spectra, 1);
@@ -167,7 +168,7 @@ fn sorted_centroid_mz_keeps_sorting_rank_zero() {
     let out = tmp("sortB", "mzpeak");
     let _ = std::fs::remove_file(&out);
 
-    mzml2mzpeak::write::convert_mzml(&mzml, &out, &mzml2mzpeak::write::EncodingOptions::default(), None)
+    mzml2mzpeak::write::convert_mzml(&mzml, &out, &mzml2mzpeak::write::EncodingOptions::default(), None, None)
         .expect("convert sorted fixture");
 
     assert_eq!(
@@ -197,6 +198,7 @@ fn sort_on_write_repairs_unsorted_and_records_data_processing() {
         &mzml,
         &out,
         &mzml2mzpeak::write::EncodingOptions::default(),
+        None,
         None,
     )
     .expect("convert");
@@ -229,6 +231,7 @@ fn centroid_nonmonotonic_warning_is_counted() {
         &mzml,
         &out,
         &mzml2mzpeak::write::EncodingOptions::default(),
+        None,
         None,
     )
     .expect("convert mixed fixture");

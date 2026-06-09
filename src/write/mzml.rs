@@ -72,6 +72,11 @@ pub enum MzmlConvertError {
     /// pulling the SDRF error types into the `MzmlConvertError` public API directly.
     #[error("SDRF error: {0}")]
     Sdrf(#[source] Box<dyn std::error::Error + Send + Sync>),
+
+    /// An ISA locate, parse, embed, or provenance error on the `--isa` code path. Boxed to avoid
+    /// pulling the ISA error types into the `MzmlConvertError` public API directly.
+    #[error("ISA error: {0}")]
+    Isa(#[source] Box<dyn std::error::Error + Send + Sync>),
 }
 
 /// A counted record of centroid spectra whose SOURCE primary m/z was non-monotonic
@@ -181,6 +186,7 @@ pub fn convert_mzml(
     output: &Path,
     opts: &crate::write::EncodingOptions,
     sdrf: Option<&Path>,
+    isa: Option<&Path>,
 ) -> Result<MzmlConvertReport, MzmlConvertError> {
     // `_xml_guard` keeps the transcoded temp file (if any) alive for the reader's lifetime.
     let (read_path, _xml_guard) = readable_path(input)?;
@@ -475,6 +481,102 @@ pub fn convert_mzml(
             .map_err(MzmlConvertError::Json)?;
     }
 
+    // ── ISA verbatim embed + metadata.study back-ref (Plan 33-03 / SM-08..10) ─────────────────
+    // Only active when the caller supplies `--isa <PATH>` via the CLI (explicit-only, SM-10).
+    // None → no-op: byte-identical output (no study/sample_metadata keys emitted at all).
+    // Mutually exclusive with --sdrf (enforced in cli.rs before this is reached).
+    if let Some(isa_path) = isa {
+        // 1. Locate + classify the ISA bundle (Tab directory / investigation file / JSON).
+        let isa_input = crate::isa::locate_isa_bundle(isa_path)
+            .map_err(|e| MzmlConvertError::Isa(Box::new(e)))?;
+
+        // 2. Parse the ISA into the unified SampleMetadataDoc model.
+        let doc = match &isa_input {
+            crate::isa::IsaInput::Tab(bundle) => {
+                crate::isa::parse_isa_tab(bundle)
+                    .map_err(|e| MzmlConvertError::Isa(Box::new(e)))?
+            }
+            crate::isa::IsaInput::Json(path) => {
+                crate::isa::parse_isa_json(path)
+                    .map_err(|e| MzmlConvertError::Isa(Box::new(e)))?
+            }
+        };
+
+        // 3. Match rows against the input mzML basename. Zero-match / multi-match emit a
+        //    LOUD log::warn! but never fail the conversion — spectral data is valid regardless.
+        let match_result = crate::sdrf::match_rows_for_data_file(&doc, input);
+        for diag in &match_result.diagnostics {
+            log::warn!("ISA file-row match: {} — {}", diag.code, diag.message);
+        }
+
+        // 4. Embed ALL ISA source files verbatim as typed sample-metadata/isa members.
+        //    member_files() uses Path::file_name() only → no path-injection surface (T-33c-01).
+        //    embed_member is called with ISA_DATA_KIND for each file.
+        let member_files = isa_input.member_files();
+        let primary_member_name = isa_input.primary_member_name();
+
+        // Track the primary member's embed facts for the provenance back-ref.
+        let mut primary_facts: Option<crate::sdrf::EmbedFacts> = None;
+        for (src_path, member_name) in &member_files {
+            let facts = crate::sdrf::embed::embed_member(
+                &mut zip,
+                src_path,
+                member_name,
+                crate::schema::cv::SAMPLE_METADATA_ENTITY_TYPE,
+                crate::schema::cv::ISA_DATA_KIND,
+            )
+            .map_err(|e| MzmlConvertError::Isa(Box::new(e)))?;
+            if member_name == &primary_member_name {
+                primary_facts = Some(facts);
+            }
+        }
+
+        // Use first member's facts if primary wasn't found (shouldn't happen; defensive fallback).
+        let embed_facts = primary_facts.unwrap_or_else(|| crate::sdrf::EmbedFacts {
+            member: primary_member_name.clone(),
+            sha256: String::new(),
+            size_bytes: 0,
+        });
+
+        // 5. Derive the dataset_accession + title from the investigation identity diagnostic.
+        //    encode: "accession=MTBLS5358;title=..." in the "isa-investigation-identity" diagnostic.
+        let (accession, title) = crate::isa::tab::extract_investigation_identity(&doc);
+
+        // 6. Write metadata.study back-ref (SM-05/SM-06 / §3.9).
+        let run_id: String = input
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "run".to_string());
+
+        let binding = crate::sdrf::build_run_sample_binding(&doc, &match_result, &run_id);
+        let study = match binding {
+            Some(b) => crate::schema::study_metadata_with_binding(
+                &accession, &title, &embed_facts.member, b,
+            ),
+            None => crate::schema::study_metadata(&accession, &title, &embed_facts.member),
+        };
+        zip.add_index_metadata("study", &study)
+            .map_err(MzmlConvertError::Json)?;
+
+        // 7. Write metadata.sample_metadata provenance block.
+        let provenance = serde_json::json!({
+            "member": embed_facts.member,
+            "sha256": embed_facts.sha256,
+            "size_bytes": embed_facts.size_bytes,
+            "precedence": "repo_wins",
+            "embed_scope": "full",
+            "dataset_accession": accession,
+        });
+        zip.add_index_metadata("sample_metadata", &provenance)
+            .map_err(MzmlConvertError::Json)?;
+
+        // 8. Emit metadata.sample_list (SM-05 query surface) — identical projection as SDRF arm.
+        let sample_list = crate::sdrf::project_sample_list(&doc);
+        zip.add_index_metadata("sample_list", &sample_list)
+            .map_err(MzmlConvertError::Json)?;
+    }
+
     // Move the transform KV onto the ZIP handle (same FileIndex.metadata map, written index-last
     // by zip.finish() below). Emitted ONLY for lossy (numpress-linear) conversions.
     if opts.mz_is_lossy() {
@@ -613,9 +715,9 @@ mod tests {
 
         let opts = crate::write::EncodingOptions::lossless();
 
-        convert_mzml(fixture, &out_a, &opts, None)
+        convert_mzml(fixture, &out_a, &opts, None, None)
             .expect("first lossless conversion must succeed");
-        convert_mzml(fixture, &out_b, &opts, None)
+        convert_mzml(fixture, &out_b, &opts, None, None)
             .expect("second lossless conversion must succeed");
 
         // (1) Read-back via the reference reader proves the index + all facets survived the
