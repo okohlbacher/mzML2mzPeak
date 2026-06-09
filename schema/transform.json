@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "mzPeak L2 transform record",
+  "description": "Governs mzpeak_index.json.metadata.transform. Written into FileIndex.metadata[\"transform\"] by the converter when a lossy (numpress-linear) m/z transform was applied. Omitted entirely for lossless (--no-numpress / L1-clean) archives. The transform CURIE (e.g. MS:1002312 for numpress-linear) is the SAME CURIE stamped into the per-column array-index transform field by the vendored writer — single source, no drift (T-28-01). Tolerances are sourced from ToleranceContract::L2 (spec v0.3 §8). Three-places rule: src/schema/transform.rs + docs/mzpeak-imaging-spec-suggestions.md + this file.",
+  "type": "object",
+  "required": [
+    "transform",
+    "name",
+    "axis",
+    "conformance_level",
+    "mz_rel_err",
+    "intensity_rel_err",
+    "data_processing_ref"
+  ],
+  "properties": {
+    "transform": {
+      "type": "string",
+      "description": "PSI-MS CURIE identifying the applied transform, e.g. \"MS:1002312\" (numpress linear prediction m/z compression). Must match the array-index transform field stamped by the vendored writer."
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable name of the transform (informative)."
+    },
+    "axis": {
+      "type": "string",
+      "description": "Data axis the transform applies to. \"m/z\" for numpress-linear (intensity stays lossless)."
+    },
+    "conformance_level": {
+      "type": "string",
+      "description": "Conformance level declared by this transform record. \"L2\" for any lossy-but-bounded transform."
+    },
+    "mz_rel_err": {
+      "type": "number",
+      "description": "m/z maximum relative error bound (spec v0.3 §8 L2 = 1e-7, ≈0.1 ppm)."
+    },
+    "intensity_rel_err": {
+      "type": "number",
+      "description": "Intensity maximum relative error bound (spec v0.3 §8 L2 = 1e-3, 0.1%)."
+    },
+    "data_processing_ref": {
+      "type": "string",
+      "description": "Id of the data_processing step that produced this transform (references the mzPeak data_processings facet)."
+    }
+  },
+  "additionalProperties": false
+}
