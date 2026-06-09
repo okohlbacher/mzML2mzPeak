@@ -195,8 +195,7 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 **Plans**: 6 plans
 
 Plans:
-
-- [x] 27-01-PLAN.md — csv dep + SDRF parse/model + row-matching foundation (SDRF-01 parse half)
+- [ ] 27-01-PLAN.md — csv dep + SDRF parse/model + row-matching foundation (SDRF-01 parse half)
 - [ ] 27-02-PLAN.md — verbatim embed FIRST (lossless anchor) + --sdrf threading + round-trip (SDRF-01/02)
 - [ ] 27-03-PLAN.md — sample_list + assay_ref promoted Int64 column + run→sample binding (SDRF-03/04)
 - [ ] 27-04-PLAN.md — channel_list + reporter-m/z constant table + ms_run.channel_set/plex_id (CHAN-01/02)
@@ -240,7 +239,7 @@ Plans:
 | 24. Spec alignment & CV governance | 3/3 | Complete   | 2026-06-09 |
 | 25. Forward declared-geometry threading | 1/2 | In Progress|  |
 | 26. Reverse `<sourceFileList>` copy | 1/1 | Complete   | 2026-06-09 |
-| 27. SDRF sample model + channels + reporter-quant | 1/6 | In Progress|  |
+| 27. SDRF sample model + channels + reporter-quant | 0/? | Not started | - |
 | 28. L2 conformance verify path | 0/? | Not started | - |
 | 29. De-vendor both forks | 0/? | Deferred (gated) | - |
 

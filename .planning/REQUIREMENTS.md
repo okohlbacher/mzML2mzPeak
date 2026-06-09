@@ -50,15 +50,15 @@
 
 ### SDRF sample modeling (SDRF) — 999.5 core
 
-- [x] **SDRF-01**: A new `--sdrf <PATH>` flag ingests a sibling SDRF file during conversion (explicitly NOT auto-discovered). *(Phase 27.)*
+- [ ] **SDRF-01**: A new `--sdrf <PATH>` flag ingests a sibling SDRF file during conversion (explicitly NOT auto-discovered). *(Phase 27.)*
 - [ ] **SDRF-02**: The SDRF file is embedded **verbatim** as the lossless source (typed `sample-metadata`/`sdrf` ZIP member) + dataset back-ref. *(Phase 27.)*
-- [x] **SDRF-03**: `sample_list` carries `characteristics[*]` projected from the SDRF, keyed by SDRF `source name`. *(Phase 27.)*
+- [ ] **SDRF-03**: `sample_list` carries `characteristics[*]` projected from the SDRF, keyed by SDRF `source name`. *(Phase 27.)*
 - [ ] **SDRF-04**: Per-spectrum `assay_ref` + run→sample binding are emitted. *(Phase 27.)*
 - [ ] **SDRF-05**: A repo-SDRF-wins precedence rule (when embedded vs repo SDRF disagree) is applied and documented. *(Phase 27.)*
 
 ### Isobaric channel modeling (CHAN) — TMT/iTRAQ
 
-- [x] **CHAN-01**: A file-level `channel_list` maps each isobaric channel → sample(s) + reporter m/z + role (sample/pooled/carrier/reference) + `sdrf_row_ref`; it is the authoritative channel→sample/reporter-m/z map. *(Phase 27.)*
+- [ ] **CHAN-01**: A file-level `channel_list` maps each isobaric channel → sample(s) + reporter m/z + role (sample/pooled/carrier/reference) + `sdrf_row_ref`; it is the authoritative channel→sample/reporter-m/z map. *(Phase 27.)*
 - [ ] **CHAN-02**: `ms_run.channel_set` / `plex_id` bind a run to its channel set. *(Phase 27.)*
 - [ ] **CHAN-03**: Reporter-ion quantitation is stored as an `auxiliary` array with a `channel_id` column (confirm via a read-back spike). *(Phase 27 — folded in here; was a separate phase.)*
 
@@ -120,12 +120,12 @@ These are **NOT** v0.7 phases. PSI-committee notes to carry forward: ROI as a sp
 | CVG-02 | Phase 24 Plan 01 | Done 2026-06-09 |
 | GEOF-01 | Phase 25 | Complete |
 | RSRC-01 | Phase 26 | Complete |
-| SDRF-01 | Phase 27 | Complete |
+| SDRF-01 | Phase 27 | Pending |
 | SDRF-02 | Phase 27 | Pending |
-| SDRF-03 | Phase 27 | Complete |
+| SDRF-03 | Phase 27 | Pending |
 | SDRF-04 | Phase 27 | Pending |
 | SDRF-05 | Phase 27 | Pending |
-| CHAN-01 | Phase 27 | Complete |
+| CHAN-01 | Phase 27 | Pending |
 | CHAN-02 | Phase 27 | Pending |
 | CHAN-03 | Phase 27 | Pending |
 | L2-01 | Phase 28 | Pending |
