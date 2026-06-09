@@ -137,10 +137,10 @@ pub struct ConvertCli {
     #[arg(long = "no-numpress")]
     pub no_numpress: bool,
 
-    /// Conformance level for `--verify`: `l1` (default) is the strict bar (value-equal at
-    /// canonical mzPeak width, Δ = 0); `l2` is opt-in bounded verify (m/z rel-err ≤ 1e-7,
-    /// intensity rel-err ≤ 1e-3 — allows numpress-written files to pass where L1 would
-    /// legitimately mismatch). A bare invocation (no flag) stays L1 / byte-unchanged.
+    /// Numeric-fidelity conformance level for optional archive verification: `l1` (default)
+    /// is the strict bar (value-equal at canonical mzPeak width, Δ = 0); `l2` is opt-in
+    /// bounded verify (m/z rel-err ≤ 1e-7, intensity rel-err ≤ 1e-3 — allows numpress-written
+    /// files to pass where L1 would legitimately mismatch). A bare invocation stays L1.
     #[arg(long = "conformance", value_name = "LEVEL", default_value_t = Conformance::L1)]
     pub conformance: Conformance,
 
@@ -366,8 +366,9 @@ fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
                     cli.zstd_level
                 );
             }
+            // Clearing the chunking strategy makes the m/z axis lossless by construction
+            // (FIX-2: lossy-ness is derived from `mz_chunking`, not a standalone flag).
             e.mz_chunking = None;
-            e.lossy_mz = false;
         }
         e
     };

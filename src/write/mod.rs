@@ -49,13 +49,15 @@ use parquet::basic::{Compression, ZstdLevel};
 #[derive(Debug, Clone)]
 pub struct EncodingOptions {
     /// m/z (+ chromatogram-time) chunked encoding. `None` = no chunking.
+    ///
+    /// This is the SINGLE SOURCE OF TRUTH for whether the m/z axis is encoded lossily: lossy-ness
+    /// is *derived* from this strategy via [`EncodingOptions::mz_is_lossy`], never tracked as an
+    /// independent flag that could drift from the strategy actually applied.
     pub mz_chunking: Option<ChunkingStrategy>,
     /// ZSTD level (1..=22); `None` = writer default (~3).
     pub zstd_level: Option<i32>,
     /// Parquet row-group size in rows; `None` = writer default. Larger groups compress better.
     pub row_group_size: Option<usize>,
-    /// True when `mz_chunking` is lossy (Numpress) — drives verify level + size-table labelling.
-    pub lossy_mz: bool,
 }
 
 /// Default chunk window (m/z Th) for chunked encodings — mirrors the reference converter's 50.
@@ -73,7 +75,6 @@ impl EncodingOptions {
             mz_chunking: Some(ChunkingStrategy::NumpressLinear { chunk_size: CHUNK_SIZE }),
             zstd_level: Some(HIGH_ZSTD),
             row_group_size: Some(TUNED_ROW_GROUP),
-            lossy_mz: true,
         }
     }
 
@@ -83,7 +84,6 @@ impl EncodingOptions {
             mz_chunking: Some(ChunkingStrategy::Delta { chunk_size: CHUNK_SIZE }),
             zstd_level: Some(HIGH_ZSTD),
             row_group_size: Some(TUNED_ROW_GROUP),
-            lossy_mz: false,
         }
     }
 
@@ -93,8 +93,18 @@ impl EncodingOptions {
             mz_chunking: None,
             zstd_level: None,
             row_group_size: None,
-            lossy_mz: false,
         }
+    }
+
+    /// Whether the m/z axis is encoded LOSSILY — derived solely from [`mz_chunking`], the single
+    /// source of truth (FIX-2). m/z is lossy iff Numpress-linear chunking is applied (bounded
+    /// fixed-point error). Delta chunking and "no chunking" are exact, so they are lossless. This
+    /// gates the `metadata.transform` L2 claim so it can never drift from the strategy actually
+    /// used.
+    ///
+    /// [`mz_chunking`]: EncodingOptions::mz_chunking
+    pub fn mz_is_lossy(&self) -> bool {
+        matches!(self.mz_chunking, Some(ChunkingStrategy::NumpressLinear { .. }))
     }
 
     /// The `parquet` [`Compression`] for `zstd_level` (falls back to writer default zstd if unset

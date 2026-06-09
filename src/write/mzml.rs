@@ -315,11 +315,12 @@ pub fn convert_mzml(
             .map_err(MzmlConvertError::Write)?;
     }
 
-    // File-level transform record (L2-01 / T-28-02): emit ONLY when a lossy (numpress) m/z
-    // transform was applied. For lossless (`--no-numpress` / Delta / legacy) archives the key is
-    // OMITTED entirely — a lossless file is byte-unchanged and carries no transform claim.
-    // Mirror the imaging path's `add_index_metadata("imaging", &block)` shape (convert.rs ~472).
-    if opts.lossy_mz {
+    // File-level transform record (L2-01 / T-28-02): emit ONLY when a lossy (numpress-linear) m/z
+    // transform was actually applied. The gate reads the m/z chunking STRATEGY (the single source
+    // of truth, FIX-2) — not a standalone bool that could drift — so the `metadata.transform`
+    // block emits iff numpress-linear m/z is genuinely in effect. For lossless (`--no-numpress` /
+    // Delta / legacy) archives the key is OMITTED entirely; a lossless file carries no claim.
+    if opts.mz_is_lossy() {
         writer
             .add_index_metadata("transform", &crate::schema::numpress_linear_transform())
             .map_err(MzmlConvertError::Json)?;
