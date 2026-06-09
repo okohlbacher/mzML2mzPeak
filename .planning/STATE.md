@@ -4,7 +4,7 @@ milestone: v0.8
 milestone_name: > **RELOCATED TO v0.8 — 2026-06-09
 status: executing
 stopped_at: v0.7 COMPLETE — all 9 active reqs done; Phases 22 (PRs) + 27 (SDRF) + 29 (de-vendor) relocated to v0.8; ready to archive/tag
-last_updated: "2026-06-09T08:06:11.189Z"
+last_updated: "2026-06-09T08:20:44.168Z"
 last_activity: 2026-06-09 — Milestone v0.8 formalized (REQUIREMENTS/ROADMAP/PROJECT/STATE from the ratified design)
 progress:
   total_phases: 3
@@ -353,6 +353,7 @@ Items deferred out of v0.7:
 | Channels | CHAN-04 — TMTpro 16/18-plex full CV modeling (blocked on PSI-MS terms) | Deferred (v2) | v0.7 scoping |
 | Imaging | F8c — true multi-modal co-registration (computing transforms) | Out of scope | v0.7 scoping |
 | Schema | Admit 32-bit m/z / 64-bit intensity into data-facet schema (HUPO-PSI #11 other horn) | Out of scope (upstream) | v0.7 scoping |
+| Phase 31-sdrf-mvp-embed P02 | 10 | 3 tasks | 3 files |
 
 ## Quick Tasks Completed
 
@@ -365,7 +366,7 @@ Items deferred out of v0.7:
 
 ## Session Continuity
 
-Last session: 2026-06-09T08:06:11.185Z
+Last session: 2026-06-09T08:20:44.164Z
 Stopped at: v0.7 COMPLETE — all 9 active reqs done; Phases 22 (PRs) + 27 (SDRF) + 29 (de-vendor) relocated to v0.8; ready to archive/tag
 Resume file: None
 

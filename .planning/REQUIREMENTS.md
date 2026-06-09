@@ -100,7 +100,7 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
   sibling extensions (`.raw`/`.d`/`.wiff`/`.mzML`/`.mzml`); record the matched name + a diagnostic;
   zero-match / multi-match emits a **loud diagnostic** and does **not** fail the conversion.
 
-- [ ] **SM-04** — Embed the SDRF **verbatim** as a typed `sample-metadata`/`sdrf` ZIP member (retrieved by
+- [x] **SM-04** — Embed the SDRF **verbatim** as a typed `sample-metadata`/`sdrf` ZIP member (retrieved by
   the deterministic archive name recorded in the index block — no reader dispatches on `entity_type`) +
   a `metadata.sample_metadata` provenance back-ref (`dataset_accession`, `source_uri`, `format`,
   `embed_scope: "applicable_rows"|"full"`, `precedence: "repo_wins"`, `sha256`, `retrieved_at`); default
