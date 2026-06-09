@@ -29,3 +29,6 @@ pub mod verify;
 pub use ion_image::IonImage;
 pub use report::{Mismatch, MismatchAxis, VerificationReport, VerifyError};
 pub use verify::{verify_against_source, verify_roundtrip, verify_streaming};
+
+pub mod geometry;
+pub use geometry::{GeometryFieldMismatch, GeometrySymmetry, assert_declared_geometry_symmetry};
