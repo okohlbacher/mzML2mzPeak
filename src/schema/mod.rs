@@ -38,5 +38,7 @@ pub use optical::{
     OpticalImageRef, OpticalParseError, parse_optical_images, resolve_optical_location,
 };
 pub use scan_settings::{ScanSettings, ScanSettingsParam, scan_settings_list_from_geometry};
+pub use source_curie::{SourceCurie, SourceCurieError};
+pub use study::{RunSampleBinding, StudyMetadata, study_metadata, study_metadata_with_binding};
 pub use tolerance::{ConformanceLevel, ToleranceContract};
 pub use transform::{TransformRecord, numpress_linear_transform};
