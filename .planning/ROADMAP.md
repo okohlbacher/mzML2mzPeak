@@ -269,7 +269,7 @@ Plans:
 
 - [x] 31-01-PLAN.md — csv dep + format-agnostic `SampleMetadataDoc`/`TypedValue` model (SourceCurie-based cvParam/userParam dispatch) + csv SDRF reader (tab/flexible/quoting(false), real key grammar) + file-row matching (SM-01..03)
 - [x] 31-02-PLAN.md — `convert_mzml` finalize-seam refactor (finish_parquet → zip → finish) + typed-member embed helper (`start_for_entry`, carve-out tokens); byte-identical no-SDRF output (SM-02, SM-04)
-- [ ] 31-03-PLAN.md — `--sdrf` CLI + parse→match→embed wiring + `metadata.study` back-ref (Phase-30 contract) + repo-wins precedence + PXD020187 byte-identical re-serve acceptance test (SM-01..04)
+- [x] 31-03-PLAN.md — `--sdrf` CLI + parse→match→embed wiring + `metadata.study` back-ref (Phase-30 contract) + repo-wins precedence + PXD020187 byte-identical re-serve acceptance test (SM-01..04)
 
 ### Phase 32: Lean `sample_list`/study projection + list-valued run binding
 
@@ -356,7 +356,7 @@ CVG-01/02, GEOF-01, RSRC-01, L2-01); Phases 23/24/25/26/28 done; Phases 22/27/29
 | 29. De-vendor both forks (relocated from v0.7) | 0/? | **Relocated — gated** | DVN-01 (chunk_series merged) + DVN-02 (mzdata 0.64.2 on crates.io); LAST |
 | 30. Sample-metadata spec alignment & CV governance | 4/4 | Complete   | 2026-06-09 |
 | 30b. Upstream list-valued `ms_run.sample_ref` PR | 0/? | Not started | early/parallel, owner-gated |
-| 31. Unified model + SDRF reader + verbatim embed (MVP) | 2/3 | In Progress|  |
+| 31. Unified model + SDRF reader + verbatim embed (MVP) | 3/3 | Complete   | 2026-06-09 |
 | 32. Lean `sample_list`/study projection + run binding | 0/? | Not started | native binding gated on 30b |
 | 33. ISA reader (Tab + JSON) | 0/? | Not started | pure-Rust, no Python |
 | 34. Isobaric channels as labeled samples | 0/? | Not started | MS:1002602, no channel_list |
