@@ -132,6 +132,12 @@ indicatif = "=0.17.11"
 # mappings (better than our old NonStandardDataArray patch), which upstream mzpeak_prototyping HEAD
 # also requires. This snapshot is therefore unmodified. Drop the whole [patch] once mzdata 0.64.2 is
 # published to crates.io (Phase 31 / DVN-02). ---
+# --- Dev-only dependencies (test helpers, not shipped in the library crate). ---
+[dev-dependencies]
+# tempfile is already in the graph transitively via mzpeak_prototyping@3.27.0;
+# declaring it here as a dev-dep pins the shared copy and makes it explicit for test use.
+tempfile = "=3.27.0"
+
 [patch.crates-io]
 mzdata = { path = "vendor/mzdata" }
 
