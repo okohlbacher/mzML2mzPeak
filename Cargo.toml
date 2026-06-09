@@ -59,6 +59,14 @@ mzpeak_prototyping = { git = "https://github.com/HUPO-PSI/mzPeak", rev = "a5c222
 # pure-Rust with NO shared transitive types with arrow/mzdata, so they cannot fracture
 # the dep graph. Pinned with `=`. The streaming Update/finalize API hashes the .ibd in
 # fixed chunks (never loading the 815MB sidecar). `md-5` is imported as `md5`. ---
+# --- SDRF reader (Phase 31, SM-01/02/03): pure-Rust CSV reader, pinned with `=`.
+# Pure-Rust leaf — shares NO transitive types with arrow/mzdata; cannot fracture the
+# type graph. Pinned with `=` per the CLAUDE.md stack discipline. Legitimacy verified:
+# image-rs-adjacent maintainer (rust-lang/csv-rs), multi-million downloads on crates.io.
+# Unifies with any arrow-csv transitive copy at the same version; verify via
+# `cargo tree -d` (no duplicates expected). The ONLY new dep added in Phase 31. ---
+csv = "=1.3.1"
+
 sha1 = "=0.10.6"
 md-5 = "=0.10.6"
 sha2 = "=0.10.9"
