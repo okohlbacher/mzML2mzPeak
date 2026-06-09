@@ -4,7 +4,7 @@ milestone: v0.8
 milestone_name: > **RELOCATED TO v0.8 — 2026-06-09
 status: completed
 stopped_at: v0.7 COMPLETE — all 9 active reqs done; Phases 22 (PRs) + 27 (SDRF) + 29 (de-vendor) relocated to v0.8; ready to archive/tag
-last_updated: "2026-06-09T07:36:52.534Z"
+last_updated: "2026-06-09T07:44:11.068Z"
 last_activity: 2026-06-09 — Milestone v0.8 formalized (REQUIREMENTS/ROADMAP/PROJECT/STATE from the ratified design)
 progress:
   total_phases: 3
@@ -59,7 +59,7 @@ BATCH proposal to `HUPO-PSI/mzPeak-specification` at the END of v0.8. Pinned sta
 |-------|------|------|--------|------------|
 | 22 | Upstream PR prep (relocated from v0.7) | UPS-01, UPS-03 | **Held (owner-gated)** | v0.7 rebase (✅) |
 | 29 | De-vendor both forks (relocated from v0.7) | DVN-01, DVN-02 | **Gated** | UPS-01 merged + mzdata 0.64.2 on crates.io; LAST |
-| 30 | Sample-metadata spec alignment & CV governance | SMSPEC-01..03, SMCVG-01..02 | ⬜ Not started | v0.7 Phase 24 (✅) — precedes 32+ |
+| 30 | Sample-metadata spec alignment & CV governance | SMSPEC-01..03, SMCVG-01..02 | ✅ Complete (2026-06-09) | v0.7 Phase 24 (✅) — precedes 32+ |
 | 30b | Upstream list-valued `ms_run.sample_ref` PR | UPSTREAM-BIND-01 | ⬜ Not started (owner-gated) | 30 — early/parallel; gates 32 native binding |
 | 31 | Unified model + SDRF reader + verbatim embed (TRUE MVP) | SM-01..04 | ⬜ Not started | 30 — nothing upstream |
 | 32 | Lean `sample_list`/study projection + run binding | SM-05..07 | ⬜ Not started | 31; native binding gated on 30b |
@@ -69,7 +69,7 @@ BATCH proposal to `HUPO-PSI/mzPeak-specification` at the END of v0.8. Pinned sta
 | 36 | comment-scope + factor-value completeness | SCOPE-01..02 | **DEFERRED ≥v0.9** | (blob holds fidelity) |
 | 37 | Round-trip + validation + batch submission | VAL-01..02, UPSTREAM-PR | ⬜ Not started | 31–34 (35 optional) |
 
-**Status:** v0.8 scoped; 0 phases complete. Next buildable = **Phase 30** (deps met — v0.7 Phase 24 ✅).
+**Status:** v0.8 in progress; **Phase 30 complete (2026-06-09)**. Next buildable = **Phase 31** (SM-01..04 — unified model + SDRF reader + verbatim embed).
 Critical path: 30 → 31 → 32 → 34 → (36 deferred) → 37. The upstream-gated native-binding sub-step (30b →
 32-binding) and the ISA track (33) run *off* the critical path.
 
@@ -186,6 +186,11 @@ release — the milestone is **not hard-blocked**, only its run-binding *queryab
 
 v0.7 decisions will be logged here per plan. v0.6 decisions are archived in
 `milestones/v0.6-ROADMAP.md` + PROJECT.md Key Decisions.
+
+**Phase 30 Plans 30-01..03 (2026-06-09):**
+- SMCVG-01 (30-01): SourceCurie verbatim-string passthrough type; first-colon split rule; MissingColon = userParam dispatch signal; zero ontology deps.
+- SMCVG-02/SMSPEC-02 (30-02): MS:1002602 via curie! macro; channel_role_token + reporter_ion_mz_token as stable tokens (no PSI-MS 4.1.x accession); three carve-out pub const strings for Phase 31.
+- SMSPEC-03 (30-03): StudyMetadata fields = dataset_accession / title / sample_metadata_ref (required) + optional run_sample_binding Phase-32 shadow; sample_list.json reuses v0.6 id/name/parameters (RATIFIED-E confirmed; no channel_list); inlined param shape (schema/param.json absent); pub use source_curie + pub use study wired in mod.rs.
 
 **Phases 22 + 29 relocated to v0.8 + v0.7 closed COMPLETE (2026-06-09, owner — closing the milestone):**
 relocated the upstream-PR prep (Phase 22 — UPS-01 chunk_series PR + UPS-03 mzPeakValidator PR) and the
@@ -359,7 +364,7 @@ Items deferred out of v0.7:
 
 ## Session Continuity
 
-Last session: 2026-06-09T07:36:52.531Z
+Last session: 2026-06-09T07:44:11.065Z
 Stopped at: v0.7 COMPLETE — all 9 active reqs done; Phases 22 (PRs) + 27 (SDRF) + 29 (de-vendor) relocated to v0.8; ready to archive/tag
 Resume file: None
 

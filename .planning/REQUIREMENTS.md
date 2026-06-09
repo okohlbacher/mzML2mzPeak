@@ -63,7 +63,7 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
   assay/sample reference, SDRF-row reference); queue the sample-metadata + samples-as-channels write-ups
   for the **single END-of-v0.8 batch** proposal (not submitted incrementally).
 
-- [ ] **SMSPEC-03** — Define the `metadata.study` / `metadata.sample_list` index.json KV-JSON contracts
+- [x] **SMSPEC-03** — Define the `metadata.study` / `metadata.sample_list` index.json KV-JSON contracts
   (the `add_index_metadata(key, val)` carrier — `HashMap<String, serde_json::Value>`, `additionalProperties:
   true`; NOT a `data_kind: metadata` member, NOT the Parquet-footer KV) + the matching `schema/*.json`.
 
