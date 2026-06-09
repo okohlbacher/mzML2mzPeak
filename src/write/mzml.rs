@@ -323,18 +323,34 @@ pub fn convert_mzml(
     //
     // FIX-1: register a real `mzml2mzpeak_numpress_linear` data_processing step (CURIE MS:1002312)
     // so the transform record's `data_processing_ref` resolves to an actually-present id instead
-    // of dangling. Mirror the `mzml2mzpeak_sort_peaks` pattern. Done BEFORE `finish()` so the step
-    // lands in the same metadata facet the index references.
+    // of dangling. Mirror the `mzml2mzpeak_sort_peaks` pattern. Done BEFORE `finish_parquet()` so
+    // the step lands in the same metadata facet the index references.
     if opts.mz_is_lossy() {
         record_numpress_linear(&mut writer);
-        writer
-            .add_index_metadata("transform", &crate::schema::numpress_linear_transform())
+    }
+
+    // Terminal sequence (mirror the imaging path in src/write/convert.rs): flush all Parquet
+    // facets and hand back the still-open ZipArchiveWriter so typed members can be inserted
+    // BEFORE the index is written. This is EQUIVALENT to the old one-liner writer.finish() —
+    // finish_parquet() is exactly the Parquet-flush half, and zip.finish() below writes the
+    // index last, closing the ZIP. The non-SDRF path is therefore BYTE-IDENTICAL.
+    let mut zip = writer
+        .finish_parquet()
+        .map_err(|e| MzmlConvertError::Finish(Box::new(e)))?;
+
+    // SDRF verbatim embed + metadata.study back-ref hang here — wired in Plan 03.
+
+    // Move the transform KV onto the ZIP handle (same FileIndex.metadata map, written index-last
+    // by zip.finish() below). Emitted ONLY for lossy (numpress-linear) conversions.
+    if opts.mz_is_lossy() {
+        zip.add_index_metadata("transform", &crate::schema::numpress_linear_transform())
             .map_err(MzmlConvertError::Json)?;
     }
 
-    writer
-        .finish()
-        .map_err(|e| MzmlConvertError::Finish(Box::new(e)))?;
+    // Write the mzPeak index LAST and close the ZIP (mirrors the imaging seam in convert.rs).
+    // ZipArchiveWriter::finish returns ZipResult<()>; convert into the boxed Finish arm.
+    zip.finish()
+        .map_err(|e| MzmlConvertError::Finish(Box::new(std::io::Error::other(e))))?;
     Ok(MzmlConvertReport {
         spectra,
         chromatograms,
