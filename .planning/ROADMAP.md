@@ -232,7 +232,11 @@ Plans:
   1. The `entity_type: sample-metadata` / `data_kind: sdrf|isa` open-enum members + the `metadata.study` / `metadata.sample_list` index.json KV contracts are defined with matching `schema/*.json` (built locally against stable CV tokens).
   2. CV strategy is fixed: own verbatim-string `SourceCurie`; cvParam-when-accession-present else userParam-keyed-by-column; no OBO bundle. `MS:1002602` + channel-role/reporter-m/z terms declared once in `src/schema/cv.rs`.
   3. The sample-metadata + samples-as-channels write-ups are queued for the END-of-v0.8 batch proposal (not submitted incrementally).
-**Plans**: TBD
+**Plans**: 4 plans (3 waves collapse to 2; all foundation, no facet emits)
+  - [ ] 30-01-PLAN.md — `SourceCurie` passthrough type (shape-only validation, verbatim CURIE round-trip) — SMCVG-01 [W1]
+  - [ ] 30-02-PLAN.md — `src/schema/cv.rs` structural terms (MS:1002602 + role/reporter-m/z) + Phase-31 carve-out tokens (sample-metadata/sdrf|isa) + cv-requests rows — SMCVG-02, SMSPEC-02 [W1]
+  - [ ] 30-03-PLAN.md — `metadata.study` + reused `metadata.sample_list` KV-JSON contracts + `schema/study.json`/`schema/sample_list.json` — SMSPEC-03 [W2]
+  - [ ] 30-04-PLAN.md — ratify Q1–Q10 + queue (not submit) the v0.8 sample-metadata spec batch + extend the extension-contract — SMSPEC-01, SMSPEC-02 [W1]
 
 ### Phase 30b: Upstream list-valued `ms_run.sample_ref` PR prep
 **Goal**: Open the upstream surface early so merge latency overlaps the rest of v0.8. Add a **list-valued** `ms_run.sample_ref` to HUPO-PSI/mzPeak (spec + reference impl) — multiplexing falls out of the list (JK; mzML `<run>` precedent). **Owner-gated** (push-policy: HUPO-PSI is outside `okohlbacher` → explicit authorization).
