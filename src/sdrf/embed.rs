@@ -41,7 +41,8 @@ pub struct EmbedFacts {
     pub size_bytes: u64,
 }
 
-/// Errors produced by [`embed_sdrf_member`] — typed library errors (thiserror, NOT anyhow).
+/// Errors produced by [`embed_sdrf_member`] and [`extract_sample_metadata_member`] —
+/// typed library errors (thiserror, NOT anyhow).
 ///
 /// `anyhow` is binary-only per CLAUDE.md; this module is a library seam, so `thiserror` is
 /// the correct choice. The caller (Plan 03, in the CLI boundary) may wrap these in `anyhow`
@@ -71,6 +72,66 @@ pub enum EmbedError {
         #[source]
         source: crate::write::WriteError,
     },
+
+    /// The requested member was not found in the archive (extract path).
+    #[error("member {member:?} not found in archive {archive}: {source}")]
+    MemberNotFound {
+        member: String,
+        archive: String,
+        #[source]
+        source: std::io::Error,
+    },
+}
+
+/// Re-serve the embedded sample-metadata member from a produced `.mzpeak` archive, VERBATIM.
+///
+/// Opens the archive as a raw `zip::ZipArchive`, looks up `member_name` by its deterministic
+/// archive path (e.g. `"sample_metadata/sdrf.tsv"` or `"sample_metadata/isa/i_Investigation.txt"`),
+/// and reads the bytes out WITHOUT touching `metadata.sample_list` / `metadata.study` — proving
+/// the roundtrip source is the verbatim blob, NOT a projection (Q10 RATIFIED).
+///
+/// # Errors
+///
+/// Returns [`EmbedError::Io`] if the archive cannot be opened, [`EmbedError::MemberNotFound`]
+/// if the requested member is absent (names the member in the error for actionable diagnostics),
+/// or [`EmbedError::Io`] for any other read failure.
+///
+/// This function NEVER returns empty bytes as success for an absent member — absence is always
+/// a distinct typed error variant.
+pub fn extract_sample_metadata_member(
+    archive: &Path,
+    member_name: &str,
+) -> Result<Vec<u8>, EmbedError> {
+    use std::io::Read as _;
+
+    let archive_str = archive.display().to_string();
+
+    // Open the archive file.
+    let file = std::fs::File::open(archive).map_err(|e| EmbedError::Io {
+        path: archive_str.clone(),
+        source: e,
+    })?;
+    let reader = std::io::BufReader::new(file);
+    let mut zip = zip::ZipArchive::new(reader).map_err(|e| EmbedError::Io {
+        path: archive_str.clone(),
+        source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+    })?;
+
+    // Look up the member by its deterministic name.
+    let mut entry = zip.by_name(member_name).map_err(|e| EmbedError::MemberNotFound {
+        member: member_name.to_string(),
+        archive: archive_str.clone(),
+        source: std::io::Error::new(std::io::ErrorKind::NotFound, e),
+    })?;
+
+    // Read member bytes verbatim — the exact inverse of embed_sdrf_member's byte-copy.
+    let mut buf = Vec::with_capacity(entry.size() as usize);
+    entry.read_to_end(&mut buf).map_err(|e| EmbedError::Io {
+        path: format!("{archive_str}!{member_name}"),
+        source: e,
+    })?;
+
+    Ok(buf)
 }
 
 /// Core embed helper: stream `bytes_path` BYTE-FOR-BYTE into `zip` as a TYPED member
@@ -334,6 +395,80 @@ mod tests {
         match result {
             Err(EmbedError::Io { .. }) => {}
             other => panic!("missing source must produce EmbedError::Io, got {:?}", other),
+        }
+    }
+
+    /// extract_sample_metadata_member round-trips embed_sdrf_member's bytes BYTE-FOR-BYTE.
+    ///
+    /// Embeds a small TSV into a temp archive, calls `extract_sample_metadata_member` to re-serve
+    /// it, and asserts the bytes are identical to the source — the VAL-01 verbatim-anchor invariant.
+    #[test]
+    fn extract_sample_metadata_member_roundtrips_embed_bytes() {
+        let sdrf_content =
+            b"source name\tassay name\tcomment[data file]\nS1\tA1\trun1.raw\nS2\tA2\trun2.raw\n";
+
+        let sdrf_path = temp_tsv("extract_rt", sdrf_content);
+        let (mut zip, out) = minimal_zip("extract_rt");
+
+        let facts = embed_sdrf_member(&mut zip, &sdrf_path, TEST_MEMBER_NAME)
+            .expect("embed_sdrf_member must succeed");
+        assert!(!facts.sha256.is_empty());
+        zip.finish().expect("zip.finish must succeed");
+
+        // Re-serve via extract_sample_metadata_member and assert byte equality.
+        let extracted = super::extract_sample_metadata_member(&out, TEST_MEMBER_NAME)
+            .expect("extract_sample_metadata_member must succeed on a present member");
+        assert_eq!(
+            extracted, sdrf_content,
+            "extracted bytes must be BYTE-FOR-BYTE identical to the source (VAL-01 verbatim anchor)"
+        );
+
+        let _ = std::fs::remove_file(&out);
+        let _ = std::fs::remove_file(&sdrf_path);
+    }
+
+    /// extract_sample_metadata_member returns a typed MemberNotFound error for an absent member.
+    ///
+    /// Never panics, never returns empty bytes as success — absence is always a distinct error.
+    #[test]
+    fn extract_sample_metadata_member_absent_member_is_typed_error() {
+        let sdrf_path = temp_tsv("extract_absent", b"content");
+        let (mut zip, out) = minimal_zip("extract_absent");
+
+        // Embed under a DIFFERENT name — TEST_MEMBER_NAME will be absent.
+        embed_sdrf_member(&mut zip, &sdrf_path, "sample_metadata/other.tsv")
+            .expect("embed with different name must succeed");
+        zip.finish().expect("zip.finish must succeed");
+
+        let result = super::extract_sample_metadata_member(&out, TEST_MEMBER_NAME);
+        let _ = std::fs::remove_file(&out);
+        let _ = std::fs::remove_file(&sdrf_path);
+
+        match result {
+            Err(super::EmbedError::MemberNotFound { member, .. }) => {
+                assert_eq!(member, TEST_MEMBER_NAME, "error names the missing member");
+            }
+            other => panic!(
+                "absent member must produce EmbedError::MemberNotFound, got {:?}",
+                other
+            ),
+        }
+    }
+
+    /// extract_sample_metadata_member returns EmbedError::Io for a non-existent archive.
+    #[test]
+    fn extract_sample_metadata_member_missing_archive_is_io_error() {
+        let absent = std::env::temp_dir()
+            .join(format!("mzml2mzpeak_absent_archive_{}.mzpeak", std::process::id()));
+        let _ = std::fs::remove_file(&absent);
+
+        let result = super::extract_sample_metadata_member(&absent, TEST_MEMBER_NAME);
+        match result {
+            Err(super::EmbedError::Io { .. }) => {}
+            other => panic!(
+                "missing archive must produce EmbedError::Io, got {:?}",
+                other
+            ),
         }
     }
 
