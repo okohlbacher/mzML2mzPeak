@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.7
 milestone_name: — Upstreaming, de-vendoring & sample-metadata modeling
-status: planning
+status: completed
 stopped_at: v0.7 reshaped to 8 phases (22–29); imaging-structure cluster deferred beyond v1.0; re-themed; REQUIREMENTS traceability mapped 21 active
-last_updated: "2026-06-09T03:41:46Z"
-last_activity: 2026-06-09 — Phase 24 Plan 01 (CV governance) complete: TODO(F9) resolved, reverse cvList no-drift by construction, CVG-02 guard test, imagingMS.obo confirmed current
+last_updated: "2026-06-09T03:48:32.783Z"
+last_activity: 2026-06-08 — v0.7 reshaped 10→8 phases; imaging-structure cluster deferred beyond v1.0; re-themed to "Upstreaming, de-vendoring & sample-metadata modeling"
 progress:
   total_phases: 8
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
   completed_plans: 3
-  percent: 0
+  percent: 13
 ---
 
 # Project State
@@ -141,6 +141,7 @@ v0.7 decisions will be logged here per plan. v0.6 decisions are archived in
 `milestones/v0.6-ROADMAP.md` + PROJECT.md Key Decisions.
 
 **Phase 24 Plan 01 (2026-06-09):**
+
 - IMS CV URI: no OBO-Foundry PURL exists; stable imzML/imzML raw URL is the recorded local token; request filed in docs/cv-requests.md. imagingMS.obo upstream byte-identical to vendored copy; vendored kept.
 - Reverse `<cvList>` now reads from `cv_list()` via loop (CVG-01 no-drift-by-construction); no independent CV literals remain in imzml_writer.rs.
 - CVG-02 guard: source-scan over decode modules proves CURIE-keyed decode (not column-name); B1/B2/B3/C1/C3/D11 classes attributed to upstream reference readers.
@@ -261,7 +262,7 @@ Items deferred out of v0.7:
 
 ## Session Continuity
 
-Last session: 2026-06-09T03:40:49.019Z
+Last session: 2026-06-09T03:48:32.780Z
 Stopped at: v0.7 reshaped to 8 phases (22–29); imaging-structure cluster deferred beyond v1.0; re-themed; REQUIREMENTS traceability mapped 21 active
 Resume file: None
 

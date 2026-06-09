@@ -143,9 +143,9 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 
 **Plans**: 3 plans
 
-- [ ] 24-01-PLAN.md — CV single-source hardening: resolve TODO(F9), refresh imagingMS.obo, drive reverse `<cvList>` from `cv_list()`, no-drift + decode-by-CURIE guard tests, `docs/cv-requests.md` (CVG-01, CVG-02)
+- [x] 24-01-PLAN.md — CV single-source hardening: resolve TODO(F9), refresh imagingMS.obo, drive reverse `<cvList>` from `cv_list()`, no-drift + decode-by-CURIE guard tests, `docs/cv-requests.md` (CVG-01, CVG-02)
 - [x] 24-02-PLAN.md — Binding extension-design-contract doc mapping every v0.7 facet to spec mechanisms + cv_list reconciliation note (SPEC-01, SPEC-03)
-- [ ] 24-03-PLAN.md — End-of-v0.7 batch-proposal queue stub + SDRF §5.7 committee-questions tracker (SPEC-02, held)
+- [x] 24-03-PLAN.md — End-of-v0.7 batch-proposal queue stub + SDRF §5.7 committee-questions tracker (SPEC-02, held)
 
 **UI hint**: yes
 
@@ -222,7 +222,7 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 |-------|----------------|--------|-----------|
 | 22. Upstream PR prep | 0/? | Deferred (held) | - |
 | 23. Upstream rebase + re-verify | inline | ✅ Done | 2026-06-08 |
-| 24. Spec alignment & CV governance | 1/3 | In Progress|  |
+| 24. Spec alignment & CV governance | 3/3 | Complete   | 2026-06-09 |
 | 25. Forward declared-geometry threading | 0/? | Not started | - |
 | 26. Reverse `<sourceFileList>` copy | 0/? | Not started | - |
 | 27. SDRF sample model + channels + reporter-quant | 0/? | Not started | - |
