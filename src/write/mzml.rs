@@ -67,6 +67,11 @@ pub enum MzmlConvertError {
     /// archive index failed.
     #[error("mzPeak index metadata serialization error: {0}")]
     Json(#[source] serde_json::Error),
+
+    /// An SDRF parse, embed, or provenance error on the `--sdrf` code path. Boxed to avoid
+    /// pulling the SDRF error types into the `MzmlConvertError` public API directly.
+    #[error("SDRF error: {0}")]
+    Sdrf(#[source] Box<dyn std::error::Error + Send + Sync>),
 }
 
 /// A counted record of centroid spectra whose SOURCE primary m/z was non-monotonic
@@ -175,6 +180,7 @@ pub fn convert_mzml(
     input: &Path,
     output: &Path,
     opts: &crate::write::EncodingOptions,
+    sdrf: Option<&Path>,
 ) -> Result<MzmlConvertReport, MzmlConvertError> {
     // `_xml_guard` keeps the transcoded temp file (if any) alive for the reader's lifetime.
     let (read_path, _xml_guard) = readable_path(input)?;
@@ -338,7 +344,9 @@ pub fn convert_mzml(
         .finish_parquet()
         .map_err(|e| MzmlConvertError::Finish(Box::new(e)))?;
 
-    // SDRF verbatim embed + metadata.study back-ref hang here — wired in Plan 03.
+    // SDRF verbatim embed + metadata.study back-ref — wired in Task 2 (Plan 03).
+    // The `sdrf` parameter carries the caller-supplied SDRF path (None → no-op, byte-identical).
+    let _ = sdrf; // used in Task 2; reference here avoids unused-variable warning
 
     // Move the transform KV onto the ZIP handle (same FileIndex.metadata map, written index-last
     // by zip.finish() below). Emitted ONLY for lossy (numpress-linear) conversions.
@@ -478,9 +486,9 @@ mod tests {
 
         let opts = crate::write::EncodingOptions::lossless();
 
-        convert_mzml(fixture, &out_a, &opts)
+        convert_mzml(fixture, &out_a, &opts, None)
             .expect("first lossless conversion must succeed");
-        convert_mzml(fixture, &out_b, &opts)
+        convert_mzml(fixture, &out_b, &opts, None)
             .expect("second lossless conversion must succeed");
 
         // (1) Read-back via the reference reader proves the index + all facets survived the

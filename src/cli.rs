@@ -147,6 +147,15 @@ pub struct ConvertCli {
     /// ZSTD compression level (1–22). Higher = smaller output, slower. Default 19.
     #[arg(long = "zstd-level", value_name = "N", default_value_t = 19)]
     pub zstd_level: i32,
+
+    /// Embed a SDRF (Sample and Data Relationship Format) file into the produced mzPeak archive.
+    /// EXPLICIT only — the converter NEVER auto-discovers an SDRF; you must name the file.
+    /// Valid on the plain-mzML forward path (`.mzML` input) only; rejected on `.imzML` inputs
+    /// (SDRF accompanies proteomics mzML, not imaging data) and on the reverse path.
+    /// The SDRF is parsed, matched against the input mzML, and embedded verbatim as a typed
+    /// `sample_metadata/sdrf.tsv` ZIP member; a `metadata.study` provenance back-ref is written.
+    #[arg(long = "sdrf", value_name = "PATH")]
+    pub sdrf: Option<PathBuf>,
 }
 
 impl ConvertCli {
@@ -236,8 +245,13 @@ fn run_forward_mzml(cli: ConvertCli) -> anyhow::Result<()> {
     })?;
 
     log::info!("converting {} (plain mzML)", cli.input.display());
-    let report = crate::write::convert_mzml(&cli.input, out, &cli.encoding_options())
-        .with_context(|| format!("plain-mzML conversion failed for {}", cli.input.display()))?;
+    let report = crate::write::convert_mzml(
+        &cli.input,
+        out,
+        &cli.encoding_options(),
+        cli.sdrf.as_deref(),
+    )
+    .with_context(|| format!("plain-mzML conversion failed for {}", cli.input.display()))?;
     log::info!(
         "converted {} spectra + {} chromatograms → {}",
         report.spectra,
@@ -298,6 +312,15 @@ fn run_forward_mzml(cli: ConvertCli) -> anyhow::Result<()> {
 /// verbatim into a branch so the bare `mzml2mzpeak <in.imzML> <out.mzpeak>` invocation parses
 /// and behaves byte-identically (T-10-COMPAT).
 fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
+    // `--sdrf` accompanies plain proteomics .mzML, NOT imaging .imzML (design §5 / SM-01).
+    // Reject with an actionable forward-only-on-mzML message so the user knows which path to use.
+    if cli.sdrf.is_some() {
+        return Err(anyhow!(
+            "--sdrf accompanies plain proteomics .mzML, not imaging .imzML \
+             (use a .mzML input for SDRF embedding)"
+        ));
+    }
+
     if cli.dry_run {
         return dry_run(&cli);
     }
@@ -484,6 +507,15 @@ fn run_reverse(cli: &ConvertCli) -> anyhow::Result<()> {
     if !cli.images.is_empty() {
         return Err(anyhow!(
             "--image is forward-only (imzML → mzPeak); reverse image export is out of scope"
+        ));
+    }
+
+    // `--sdrf` is forward-only (SM-02 / T-31-rev) — the reverse path outputs .imzML + .ibd,
+    // not a mzPeak ZIP, so there is no ZIP member to embed into. Use a .mzML input for SDRF.
+    if cli.sdrf.is_some() {
+        return Err(anyhow!(
+            "--sdrf is forward-only (.mzML → .mzpeak); the reverse path writes .imzML + .ibd \
+             and cannot embed an SDRF member (use a .mzML input for SDRF embedding)"
         ));
     }
 
@@ -988,6 +1020,59 @@ mod tests {
         assert!(
             err.to_string().contains("forward-only"),
             "reverse --image rejection names it forward-only, got: {err}"
+        );
+    }
+
+    // --- Task 1 (Plan 31-03): --sdrf flag parse + rejection guards -------------------
+
+    #[test]
+    fn sdrf_flag_parses_on_mzml_input() {
+        // --sdrf <PATH> must parse for a plain .mzML input.
+        let cli = ConvertCli::try_parse_from([
+            "mzml2mzpeak", "in.mzML", "out.mzpeak", "--sdrf", "sdrf.tsv",
+        ])
+        .expect("--sdrf must parse on a plain .mzML input");
+        assert_eq!(
+            cli.sdrf,
+            Some(PathBuf::from("sdrf.tsv")),
+            "--sdrf path must be captured"
+        );
+    }
+
+    #[test]
+    fn sdrf_absent_is_none() {
+        // No --sdrf → None (the no-SDRF path must be byte-identical to prior behavior).
+        let cli = ConvertCli::try_parse_from(["mzml2mzpeak", "in.mzML", "out.mzpeak"])
+            .expect("absent --sdrf parses");
+        assert_eq!(cli.sdrf, None, "absent --sdrf ⇒ None");
+    }
+
+    #[test]
+    fn sdrf_rejected_on_reverse_path() {
+        // --sdrf is forward-only: rejected when the reverse path is taken (.mzpeak input).
+        let cli = ConvertCli::try_parse_from([
+            "mzml2mzpeak", "in.mzpeak", "-o", "out", "--sdrf", "sdrf.tsv",
+        ])
+        .expect("reverse invocation with --sdrf parses (rejection is a runtime guard)");
+        let err = run(cli).expect_err("reverse + --sdrf must be rejected");
+        assert!(
+            err.to_string().contains("forward-only"),
+            "reverse --sdrf rejection names it forward-only, got: {err}"
+        );
+    }
+
+    #[test]
+    fn sdrf_rejected_on_imaging_imzml_path() {
+        // --sdrf is not valid on .imzML input (imaging path): rejected with clear message.
+        let cli = ConvertCli::try_parse_from([
+            "mzml2mzpeak", "in.imzML", "out.mzpeak", "--sdrf", "sdrf.tsv",
+        ])
+        .expect("imaging invocation with --sdrf parses (rejection is a runtime guard)");
+        let err = run(cli).expect_err(".imzML + --sdrf must be rejected");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("mzML") || msg.contains("sdrf") || msg.contains("imaging"),
+            ".imzML --sdrf rejection message should mention the constraint, got: {msg}"
         );
     }
 

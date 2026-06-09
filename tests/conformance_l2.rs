@@ -215,7 +215,7 @@ fn numpress_archive_carries_transform_record_in_both_places() {
 
     let out = tmp("tr", "mzpeak");
     let _ = std::fs::remove_file(&out);
-    convert_mzml(input, &out, &EncodingOptions::compact()).expect("numpress conversion");
+    convert_mzml(input, &out, &EncodingOptions::compact(), None).expect("numpress conversion");
 
     // (a) File-level block.
     let reader = MzPeakReader::new(&out).expect("open mzpeak reader");
@@ -269,7 +269,7 @@ fn numpress_transform_data_processing_ref_resolves_to_present_step() {
 
     let out = tmp("dpref", "mzpeak");
     let _ = std::fs::remove_file(&out);
-    convert_mzml(input, &out, &EncodingOptions::compact()).expect("numpress conversion");
+    convert_mzml(input, &out, &EncodingOptions::compact(), None).expect("numpress conversion");
 
     let reader = MzPeakReader::new(&out).expect("open mzpeak reader");
 
@@ -328,7 +328,7 @@ fn lossless_mz_passes_l1_and_carries_no_transform_block() {
 
     let out = tmp("lossless", "mzpeak");
     let _ = std::fs::remove_file(&out);
-    convert_mzml(input, &out, &EncodingOptions::lossless()).expect("lossless conversion");
+    convert_mzml(input, &out, &EncodingOptions::lossless(), None).expect("lossless conversion");
 
     // Profile spectrum (index 1, scan=20): lossless Delta stores exact f64 values.
     // The source has m/z=[0.0, 2.0, 4.0, ...] which Delta encodes and decodes exactly.
