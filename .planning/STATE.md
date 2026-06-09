@@ -1,31 +1,35 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.8
-milestone_name: > **RELOCATED TO v0.8 — 2026-06-09
-status: executing
-stopped_at: All buildable v0.8 phases complete (30/31/32/33/34/35/37); remainder owner-gated (22/30b) or deferred (29/36)
-last_updated: "2026-06-09T18:00:00Z"
-last_activity: 2026-06-09 — Phases 33/34/35/37 complete (ISA reader + isobaric channels + reporter-quant + roundtrip/validation); 565 tests green
+milestone: v0.9
+milestone_name: "Upstreaming / de-vendoring finish + factor_values + native ms_run.sample_ref"
+status: not_started
+stopped_at: "v0.8 ARCHIVED 2026-06-09 (tag v0.8). v0.9 not yet scoped — awaiting /gsd:new-milestone."
+last_updated: "2026-06-09T18:30:00Z"
+last_activity: "2026-06-09 — v0.8 milestone CLOSED. Archive: milestones/v0.8-ROADMAP.md + milestones/v0.8-REQUIREMENTS.md. 565 tests green. Carried to v0.9: Phases 22/29/30b + UPSTREAM-PR. Deferred ≥v0.9: Phase 36/SM-07."
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 16
-  completed_plans: 16
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-06)
+See: .planning/PROJECT.md (updated 2026-06-09)
 
 **Core value:** Convert an arbitrary imzML imaging dataset into a valid imaging mzPeak file without
 losing spatial or spectral information — every pixel's coordinates and its m/z + intensity survive the
 roundtrip. Both-direction converter shipped (v0.3 forward + v0.4 reverse + v0.5 index enrichment /
-optical-image import + v0.6 spec conformance).
+optical-image import + v0.6 spec conformance + v0.7 CV governance + v0.8 sample-metadata ingestion).
 
-**Current focus:** v0.8 — **Sample-metadata ingestion (SDRF + ISA) + upstreaming/de-vendoring finish.**
+**v0.8 ARCHIVED/SHIPPED (2026-06-09, tag `v0.8`).** See `milestones/v0.8-ROADMAP.md` +
+`milestones/v0.8-REQUIREMENTS.md`. 22/28 requirements done; 565 tests green.
+
+**Current focus:** v0.9 — **Upstreaming / de-vendoring finish + factor_values + native `ms_run.sample_ref`.**
+Not yet scoped — run `/gsd:new-milestone` to formalize.
 Formalized 2026-06-09 from the ratified, adversarially-reviewed `milestones/v0.8-DESIGN-DRAFT.md`
 (cornerstones A–G + §0c). **Two work streams:** (1) ingest a sibling **SDRF-Proteomics TSV or ISA bundle
 (Tab/JSON)** during conversion so the sample↔data-file relationship + study context survive into the mzPeak
@@ -40,45 +44,33 @@ dep: **`csv`** (re-added) + `serde_json` (already present). v0.7 is **shipped** 
 
 ## Current Position
 
-Phase: 37-roundtrip-validation
-Plan: 03 (complete)
-Status: **All buildable v0.8 phases complete (30/31/32/33/34/35/37). Remainder = 30b/22 (owner-gated) + 29 (gated on external merges) + 36 (deferred ≥v0.9).**
-Last activity: 2026-06-09 — Phase 37 Plans 01–03 complete — VAL-01 byte-for-byte fixture sweep PASSED (label-free + TMT arms; ISA arm skip-guarded); VAL-02 --validate-sample-metadata non-blocking oracle shipped; UPSTREAM-PR bundle PREPARED-AND-HELD (docs/upstream/v0.8-spec-batch-bundle.md + ms-run-sample-ref-writer-pr.md); 565 tests green
+Phase: v0.8 ARCHIVED
+Plan: — (v0.9 not yet scoped)
+Status: **v0.8 CLOSED 2026-06-09 (tag `v0.8`). v0.9 pending `/gsd:new-milestone`.**
+Last activity: 2026-06-09 — v0.8 archived; milestone closed; tag v0.8 created; planning docs updated
+(ROADMAP.md v0.8 section collapsed; REQUIREMENTS.md deleted; milestones/v0.8-ROADMAP.md +
+milestones/v0.8-REQUIREMENTS.md created; PROJECT.md + STATE.md updated). 565 tests green. Carried to
+v0.9: Phases 22/29/30b + UPSTREAM-PR. Deferred ≥v0.9: Phase 36/SM-07.
 
-## v0.8 Roadmap (Phases 22, 29, 30, 30b, 31–37)
+## v0.8 Roadmap — ARCHIVED (Phases 22, 29, 30, 30b, 31–37)
 
-Numbering continues from v0.7's Phase 29 (do **not** reset; **NO renumbering**). Standing rule (XRT): every
-structured addition lands in THREE places — `src/…`, `docs/mzpeak-imaging-spec-suggestions.md`, the
-matching `schema/*.json` — plus a `src/verify/` round-trip assertion (sample-metadata roundtrip = a cheap
-byte-`assert_eq!` re-serve of the embedded verbatim member) **and** a spec-extension write-up queued for the
-BATCH proposal to `HUPO-PSI/mzPeak-specification` at the END of v0.8. Pinned stack (`arrow`/`parquet` =
-57.0.0, `zip` = 4.1.0, `mzpeaks` = 1.0.9) holds; v0.8's only new dep is **`csv`** (re-added) + `serde_json`
-(already present).
+**v0.8 CLOSED 2026-06-09 (tag `v0.8`).** Full detail: `milestones/v0.8-ROADMAP.md`.
 
-| Phase | Name | Reqs | Status | Depends on |
-|-------|------|------|--------|------------|
-| 22 | Upstream PR prep (relocated from v0.7) | UPS-01, UPS-03 | **Held (owner-gated)** | v0.7 rebase (✅) |
-| 29 | De-vendor both forks (relocated from v0.7) | DVN-01, DVN-02 | **Gated** | UPS-01 merged + mzdata 0.64.2 on crates.io; LAST |
-| 30 | Sample-metadata spec alignment & CV governance | SMSPEC-01..03, SMCVG-01..02 | ✅ Complete (2026-06-09) | v0.7 Phase 24 (✅) — precedes 32+ |
-| 30b | Upstream list-valued `ms_run.sample_ref` PR | UPSTREAM-BIND-01 | ⬜ Not started (owner-gated) | 30 — early/parallel; gates 32 native binding |
-| 31 | Unified model + SDRF reader + verbatim embed (TRUE MVP) | SM-01..04 | ✅ Complete (2026-06-09) | 30 — nothing upstream |
-| 32 | Lean `sample_list`/study projection + run binding | SM-05..07 | ✅ Complete (2026-06-09; SM-07 deferred ≥v0.9) | 31; native binding gated on 30b |
-| 33 | ISA reader (Tab + JSON) | SM-08..10 | ✅ Complete (2026-06-09) | 31, 32 — pure-Rust, no Python |
-| 34 | Isobaric channels as labeled samples | CHAN-01..03 | ✅ Complete (2026-06-09) | 32 — MS:1002602, no channel_list |
-| 35 | Reporter-ion quantitation (optional) | QUANT-01..02 | ✅ Complete (2026-06-09) | 34 |
-| 36 | comment-scope + factor-value completeness | SCOPE-01..02 | **DEFERRED ≥v0.9** | (blob holds fidelity) |
-| 37 | Round-trip + validation + batch submission | VAL-01..02, UPSTREAM-PR | ✅ Complete (2026-06-09) | 31–34 (35 optional) |
+| Phase | Name | Reqs | Final Status |
+|-------|------|------|-------------|
+| 22 | Upstream PR prep | UPS-01, UPS-03 | → CARRIED TO v0.9 (held) |
+| 29 | De-vendor both forks | DVN-01, DVN-02 | → CARRIED TO v0.9 (gated) |
+| 30 | Sample-metadata spec alignment & CV governance | SMSPEC-01..03, SMCVG-01..02 | ✅ Complete 2026-06-09 |
+| 30b | Upstream list-valued `ms_run.sample_ref` PR | UPSTREAM-BIND-01 | → CARRIED TO v0.9 (owner-gated) |
+| 31 | Unified model + SDRF reader + verbatim embed | SM-01..04 | ✅ Complete 2026-06-09 |
+| 32 | Lean `sample_list`/study projection + run binding | SM-05..07 | ✅ Complete 2026-06-09 (SM-07 deferred ≥v0.9) |
+| 33 | ISA reader (Tab + JSON) | SM-08..10 | ✅ Complete 2026-06-09 |
+| 34 | Isobaric channels as labeled samples | CHAN-01..03 | ✅ Complete 2026-06-09 |
+| 35 | Reporter-ion quantitation (optional) | QUANT-01..02 | ✅ Complete 2026-06-09 |
+| 36 | comment-scope + factor-value completeness | SCOPE-01..02 | DEFERRED ≥v0.9 |
+| 37 | Round-trip + validation + batch submission | VAL-01..02, UPSTREAM-PR | ✅ Complete 2026-06-09 (UPSTREAM-PR HELD) |
 
-**Status:** All buildable v0.8 phases complete — **Phases 30, 31, 32, 33, 34, 35, 37 complete (2026-06-09)**. Remainder: Phase 30b (owner-gated), Phase 22 (owner-gated/held), Phase 29 (gated on external merges), Phase 36 (deferred ≥v0.9). 565 tests green.
-Critical path: 30 → 31 → 32 → 34 → (36 deferred) → 37 — **all complete**. The upstream-gated native-binding sub-step (30b → 32-binding) and Phase 22/29 remain non-blocking external work.
-
-**Done-upstream (not active work):** UPS-02 (mzdata SONAR/IM) + UPS-04 (array_buffer B2) — both fixed by
-the v0.7 rebase, no PR/issue to file.
-
-**Deferred beyond v1.0 (NOT v0.8 phases):** PIX-01, ROI-01, CONT-01, IMG-01 — the imaging-structure
-cluster (pixel facet, ROI polygons, continuous shared-axis, `images.parquet`). See REQUIREMENTS.md →
-"Deferred beyond v1.0" + the ROADMAP Backlog pointer. PSI notes carried: ROI = spatial-annotation
-polygon; pixel = coords + scan-PK (`scan.scan_index` + `scan.spectrum_reference`, ex-999.10).
+**22/28 requirements satisfied. 565 tests green.**
 
 ## v0.8 Locked Sequencing Constraints
 
@@ -407,18 +399,16 @@ Resume file: None
 
 ## Operator Next Steps
 
-- **All buildable v0.8 phases are COMPLETE (2026-06-09).** 565 tests green. Phases 30/31/32/33/34/35/37 done.
+- **v0.8 is ARCHIVED AND TAGGED (2026-06-09, tag `v0.8`).** 565 tests green.
 
-- **Remaining open work (non-blocking, owner-gated or externally gated):**
-  - **Phase 30b** (upstream list-valued `ms_run.sample_ref` PR) — OWNER-GATED. The native binding ships as the phase32_shadow until merged. PR text ready in `docs/upstream/ms-run-sample-ref-writer-pr.md`.
-  - **Phase 22** (chunk_series PR + mzPeakValidator PR) — OWNER-GATED/HELD. Drafts in `/tmp/mzpeak-prs/`; UPS-02/UPS-04 done-upstream.
-  - **Phase 29** (de-vendor both forks) — GATED on chunk_series PR (UPS-01) merged + mzdata 0.64.2 on crates.io. Sequenced LAST.
-  - **Phase 36** (comment-scope + factor_values) — DEFERRED ≥v0.9. Blob holds full fidelity.
+- **Start v0.9:** run `/gsd:new-milestone` to formalize v0.9 scope from the carried-forward work.
 
-- **Upstream submissions ready to file when authorized:**
-  - v0.8 spec batch bundle: `docs/upstream/v0.8-spec-batch-bundle.md` (P-02/03/04/05/08/09 → HUPO-PSI/mzPeak-specification)
-  - ms_run.sample_ref writer PR: `docs/upstream/ms-run-sample-ref-writer-pr.md` (→ HUPO-PSI/mzPeak)
-
-- **Next: run `/gsd:complete-milestone`** to archive/tag v0.8 when the owner is ready.
+- **Carried-forward work ready to execute when authorized:**
+  - **Phase 22 / UPS-01** (chunk_series PR) — `docs/upstream/` draft ready; owner authorizes submission.
+  - **Phase 22 / UPS-03** (mzPeakValidator PR) — draft ready; owner authorizes submission.
+  - **Phase 30b / UPSTREAM-BIND-01** (`ms_run.sample_ref` PR) — `docs/upstream/ms-run-sample-ref-writer-pr.md` ready; owner authorizes push to HUPO-PSI/mzPeak.
+  - **UPSTREAM-PR** (v0.8 spec batch) — `docs/upstream/v0.8-spec-batch-bundle.md` (P-02..P-09) ready; owner authorizes push to HUPO-PSI/mzPeak-specification.
+  - **Phase 29 / DVN-01+02** — once UPS-01 merges + mzdata 0.64.2 publishes to crates.io.
+  - **Phase 36 / SM-07** (factor_values + scope) — deferred ≥v0.9; prioritize after upstreaming.
 
 - **Backlog DONE history retained:** 999.2 (PNG/JPEG dims), 999.3 (benchmark), 999.4 (S3 corpus).
