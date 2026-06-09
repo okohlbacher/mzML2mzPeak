@@ -131,7 +131,10 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
   3. The v0.6 `cv_list` block is kept as a file-level JSON block but reconciled with the rewritten spec's CV-declaration mechanism (the spec defines no `cv_list`) — confirmed, aligned, or queued as a proposal, with the decision recorded.
   4. Canonical IMS CV accessions are declared once in `src/schema/cv.rs` (the `TODO(F9)` placeholders are gone), forward emit and reverse `<cvList>` read the same constants and are proven not to drift, and the vendored `imagingMS.obo` is refreshed before any new accession is referenced; missing terms use stable tokens + a filed file-level CV request.
   5. CV decode is keyed by CURIE (not column name), closing the documented B1/B2/B3/C1/C3/D11 drift classes; the TMTpro 16/18-plex CV gap is documented and a term request is filed.
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 24-01-PLAN.md — CV single-source hardening: resolve TODO(F9), refresh imagingMS.obo, drive reverse `<cvList>` from `cv_list()`, no-drift + decode-by-CURIE guard tests, `docs/cv-requests.md` (CVG-01, CVG-02)
+- [ ] 24-02-PLAN.md — Binding extension-design-contract doc mapping every v0.7 facet to spec mechanisms + cv_list reconciliation note (SPEC-01, SPEC-03)
+- [ ] 24-03-PLAN.md — End-of-v0.7 batch-proposal queue stub + SDRF §5.7 committee-questions tracker (SPEC-02, held)
 **UI hint**: yes
 
 ### Phase 25: Forward declared-geometry threading (GEO-F)
@@ -192,7 +195,7 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 |-------|----------------|--------|-----------|
 | 22. Upstream PR prep | 0/? | Deferred (held) | - |
 | 23. Upstream rebase + re-verify | inline | ✅ Done | 2026-06-08 |
-| 24. Spec alignment & CV governance | 0/? | Not started | - |
+| 24. Spec alignment & CV governance | 0/3 | Planned | - |
 | 25. Forward declared-geometry threading | 0/? | Not started | - |
 | 26. Reverse `<sourceFileList>` copy | 0/? | Not started | - |
 | 27. SDRF sample model + channels + reporter-quant | 0/? | Not started | - |
