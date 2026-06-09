@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "mzPeak metadata.sample_list",
+  "description": "Governs mzpeak_index.json.metadata.sample_list. This is the REUSED v0.6 sample_list shape (id/name/parameters) confirmed/authored for v0.8 sample-metadata ingestion — NO new construct (RATIFIED-E). Isobaric channels are labeled sample_list entries via MS:1002602 \"sample label\" + its reagent children (TMT126...); there is NO channel_list schema. Each parameters array item is an inlined CV-param object (schema/param.json does not exist in this repo — inline mirrors schema/scan_settings.json and metadata.rs). Three-places rule: this file + src/schema/study.rs (sample_list schema-agreement test) + docs/mzpeak-imaging-spec-suggestions.md (Plan 30-04 spec write-up).",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "description": "A single sample entry. Analogous to the mzML sample element. For isobaric-channel studies each channel is also a sample entry carrying a 'sample label' cvParam (MS:1002602) plus reporter-m/z and role attributes.",
+    "required": ["id", "name", "parameters"],
+    "properties": {
+      "id": {
+        "type": "string",
+        "description": "A unique identifier for this sample within the sample_list, e.g. \"s1\". Corresponds to the SDRF 'source name' column after normalization."
+      },
+      "name": {
+        "type": "string",
+        "description": "A human-readable name for this sample. Typically the SDRF 'source name' or ISA source name verbatim."
+      },
+      "parameters": {
+        "type": "array",
+        "description": "CV params describing this sample (characteristics, labels, roles, etc.). Each item is an inlined CV-param object. schema/param.json does not exist in this repo; the shape is inlined here to match how scan_settings.json and metadata.rs encode cvParams.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "cv_ref": {
+              "type": "string",
+              "description": "CV code, e.g. MS, NCBITaxon, UNIMOD, CHMO"
+            },
+            "accession": {
+              "type": "string",
+              "description": "CV accession CURIE, e.g. MS:1002602 (sample label), NCBITaxon:9606 (Homo sapiens)"
+            },
+            "name": {
+              "type": "string",
+              "description": "CV term name, e.g. \"sample label\""
+            },
+            "value": {
+              "type": ["string", "null"],
+              "description": "Term value; absent for presence-only terms. For sample label this is the reagent name, e.g. \"TMT126\"."
+            },
+            "unit_cv_ref": {
+              "type": ["string", "null"],
+              "description": "Unit CV code, e.g. UO"
+            },
+            "unit_accession": {
+              "type": ["string", "null"],
+              "description": "Unit accession, e.g. UO:0000221 (dalton) for reporter-ion m/z"
+            }
+          },
+          "required": ["cv_ref", "accession", "name"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "additionalProperties": false
+  }
+}

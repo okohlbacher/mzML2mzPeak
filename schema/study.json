@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "mzPeak metadata.study global study-context block",
+  "description": "Governs mzpeak_index.json.metadata.study. Written into FileIndex.metadata[\"study\"] by the converter (Phase 32 SM-05) when a SDRF or ISA sample-metadata file is ingested. Carries the minimal global study context (repository accession, title, back-ref to the verbatim embedded member) plus an optional run_sample_binding provenance shadow reserved for Phase 32 (interim pre-upstream-merge binding until the list-valued ms_run.sample_ref field — Phase 30b — merges into HUPO-PSI/mzPeak). Per the lean posture (RATIFIED-G): factor_values, comment-scope, and full characteristics->Param shaping are deferred >=v0.9 — the verbatim blob anchor (Phase 31) holds full fidelity. Three-places rule: src/schema/study.rs + docs/mzpeak-imaging-spec-suggestions.md + this file.",
+  "type": "object",
+  "required": [
+    "dataset_accession",
+    "title",
+    "sample_metadata_ref"
+  ],
+  "properties": {
+    "dataset_accession": {
+      "type": "string",
+      "description": "Repository accession for this study, e.g. \"PXD011799\" (PRIDE / ProteomeXchange) or \"MTBLS1129\" (MetaboLights). Used as the primary key for cross-referencing the embedded verbatim member against the public repository."
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable study title (informative). Sourced from the SDRF Investigation Title column or the ISA investigation title field."
+    },
+    "sample_metadata_ref": {
+      "type": "string",
+      "description": "Archive path of the verbatim embedded sample-metadata member within the mzPeak ZIP. The back-reference that lets a reader locate the full-fidelity verbatim embed without scanning the file index. E.g. \"sample_metadata/sdrf.tsv\" or \"sample_metadata/isa/i_investigation.txt\"."
+    },
+    "run_sample_binding": {
+      "type": "object",
+      "description": "OPTIONAL Phase-32 provenance shadow for the upstream ms_run.sample_ref binding (RATIFIED-C/F). Written only when run->sample binding is known. Omitted entirely when absent (skip_serializing_if). Will be superseded by the native list-valued ms_run.sample_ref field once Phase 30b (upstream PR) merges.",
+      "required": ["run_id", "sample_ids", "binding_provenance"],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "description": "The run identifier, typically the ms_run id from the study-metadata file."
+        },
+        "sample_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "The list of sample identifiers this run is bound to."
+        },
+        "binding_provenance": {
+          "type": "string",
+          "description": "Binding provenance token. \"phase32_shadow\" indicates this is a provisional pre-upstream-merge shadow."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
