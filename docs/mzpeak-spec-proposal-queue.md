@@ -387,8 +387,8 @@ Implementation gates (must be complete before submitting the v0.8 batch):
 
 - [x] Q1–Q10 SDRF §5.7 committee questions ratified + recorded (Section 3 above). *(Phase 30, Plan 04 — DONE)*
 - [x] Proposal rows P-02..P-09 stated against the v0.8 design + mechanism references to extension contract. *(Phase 30, Plan 04 — DONE)*
-- [ ] Phase 31 (verbatim embed + typed-member seam) complete — `data_kind: sdrf/isa` + `entity_type: sample-metadata` tokens in use in real output.
-- [ ] Phase 32 (sample_list + metadata.study) complete — lean projection in real output.
+- [x] Phase 31 (verbatim embed + typed-member seam) complete — `data_kind: sdrf/isa` + `entity_type: sample-metadata` tokens in use in real output. *(Phase 31 — DONE)*
+- [x] Phase 32 (sample_list + metadata.study) complete — lean projection in real output. *(Phase 32 — DONE)*
 - [ ] Phase 34 (isobaric channels as labeled samples) complete — MS:1002602 cvParam + list-valued sample_ref binding in real output.
 - [ ] Reporter-quant keying spike confirmed (Phase 35): `channel_id` survives `add_spectrum_array_override` read-back in the Rust reader (own-reader gate).
 - [ ] Phase 30b upstream PR (`ms_run.sample_ref` list-valued field) drafted + held for owner push authorization. *(This is the Phase 37 upstream submission, not a v0.8 implementation gate.)*
@@ -398,7 +398,9 @@ Implementation gates (must be complete before submitting the v0.8 batch):
 - [ ] PRs drafted (one per proposal, or a single batch PR); draft PR text reviewed by owner before submission.
 - [ ] Submission confirmed by owner. **Submission is HELD until this checkbox is checked by the owner.**
 
+**Assembled into [`docs/upstream/v0.8-spec-batch-bundle.md`](../upstream/v0.8-spec-batch-bundle.md) (PREPARED AND HELD, Phase 37, Plan 03)**
+
 ---
 
 *Living document — update readiness status after each implementing phase completes.*
-*Submission status: HELD. Last updated: 2026-06-09 — v0.8 sample-metadata batch QUEUED (Phase 30, Plan 04 — SMSPEC-01/02): Q1–Q10 ratified; P-02..P-09 stated as queued; §4b gate updated. Submission of the v0.8 batch is HELD for Phase 37 (owner-gated; push policy: HUPO-PSI outside okohlbacher → explicit interactive authorization). v0.7 batch (P-01/P-06/P-07) unchanged — narrowed 2026-06-09 (owner + CODEX adversarial review).*
+*Submission status: HELD. Last updated: 2026-06-09 — v0.8 sample-metadata batch QUEUED (Phase 30, Plan 04 — SMSPEC-01/02): Q1–Q10 ratified; P-02..P-09 stated as queued; §4b gate updated. Phase 31/32 gates checked (2026-06-09, Phase 37). Assembled into docs/upstream/v0.8-spec-batch-bundle.md (PREPARED AND HELD, Phase 37). Submission of the v0.8 batch is HELD for owner authorization (push policy: HUPO-PSI outside okohlbacher → explicit interactive authorization). v0.7 batch (P-01/P-06/P-07) unchanged — narrowed 2026-06-09 (owner + CODEX adversarial review).*
