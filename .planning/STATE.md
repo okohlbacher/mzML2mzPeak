@@ -4,14 +4,14 @@ milestone: v0.7
 milestone_name: — Upstreaming, de-vendoring & sample-metadata modeling
 status: completed
 stopped_at: v0.7 reshaped to 8 phases (22–29); imaging-structure cluster deferred beyond v1.0; re-themed; REQUIREMENTS traceability mapped 21 active
-last_updated: "2026-06-09T04:08:23.805Z"
+last_updated: "2026-06-09T04:19:20.721Z"
 last_activity: 2026-06-08 — v0.7 reshaped 10→8 phases; imaging-structure cluster deferred beyond v1.0; re-themed to "Upstreaming, de-vendoring & sample-metadata modeling"
 progress:
   total_phases: 8
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 5
-  percent: 25
+  completed_plans: 6
+  percent: 38
 ---
 
 # Project State
@@ -35,10 +35,10 @@ request); Phase 22 (PRs) and Phase 29 (de-vendor) are DEFERRED/held; the next bu
 
 ## Current Position
 
-Phase: **24 (Spec alignment & CV governance)** — Plan 01 ✅ DONE
-Plan: 01 complete (`aa47452`)
-Status: Phase 23 (upstream rebase) ✅ DONE (`5021eed`). Phase 22 (PRs) DEFERRED — held by owner (UPS-02/04 done-upstream). Phase 29 (de-vendor) DEFERRED — gated on external merges. Phase 24 Plan 01 DONE — CVG-01/CVG-02 gates closed. Next: Phase 24 Plan 02 (if planned) or Phase 25/26.
-Last activity: 2026-06-08 — v0.7 reshaped 10→8 phases; imaging-structure cluster deferred beyond v1.0; re-themed to "Upstreaming, de-vendoring & sample-metadata modeling"
+Phase: **25 (Forward declared-geometry threading)** — Plans 01–02 ✅ DONE
+Plan: 02 complete (`b9d1541`)
+Status: Phase 23 (upstream rebase) ✅ DONE (`5021eed`). Phase 22 (PRs) DEFERRED — held by owner (UPS-02/04 done-upstream). Phase 29 (de-vendor) DEFERRED — gated on external merges. Phase 24 Plan 01 DONE — CVG-01/CVG-02 gates closed. Phase 25 Plans 01–02 DONE — GEOF-01 fully proven end-to-end. Next: Phase 26 (RSRC) or Phase 27 (SDRF).
+Last activity: 2026-06-09 — Phase 25 Plans 01–02 complete; GEOF-01 closed; declared-geometry fixture + symmetry assertion + integration test committed
 
 ### Rebase findings (2026-06-08, commit 5021eed)
 
@@ -68,7 +68,7 @@ stack (`arrow`/`parquet` = 57.0.0, `zip` = 4.1.0, `mzpeaks` = 1.0.9) holds every
 | 22 | Upstream PR prep | UPS-01, UPS-03 | **Deferred (held)** | 23 — runs early so PRs age |
 | 23 | Upstream rebase + re-verify | REB-01 | **✅ DONE (`5021eed`)** | — (first; precedes all new facets) |
 | 24 | Spec alignment & CV governance | SPEC-01..03, CVG-01..02 | **Next buildable** | 23 — precedes every emitting phase |
-| 25 | Forward declared-geometry threading (GEO-F) | GEOF-01 | Not started | 24 (∥ 26) |
+| 25 | Forward declared-geometry threading (GEO-F) | GEOF-01 | **✅ DONE** | 24 (∥ 26) |
 | 26 | Reverse `<sourceFileList>` copy (RSRC) | RSRC-01 | Not started | 24 (∥ 25) |
 | 27 | SDRF model + isobaric channels + reporter-quant | SDRF-01..05, CHAN-01..03 | Not started | 24 |
 | 28 | L2 conformance verify path (F10) | L2-01 | Not started | 24 |
@@ -139,6 +139,12 @@ polygon; pixel = coords + scan-PK (`scan.scan_index` + `scan.spectrum_reference`
 
 v0.7 decisions will be logged here per plan. v0.6 decisions are archived in
 `milestones/v0.6-ROADMAP.md` + PROJECT.md Key Decisions.
+
+**Phase 25 Plans 01–02 (2026-06-09):**
+
+- GEOF-01 consistency guard: fold_into compares observed max vs declared grid; inconsistent → observed_max + warn; empty-run + declared → consistent; no-declared → unchanged.
+- Symmetry assertion excludes scan-pattern CURIEs from comparison: metadata.imaging does not carry them; re-emitting them is a known round-trip gap (FID-02); scan_pattern difference is not a symmetry failure.
+- Fixture uses deterministic UUID distinct from Example_Processed to avoid cross-test provenance overlap.
 
 **Phase 24 Plan 01 (2026-06-09):**
 

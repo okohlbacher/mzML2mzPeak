@@ -58,7 +58,7 @@
 - [ ] **Phase 22: Upstream PR prep** *(DEFERRED — held)* - Submit the chunk_series PR (UPS-01) + the mzPeakValidator PR (UPS-03). UPS-02 (mzdata SONAR/IM) + UPS-04 (array_buffer B2) are **done-upstream** (fixed by the rebase) — no action. Owner is holding PR submission for now (writes PR text when ready). No fork removal.
 - [x] **Phase 23: Upstream rebase + re-verify** - ✅ DONE 2026-06-08 (`5021eed`). mzpeak→`a5c222c`, mzdata→`0.64.2`; 2 of 3 patches dropped (upstreamed); only chunk_series remains; build + full test suite green; pwiz 139/139.
 - [x] **Phase 24: Spec alignment & CV governance** - Plan 01 ✅ 2026-06-09 (`aa47452`). TODO(F9) resolved; reverse `<cvList>` driven from `cv_list()` (no-drift by construction); CVG-02 guard test; imagingMS.obo confirmed current; docs/cv-requests.md created (IMS home + TMTpro 132–135 gap). 247 tests green.
-- [ ] **Phase 25: Forward declared-geometry threading (GEO-F)** - Thread imzML `<scanSettings>` declared grid; flip `pixel_count_source` to "declared". Parallel-able with Phase 26.
+- [x] **Phase 25: Forward declared-geometry threading (GEO-F)** - Thread imzML `<scanSettings>` declared grid; flip `pixel_count_source` to "declared". **✅ DONE** (both plans complete).
 - [ ] **Phase 26: Reverse `<sourceFileList>` copy (RSRC)** - Re-emit `file_description.source_files[]` provenance into the reverse `.imzML`. Parallel-able with Phase 25.
 - [ ] **Phase 27: SDRF sample model + isobaric channels + reporter-quant** - Verbatim SDRF embed + projected `sample_list`/`channel_list` + run→sample binding + reporter-ion quant (aux array keyed by `channel_id`). Only new dep (`csv`).
 - [ ] **Phase 28: L2 conformance verify path (F10)** - `--conformance l2` value-equal-under-recorded-transform arm on the existing `ToleranceContract::L2`.
@@ -163,7 +163,7 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 **Plans**: 2 plans
 
 - [x] 25-01-PLAN.md — Consistency guard: declared-vs-observed grid check in IndexAccumulator::fold_into; keep observed_max + counted warning on inconsistency (no fabrication); surface on convert + CLI (GEOF-01)
-- [ ] 25-02-PLAN.md — Declared-grid+.ibd fixture; end-to-end convert-path declared-flip + scan_settings_list test; src/verify/ forward↔reverse declared-geometry symmetry assertion; spec-suggestions consistency note (GEOF-01)
+- [x] 25-02-PLAN.md — Declared-grid+.ibd fixture; end-to-end convert-path declared-flip + scan_settings_list test; src/verify/ forward↔reverse declared-geometry symmetry assertion; spec-suggestions consistency note (GEOF-01)
 
 ### Phase 26: Reverse `<sourceFileList>` copy (RSRC)
 
