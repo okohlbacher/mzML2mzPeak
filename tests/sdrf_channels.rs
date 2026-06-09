@@ -96,7 +96,7 @@ fn synthetic_tmt_sdrf_sample_list_has_labeled_entries() {
     let out = tmp_out("labeled_entries");
     let _ = std::fs::remove_file(&out);
 
-    let result = convert_mzml(input, &out, &EncodingOptions::lossless(), Some(&sdrf_path), None);
+    let result = convert_mzml(input, &out, &EncodingOptions::lossless(), Some(&sdrf_path), None, false);
     let _ = std::fs::remove_file(&sdrf_path);
     result.expect("convert_mzml with synthetic TMT SDRF must succeed");
 
@@ -299,9 +299,9 @@ fn no_sdrf_output_byte_identical_and_no_study_key() {
     let _ = std::fs::remove_file(&out_a);
     let _ = std::fs::remove_file(&out_b);
 
-    convert_mzml(input, &out_a, &EncodingOptions::lossless(), None, None)
+    convert_mzml(input, &out_a, &EncodingOptions::lossless(), None, None, false)
         .expect("first no-SDRF conversion must succeed");
-    convert_mzml(input, &out_b, &EncodingOptions::lossless(), None, None)
+    convert_mzml(input, &out_b, &EncodingOptions::lossless(), None, None, false)
         .expect("second no-SDRF conversion must succeed");
 
     for (label, path) in [("A", &out_a), ("B", &out_b)] {

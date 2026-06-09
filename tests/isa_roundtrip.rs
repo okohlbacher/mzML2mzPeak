@@ -92,7 +92,7 @@ fn mtbls5358_isa_tab_embeds_losslessly_and_reserves_byte_identical() {
     let _ = std::fs::remove_file(&out);
 
     // Convert with ISA-Tab bundle (directory path).
-    convert_mzml(input, &out, &EncodingOptions::lossless(), None, Some(isa_dir))
+    convert_mzml(input, &out, &EncodingOptions::lossless(), None, Some(isa_dir), false)
         .expect("convert_mzml with MTBLS5358 ISA-Tab must succeed");
 
     // ── (a) FileIndex SURVIVAL ────────────────────────────────────────────────────────────────
@@ -223,7 +223,7 @@ fn minimal_isa_json_embeds_losslessly_and_reserves_byte_identical() {
     let _ = std::fs::remove_file(&out);
 
     // Convert with ISA-JSON.
-    convert_mzml(input, &out, &EncodingOptions::lossless(), None, Some(json_path))
+    convert_mzml(input, &out, &EncodingOptions::lossless(), None, Some(json_path), false)
         .expect("convert_mzml with minimal ISA-JSON must succeed");
 
     // FileIndex SURVIVAL.
@@ -293,7 +293,7 @@ fn no_isa_flag_output_has_no_isa_keys() {
     let out = tmp_out("noflag");
     let _ = std::fs::remove_file(&out);
 
-    convert_mzml(input, &out, &EncodingOptions::lossless(), None, None)
+    convert_mzml(input, &out, &EncodingOptions::lossless(), None, None, false)
         .expect("no-flag conversion must succeed");
 
     let reader = MzPeakReader::new(&out)

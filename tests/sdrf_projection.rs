@@ -60,7 +60,7 @@ fn pxd020187_sample_list_reads_back_one_entry() {
     let out = tmp_out("sample_list_a");
     let _ = std::fs::remove_file(&out);
 
-    convert_mzml(input, &out, &EncodingOptions::lossless(), Some(sdrf), None)
+    convert_mzml(input, &out, &EncodingOptions::lossless(), Some(sdrf), None, false)
         .expect("convert_mzml with PXD020187 SDRF must succeed");
 
     let reader = MzPeakReader::new(&out)
@@ -137,7 +137,7 @@ fn pxd020187_zero_match_no_run_sample_binding() {
     let out = tmp_out("binding_b");
     let _ = std::fs::remove_file(&out);
 
-    convert_mzml(input, &out, &EncodingOptions::lossless(), Some(sdrf), None)
+    convert_mzml(input, &out, &EncodingOptions::lossless(), Some(sdrf), None, false)
         .expect("convert_mzml must succeed");
 
     let reader = MzPeakReader::new(&out).expect("MzPeakReader must open archive");
@@ -209,7 +209,7 @@ fn synthetic_match_emits_run_sample_binding_shadow() {
     let out = tmp_out("binding_c");
     let _ = std::fs::remove_file(&out);
 
-    let result = convert_mzml(input, &out, &EncodingOptions::lossless(), Some(&sdrf_path), None);
+    let result = convert_mzml(input, &out, &EncodingOptions::lossless(), Some(&sdrf_path), None, false);
     let _ = std::fs::remove_file(&sdrf_path);
     result.expect("convert_mzml with synthetic matching SDRF must succeed");
 
@@ -285,9 +285,9 @@ fn no_sdrf_conversion_has_no_study_or_sample_metadata_key() {
     let _ = std::fs::remove_file(&out_a);
     let _ = std::fs::remove_file(&out_b);
 
-    convert_mzml(input, &out_a, &EncodingOptions::lossless(), None, None)
+    convert_mzml(input, &out_a, &EncodingOptions::lossless(), None, None, false)
         .expect("first no-SDRF conversion must succeed");
-    convert_mzml(input, &out_b, &EncodingOptions::lossless(), None, None)
+    convert_mzml(input, &out_b, &EncodingOptions::lossless(), None, None, false)
         .expect("second no-SDRF conversion must succeed");
 
     for (label, path) in [("A", &out_a), ("B", &out_b)] {
