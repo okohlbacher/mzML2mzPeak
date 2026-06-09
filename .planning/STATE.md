@@ -391,11 +391,12 @@ Items deferred out of v0.7:
 | 260609-8wo | Reconcile dir-name vs in-file instrument model — `agilent-qtof`→6490 QqQ, `waters-xevo-g2s-qtof`→G2-XS (kept names + caveats) | 2026-06-09 |
 | 260609-hhj | S3 index: per-accordion raw/mzML/mzPeak size+% headers (imaging RAW incl. optical) + per-category compression box-scatter PNGs embedded in each subpage (examples >50 MB input) | 2026-06-09 |
 | 260609-rfp | Make SDRF/ISA projections run-filtered — sample_list and channels scoped to matched rows only (v0.8.1 patch) | 2026-06-09 |
+| 260609-aim | ISA run-matching: structural assay-based match so ISA archives get non-empty run-filtered sample_list (v0.8.2 patch) | 2026-06-09 |
 
 ## Session Continuity
 
-Last session: 2026-06-09T18:00:00Z
-Stopped at: Phase 37 Plan 03 COMPLETE — all buildable v0.8 phases done (30/31/32/33/34/35/37); VAL-01 PASSED (label-free + TMT byte-for-byte); VAL-02 shipped; UPSTREAM-PR PREPARED-AND-HELD; 565 tests green
+Last session: 2026-06-09T18:30:00Z
+Stopped at: Quick task isa-run-matching COMPLETE — ISA structural assay matcher added; 584 tests green (was 565)
 Resume file: None
 
 ## Operator Next Steps
