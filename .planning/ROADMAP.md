@@ -192,7 +192,16 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
   4. Reporter-ion quantitation is stored as an `auxiliary` array with a `channel_id` column; `channel_id` is proven to survive read-back (confirm via a read-back spike) and resolves to `channel_list`.
   5. Round-trip validates with `sdrf-pipelines` on a label-free fixture (MTBLS1129) and a TMT 10-plex fixture (PXD011799).
 
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+- [ ] 27-01-PLAN.md — csv dep + SDRF parse/model + row-matching foundation (SDRF-01 parse half)
+- [ ] 27-02-PLAN.md — verbatim embed FIRST (lossless anchor) + --sdrf threading + round-trip (SDRF-01/02)
+- [ ] 27-03-PLAN.md — sample_list + assay_ref promoted Int64 column + run→sample binding (SDRF-03/04)
+- [ ] 27-04-PLAN.md — channel_list + reporter-m/z constant table + ms_run.channel_set/plex_id (CHAN-01/02)
+- [ ] 27-05-PLAN.md — reporter-quant aux array WITH channel_id read-back spike gate (CHAN-03)
+- [ ] 27-06-PLAN.md — repo-SDRF-wins precedence + three-places docs + XRT validator/L1 sweep (SDRF-05)
+
 **UI hint**: yes
 
 ### Phase 28: L2 conformance verify path (F10)
