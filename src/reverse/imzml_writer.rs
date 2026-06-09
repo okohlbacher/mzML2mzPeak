@@ -307,7 +307,8 @@ impl ImzmlWriter {
     ) -> Result<Self, ReverseError> {
         let sink = BufWriter::new(File::create(path.as_ref()).map_err(ReverseError::XmlEmit)?);
         let mut w = Self { sink };
-        Self::write_header_to(&mut w.sink, uuid, ibd_md5_hex, count, imaging, &[])?;
+        // Eager-header lifecycle: no source_files (callers/tests stay on the back-compat no-op surface).
+        Self::write_header_to(&mut w.sink, uuid, ibd_md5_hex, count, imaging, &[], &[])?;
         Ok(w)
     }
 
@@ -359,14 +360,21 @@ impl ImzmlWriter {
 
     /// Write the complete spec-rich header to an ARBITRARY sink: prolog → `<mzML>` → `<cvList>`
     /// (with `<cv id="IMS">`) → `<fileDescription>`/`<fileContent>` (UUID/MD5/processed) →
-    /// scaffolding lists → `<scanSettingsList>` (from `imaging` or empty) → `<run>` →
-    /// `<spectrumList count="N">`.
+    /// `<sourceFileList>` (from `source_files` — Phase 26 RSRC-01) → scaffolding lists →
+    /// `<scanSettingsList>` (from `imaging` or empty) → `<run>` → `<spectrumList count="N">`.
     ///
     /// This is an ASSOCIATED function over `&mut impl Write` (Plan 10-01 — Option C) so the
     /// orchestrator can write the header — which carries `IMS:1000090` (the `.ibd` MD5, only known
     /// AFTER the body) — to the real `.imzML` sink AFTER the spectra body has been streamed to a
     /// temp file. The bytes are byte-identical to the eager-header lifecycle (both route through the
     /// same free emit helpers); [`Self::new`] is now a thin wrapper that calls this.
+    ///
+    /// `source_files` (Phase 26 — RSRC-01) is the `file_description.source_files[]` slice the
+    /// reverse `convert` orchestrator reads from the archive once and threads in. When NON-empty,
+    /// a `<sourceFileList>` carrying the original provenance (id/name/location + UUID/checksum params)
+    /// is emitted inside `<fileDescription>` after `<fileContent>`. When EMPTY (or the archive
+    /// carries no source-files), NO `<sourceFileList>` is emitted at all — byte-identical to the
+    /// pre-Phase-26 back-compat surface (nothing fabricated — threat T-26-FAB).
     ///
     /// `samples` (Phase 21 — RIMG-02) is the per-image `(exported_filename, RecoveredOptical)` list
     /// the reverse `convert` orchestrator threads in from `export_image_members` + the inverse fold.
@@ -382,6 +390,7 @@ impl ImzmlWriter {
         count: u64,
         imaging: Option<&ImagingMetadata>,
         samples: &[(String, RecoveredOptical)],
+        source_files: &[mzdata::meta::SourceFile],
     ) -> Result<(), ReverseError> {
         emit_raw(sink, PROLOG)?;
         emit_raw(
@@ -430,14 +439,10 @@ impl ImzmlWriter {
         // IMS:1000031 — processed mode (presence-only).
         emit_cv_param_flag(sink, "IMS", "IMS:1000031", "processed")?;
         emit_raw(sink, "</fileContent>")?;
-        // OUR output lineage only (NOT the upstream's — deferred per CONTEXT).
-        emit_raw(
-            sink,
-            "<sourceFileList count=\"1\">\
-             <sourceFile id=\"sf_reverse\" name=\"mzml2mzpeak\" location=\"file://\">\
-             <cvParam cvRef=\"MS\" accession=\"MS:1000824\" name=\"no nativeID format\" value=\"\"/>\
-             </sourceFile></sourceFileList>",
-        )?;
+        // Phase 26 (RSRC-01): re-emit read-back source_files[] as <sourceFileList> (replacing the
+        // previous hardcoded sf_reverse block). Empty slice -> no element (back-compat no-op,
+        // T-26-FAB). Non-empty -> reconstructed provenance (id/name/location + UUID/checksum CURIEs).
+        write_source_file_list_to(sink, source_files)?;
         emit_raw(sink, "</fileDescription>\n")?;
 
         // sampleList — the embedded optical images re-exported on the reverse path (RIMG-02). Emits
@@ -1894,9 +1899,10 @@ mod tests {
     use crate::reverse::optical_fold::RecoveredOptical;
 
     /// Emit a header to an in-memory buffer with the given samples and return it as a UTF-8 string.
+    /// Passes an empty source_files slice (back-compat no-op path — Phase 26).
     fn header_string(samples: &[(String, RecoveredOptical)]) -> String {
         let mut buf: Vec<u8> = Vec::new();
-        ImzmlWriter::write_header_to(&mut buf, Uuid::nil(), "deadbeef", 0, None, samples)
+        ImzmlWriter::write_header_to(&mut buf, Uuid::nil(), "deadbeef", 0, None, samples, &[])
             .expect("header emits");
         String::from_utf8(buf).expect("header is valid UTF-8")
     }

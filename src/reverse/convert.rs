@@ -36,6 +36,7 @@ use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 
 use mzdata::io::imzml::Uuid;
+use mzdata::prelude::MSDataFileMetadata;
 use mzpeak_prototyping::MzPeakReader;
 
 use crate::reverse::error::ReverseError;
@@ -202,9 +203,15 @@ fn run_pipeline(
     // `images` block is a clean no-op (no `<sampleList>` is emitted — RIMG-03).
     let samples = export_samples(archive, imzml_path, imaging.as_ref());
 
+    // Phase 26 (RSRC-01): read back source_files[] once at pipeline level (the reader is still in
+    // scope here; one clone per conversion run, never per-pixel). An archive that carries no
+    // source_files[] returns an empty Vec — the empty-slice no-op path in write_source_file_list_to
+    // emits nothing (back-compat, T-26-FAB).
+    let source_files = reader.file_description().source_files.clone();
+
     // Assemble the real .imzML: header (with MD5 + UUID, structurally first) → body → trailer.
     let mut out = BufWriter::new(File::create(imzml_path).map_err(ReverseError::XmlEmit)?);
-    ImzmlWriter::write_header_to(&mut out, uuid, &md5, count, imaging.as_ref(), &samples)?;
+    ImzmlWriter::write_header_to(&mut out, uuid, &md5, count, imaging.as_ref(), &samples, &source_files)?;
     let mut body_rd = File::open(body_tmp).map_err(ReverseError::XmlEmit)?;
     // Bounded file→file copy (fixed stack buffer) — never buffers the whole body in RAM.
     std::io::copy(&mut body_rd, &mut out).map_err(ReverseError::XmlEmit)?;
