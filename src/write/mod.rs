@@ -25,6 +25,7 @@ pub mod writer;
 pub mod convert;
 pub mod image;
 pub mod mzml;
+pub mod reporter_quant;
 
 pub use spectrum::{to_mzdata, to_mzdata_canonical, CastNarrowing};
 pub use writer::{ImagingWriter, WriteError};
