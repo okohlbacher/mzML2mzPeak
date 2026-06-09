@@ -54,12 +54,15 @@ pub enum SdrfError {
 
 /// Which source format produced this `SampleMetadataDoc`.
 ///
-/// ISA variants are reserved for Phase 33 — only `Sdrf` is used now.
+/// Phase 33 adds `IsaTab` (ISA-Tab block format) and `IsaJson` (ISA-JSON serde layer).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SourceFormat {
     /// SDRF (Sample and Data Relationship Format) TSV.
     Sdrf,
-    // ISA-Tab and ISA-JSON are deferred to Phase 33.
+    /// ISA-Tab (Investigation/Study/Assay block-structured tab format, as used by MetaboLights).
+    IsaTab,
+    /// ISA-JSON (ISA object model serialized as nested JSON with `@id` references).
+    IsaJson,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
