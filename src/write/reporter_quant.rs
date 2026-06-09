@@ -137,15 +137,15 @@ impl ReporterQuantContract {
 
 /// A channel descriptor projected from the Phase-34 labeled `sample_list` entries.
 ///
-/// `channel_id` is the stable id of the labeled sample-list entry (e.g. `"sample-1::TMT126"`).
-/// `reporter_mz` is `Some(mz)` for resolved table entries; `None` for TMTpro high channels
-/// (CHAN-03) — channels with `None` are **skipped** by `extract_reporter_intensities`, never
-/// assigned a sentinel intensity.
+/// `channel_id` is the stable id of the labeled sample-list entry (e.g. `"sample-1"`), taken
+/// directly from `s.id` in `collect_channel_refs`. `reporter_mz` is `Some(mz)` for resolved
+/// table entries; `None` for TMTpro high channels (CHAN-03) — channels with `None` are
+/// **skipped** by `extract_reporter_intensities`, never assigned a sentinel intensity.
 ///
 /// Constructed in Plan 35-02's `convert_mzml` from the Phase-34 projected `sample_list`.
 #[derive(Debug, Clone)]
 pub struct ChannelRef {
-    /// Stable id from the Phase-34 sample-list entry (e.g. `"sample-1::TMT126"`).
+    /// Stable id from the Phase-34 sample-list entry (e.g. `"sample-1"`), taken from `s.id`.
     pub channel_id: String,
     /// Nominal reporter-ion m/z (monoisotopic). `None` = unresolved TMTpro high channel.
     pub reporter_mz: Option<f64>,
