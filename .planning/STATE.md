@@ -4,13 +4,13 @@ milestone: v0.7
 milestone_name: — Upstreaming, de-vendoring & sample-metadata modeling
 status: planning
 stopped_at: v0.7 reshaped to 8 phases (22–29); imaging-structure cluster deferred beyond v1.0; re-themed; REQUIREMENTS traceability mapped 21 active
-last_updated: "2026-06-09T03:40:49.022Z"
-last_activity: 2026-06-08 — v0.7 reshaped 10→8 phases; imaging-structure cluster deferred beyond v1.0; re-themed to "Upstreaming, de-vendoring & sample-metadata modeling"
+last_updated: "2026-06-09T03:41:46Z"
+last_activity: 2026-06-09 — Phase 24 Plan 01 (CV governance) complete: TODO(F9) resolved, reverse cvList no-drift by construction, CVG-02 guard test, imagingMS.obo confirmed current
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 3
   percent: 0
 ---
 
@@ -35,9 +35,9 @@ request); Phase 22 (PRs) and Phase 29 (de-vendor) are DEFERRED/held; the next bu
 
 ## Current Position
 
-Phase: **24 (Spec alignment & CV governance)** — next buildable
-Plan: —
-Status: Phase 23 (upstream rebase) ✅ DONE (`5021eed`). Phase 22 (PRs) DEFERRED — held by owner (UPS-02/04 done-upstream). Phase 29 (de-vendor) DEFERRED — gated on external merges. Ready to plan Phase 24.
+Phase: **24 (Spec alignment & CV governance)** — Plan 01 ✅ DONE
+Plan: 01 complete (`aa47452`)
+Status: Phase 23 (upstream rebase) ✅ DONE (`5021eed`). Phase 22 (PRs) DEFERRED — held by owner (UPS-02/04 done-upstream). Phase 29 (de-vendor) DEFERRED — gated on external merges. Phase 24 Plan 01 DONE — CVG-01/CVG-02 gates closed. Next: Phase 24 Plan 02 (if planned) or Phase 25/26.
 Last activity: 2026-06-08 — v0.7 reshaped 10→8 phases; imaging-structure cluster deferred beyond v1.0; re-themed to "Upstreaming, de-vendoring & sample-metadata modeling"
 
 ### Rebase findings (2026-06-08, commit 5021eed)
@@ -139,6 +139,11 @@ polygon; pixel = coords + scan-PK (`scan.scan_index` + `scan.spectrum_reference`
 
 v0.7 decisions will be logged here per plan. v0.6 decisions are archived in
 `milestones/v0.6-ROADMAP.md` + PROJECT.md Key Decisions.
+
+**Phase 24 Plan 01 (2026-06-09):**
+- IMS CV URI: no OBO-Foundry PURL exists; stable imzML/imzML raw URL is the recorded local token; request filed in docs/cv-requests.md. imagingMS.obo upstream byte-identical to vendored copy; vendored kept.
+- Reverse `<cvList>` now reads from `cv_list()` via loop (CVG-01 no-drift-by-construction); no independent CV literals remain in imzml_writer.rs.
+- CVG-02 guard: source-scan over decode modules proves CURIE-keyed decode (not column-name); B1/B2/B3/C1/C3/D11 classes attributed to upstream reference readers.
 
 **Reshape revision (2026-06-08):** dropped the imaging-structure cluster (PIX-01/ROI-01/CONT-01/IMG-01)
 to "Deferred beyond v1.0"; re-themed v0.7 to "Upstreaming, de-vendoring & sample-metadata modeling";

@@ -40,8 +40,8 @@
 - [x] **SPEC-01**: Every new facet/metadata block is modeled via the updated spec's own mechanisms — file-level metadata as JSON in the `metadata` data-kind Parquet KV; new members via the documented **"Adding a new Data Kind / Entity Type"** process; CV concepts via the spec's **column-name inflection** + `parameters` list — not ad-hoc structures. Built LOCALLY against stable CV tokens (no blocking on IMS URI minting). *(Phase 24.)*
 - [ ] **SPEC-02**: The SDRF/sample/channel extensions are written up and **submitted as a BATCH of proposals/PRs to `HUPO-PSI/mzPeak-specification`** (the new spec repo) at the **END of v0.7** (not incrementally) so the format stays mergeable-by-design; the committee's open questions (SDRF §5.7) are tracked. *(Phase 24.)*
 - [x] **SPEC-03**: The v0.6 `cv_list` block is kept as a file-level JSON block but reconciled with the updated spec's CV-declaration mechanism (the spec defines no `cv_list` — confirm/align/propose). *(Phase 24.)*
-- [ ] **CVG-01**: Canonical IMS CV accessions are declared via the single-source `src/schema/cv.rs` (resolving the v0.6 `TODO(F9)` placeholders), with forward emit + reverse `<cvList>` guaranteed not to drift; stable tokens + file CV requests where terms are missing. *(Phase 24.)*
-- [ ] **CVG-02**: Existing `IMS:1006xxx` accessions are audited and the vendored `imagingMS.obo` refreshed before any new accession is referenced; CV decode is by CURIE, not column name (fixes the documented B1/B2/B3 / C1/C3/D11 drift classes). *(Phase 24.)*
+- [x] **CVG-01**: Canonical IMS CV accessions are declared via the single-source `src/schema/cv.rs` (resolving the v0.6 `TODO(F9)` placeholders), with forward emit + reverse `<cvList>` guaranteed not to drift; stable tokens + file CV requests where terms are missing. *(Phase 24 Plan 01 ✅ 2026-06-09)*
+- [x] **CVG-02**: Existing `IMS:1006xxx` accessions are audited and the vendored `imagingMS.obo` refreshed before any new accession is referenced; CV decode is by CURIE, not column name (fixes the documented B1/B2/B3 / C1/C3/D11 drift classes). *(Phase 24 Plan 01 ✅ 2026-06-09)*
 
 ### Geometry & provenance round-trip (GEOF / RSRC)
 
@@ -116,8 +116,8 @@ These are **NOT** v0.7 phases. PSI-committee notes to carry forward: ROI as a sp
 | SPEC-01 | Phase 24 | Complete |
 | SPEC-02 | Phase 24 | Pending |
 | SPEC-03 | Phase 24 | Complete |
-| CVG-01 | Phase 24 | Pending |
-| CVG-02 | Phase 24 | Pending |
+| CVG-01 | Phase 24 Plan 01 | Done 2026-06-09 |
+| CVG-02 | Phase 24 Plan 01 | Done 2026-06-09 |
 | GEOF-01 | Phase 25 | Pending |
 | RSRC-01 | Phase 26 | Pending |
 | SDRF-01 | Phase 27 | Pending |
