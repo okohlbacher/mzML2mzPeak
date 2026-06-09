@@ -4,13 +4,13 @@ milestone: v0.7
 milestone_name: — Upstreaming, de-vendoring & sample-metadata modeling
 status: completed
 stopped_at: v0.7 reshaped to 8 phases (22–29); imaging-structure cluster deferred beyond v1.0; re-themed; REQUIREMENTS traceability mapped 21 active
-last_updated: "2026-06-09T03:48:32.783Z"
+last_updated: "2026-06-09T04:01:31.273Z"
 last_activity: 2026-06-08 — v0.7 reshaped 10→8 phases; imaging-structure cluster deferred beyond v1.0; re-themed to "Upstreaming, de-vendoring & sample-metadata modeling"
 progress:
   total_phases: 8
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 6
+  completed_plans: 4
   percent: 13
 ---
 
@@ -262,7 +262,7 @@ Items deferred out of v0.7:
 
 ## Session Continuity
 
-Last session: 2026-06-09T03:48:32.780Z
+Last session: 2026-06-09T04:01:31.270Z
 Stopped at: v0.7 reshaped to 8 phases (22–29); imaging-structure cluster deferred beyond v1.0; re-themed; REQUIREMENTS traceability mapped 21 active
 Resume file: None
 
