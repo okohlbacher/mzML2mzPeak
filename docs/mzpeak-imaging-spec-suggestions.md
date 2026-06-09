@@ -324,6 +324,60 @@
 
 > <a name="imaging-provenance"></a>For imaging sources, `file_description.contents` _MUST_ carry the source `IMS:1000080` UUID, the `.ibd` checksum term present (`IMS:1000090` MD5 / `IMS:1000091` SHA-1 / `IMS:1000092` SHA-256), and the storage-mode term (`IMS:1000030`/`IMS:1000031`). `file_description.source_files[]` _SHOULD_ list the original `.imzML`, `.ibd`, and the vendor raw file. The `.ibd` entry's params _SHOULD_ carry the same source `IMS:1000080` UUID and `.ibd` checksum term (`IMS:1000090`/`IMS:1000091`/`IMS:1000092`) as `contents`, drawn from the same already-verified values (no second hash). The converter _MUST_ verify the UUID and declared `.ibd` checksum before conversion and hard-fail on mismatch. (This converter lists the `.imzML` + `.ibd`; the vendor raw file is omitted as it is unavailable to the converter.)
 
+### Edit 11 — L2 transform record in `### File-Level Metadata` (P-07, queued v0.7)
+**Location:** "File-Level Metadata" subsection (the existing `metadata` key table), immediately after the `cv_list` entry.
+**Action:** insert a new `transform` row in the metadata table and a new normative sub-section.
+**Status:** QUEUED (v0.7 batch SPEC-02 P-07) — submission held to end of v0.7; this text is the proposed wording.
+
+> #### L2 Transform Record (`metadata.transform`)
+>
+> When a lossy-but-bounded transform is applied to a data axis during conversion (e.g. Numpress
+> linear prediction m/z compression, `MS:1002312`), a converter declaring **L2 conformance** _MUST_
+> write a `transform` block into the file-level `metadata` map. A converter that applied no lossy
+> transform _MUST NOT_ emit this key — its absence is an honest declaration of L1 (lossless)
+> conformance.
+>
+> The block is governed by [`schema/transform.json`](../schema/transform.json)
+> (`additionalProperties: false`; all fields required).
+>
+> ```json
+> {
+>   "transform": {
+>     "transform":           "MS:1002312",
+>     "name":                "Numpress linear prediction m/z compression",
+>     "axis":                "m/z",
+>     "conformance_level":   "L2",
+>     "mz_rel_err":          1e-7,
+>     "intensity_rel_err":   1e-3,
+>     "data_processing_ref": "mzml2mzpeak_numpress_linear"
+>   }
+> }
+> ```
+>
+> **Field semantics:**
+>
+> | Field | Type | Meaning |
+> |---|---|---|
+> | `transform` | string | PSI-MS CURIE of the applied transform (`MS:1002312` for Numpress linear). _MUST_ match the `transform` CURIE in the per-column `array_index` entries — single source, no drift. |
+> | `name` | string | Human-readable name (informative). |
+> | `axis` | string | Data axis to which the transform applies. `"m/z"` for Numpress linear (intensity stays lossless). |
+> | `conformance_level` | string | Declared conformance level. `"L2"` for any lossy-but-bounded transform. |
+> | `mz_rel_err` | number | m/z maximum relative error bound (spec v0.3 §8: L2 = `1e-7`, ≈0.1 ppm). |
+> | `intensity_rel_err` | number | Intensity maximum relative error bound (spec v0.3 §8: L2 = `1e-3`, 0.1%). |
+> | `data_processing_ref` | string | Id of the `data_processing` step that produced the transform. |
+>
+> **Relationship to the array-index `transform` field:** The per-column array-index `transform` CURIE
+> (stamped by the writer for each Numpress-encoded column) and the file-level `metadata.transform.transform`
+> CURIE _MUST_ be identical. A reader that detects a mismatch _SHOULD_ treat the file as non-conformant
+> for L2. A conformant writer derives both from the same single source — e.g.
+> `mzdata::spectrum::bindata::BinaryCompressionType::NumpressLinear.as_param().curie()` in the
+> reference Rust implementation — so drift is structurally impossible.
+>
+> **L2 verification:** A reader verifying L2 conformance _MUST_ compare each decoded (m/z, intensity)
+> pair against the source within the recorded `mz_rel_err` / `intensity_rel_err` bounds. Only archives
+> carrying `metadata.transform` (with `conformance_level: "L2"`) are eligible for L2 verification; all
+> others _MUST_ be verified at L1 (value-equal at canonical width: `point.mz = f64`, `point.intensity = f32`).
+
 ---
 
 ## Part B — New JSON Schema files
@@ -491,6 +545,28 @@
 }
 ```
 
+### `schema/transform.json` (P-07, queued v0.7)
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "mzPeak L2 transform record",
+  "description": "Governs mzpeak_index.json.metadata.transform. Written when a lossy m/z transform is applied; omitted for lossless archives. transform CURIE must match the per-column array_index transform field (single source, no drift).",
+  "type": "object",
+  "required": ["transform", "name", "axis", "conformance_level", "mz_rel_err", "intensity_rel_err", "data_processing_ref"],
+  "properties": {
+    "transform":           {"type": "string", "description": "PSI-MS CURIE of the applied transform, e.g. MS:1002312 (numpress linear prediction m/z compression)."},
+    "name":                {"type": "string", "description": "Human-readable name (informative)."},
+    "axis":                {"type": "string", "description": "Data axis the transform applies to. m/z for numpress-linear."},
+    "conformance_level":   {"type": "string", "description": "Conformance level declared. L2 for any lossy-but-bounded transform."},
+    "mz_rel_err":          {"type": "number", "description": "m/z maximum relative error bound (spec v0.3 §8 L2 = 1e-7)."},
+    "intensity_rel_err":   {"type": "number", "description": "Intensity maximum relative error bound (spec v0.3 §8 L2 = 1e-3)."},
+    "data_processing_ref": {"type": "string", "description": "Id of the data_processing step that produced the transform."}
+  },
+  "additionalProperties": false
+}
+```
+
 ---
 
 ## Part C — Summary
@@ -508,6 +584,7 @@
 | 8 | `metadata.imaging` block — adds `pixel_count.z`, `pixel_count_source`, `mz_range`, `images[]`, `absolute_offset_um` (µm offset, IMS:1000053/54, reverse-emitted with the UO:0000017 µm unit); `pixel_count` optional; `max_dimension_um` integer; the µm geometry terms (IMS:1000044/45/46/47/53/54) carry `unitCvRef="UO" unitAccession="UO:0000017"`; index written last | Index File | `imaging.json` | ext. |
 | 9 | shared-axis grid layout | Signal Data Layouts | — | base |
 | 10 | imaging provenance | file_description usage | — | ext. |
+| 11 | L2 transform record `metadata.transform` — CURIE + tolerance + data-processing ref; `transform` CURIE _MUST_ match per-column array-index `transform` field; omitted for lossless archives (QUEUED v0.7 P-07) | File-Level Metadata | `transform.json` | base |
 
 ### New CV terms required (🔣 — CV-governance gate)
 - image **role** (optical / overview / histology / derived-MS-image / …) and **modality**;

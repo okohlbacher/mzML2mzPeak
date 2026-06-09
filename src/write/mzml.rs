@@ -62,6 +62,11 @@ pub enum MzmlConvertError {
     /// The m/z sort-on-write could not reorder a spectrum's arrays (e.g. an array failed to decode).
     #[error("m/z sort-on-write reorder failed: {0}")]
     SortPeaks(String),
+
+    /// Serializing a file-level metadata block (e.g. the transform record) into the mzPeak
+    /// archive index failed.
+    #[error("mzPeak index metadata serialization error: {0}")]
+    Json(#[source] serde_json::Error),
 }
 
 /// A counted record of centroid spectra whose SOURCE primary m/z was non-monotonic
@@ -308,6 +313,16 @@ pub fn convert_mzml(
         writer
             .write_chromatogram(&empty)
             .map_err(MzmlConvertError::Write)?;
+    }
+
+    // File-level transform record (L2-01 / T-28-02): emit ONLY when a lossy (numpress) m/z
+    // transform was applied. For lossless (`--no-numpress` / Delta / legacy) archives the key is
+    // OMITTED entirely — a lossless file is byte-unchanged and carries no transform claim.
+    // Mirror the imaging path's `add_index_metadata("imaging", &block)` shape (convert.rs ~472).
+    if opts.lossy_mz {
+        writer
+            .add_index_metadata("transform", &crate::schema::numpress_linear_transform())
+            .map_err(MzmlConvertError::Json)?;
     }
 
     writer
