@@ -354,6 +354,18 @@ fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
         );
     }
 
+    // GEOF-01: if the declared <scanSettings> grid was inconsistent with observed pixel
+    // coordinates, the library already emitted a counted library-layer warning from convert_with.
+    // The CLI surfaces this as a second, redundant sink (mirroring the DTY-04 narrowing pattern)
+    // so the user sees it on stderr even when the log level filters library warnings.
+    if outcome.declared_geometry_inconsistent {
+        log::warn!(
+            "declared <scanSettings> grid is inconsistent with observed pixel coordinates — \
+             pixel_count_source recorded as observed_max (declared grid not trusted, per GEOF-01); \
+             review the source imzML <scanSettings> for correctness"
+        );
+    }
+
     if let Some(pb) = bar {
         if let Some(n) = total {
             pb.set_position(n as u64);

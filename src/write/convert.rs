@@ -62,7 +62,8 @@ pub enum EmbedMode {
 }
 
 /// The outcome of a forward conversion, carrying the per-axis canonical-cast narrowing
-/// determination (Phase 16, DTY-04) so the CLI can surface a warning.
+/// determination (Phase 16, DTY-04) and the GEOF-01 declared-geometry consistency flag so the
+/// CLI can surface warnings for both conditions.
 ///
 /// A real imzML run is dtype-homogeneous, so a single run-level narrowing flag (observed on the
 /// sampled-first spectrum) is authoritative: `narrowing.intensity_f64_to_f32 == true` iff the
@@ -72,6 +73,13 @@ pub enum EmbedMode {
 pub struct ConversionOutcome {
     /// Per-axis narrowing incurred by the canonical data-facet cast (DTY-03/DTY-04).
     pub narrowing: CastNarrowing,
+    /// `true` iff the declared `<scanSettings>` grid was INCONSISTENT with the observed pixel
+    /// coordinates (observed extent exceeded the declared grid on at least one axis). When
+    /// `true`, `pixel_count_source` in the emitted archive is `observed_max` — the declared
+    /// count was NOT trusted (GEOF-01 "do NOT fabricate"). The CLI surfaces this as a counted,
+    /// non-fatal warning (the library `convert()` back-compat wrapper always produces `false`
+    /// since it passes `geometry = None`).
+    pub declared_geometry_inconsistent: bool,
 }
 
 /// Convert an imaging spectrum stream into an imaging mzPeak archive at `out_path`.
@@ -280,7 +288,23 @@ pub fn convert_with(
     // Fold the bounded accumulator into the cloned block AFTER the full pass and BEFORE the index
     // is written (IDX-01 index-last seam): observed_max pixel_count when geometry did not declare
     // grid counts, and MS1 m/z bounds. mz_range is left None when no MS1 spectra were seen.
-    acc.fold_into(&mut block);
+    // Capture the FoldOutcome to surface the GEOF-01 declared-vs-observed inconsistency signal.
+    let fold = acc.fold_into(&mut block);
+    if fold.declared_inconsistent {
+        // GEOF-01: the declared <scanSettings> grid is inconsistent with the observed pixel
+        // coordinates. The declared count was NOT trusted — pixel_count_source is observed_max.
+        // Emit ONE counted, non-fatal warning naming the declared vs observed extents so the user
+        // can audit the source imzML's <scanSettings> (per CLAUDE.md: log facade, not tracing).
+        log::warn!(
+            "declared <scanSettings> grid ({}×{}) is inconsistent with observed pixel coordinates \
+             (max {}×{}) — pixel_count_source kept as observed_max (declared grid not trusted, \
+             per GEOF-01)",
+            fold.declared_x,
+            fold.declared_y,
+            fold.observed_x_max,
+            fold.observed_y_max,
+        );
+    }
     if block.mz_range.is_none() {
         // IDX-03: no MS1 (ms_level==1) spectra were observed, so mz_range is OMITTED (not a bogus
         // empty range). Log the omission via the existing `log` facade (not `tracing`).
@@ -451,7 +475,10 @@ pub fn convert_with(
     // (zip::result::ZipError: Into<std::io::Error> is not guaranteed, so convert explicitly).
     zip.finish()
         .map_err(|e| WriteError::Io(std::io::Error::other(e)))?;
-    Ok(ConversionOutcome { narrowing })
+    Ok(ConversionOutcome {
+        narrowing,
+        declared_geometry_inconsistent: fold.declared_inconsistent,
+    })
 }
 
 /// A best-effort canonicalized dedup key for an embed path (OPT-04): tries `fs::canonicalize`
