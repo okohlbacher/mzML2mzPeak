@@ -20,8 +20,10 @@ use mzml2mzpeak::reverse::convert as reverse_convert; // pub use reverse::conver
 use mzml2mzpeak::reverse::source::{ReversePixel, read_pixel};
 use mzml2mzpeak::reverse::ReverseError;
 use mzml2mzpeak::schema::ConformanceLevel;
+use mzml2mzpeak::schema::parse_scan_settings;
 use mzml2mzpeak::verify::verify_streaming;
 use mzml2mzpeak::write::convert as forward_convert;
+use mzml2mzpeak::write::{convert_with, EncodingOptions};
 use mzpeak_prototyping::MzPeakReader;
 
 #[path = "fixtures/reverse/mod.rs"]
@@ -267,6 +269,141 @@ fn mixed_dtype_reverse_roundtrip_value_equal() {
 
     std::fs::remove_dir_all(&dir).ok();
     std::fs::remove_file(&orig).ok();
+}
+
+/// RSRC-01 / XRT: forward→reverse provenance round-trip assertion (Phase 26).
+///
+/// Proves that a converted-then-reversed `.imzML` carries a `<sourceFileList>` reflecting the
+/// `source_files[]` recorded by the forward pass (id/name/location + UUID + checksum CURIE params),
+/// and that the old hardcoded `sf_reverse` is gone. Deterministic committed-fixture test only —
+/// no network, no forged `.ibd`, no `#[ignore]`.
+///
+/// Steps:
+///   1. Forward-convert `Example_Processed.imzML` via the PATH-THREADED seam (`convert_with`
+///      with `Some(input)`) so the produced `.mzpeak` carries `source_files[]` (imzml + ibd with
+///      IMS:1000080 UUID + IMS:1000091 SHA-1).
+///   2. Reverse-convert that `.mzpeak` to `out.imzML` + `out.ibd` via `reverse::convert`.
+///   3. Assert: `out.imzML` contains `<sourceFileList`; both the `.imzML` entry (id="imzml",
+///      name="Example_Processed.imzML") and `.ibd` entry (id="ibd") are present; the `.ibd`
+///      entry carries `accession="IMS:1000080"` with the expected UUID value AND
+///      `accession="IMS:1000091"` with the expected SHA-1; `sf_reverse` does NOT appear.
+///   4. Re-read `out.imzML`/`out.ibd` through `mzdata::io::imzml::ImzMLReader` to confirm
+///      the document still parses (uuid.is_some() — the three <fileContent> terms survived).
+#[test]
+fn reverse_imzml_carries_source_file_list_from_archive() {
+    use mzdata::io::imzml::ImzMLReader;
+    use std::fs::File;
+
+    let input = Path::new("tests/fixtures/imaging/Example_Processed.imzML");
+    assert!(
+        input.exists(),
+        "committed processed fixture must exist at tests/fixtures/imaging/Example_Processed.imzML"
+    );
+
+    let work_dir = tempdir("xrt");
+
+    // --- Step 1: capture expected provenance BEFORE the reader is consumed ---
+    let reader_pre = ImagingReader::open(input).expect("open processed fixture");
+    let prov = reader_pre.provenance().clone();
+    let expected_uuid = prov.uuid.clone().expect("processed fixture surfaces a RunProvenance.uuid");
+    let expected_sha1 = prov
+        .ibd_checksum
+        .clone()
+        .expect("processed fixture surfaces a RunProvenance.ibd_checksum");
+    let checksum_type = prov
+        .ibd_checksum_type
+        .clone()
+        .expect("processed fixture surfaces a RunProvenance.ibd_checksum_type");
+    assert!(
+        checksum_type.eq_ignore_ascii_case("SHA1") || checksum_type.eq_ignore_ascii_case("SHA-1"),
+        "processed fixture declares SHA-1; got {checksum_type}"
+    );
+
+    // --- Forward-convert via PATH-THREADED seam so source_files[] is pushed ---
+    let geom = parse_scan_settings(input).expect("parse scan settings from processed fixture");
+    let out_mzpeak = work_dir.join("out.mzpeak");
+    let image_paths: [PathBuf; 0] = [];
+    convert_with(
+        reader_pre,
+        &out_mzpeak,
+        &image_paths,
+        &EncodingOptions::legacy(),
+        Some(&geom),
+        Some(input),
+    )
+    .expect("convert_with(.., Some(input)) pushes source_files");
+
+    // --- Step 2: Reverse-convert the produced archive ---
+    let out_imzml = work_dir.join("out.imzML");
+    let out_ibd = work_dir.join("out.ibd");
+    reverse_convert(&out_imzml, &out_ibd, &out_mzpeak)
+        .expect("reverse convert of path-threaded archive succeeds");
+
+    // --- Step 3: Assert the XRT provenance assertions on the emitted .imzML bytes ---
+    let text = std::fs::read_to_string(&out_imzml)
+        .expect("read emitted .imzML as UTF-8");
+
+    assert!(
+        text.contains("<sourceFileList"),
+        "XRT: emitted .imzML must carry a <sourceFileList> (source_files threaded through)"
+    );
+    assert!(
+        !text.contains("sf_reverse"),
+        "XRT: the old hardcoded sf_reverse id must be absent (replaced by write_source_file_list_to)"
+    );
+
+    // Both entries must be present by id.
+    assert!(
+        text.contains("id=\"imzml\""),
+        "XRT: .imzML source-file entry (id=imzml) present"
+    );
+    assert!(
+        text.contains("id=\"ibd\""),
+        "XRT: .ibd source-file entry (id=ibd) present"
+    );
+
+    // Entry names: exact base names.
+    assert!(
+        text.contains("name=\"Example_Processed.imzML\""),
+        "XRT: imzml entry name=Example_Processed.imzML"
+    );
+    assert!(
+        text.contains("name=\"Example_Processed.ibd\""),
+        "XRT: ibd entry name=Example_Processed.ibd"
+    );
+
+    // The .ibd entry carries IMS:1000080 UUID with the expected value.
+    assert!(
+        text.contains("accession=\"IMS:1000080\""),
+        "XRT: IMS:1000080 (UUID) accession present on .ibd entry"
+    );
+    assert!(
+        text.contains(&expected_uuid),
+        "XRT: IMS:1000080 value equals the source RunProvenance.uuid (reuse)"
+    );
+
+    // The .ibd entry carries IMS:1000091 SHA-1 with the expected checksum.
+    assert!(
+        text.contains("accession=\"IMS:1000091\""),
+        "XRT: IMS:1000091 (SHA-1) accession present on .ibd entry"
+    );
+    assert!(
+        text.contains(&expected_sha1),
+        "XRT: IMS:1000091 value equals the source RunProvenance.ibd_checksum (reuse)"
+    );
+
+    // --- Step 4: Oracle re-read (the document still parses through mzdata::ImzMLReader) ---
+    let oracle = ImzMLReader::<File, File>::new(
+        File::open(&out_imzml).expect("open out.imzML"),
+        File::open(&out_ibd).expect("open out.ibd"),
+    );
+    assert!(
+        oracle.imzml_metadata.uuid.is_some(),
+        "XRT oracle: the reversed .imzML still parses required imzML metadata (uuid.is_some())"
+    );
+
+    // Cleanup.
+    std::fs::remove_dir_all(&work_dir).ok();
 }
 
 /// RDAT-01 (SC-4): the repeatable real-dataset acceptance gate on the 34,840-spectrum,
