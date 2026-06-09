@@ -167,6 +167,18 @@ pub struct ConvertCli {
     /// with `data_kind:"isa"`; a `metadata.study` provenance back-ref is written.
     #[arg(long = "isa", value_name = "PATH")]
     pub isa: Option<PathBuf>,
+
+    /// Store per-MS2 reporter-ion intensities keyed by channel_id to the labeled sample_list
+    /// channels from the accompanying `--sdrf` file (Phase 35, QUANT-01..02).
+    ///
+    /// OFF by default. Only meaningful on the plain-mzML forward path (`.mzML` input) with
+    /// `--sdrf` on an isobaric (TMT/iTRAQ) run; the channel descriptors come from the Phase-34
+    /// labeled sample_list. Rejected on `.imzML` inputs and on the reverse path (forward-only).
+    ///
+    /// A bare invocation (no `--reporter-quant`) leaves every existing code path byte-identical
+    /// (flag absent ⇒ `false` ⇒ no reporter-quant emit considered).
+    #[arg(long = "reporter-quant")]
+    pub reporter_quant: bool,
 }
 
 impl ConvertCli {
@@ -345,6 +357,15 @@ fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
         return Err(anyhow!(
             "--isa accompanies plain proteomics .mzML, not imaging .imzML \
              (use a .mzML input for ISA embedding)"
+        ));
+    }
+
+    // `--reporter-quant` is forward-only on plain .mzML (QUANT-02 / T-35-03). Rejected on
+    // .imzML (imaging path) with an actionable forward-only message.
+    if cli.reporter_quant {
+        return Err(anyhow!(
+            "--reporter-quant is forward-only (.mzML → .mzpeak); it is not valid for .imzML \
+             imaging input (use a plain .mzML input for reporter-quant)"
         ));
     }
 
@@ -551,6 +572,15 @@ fn run_reverse(cli: &ConvertCli) -> anyhow::Result<()> {
         return Err(anyhow!(
             "--isa is forward-only (.mzML → .mzpeak); the reverse path writes .imzML + .ibd \
              and cannot embed an ISA member (use a .mzML input for ISA embedding)"
+        ));
+    }
+
+    // `--reporter-quant` is forward-only (QUANT-02 / T-35-03) — the reverse path outputs
+    // .imzML + .ibd, not a .mzpeak ZIP, so there is no archive to embed reporter arrays in.
+    if cli.reporter_quant {
+        return Err(anyhow!(
+            "--reporter-quant is forward-only (.mzML → .mzpeak); the reverse path writes \
+             .imzML + .ibd and does not produce a mzPeak archive (use a .mzML input)"
         ));
     }
 
@@ -1176,6 +1206,60 @@ mod tests {
         assert!(
             msg.contains("mzML") || msg.contains("sdrf") || msg.contains("imaging"),
             ".imzML --sdrf rejection message should mention the constraint, got: {msg}"
+        );
+    }
+
+    // --- Task 2 (Plan 35-01): --reporter-quant flag parse + rejection guards (QUANT-02) --------
+
+    #[test]
+    fn reporter_quant_flag_parses_on_mzml_input() {
+        // --reporter-quant must parse for a plain .mzML input (no rejection at parse time).
+        let cli = ConvertCli::try_parse_from([
+            "mzml2mzpeak", "in.mzML", "out.mzpeak", "--reporter-quant",
+        ])
+        .expect("--reporter-quant must parse on a plain .mzML input");
+        assert!(
+            cli.reporter_quant,
+            "--reporter-quant must be true when supplied"
+        );
+    }
+
+    #[test]
+    fn reporter_quant_absent_is_false() {
+        // No --reporter-quant → false (OFF by default; the no-flag path must be byte-identical).
+        let cli = ConvertCli::try_parse_from(["mzml2mzpeak", "in.mzML", "out.mzpeak"])
+            .expect("absent --reporter-quant parses");
+        assert!(
+            !cli.reporter_quant,
+            "absent --reporter-quant ⇒ false (OFF by default; T-35-01 no-flag path byte-identical)"
+        );
+    }
+
+    #[test]
+    fn reporter_quant_rejected_on_reverse_path() {
+        // --reporter-quant is forward-only: rejected when the reverse path is taken (.mzpeak).
+        let cli = ConvertCli::try_parse_from([
+            "mzml2mzpeak", "in.mzpeak", "-o", "out", "--reporter-quant",
+        ])
+        .expect("reverse invocation with --reporter-quant parses (rejection is a runtime guard)");
+        let err = run(cli).expect_err("reverse + --reporter-quant must be rejected");
+        assert!(
+            err.to_string().contains("forward-only"),
+            "reverse --reporter-quant rejection names it forward-only, got: {err}"
+        );
+    }
+
+    #[test]
+    fn reporter_quant_rejected_on_imaging_imzml_path() {
+        // --reporter-quant is not valid on .imzML input (imaging path): rejected.
+        let cli = ConvertCli::try_parse_from([
+            "mzml2mzpeak", "in.imzML", "out.mzpeak", "--reporter-quant",
+        ])
+        .expect("imaging invocation with --reporter-quant parses (rejection is a runtime guard)");
+        let err = run(cli).expect_err(".imzML + --reporter-quant must be rejected");
+        assert!(
+            err.to_string().contains("forward-only"),
+            ".imzML --reporter-quant rejection must mention forward-only, got: {err}"
         );
     }
 
