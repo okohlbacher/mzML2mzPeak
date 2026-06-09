@@ -26,6 +26,7 @@ pub mod geometry;
 pub mod metadata;
 pub mod optical;
 pub mod scan_settings;
+pub mod study;
 pub mod tolerance;
 pub mod transform;
 
