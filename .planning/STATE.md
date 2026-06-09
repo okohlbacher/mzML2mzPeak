@@ -265,6 +265,7 @@ Items deferred out of v0.7:
 |------|-------|------|
 | 260606-90y | Expose checksum-mismatch escape hatch as `--ignore-incorrect-checksum` | 2026-06-06 |
 | 260606-a8f | Data-derive `sorting_rank` + `--sort-peaks` repair + validator handoff doc | 2026-06-06 |
+| 260609-8tf | Re-check MetaboLights pub status (MTBLS13204 published → paper note; 11550/12824 still unpublished) | 2026-06-09 |
 
 ## Session Continuity
 
