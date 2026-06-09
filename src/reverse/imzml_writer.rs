@@ -177,6 +177,84 @@ fn emit_cv_param_um(
     Ok(())
 }
 
+/// Emit `<sourceFileList>` to an arbitrary sink (RSRC-01 / Phase 26).
+///
+/// Reconstructs the imzML `<sourceFileList>` from the archive's `file_description.source_files[]`.
+/// Each [`mzdata::meta::SourceFile`] entry is emitted with its `id`/`name`/`location` attributes
+/// ESCAPED via [`emit_escaped`] (threat T-26-INJ) and its params as `<cvParam>` elements.
+///
+/// The emit loop covers three param sources per entry (in order):
+///   1. `sf.params` — the standard params (UUID / checksum CURIEs etc.)
+///   2. `sf.file_format` — the file-format CV term (`params()` excludes this field)
+///   3. `sf.id_format` — the nativeID-format CV term (`params()` excludes this field)
+///
+/// For CV params (those with a `curie()`) the cv_ref is derived from the CURIE's
+/// `controlled_vocabulary.prefix()` — the same token ("IMS", "MS", "UO") the other emit helpers
+/// use. User params (no curie) are emitted as `<userParam name="…" value="…"/>` with both values
+/// escaped (faithful, never dropped).
+///
+/// **Back-compat no-op (T-26-FAB):** an empty slice returns `Ok(())` immediately, emitting ZERO
+/// bytes — no `<sourceFileList>` element at all. An older archive with no `source_files` therefore
+/// produces byte-identical output to pre-Phase-26 (nothing is fabricated).
+fn write_source_file_list_to(
+    sink: &mut impl Write,
+    source_files: &[mzdata::meta::SourceFile],
+) -> Result<(), ReverseError> {
+    if source_files.is_empty() {
+        return Ok(());
+    }
+
+    emit_raw(sink, "<sourceFileList count=\"")?;
+    emit_raw(sink, &source_files.len().to_string())?;
+    emit_raw(sink, "\">")?;
+
+    for sf in source_files {
+        // Open <sourceFile> with escaped id/name/location attributes.
+        emit_raw(sink, "<sourceFile id=\"")?;
+        emit_escaped(sink, &sf.id)?;
+        emit_raw(sink, "\" name=\"")?;
+        emit_escaped(sink, &sf.name)?;
+        emit_raw(sink, "\" location=\"")?;
+        emit_escaped(sink, &sf.location)?;
+        emit_raw(sink, "\">")?;
+
+        // Emit all param sources: sf.params + file_format (if any) + id_format (if any).
+        // `params()` (ParamDescribed) exposes only `sf.params`; we iterate the format fields
+        // explicitly so they are never silently dropped.
+        let all_params = sf
+            .params
+            .iter()
+            .chain(sf.file_format.iter())
+            .chain(sf.id_format.iter());
+
+        for param in all_params {
+            match param.curie() {
+                Some(curie) => {
+                    // CV param: derive cv_ref from the CURIE's vocabulary prefix.
+                    let cv_ref: std::borrow::Cow<'static, str> =
+                        curie.controlled_vocabulary.prefix();
+                    let accession = curie.to_string(); // e.g. "IMS:1000080"
+                    let value = param.value.to_string();
+                    emit_cv_param(sink, &cv_ref, &accession, &param.name, &value)?;
+                }
+                None => {
+                    // User param: emit as <userParam> with both name and value escaped.
+                    emit_raw(sink, "<userParam name=\"")?;
+                    emit_escaped(sink, &param.name)?;
+                    emit_raw(sink, "\" value=\"")?;
+                    emit_escaped(sink, &param.value.to_string())?;
+                    emit_raw(sink, "\"/>")?;
+                }
+            }
+        }
+
+        emit_raw(sink, "</sourceFile>")?;
+    }
+
+    emit_raw(sink, "</sourceFileList>")?;
+    Ok(())
+}
+
 /// Streamed writer for one `.imzML` document.
 ///
 /// Holds a [`BufWriter`] sink (never buffers all 34,840 spectra). [`Self::new`] eagerly writes
@@ -1213,7 +1291,7 @@ mod tests {
     // ---- Phase 26 (RSRC-01): write_source_file_list_to unit tests ----
 
     use mzdata::meta::SourceFile;
-    use mzdata::params::{ControlledVocabulary, Param, ParamValue, CURIE};
+    use mzdata::params::{ControlledVocabulary, Param, CURIE};
 
     /// Build a minimal SourceFile with no params, file_format, or id_format.
     fn make_sf(id: &str, name: &str, location: &str) -> SourceFile {
