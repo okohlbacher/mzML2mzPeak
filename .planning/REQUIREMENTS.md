@@ -57,22 +57,25 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
   [`HUPO-PSI/mzPeak-specification`](https://github.com/HUPO-PSI/mzPeak-specification) (v0.9); record the
   precedence rule (repo-SDRF-wins), the `entity_type: sample-metadata` / `data_kind: sdrf|isa` open-enum
   tokens, and Q2 (`sample`/`SDRF`) agreement.
-- [ ] **SMSPEC-02** — Declare the structural CV terms against **stable tokens** in `src/schema/cv.rs`
+
+- [x] **SMSPEC-02** — Declare the structural CV terms against **stable tokens** in `src/schema/cv.rs`
   (sample-metadata entity / sdrf+isa data-kind, channel role enum, reporter-ion m/z attribute,
   assay/sample reference, SDRF-row reference); queue the sample-metadata + samples-as-channels write-ups
   for the **single END-of-v0.8 batch** proposal (not submitted incrementally).
+
 - [ ] **SMSPEC-03** — Define the `metadata.study` / `metadata.sample_list` index.json KV-JSON contracts
   (the `add_index_metadata(key, val)` carrier — `HashMap<String, serde_json::Value>`, `additionalProperties:
   true`; NOT a `data_kind: metadata` member, NOT the Parquet-footer KV) + the matching `schema/*.json`.
 
 ### CV strategy & governance (SMCVG) — Phase 30
 
-- [ ] **SMCVG-01** — Fix the CV strategy = **passthrough / structure-only** (Cornerstone A): own
+- [x] **SMCVG-01** — Fix the CV strategy = **passthrough / structure-only** (Cornerstone A): own
   verbatim-string `SourceCurie { prefix, accession, label }` (NOT `mzdata::CURIE`, which is a closed-CV
   integer enum that collapses NCBITaxon/Unimod/Cellosaurus/CHMO/MSIO to `Unknown`); cvParam when an
   accession is present, else userParam keyed by the exact source column; no OBO bundle, no online
   resolution.
-- [ ] **SMCVG-02** — Confirm `MS:1002602` "sample label" (+ its reagent children) are the channel-label
+
+- [x] **SMCVG-02** — Confirm `MS:1002602` "sample label" (+ its reagent children) are the channel-label
   terms and reserve the small *additional* structural set (channel role; reporter-ion m/z attribute) in
   `src/schema/cv.rs`. **NO `channel_list` schema** (RATIFIED-E): channels are labeled `sample_list` entries
   bound via the list-valued `ms_run.sample_ref`; no `plex_id` / `channel_set`.
@@ -83,6 +86,7 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
   `TypedValue` / `Channel` / `VerbatimBundle` / `Diagnostic`) + the own `SourceCurie` type; `TypedValue`
   is the single place the cvParam/userParam decision (Cornerstone A) is made, with an `extra` slot
   preserving long-tail SDRF cell tokens (`MT/TA/PP/CT/PS/…`) verbatim.
+
 - [ ] **SM-02** — `csv` SDRF reader: `delimiter(b'\t')`, `flexible(true)`, **`quoting(false)`**; parse cells
   on the real SDRF key grammar (`NT, AC, MT, TA, PP, CT, QY, PS, SP, CN, CV, CL, MH, ML, VV` — no `TT`);
   reserved sentinels (`not available`/`not applicable`/`anonymized`) → `is_na`; **plus the `convert_mzml`
@@ -90,10 +94,12 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
   into `finish_parquet()` + `add_index_metadata` + typed-member embed + `finish()`) + the **typed-member
   helper** (`start_for_entry(FileEntry::new(name, EntityType::Other("sample-metadata"),
   DataKind::Other("sdrf")))`, NOT `start_other`) + the net-new `--sdrf` CLI layer.
+
 - [ ] **SM-03** — File-row matching: keep rows whose **`comment[data file]`** (canonical required binding
   column; `comment[file uri]` is a secondary hint) matches this mzML by **path-stripped basename** across
   sibling extensions (`.raw`/`.d`/`.wiff`/`.mzML`/`.mzml`); record the matched name + a diagnostic;
   zero-match / multi-match emits a **loud diagnostic** and does **not** fail the conversion.
+
 - [ ] **SM-04** — Embed the SDRF **verbatim** as a typed `sample-metadata`/`sdrf` ZIP member (retrieved by
   the deterministic archive name recorded in the index block — no reader dispatches on `entity_type`) +
   a `metadata.sample_metadata` provenance back-ref (`dataset_accession`, `source_uri`, `format`,
@@ -108,10 +114,12 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
   **id + name + a minimal identifying param set**; full `characteristics→Param` shaping is **demoted** (the
   verbatim blob holds it). Plus `metadata.study` global context (accession / title / back-ref) — **un-gated,
   ships immediately**.
+
 - [ ] **SM-06** — Run→sample binding via the **native list-valued `ms_run.sample_ref`** field — **GATED on
   Phase 30b's upstream merge**; until then write the `metadata.study.run_sample_binding` index.json
   **provenance shadow** so the slice still roundtrips. Documented **repo-SDRF-wins** precedence rule resolves
   embedded-vs-repo conflicts.
+
 - [ ] **SM-07** — `factor_values` slice (this file's `factor value[*]` levels) — **DEMOTED / DEFERRED ≥v0.9**
   (RATIFIED-G): held losslessly in the verbatim blob, not natively projected in v0.8. *(Recorded as an
   active-milestone requirement only to track its deferral; no v0.8 emit work.)*
@@ -123,10 +131,12 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
   Study Factor/Protocol definitions; parse `s_*.txt` → `samples` (paired `Term Source REF` /
   `Term Accession Number`); parse `a_*.txt` → `assays`. **AND** ISA-JSON: its own `Deserialize` layer +
   `@id` reference resolution → the same `StudyMetadata` (three parse front-ends, one target model).
+
 - [ ] **SM-09** — Assay-row → file matching on `Raw Spectral Data File` / `Derived Spectral Data File`
   (tolerate `Acquisition Parameter Data File` + `MS Assay Name`); join assay rows → Sample Name → Source
   Name; harvest `Factor Value[...]` from **both** `s_*.txt` and `a_*.txt`; labeled-extract fan-out modeled
   only when encountered, else degrade to verbatim + diagnostic.
+
 - [ ] **SM-10** — Embed the **whole ISA bundle** verbatim (`data_kind: isa`; investigation + relevant
   study + relevant assay files, or the ISA-JSON) — ISA is normalized, a single assay file is meaningless
   alone; the protocol/process graph + multi-assay grouping are preserved in the blob + a diagnostic, **never
@@ -138,11 +148,13 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
   (`MS:1002602` + its reagent child, e.g. TMT126) + `reporter_mz` + role + `tag_modification` (Unimod)
   params; the run binds them via the **list-valued `ms_run.sample_ref`** (Phase 30b). **NO
   `channel_list` / `plex_id` / `channel_set`** — multiplexing is just a run referencing N labeled samples.
+
 - [ ] **CHAN-02** — Roles derived: carrier/reference from the dedicated columns
   `comment[carrier channel]` / `comment[reference channel]` (value = the channel label); pooled via
   `pool_member` sample refs / `characteristics[pooled sample]`; `reporter_mz: Option<f64>` (None when
   unresolved — never a sentinel) with `reporter_mz_source` recorded (reagent-table / vendor-method /
   unresolved).
+
 - [ ] **CHAN-03** — Channel-path exclusions: `label free sample` and `SILAC light|medium|heavy` are
   **excluded** from the channel path (SILAC preserved in verbatim + a diagnostic — it is MS1 quant, no
   channel construct); TMTpro 16/18-plex unresolved reporter-m/z degrades to an **honest free-text
@@ -152,6 +164,7 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
 
 - [ ] **QUANT-01** — Reporter intensities stored as an `auxiliary` array with a `channel_id` column
   (`add_spectrum_array_override` aux-array seam); gated behind `--reporter-quant`, **off by default**.
+
 - [ ] **QUANT-02** — A read-back spike proves `channel_id` survives through **this repo's own reader**
   (third-party read-back is a known blocker — aux arrays = Arrow struct columns); peak → channel → sample
   resolves through the labeled samples.
@@ -162,6 +175,7 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
   embedded verbatim document **byte-for-byte** — passes on all three fixtures (MTBLS1129 label-free SDRF,
   PXD011799 TMT-10plex SDRF, `data/sdrf-examples/MTBLS5358` native ISA-Tab). The `--reconstruct-sdrf` /
   `--reconstruct-isa` reverse path extracts the member; it does **not** regenerate from projections.
+
 - [ ] **VAL-02** — The optional `--validate-sample-metadata` oracle shells to the reference validator
   (`sdrf-pipelines` for SDRF; `isa-api`/`linkml` for ISA) **only when present** — non-blocking,
   CI/fixtures only, **never a release gate** (keeps Python out of the hard path). Results recorded when
@@ -186,12 +200,15 @@ the matching `schema/*.json`). New deps expected this milestone: **`csv`** (re-a
 - [ ] **UPS-01** — Submit the `mzpeak_prototyping` chunk_series intensity/mz index-desync PR to
   HUPO-PSI/mzPeak (branch `fix/chunk-series-intensity-index-desync` on `okohlbacher/mzPeak`, drafted, not
   submitted). *(Phase 22 — held by owner.)*
+
 - [ ] **UPS-03** — Submit the mzPeakValidator `index_files_present` non-Parquet-skip PR (skip members whose
   `data_kind`/`entity_type` is `other` or whose name isn't `.parquet`; separate validator repo, no converter
   change). *(Phase 22 — held by owner.)*
+
 - [ ] **DVN-01** — Drop `vendor/mzpeak_prototyping` + its `[patch]` redirect; depend on upstream directly.
   **Gated on** the chunk_series PR (UPS-01) merged. (file_index serde is already fixed upstream — PR #20.)
   *(Phase 29 — gated; sequenced LAST so the gate exercises the worst-case `Other`-typed member.)*
+
 - [ ] **DVN-02** — Drop `vendor/mzdata` + the `[patch.crates-io] mzdata` redirect. **Gated on** mzdata
   0.64.2 published to crates.io. *(Phase 29 — gated.)*
 

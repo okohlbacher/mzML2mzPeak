@@ -225,90 +225,116 @@ Plans:
 - [ ] **Phase 37: Round-trip + validation + batch spec/upstream submission** — internal Rust roundtrip-parity = hard gate; optional `--validate-sample-metadata` oracle (never required); submit the batched spec proposals + the upstream `sample_ref` PR (owner-gated). *(VAL-01..02.)*
 
 ### Phase 30: Sample-metadata spec alignment & CV governance
+
 **Goal**: A single authoritative source of sample-metadata CV facts + spec-aligned contracts before any term lands — so no ad-hoc structure is baked in. Confirm `MS:1002602` "sample label" (+ reagent children) covers channels (no `channel_list`); declare the small additional structural terms (channel role, reporter-ion m/z) in `src/schema/cv.rs`; fix CV strategy = passthrough + own `SourceCurie`.
 **Depends on**: v0.7 Phase 24 (`src/schema/cv.rs` single-source pattern — ✅ DONE). Precedes Phases 32+.
 **Requirements**: SMSPEC-01, SMSPEC-02, SMSPEC-03, SMCVG-01, SMCVG-02
 **Success Criteria**:
+
   1. The `entity_type: sample-metadata` / `data_kind: sdrf|isa` open-enum members + the `metadata.study` / `metadata.sample_list` index.json KV contracts are defined with matching `schema/*.json` (built locally against stable CV tokens).
   2. CV strategy is fixed: own verbatim-string `SourceCurie`; cvParam-when-accession-present else userParam-keyed-by-column; no OBO bundle. `MS:1002602` + channel-role/reporter-m/z terms declared once in `src/schema/cv.rs`.
   3. The sample-metadata + samples-as-channels write-ups are queued for the END-of-v0.8 batch proposal (not submitted incrementally).
+
 **Plans**: 4 plans (3 waves collapse to 2; all foundation, no facet emits)
-  - [ ] 30-01-PLAN.md — `SourceCurie` passthrough type (shape-only validation, verbatim CURIE round-trip) — SMCVG-01 [W1]
-  - [ ] 30-02-PLAN.md — `src/schema/cv.rs` structural terms (MS:1002602 + role/reporter-m/z) + Phase-31 carve-out tokens (sample-metadata/sdrf|isa) + cv-requests rows — SMCVG-02, SMSPEC-02 [W1]
+
+  - [x] 30-01-PLAN.md — `SourceCurie` passthrough type (shape-only validation, verbatim CURIE round-trip) — SMCVG-01 [W1]
+  - [x] 30-02-PLAN.md — `src/schema/cv.rs` structural terms (MS:1002602 + role/reporter-m/z) + Phase-31 carve-out tokens (sample-metadata/sdrf|isa) + cv-requests rows — SMCVG-02, SMSPEC-02 [W1]
   - [ ] 30-03-PLAN.md — `metadata.study` + reused `metadata.sample_list` KV-JSON contracts + `schema/study.json`/`schema/sample_list.json` — SMSPEC-03 [W2]
   - [ ] 30-04-PLAN.md — ratify Q1–Q10 + queue (not submit) the v0.8 sample-metadata spec batch + extend the extension-contract — SMSPEC-01, SMSPEC-02 [W1]
 
 ### Phase 30b: Upstream list-valued `ms_run.sample_ref` PR prep
+
 **Goal**: Open the upstream surface early so merge latency overlaps the rest of v0.8. Add a **list-valued** `ms_run.sample_ref` to HUPO-PSI/mzPeak (spec + reference impl) — multiplexing falls out of the list (JK; mzML `<run>` precedent). **Owner-gated** (push-policy: HUPO-PSI is outside `okohlbacher` → explicit authorization).
 **Depends on**: Phase 30 (the binding term defined). Runs as a parallel merge-clock track; gates only Phase 32's native-binding step.
 **Requirements**: UPSTREAM-BIND-01
 **Success Criteria**:
+
   1. The list-valued `ms_run.sample_ref` change is an open PR against HUPO-PSI/mzPeak (URL recorded) — OR an explicit recorded "held" determination by the owner.
   2. The Phase-32 gate is recorded: native binding waits on this merge; `metadata.study.run_sample_binding` index.json shadow is the interim carrier.
+
 **Plans**: TBD
 
 ### Phase 31: Unified model + SDRF reader + verbatim embed (TRUE MVP)
+
 **Goal**: A label-free SDRF embeds losslessly and re-serves byte-identical — a complete, demoable, upstream-independent vertical. Carries the heavier-than-it-looks groundwork: the `convert_mzml` finalize-seam refactor (plain-mzML path has no post-spectrum embed seam today), the typed-member helper (`start_for_entry`, not `start_other`), the own `SourceCurie`, and the `--sdrf` CLI layer.
 **Depends on**: Phase 30 (member/KV contracts + CV strategy). Nothing upstream.
 **Requirements**: SM-01, SM-02, SM-03, SM-04
 **Success Criteria**:
+
   1. `--sdrf <PATH>` ingests a sibling SDRF (csv parse: tab, `flexible`, `quoting(false)`, real token set); file-row matching binds the input by path-stripped basename across sibling extensions; zero/multi-match emits a loud diagnostic.
   2. The SDRF is embedded **verbatim** as a typed `sample-metadata`/`sdrf` ZIP member + a `metadata.sample_metadata` back-ref (`accession`, `source_uri`, `sha256`, `retrieved_at`).
   3. Round-trip re-serves the embedded bytes byte-for-byte; the spectral L1 round-trip is unchanged (XRT).
+
 **Plans**: TBD
 
 ### Phase 32: Lean `sample_list`/study projection + list-valued run binding
+
 **Goal**: Label-free 1:1 is readable + roundtrips. Emit minimal `sample_list` entries (per source name) + `metadata.study` global context; bind run→sample via the native list-valued `ms_run.sample_ref` once Phase 30b merges (shadow in the interim). Full `characteristics→Param` + `factor_values` are deferred ≥v0.9 (blob holds them).
 **Depends on**: Phase 31. Native-binding step gated on Phase 30b's upstream merge.
 **Requirements**: SM-05, SM-06, SM-07
 **Success Criteria**:
+
   1. `sample_list` entries (one per `source name`) carry id + name + minimal params; `metadata.study` records accession/title/back-ref.
   2. Run→sample binding emits via list-valued `ms_run.sample_ref` (or the `metadata.study.run_sample_binding` shadow until merge); a documented repo-wins precedence rule resolves embedded-vs-repo.
   3. Label-free 1:1 SDRF (MTBLS1129) roundtrips + the projection reads back.
+
 **Plans**: TBD
 
 ### Phase 33: ISA reader (Tab + JSON)
+
 **Goal**: A native MetaboLights ISA bundle ingests + roundtrips. Pure-Rust hand parser (NO Python) for ISA-Tab `i_/s_/a_` (+ Ontology Source Reference registry) and a separate ISA-JSON deserialize (`@id` resolution), both into the one `StudyMetadata`; the protocol/process graph is preserved in the verbatim bundle + a diagnostic, never dropped.
 **Depends on**: Phase 31 (model + embed) + Phase 32 (projection plumbing). Independent of channels. *Consider splitting ISA-Tab and ISA-JSON.*
 **Requirements**: SM-08, SM-09, SM-10
 **Success Criteria**:
+
   1. ISA-Tab (`data/sdrf-examples/MTBLS5358`) parses into `StudyMetadata`; assay-row→file matching on `Raw/Derived Spectral Data File`; factor values harvested from study + assay files.
   2. The whole ISA bundle embeds verbatim (`data_kind: isa`) + roundtrips byte-for-byte; ISA-JSON deserializes into the same model.
   3. The protocol/process graph + multi-assay grouping are preserved (in the blob) with a diagnostic — never silently dropped.
+
 **Plans**: TBD
 
 ### Phase 34: Isobaric channels as labeled samples (NO new construct)
+
 **Goal**: TMT/iTRAQ multiplexing modeled by reusing `sample_list` + PSI-MS CV — no new `channel_list`. Each isobaric channel is a `sample_list` entry with a `sample label` cvParam (MS:1002602 + reagent child) + reporter-m/z + role + `tag_modification` (Unimod); the run references them via the list-valued `ms_run.sample_ref`.
 **Depends on**: Phase 32 (sample_list + list-valued binding). Independent breadth-track with Phase 33.
 **Requirements**: CHAN-01, CHAN-02, CHAN-03
 **Success Criteria**:
+
   1. A TMT-10plex SDRF (PXD011799) emits N labeled `sample_list` entries + a list-valued `ms_run.sample_ref`; SILAC/label-free excluded from the channel path.
   2. Carrier/reference/pooled roles derived from `comment[carrier/reference channel]` + pooled flags; `reporter_mz: Option<f64>` with source recorded; TMTpro 16/18-plex honest free-text fallback.
   3. No `channel_list`/`plex_id`/`channel_set` is emitted; channel→sample resolves through the labeled samples.
+
 **Plans**: TBD
 
 ### Phase 35: Reporter-ion quantitation (optional, off by default)
+
 **Goal**: Optional per-MS2 reporter quant, channel-keyed. **First-to-cut if the milestone overruns** (serves breadth, not the core sample↔file value).
 **Depends on**: Phase 34.
 **Requirements**: QUANT-01, QUANT-02
 **Success Criteria**:
+
   1. With `--reporter-quant`, reporter intensities are stored as an `auxiliary` array with a `channel_id` column.
   2. A read-back spike proves `channel_id` survives through **this repo's own reader**; peak → channel → sample resolves.
+
 **Plans**: TBD
 
 ### Phase 36: `comment[…]` scope decomposition + factor-value/CV completeness — DEFERRED ≥v0.9
+
 **Goal**: *(Deferred.)* Native re-serialization of per-`comment[*]` true-scope placement, `factor_values` block, full `characteristics→Param` shaping (incl. `MT/TA/PP` modification sub-fields). The verbatim blob carries this fidelity losslessly in v0.8; JK's "don't make the reader an SDRF writer" posture defers native projection. Kept as a v0.9 candidate if a query need materializes.
 **Requirements**: SCOPE-01, SCOPE-02 *(deferred ≥v0.9)*
 **Plans**: deferred
 
 ### Phase 37: Round-trip + validation + batch spec/upstream submission
+
 **Goal**: Close the milestone — prove the roundtrip, run optional external validation, and submit the batched spec proposal + upstream PR.
 **Depends on**: Phases 31–34 (the emitted facets). Phase 35 optional.
 **Requirements**: VAL-01, VAL-02 (+ SMSPEC-02 batch, UPSTREAM-BIND-01 submission)
 **Success Criteria**:
+
   1. The internal Rust round-trip-parity assertion (re-serve embedded bytes byte-for-byte) passes on all three fixtures (MTBLS1129 label-free SDRF, PXD011799 TMT-10plex SDRF, MTBLS5358 native ISA-Tab) — the hard gate.
   2. The optional `--validate-sample-metadata` oracle (sdrf-pipelines/isa-api) runs only when present, non-blocking, never required at runtime (no Python dependency); results recorded when available.
   3. The batched sample-metadata + samples-as-channels spec proposals are submitted to `HUPO-PSI/mzPeak-specification` and the upstream `ms_run.sample_ref` PR is submitted (both owner-gated).
+
 **Plans**: TBD
 
 ## Progress
@@ -324,7 +350,7 @@ CVG-01/02, GEOF-01, RSRC-01, L2-01); Phases 23/24/25/26/28 done; Phases 22/27/29
 |-------|-------|--------|-------|
 | 22. Upstream PR prep (relocated from v0.7) | 0/? | **Relocated — held (owner-gated)** | UPS-01 chunk_series + UPS-03 validator PRs |
 | 29. De-vendor both forks (relocated from v0.7) | 0/? | **Relocated — gated** | DVN-01 (chunk_series merged) + DVN-02 (mzdata 0.64.2 on crates.io); LAST |
-| 30. Sample-metadata spec alignment & CV governance | 0/? | Not started | precedes 32+; deps v0.7 Phase 24 (✅) |
+| 30. Sample-metadata spec alignment & CV governance | 2/4 | In Progress|  |
 | 30b. Upstream list-valued `ms_run.sample_ref` PR | 0/? | Not started | early/parallel, owner-gated |
 | 31. Unified model + SDRF reader + verbatim embed (MVP) | 0/? | Not started | upstream-independent |
 | 32. Lean `sample_list`/study projection + run binding | 0/? | Not started | native binding gated on 30b |
