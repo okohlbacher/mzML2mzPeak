@@ -85,28 +85,40 @@ compound-key (PIX-01, ex-999.10); MSI ROI spatial-annotation polygon + region→
 continuous-mode shared-axis + imzML emit (CONT-01); full `image` entity / `images.parquet` blob (IMG-01).
 See REQUIREMENTS.md → "Deferred beyond v1.0".
 
-## Next Milestone: v0.8 — Sample-metadata ingestion (SDRF + ISA) AND upstreaming / de-vendoring finish — LAID DOWN 2026-06-09
+## Current Milestone: v0.8 — Sample-metadata ingestion (SDRF + ISA) AND upstreaming / de-vendoring finish — FORMALIZED 2026-06-09
 
-**Status:** v0.7 is **shipped** (tag `v0.7`); v0.8 is the **active** milestone. Formalized into
-`ROADMAP.md` (Phases 22, 29, 30, 30b, 31–37) and the v0.8 design draft
-(SMSPEC/SMCVG/SM/CHAN/QUANT/UPSTREAM-BIND/VAL + deferred SCOPE/INJECT + the relocated UPS-01/03 +
-DVN-01/02). The active `REQUIREMENTS.md` was archived to `milestones/v0.7-REQUIREMENTS.md` at v0.7 close; a
-fresh `REQUIREMENTS.md` is written when v0.8 is scoped (`/gsd:new-milestone`). Next buildable: **Phase 30**
-(deps met — v0.7 Phase 24 ✅).
+**Status:** v0.7 is **shipped** (tag `v0.7`); v0.8 is the **active** milestone, formalized 2026-06-09 from
+the ratified, adversarially-reviewed [`.planning/milestones/v0.8-DESIGN-DRAFT.md`](milestones/v0.8-DESIGN-DRAFT.md)
+(cornerstones A–G + §0c) into `REQUIREMENTS.md` (28 active reqs) + `ROADMAP.md` (Phases 22, 29, 30, 30b,
+31–37) + `STATE.md`. **10 phases**, numbering continued from v0.7's Phase 29 — **NO renumbering**. Next
+buildable: **Phase 30** (deps met — v0.7 Phase 24 ✅).
 
-**Two work streams.** (1) **Sample-metadata ingestion** (Phases 30, 30b, 31–37): ingest a sibling
-**SDRF-Proteomics TSV or ISA bundle (Tab/JSON)** during conversion so the sample ↔ data-file relationship
-and study context survive into the mzPeak archive — losslessly (verbatim blob anchor) and queryably
-(minimal projections). Keystone is a format-agnostic unified `StudyMetadata` / `SourceCurie` model;
-channels are reframed as labeled `sample_list` entries (MS:1002602), the `channel_list` construct is
+**Goal.** Given an mzML plus a sibling SDRF or ISA file, pull the global/study metadata and the sample rows
+applicable to that mzML into the mzPeak archive — **losslessly** (verbatim blob anchor) and **queryably**
+(minimal scoped projections with stable join keys) — so the binding survives the roundtrip and validates
+against the source ecosystem's reference tools.
+
+**Two work streams (target features).** (1) **Sample-metadata ingestion** (Phases 30, 30b, 31–37): ingest a
+sibling **SDRF-Proteomics TSV or ISA bundle (Tab/JSON)** during conversion. Keystone is a format-agnostic
+unified `StudyMetadata` / `SourceCurie` model that both readers populate and a single emitter consumes;
+channels are reframed as labeled `sample_list` entries (`MS:1002602`), the `channel_list` construct is
 dropped, and run→sample binding lands via an upstream-first **list-valued** `ms_run.sample_ref`. Pure-Rust
-readers (no Python dep); only new crate is `csv`. **Absorbs and supersedes v0.7's Phase 27** (SDRF-01..05,
-CHAN-01..03 → SM-* / CHAN-* / QUANT-*). (2) **Upstreaming / de-vendoring finish** (Phases 22, 29, relocated
-from v0.7): submit the chunk_series PR (UPS-01) + the mzPeakValidator PR (UPS-03), then drop both vendored
-forks (DVN-01/02) once the chunk_series fix is upstreamed and mzdata 0.64.2 publishes to crates.io. The
-two streams interlock — the upstream `ms_run.sample_ref` PR (Phase 30b) and the held chunk_series PR
-(Phase 22) are both merge-clock work, and de-vendor clears the fork the native binding builds on. Full
-design (cornerstones A–G + §0c): [`.planning/milestones/v0.8-DESIGN-DRAFT.md`](milestones/v0.8-DESIGN-DRAFT.md).
+readers (no Python dep); only new crate is `csv` (+ `serde_json`, already present). **Absorbs and supersedes
+v0.7's Phase 27** (SDRF-01..05, CHAN-01..03 → SM-* / CHAN-* / QUANT-*). (2) **Upstreaming / de-vendoring
+finish** (Phases 22, 29, relocated from v0.7): submit the chunk_series PR (UPS-01) + the mzPeakValidator PR
+(UPS-03), then drop both vendored forks (DVN-01/02) once the chunk_series fix is upstreamed and mzdata
+0.64.2 publishes to crates.io. The two streams interlock — the upstream `ms_run.sample_ref` PR (Phase 30b)
+and the held chunk_series PR (Phase 22) are both merge-clock work, and de-vendor clears the fork the native
+binding builds on.
+
+**Ratified cornerstones (owner, 2026-06-09 — do NOT re-decide).** **A** CV = passthrough / structure-only
+(own `SourceCurie`, no OBO bundle); **B** pure-Rust readers + optional non-blocking external oracle (no
+runtime Python); **C** upstream-first run-level binding, no local writer fork (dissolves the de-vendor
+collision); **D** one milestone (SDRF + ISA together); **E** samples-as-channels, no `channel_list`
+(`MS:1002602` sample-label); **F** list-valued `ms_run.sample_ref` (multiplexing falls out of the list);
+**G** lean posture — verbatim blob is the anchor, heavy native projections (factor_values, comment-scope,
+full `characteristics→Param`) deferred ≥v0.9. Per-spectrum `assay_ref` deferred ≥v0.9; post-deposition
+`inject-metadata` deferred to v1.0 (design captured in draft §5.4).
 
 Then later: **v1.0** — post-deposition metadata injection (`inject-metadata` mode; design captured in the
 v0.8 draft §5.4) **plus** the deferred imaging-structure cluster (PIX-01, ROI-01, CONT-01, IMG-01).
