@@ -1,13 +1,23 @@
 # Requirements: mzML2mzPeak — v0.7
 
 **Defined:** 2026-06-08
-**Milestone:** v0.7 — Upstreaming, de-vendoring & sample-metadata modeling
+**Milestone:** v0.7 — Upstreaming, de-vendoring & spec-governed round-trip / conformance hardening
 **Core Value:** Convert an arbitrary imzML imaging dataset into a valid imaging mzPeak file without losing spatial or spectral information — every pixel's coordinates and its m/z + intensity survive the roundtrip.
 
 > **Reshaped 2026-06-08 (owner decision):** the imaging-structure cluster (PIX-01, ROI-01, CONT-01,
-> IMG-01 — F6/F7/F8) is **deferred beyond v1.0** (see the section below). v0.7 is re-themed to
-> *Upstreaming, de-vendoring & sample-metadata modeling* — sample/SDRF/channel modeling + conformance +
-> fidelity, not spatial structural modeling. **8 phases (22–29), 21 active requirements.**
+> IMG-01 — F6/F7/F8) is **deferred beyond v1.0** (see the section below). v0.7 is re-scoped to
+> upstreaming, de-vendoring, spec-governed round-trip + conformance/fidelity, not spatial structural
+> modeling.
+
+> **SDRF relocated to v0.8 — 2026-06-09 (owner + CODEX adversarial review).** The SDRF sample-metadata
+> + isobaric-channel cluster (SDRF-01..05, CHAN-01..03 — Phase 27) is **moved out of v0.7 into v0.8**
+> (see "## Moved to v0.8" below) and v0.7 is **re-themed** from "sample-metadata modeling" to
+> **"Upstreaming, de-vendoring & spec-governed round-trip / conformance hardening"** — CV governance +
+> declared-geometry threading + reverse provenance + L2 conformance. The 27-01 SDRF parser was reverted
+> (it was already misaligned with the v0.8 design draft — `channel_list` dropped, per-spectrum
+> `assay_ref` deferred, `.mzML` seam, parser-rule changes); v0.8 redoes the work from the
+> `StudyMetadata`/`SourceCurie` model. **8 phases (22–29), 13 active requirements; v0.7 carries NO new
+> dependency** (the `csv` dep went with the SDRF revert).
 
 > **Standing cross-cutting criterion (XRT) — applies to EVERY structured requirement below.** Any new
 > facet / metadata block / column must (a) preserve forward↔reverse round-trip symmetry (define each
@@ -48,29 +58,38 @@
 - [x] **GEOF-01**: The forward path threads imzML `<scanSettings>` *declared* geometry (flipping `pixel_count_source` to the declared branch) beyond parsed coordinates. *(Phase 25.)*
 - [x] **RSRC-01**: The reverse path copies `file_description.source_files[]` back into the emitted `.imzML` `<sourceFileList>`. *(Phase 26.)*
 
-### SDRF sample modeling (SDRF) — 999.5 core
-
-- [ ] **SDRF-01**: A new `--sdrf <PATH>` flag ingests a sibling SDRF file during conversion (explicitly NOT auto-discovered). *(Phase 27.)*
-- [ ] **SDRF-02**: The SDRF file is embedded **verbatim** as the lossless source (typed `sample-metadata`/`sdrf` ZIP member) + dataset back-ref. *(Phase 27.)*
-- [ ] **SDRF-03**: `sample_list` carries `characteristics[*]` projected from the SDRF, keyed by SDRF `source name`. *(Phase 27.)*
-- [ ] **SDRF-04**: Per-spectrum `assay_ref` + run→sample binding are emitted. *(Phase 27.)*
-- [ ] **SDRF-05**: A repo-SDRF-wins precedence rule (when embedded vs repo SDRF disagree) is applied and documented. *(Phase 27.)*
-
-### Isobaric channel modeling (CHAN) — TMT/iTRAQ
-
-- [ ] **CHAN-01**: A file-level `channel_list` maps each isobaric channel → sample(s) + reporter m/z + role (sample/pooled/carrier/reference) + `sdrf_row_ref`; it is the authoritative channel→sample/reporter-m/z map. *(Phase 27.)*
-- [ ] **CHAN-02**: `ms_run.channel_set` / `plex_id` bind a run to its channel set. *(Phase 27.)*
-- [ ] **CHAN-03**: Reporter-ion quantitation is stored as an `auxiliary` array with a `channel_id` column (confirm via a read-back spike). *(Phase 27 — folded in here; was a separate phase.)*
-
 ### Conformance (L2)
 
 - [ ] **L2-01**: An L2 conformance verify path (value-equal under a recorded transform) is wired into the CLI on top of the existing `ToleranceContract::L2`, recording the transform. *(F10 · Phase 28.)*
 
-> **Reporter-quant keying decision (CHAN-03):** reporter intensities go in an `auxiliary` array with a
-> `channel_id` column; `channel_list` is the authoritative channel→sample/reporter-m/z map (confirm via
-> a read-back spike). **Spec-engagement decision:** build all extensions locally against the spec's
-> mechanisms + stable tokens; submit the write-ups as a **batch of proposals to
-> `HUPO-PSI/mzPeak-specification` at the END of v0.7** (not incrementally).
+> **Spec-engagement decision:** build all extensions locally against the spec's mechanisms + stable
+> tokens; submit the write-ups as a **batch of proposals to `HUPO-PSI/mzPeak-specification` at the END of
+> v0.7** (not incrementally). **SPEC-02 scope is narrowed (2026-06-09)** to v0.7-only proposals —
+> `cv_list` (P-01), `scan_settings_list` / IMS declared-geometry (P-06), and the L2 transform-record
+> (P-07). The SDRF/channel proposals (P-02..P-05) and the SDRF §5.7 committee open-questions are
+> relocated to the v0.8 batch (see `docs/mzpeak-spec-proposal-queue.md`).
+
+## Moved to v0.8 — SDRF sample-metadata & isobaric channels
+
+> **Relocated 2026-06-09 (owner + CODEX adversarial review).** The SDRF sample-metadata + isobaric
+> channel + reporter-quant cluster (formerly Phase 27, SDRF-01..05 + CHAN-01..03) is moved out of v0.7
+> into milestone **v0.8**. The 27-01 SDRF TSV parser was reverted because it was **already misaligned
+> with the v0.8 design draft** (`channel_list` dropped in favour of samples-as-channels via MS:1002602;
+> per-spectrum `assay_ref` deferred to ≥v0.9; the `.mzML` `convert_mzml` finalize-seam — not the imaging
+> seam; SDRF parser-rule changes — own `SourceCurie`, `quoting(false)`, real token set). v0.8 redoes the
+> work from `.planning/milestones/v0.8-DESIGN-DRAFT.md` with the unified `StudyMetadata` / `SourceCurie`
+> model; the 27-CONTEXT + 27-01..06 plans are kept as v0.8 design groundwork (do NOT execute them under
+> v0.7). These requirements migrate to v0.8's SM-* / CHAN-* / QUANT-* sketch — they are NOT duplicated
+> there.
+
+- **SDRF-01** *(→ v0.8)*: A `--sdrf <PATH>` flag ingests a sibling SDRF file during conversion (explicitly NOT auto-discovered).
+- **SDRF-02** *(→ v0.8)*: The SDRF file is embedded **verbatim** as the lossless source (typed `sample-metadata`/`sdrf` ZIP member) + dataset back-ref.
+- **SDRF-03** *(→ v0.8)*: `sample_list` carries `characteristics[*]` projected from the SDRF, keyed by SDRF `source name`.
+- **SDRF-04** *(→ v0.8)*: Per-spectrum `assay_ref` + run→sample binding are emitted. *(v0.8 binds run-level; per-spectrum `assay_ref` deferred ≥v0.9.)*
+- **SDRF-05** *(→ v0.8)*: A repo-SDRF-wins precedence rule (when embedded vs repo SDRF disagree) is applied and documented.
+- **CHAN-01** *(→ v0.8)*: Isobaric channel → sample(s) + reporter m/z + role. *(v0.8 reframes this as samples-as-channels — labeled `sample_list` entries via MS:1002602; the `channel_list` construct is dropped.)*
+- **CHAN-02** *(→ v0.8)*: Run → channel-set binding. *(v0.8 reframes as list-valued `ms_run.sample_ref`; no `plex_id`/`channel_set`.)*
+- **CHAN-03** *(→ v0.8)*: Reporter-ion quantitation stored as an `auxiliary` array with a `channel_id` column (confirm via a read-back spike).
 
 ## Deferred beyond v1.0 — imaging structure (F6/F7/F8)
 
@@ -93,7 +112,7 @@ These are **NOT** v0.7 phases. PSI-committee notes to carry forward: ROI as a sp
 
 ### Channels
 
-- **CHAN-04**: TMTpro 16/18-plex (channels 132–135) full CV modeling — blocked on PSI-MS CV terms existing (TMTpro gap); ship honest free-text fallback in v0.7 if encountered.
+- **CHAN-04**: TMTpro 16/18-plex (channels 132–135) full CV modeling — blocked on PSI-MS CV terms existing (TMTpro gap); ship honest free-text fallback in v0.8 if encountered. *(Channel work relocated to v0.8.)*
 
 ## Out of Scope
 
@@ -101,34 +120,26 @@ These are **NOT** v0.7 phases. PSI-committee notes to carry forward: ROI as a sp
 |---------|--------|
 | **F8c — true multi-modal co-registration** (computing registration transforms) | Anti-feature for a *converter*. mzPeak stores registration metadata (affine) but does not compute it; co-registration belongs in a dedicated analysis tool. |
 | Admitting 32-bit m/z / 64-bit intensity into the mzPeak data-facet schema (other horn of HUPO-PSI #11) | Upstream maintainer's call; v0.6 already conforms the converter (canonical-width cast + recorded narrowing). |
-| Auto-discovering the SDRF file | Explicit `--sdrf` only — silent sample-metadata ingestion is a fidelity risk. |
+| Auto-discovering the SDRF file | Explicit `--sdrf` only — silent sample-metadata ingestion is a fidelity risk. *(SDRF relocated to v0.8; this stance carries forward.)* |
 | Python-binding validation of new `IMS:*` columns | Blocked by the upstream Python reader `IMS:*` crash (C1) — out of our repo's control. |
 
 ## Traceability
 
-**Active v0.7 requirements (21) — mapped across Phases 22–29:**
+**Active v0.7 requirements (13) — mapped across Phases 22–29:**
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | UPS-01 | Phase 22 (DEFERRED — held) | Pending |
 | UPS-03 | Phase 22 (DEFERRED — held) | Pending |
 | REB-01 | Phase 23 | ✅ Done (`5021eed`) |
-| SPEC-01 | Phase 24 | Complete |
-| SPEC-02 | Phase 24 | Complete |
-| SPEC-03 | Phase 24 | Complete |
-| CVG-01 | Phase 24 Plan 01 | Done 2026-06-09 |
-| CVG-02 | Phase 24 Plan 01 | Done 2026-06-09 |
-| GEOF-01 | Phase 25 | Complete |
-| RSRC-01 | Phase 26 | Complete |
-| SDRF-01 | Phase 27 | Pending |
-| SDRF-02 | Phase 27 | Pending |
-| SDRF-03 | Phase 27 | Pending |
-| SDRF-04 | Phase 27 | Pending |
-| SDRF-05 | Phase 27 | Pending |
-| CHAN-01 | Phase 27 | Pending |
-| CHAN-02 | Phase 27 | Pending |
-| CHAN-03 | Phase 27 | Pending |
-| L2-01 | Phase 28 | Pending |
+| SPEC-01 | Phase 24 | ✅ Done |
+| SPEC-02 | Phase 24 (scope narrowed to v0.7-only batch) | ✅ Done |
+| SPEC-03 | Phase 24 | ✅ Done |
+| CVG-01 | Phase 24 Plan 01 | ✅ Done 2026-06-09 |
+| CVG-02 | Phase 24 Plan 01 | ✅ Done 2026-06-09 |
+| GEOF-01 | Phase 25 | ✅ Done |
+| RSRC-01 | Phase 26 | ✅ Done |
+| L2-01 | Phase 28 (next buildable) | Pending |
 | DVN-01 | Phase 29 (DEFERRED — gated) | Pending |
 | DVN-02 | Phase 29 (DEFERRED — gated) | Pending |
 
@@ -138,6 +149,13 @@ These are **NOT** v0.7 phases. PSI-committee notes to carry forward: ROI as a sp
 |-------------|---------|
 | UPS-02 | DONE UPSTREAM (mzdata 0.64.2 dedicated SONAR/IM variants) — patch dropped on rebase |
 | UPS-04 | DONE UPSTREAM (writer rewrite `a5c222c`; pwiz 139/139) — no issue to file |
+
+**Moved to v0.8 (NOT v0.7 phases — see "## Moved to v0.8" above):**
+
+| Requirement | Status |
+|-------------|--------|
+| SDRF-01..05 | Relocated to v0.8 (2026-06-09); 27-01 parser reverted (misaligned with v0.8 design) |
+| CHAN-01..03 | Relocated to v0.8 (2026-06-09); reframed as samples-as-channels (no `channel_list`) |
 
 **Deferred beyond v1.0 (NOT v0.7 phases):**
 
@@ -150,11 +168,13 @@ These are **NOT** v0.7 phases. PSI-committee notes to carry forward: ROI as a sp
 
 **Coverage:**
 
-- Active v0.7 requirements: 21 total
-- Mapped to phases (22–29): 21 ✓
+- Active v0.7 requirements: 13 total (UPS-01, UPS-03, REB-01, SPEC-01, SPEC-02, SPEC-03, CVG-01, CVG-02, GEOF-01, RSRC-01, L2-01, DVN-01, DVN-02)
+- Mapped to phases (22–29): 13 ✓
 - Unmapped (among active): 0 ✓
+- Done (7): REB-01, SPEC-01, SPEC-03, CVG-01, CVG-02, GEOF-01, RSRC-01
 - Done-upstream (note, not mapped): UPS-02, UPS-04
+- Moved to v0.8 (not in v0.7): SDRF-01..05, CHAN-01..03
 - Deferred beyond v1.0 (not in v0.7): PIX-01, ROI-01, CONT-01, IMG-01
 
 ---
-*Requirements defined: 2026-06-08 · Mapped to roadmap: 2026-06-08 · Reshaped 2026-06-08 (10→8 phases 22–29; imaging-structure cluster deferred beyond v1.0; reporter-quant CHAN-03 folded into Phase 27; re-themed to "Upstreaming, de-vendoring & sample-metadata modeling")*
+*Requirements defined: 2026-06-08 · Mapped to roadmap: 2026-06-08 · Reshaped 2026-06-08 (10→8 phases 22–29; imaging-structure cluster deferred beyond v1.0). SDRF relocated to v0.8 + v0.7 re-themed to "Upstreaming, de-vendoring & spec-governed round-trip / conformance hardening" — 2026-06-09 (owner + CODEX adversarial review); 21→13 active requirements; no new dep (csv reverted with SDRF).*

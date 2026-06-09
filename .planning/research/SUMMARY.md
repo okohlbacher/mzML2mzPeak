@@ -1,5 +1,11 @@
 # Project Research Summary
 
+> **SNAPSHOT (2026-06-08) — partially superseded.** This research predates the 2026-06-08 imaging-cluster
+> deferral AND the 2026-06-09 SDRF relocation. SDRF/TMT sample modeling (and its `csv` dep) is **moved to
+> v0.8** (see `.planning/milestones/v0.8-DESIGN-DRAFT.md`); the imaging cluster is deferred beyond v1.0.
+> v0.7 is now "Upstreaming, de-vendoring & spec-governed round-trip / conformance hardening" (13 active
+> reqs, NO new dep). Live state: `.planning/STATE.md` / `REQUIREMENTS.md` / `ROADMAP.md`.
+
 **Project:** mzML2mzPeak — v0.7 Upstreaming, de-vendoring & sample/spatial modeling
 **Domain:** Rust MS-imaging converter (imzML ↔ imaging mzPeak) — SDRF/TMT sample modeling, imaging-spec extensions, CV governance/L2 conformance, geometry/provenance round-trip
 **Researched:** 2026-06-08

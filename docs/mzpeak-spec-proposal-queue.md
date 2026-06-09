@@ -8,28 +8,52 @@
 > Nothing in this file constitutes a submission.
 
 **Prepared:** 2026-06-09 (Phase 24, Plan 03 — SPEC-02)
+
+> **SCOPE NARROWED — 2026-06-09 (owner + CODEX adversarial review).** The SDRF/channel work (Phase 27)
+> was relocated to milestone **v0.8**. The v0.7 end-of-milestone batch (SPEC-02) is therefore narrowed
+> to the **v0.7-only** proposals: **P-01** (cv_list), **P-06** (scan_settings_list / IMS declared
+> geometry), **P-07** (L2 transform-record). The SDRF/channel proposals **P-02..P-05** and ALL the SDRF
+> §5.7 committee open-questions are moved to the new **"## v0.8 batch (SDRF/channels — deferred)"**
+> section below — they are submitted with the v0.8 batch, NOT the v0.7 batch.
+
 **Spec target:** [`HUPO-PSI/mzPeak-specification`](https://github.com/HUPO-PSI/mzPeak-specification) (nominal v0.9)
 **Mechanism reference:** [`docs/mzpeak-extension-contract.md`](./mzpeak-extension-contract.md) — the binding contract for all facet→mechanism mappings. Proposal items CITE the contract; they do NOT re-derive mechanisms.
 **SDRF open questions:** [`docs/sdrf-open-questions.md`](./sdrf-open-questions.md) — the committee Q&A tracker for §5.7
 
 ---
 
-## 1. Batch Proposal Queue
+## 1. Batch Proposal Queue (v0.7 — narrowed)
 
-Each row below is one write-up to include in the end-of-v0.7 batch submission. Status values:
+Each row below is one write-up to include in the **end-of-v0.7** batch submission. Status values:
 - `drafted` — write-up exists or is fully spec-able from the contract now
 - `pending-phase` — implementation phase not yet complete; write-up can be finalised after that phase
 - `blocked` — gated on an external dependency (e.g. CV minting)
 
+> **v0.7 batch scope (narrowed 2026-06-09):** only P-01, P-06, P-07. The SDRF/channel proposals
+> P-02..P-05 moved to the v0.8 batch (see Section 1b).
+
 | # | Proposal Title | Spec Mechanism Extended | Source Reqs / Phase | Contract Section | Readiness |
 |---|---------------|------------------------|--------------------|--------------------|-----------|
 | P-01 | CV-declaration block (`cv_list`) adoption | File-Level Metadata JSON (`metadata` KV) | SPEC-03 / Phase 24 | §3.1 | `drafted` |
-| P-02 | SDRF verbatim embed — new `sdrf` Data Kind + `sample-metadata` Entity Type | Adding a new Data Kind + Adding a new Entity Type | SDRF-01, SDRF-02 / Phase 27 | §3.4 | `pending-phase` |
-| P-03 | `sample_list` characteristics mapping + `assay_ref` per-spectrum column | File-Level Metadata JSON (`sample_list`) + Column Name Inflection | SDRF-03, SDRF-04 / Phase 27 | §3.5 | `pending-phase` |
-| P-04 | `channel_list` + `ms_run.channel_set` / `plex_id` (isobaric-channel model) | File-Level Metadata JSON (new `channel_list` key) | CHAN-01, CHAN-02 / Phase 27 | §3.6 | `pending-phase` |
-| P-05 | Reporter-ion quant auxiliary array binding (`channel_id` in `auxiliary_arrays[].parameters`) | Auxiliary Data Arrays | CHAN-03 / Phase 27 | §3.7 | `pending-phase` |
 | P-06 | Declared-geometry / `scan_settings_list` fill | File-Level Metadata JSON (`scan_settings_list` TODO slot) + Column Name Inflection (IMS µm columns) | GEOF-01 / Phase 25 | §3.2 | `pending-phase` |
 | P-07 | L2 transform-record convention (`transform` CURIE in array index + file-level `"transform"` key) | Array Index `transform` field + File-Level Metadata JSON | L2-01 / Phase 28 | §3.8 | `pending-phase` |
+
+## 1b. v0.8 batch (SDRF/channels — deferred)
+
+> **Relocated 2026-06-09 (owner + CODEX adversarial review).** These SDRF/channel proposals are
+> submitted with the **v0.8** batch, NOT the v0.7 batch. v0.8 redoes the SDRF work from the unified
+> `StudyMetadata`/`SourceCurie` model (`.planning/milestones/v0.8-DESIGN-DRAFT.md`), which **reframes**
+> channels as labeled `sample_list` entries (MS:1002602 "sample label") and **drops the `channel_list`
+> construct** (P-04 changes shape) and binds run→sample via a list-valued `ms_run.sample_ref`. The rows
+> below are kept for provenance; the v0.8 milestone restates them against the v0.8 design. The Phase
+> references are historical (the original v0.7 Phase 27).
+
+| # | Proposal Title | Spec Mechanism Extended | Source Reqs / (historical) Phase | Contract Section | Readiness |
+|---|---------------|------------------------|--------------------|--------------------|-----------|
+| P-02 | SDRF verbatim embed — new `sdrf` Data Kind + `sample-metadata` Entity Type | Adding a new Data Kind + Adding a new Entity Type | SDRF-01, SDRF-02 / ex-Phase 27 → v0.8 | §3.4 | `deferred-to-v0.8` |
+| P-03 | `sample_list` characteristics mapping + `assay_ref` per-spectrum column | File-Level Metadata JSON (`sample_list`) + Column Name Inflection | SDRF-03, SDRF-04 / ex-Phase 27 → v0.8 *(per-spectrum `assay_ref` deferred ≥v0.9 in v0.8)* | §3.5 | `deferred-to-v0.8` |
+| P-04 | Isobaric-channel model | *(v0.8: samples-as-channels via MS:1002602 + list-valued `ms_run.sample_ref`; the `channel_list`/`plex_id` form is dropped)* | CHAN-01, CHAN-02 / ex-Phase 27 → v0.8 | §3.6 *(superseded by v0.8 design)* | `deferred-to-v0.8` |
+| P-05 | Reporter-ion quant auxiliary array binding (`channel_id` in `auxiliary_arrays[].parameters`) | Auxiliary Data Arrays | CHAN-03 / ex-Phase 27 → v0.8 | §3.7 | `deferred-to-v0.8` |
 
 ### Explicitly OUT of this batch (deferred beyond v1.0)
 
@@ -68,7 +92,11 @@ own voice ("Proposed addition to `index.md` §…").
 - **Pending CURIE:** IMS CV URI (TODO(F9)) tracked in `docs/cv-requests.md`; include the filed request
   reference in the proposal.
 
-### P-02 — SDRF verbatim embed + `sample-metadata` Entity Type + `sdrf` Data Kind
+> **P-02..P-05 below are DEFERRED to the v0.8 batch** (relocated 2026-06-09). Notes kept for provenance;
+> v0.8 restates them against the unified `StudyMetadata`/`SourceCurie` design (channels reframed as
+> labeled samples; `channel_list` dropped).
+
+### P-02 — SDRF verbatim embed + `sample-metadata` Entity Type + `sdrf` Data Kind *(→ v0.8)*
 
 - **New Data Kind:** `"sdrf"` (or `"other"` as safe fallback until accepted).
 - **New Entity Type:** `"sample-metadata"` (or `"other"` as safe fallback). The spec's
@@ -82,7 +110,7 @@ own voice ("Proposed addition to `index.md` §…").
 - **Pending CURIE/vocab:** `sample-metadata` entity-type term needs a PSI-MS structural term. Tracked
   in stable-token register (contract §4).
 
-### P-03 — `sample_list` characteristics + `assay_ref`
+### P-03 — `sample_list` characteristics + `assay_ref` *(→ v0.8)*
 
 - **Existing spec member:** `sample_list` (`id`/`name`/`parameters`) already documented in the spec.
   Proposal extends its use: SDRF `characteristics[*]` as `parameters` items; `source name` as `id`.
@@ -90,7 +118,7 @@ own voice ("Proposed addition to `index.md` §…").
   promoted-column seam (`add_spectrum_scan_field`, `Int64` baseline per visitor.rs constraint).
 - **Propose:** run→sample reference + per-spectrum `assay_ref` as base-schema additions.
 
-### P-04 — `channel_list` + `ms_run.channel_set` / `plex_id`
+### P-04 — `channel_list` + `ms_run.channel_set` / `plex_id` *(→ v0.8 — superseded: v0.8 drops `channel_list`, uses samples-as-channels via MS:1002602 + list-valued `ms_run.sample_ref`)*
 
 - **New file-level JSON key:** `"channel_list"` under `metadata` KV.
 - **Schema per channel entry:** `{id, label: {name, accession?}, reporter_mz, tag_modification: {name,
@@ -99,7 +127,7 @@ own voice ("Proposed addition to `index.md` §…").
 - **Constraint (propose):** non-isobaric runs MUST NOT emit a `channel_list`.
 - **Pending CURIEs:** TMTpro 132–135 (18-plex) channel labels; tracked in `docs/cv-requests.md`.
 
-### P-05 — Reporter-ion quant auxiliary array binding
+### P-05 — Reporter-ion quant auxiliary array binding *(→ v0.8)*
 
 - **Mechanism:** Auxiliary Data Arrays (`auxiliary_arrays` list column in `spectra_metadata.parquet`).
 - **Binding:** `channel_id` stored in `auxiliary_arrays[].parameters` makes peak→channel→sample
@@ -134,11 +162,19 @@ own voice ("Proposed addition to `index.md` §…").
 
 ---
 
-## 3. Committee Open Questions — SDRF §5.7
+## 3. Committee Open Questions — SDRF §5.7 — DEFERRED TO v0.8 BATCH
+
+> **Relocated to the v0.8 batch — 2026-06-09 (owner + CODEX adversarial review).** With the SDRF/channel
+> work moved to milestone v0.8, ALL the SDRF §5.7 committee open-questions below ship with the **v0.8**
+> spec batch, NOT the v0.7 batch. They are kept here for provenance; the v0.8 milestone restates and
+> ratifies them against the unified `StudyMetadata`/`SourceCurie` design
+> (`.planning/milestones/v0.8-DESIGN-DRAFT.md` §13). Note v0.8 already resolves several (Q4 → samples-as-
+> channels, no `channel_list`; Q3 → list-valued `ms_run.sample_ref`; Q6/Q7 → deferred ≥v0.9 under the
+> lean posture). Phase references below are historical (the original v0.7 Phase 27).
 
 These questions were raised in the mzPeak HUPO-PSI design notes (2026-05-07, §5.7) and in the
 companion open-questions document. Each is flagged as needing **committee ratification** before the
-Phase 27 SDRF implementation is considered finalized.
+SDRF implementation (now in v0.8) is considered finalized.
 
 **Canonical detail:** [`docs/sdrf-open-questions.md`](./sdrf-open-questions.md)
 
@@ -194,18 +230,24 @@ Phase 27 SDRF implementation is considered finalized.
 
 ---
 
-## 4. Submission Checklist (run at v0.7 end)
+## 4. Submission Checklist
 
-Gate conditions that MUST all be checked before the owner assembles and submits the batch. Leave
-unchecked until each gate is confirmed at milestone end.
+### 4a. v0.7 batch (run at v0.7 end — P-01, P-06, P-07 only)
 
-- [ ] All `pending-phase` items above have reached `drafted` status (implementing phase complete + write-up finalised).
-- [ ] Every proposal satisfies the three-places rule: implementation in `src/…`, spec write-up in `docs/mzpeak-imaging-spec-suggestions.md`, JSON schema in `schema/*.json`. (Contract rule 3.)
+Gate conditions that MUST all be checked before the owner assembles and submits the **v0.7** batch.
+
+- [ ] The three v0.7 `pending-phase` items (P-06, P-07; P-01 already `drafted`) have reached `drafted` status (implementing phase complete + write-up finalised).
+- [ ] Every v0.7 proposal satisfies the three-places rule: implementation in `src/…`, spec write-up in `docs/mzpeak-imaging-spec-suggestions.md`, JSON schema in `schema/*.json`. (Contract rule 3.)
 - [ ] `docs/cv-requests.md` is current — all pending CURIEs are listed, no inline inventions in implementing phases.
-- [ ] `docs/mzpeak-extension-contract.md` is finalized (no pending cross-phase review items).
-- [ ] Committee SDRF §5.7 open questions (Section 3 above) have been resolved or explicitly deferred post-v1.0.
-- [ ] All SDRF committee questions resolved items are reflected in Phase 27 implementation.
-- [ ] Reporter-quant keying spike confirmed: `channel_id` survives `add_spectrum_array_override` read-back in the Rust reader (STATE.md Research Flags).
+- [ ] `docs/mzpeak-extension-contract.md` is finalized for the v0.7 facets (no pending cross-phase review items).
+
+### 4b. v0.8 batch (deferred — SDRF/channel gates, run at v0.8 end)
+
+These gates moved to v0.8 with the SDRF/channel relocation (2026-06-09). Do NOT block the v0.7 batch on them.
+
+- [ ] Committee SDRF §5.7 open questions (Section 3 above) resolved or explicitly deferred (restated against the v0.8 design).
+- [ ] All resolved SDRF committee-question items are reflected in the v0.8 SDRF implementation.
+- [ ] Reporter-quant keying spike confirmed: `channel_id` survives `add_spectrum_array_override` read-back in the Rust reader.
 - [ ] mzPeakValidator / roundtrip tests pass on a real PXD dataset (PXD011799 TMT 10-plex recommended for the isobaric path).
 - [ ] `docs/sdrf-open-questions.md` is up to date with any committee responses received.
 - [ ] **Owner authorization to push.** Per git push policy: no remote push outside github.com/okohlbacher without explicit interactive authorization; warn first even then. The spec proposals go to `HUPO-PSI/mzPeak-specification` — explicit authorization required before filing any PR.
@@ -215,4 +257,4 @@ unchecked until each gate is confirmed at milestone end.
 ---
 
 *Living document — update readiness status after each implementing phase completes.*
-*Submission status: HELD. Last updated: 2026-06-09 (Phase 24 Plan 03).*
+*Submission status: HELD. Last updated: 2026-06-09 — v0.7 batch narrowed to P-01/P-06/P-07; SDRF/channel proposals (P-02..P-05) + SDRF §5.7 committee questions relocated to the v0.8 batch (owner + CODEX adversarial review).*

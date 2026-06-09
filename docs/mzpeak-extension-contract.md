@@ -2,8 +2,17 @@
 
 **Version:** v0.7 binding contract (2026-06-09)
 **Spec source:** HUPO-PSI/mzPeak-specification, nominal v0.9 (prose `index.md`, 10 JSON schemas)
-**Status:** BINDING — Phases 25–28 implement against this contract. Changes require cross-phase review.
+**Status:** BINDING — Phases 25, 26, 28 implement against this contract. Changes require cross-phase review.
 **Requirement coverage:** SPEC-01 (all facets via spec mechanisms) + SPEC-03 (cv_list reconciliation)
+
+> **SDRF/channel facets deferred to v0.8 — 2026-06-09 (owner + CODEX adversarial review).** The SDRF
+> embed + sample_list + channel_list + reporter-quant facets (§3.4–§3.7 below) were Phase 27 work; that
+> phase is **relocated to milestone v0.8**. Those sections are marked **DEFERRED TO v0.8** and are kept
+> here for provenance only — v0.8 redoes them from the unified `StudyMetadata`/`SourceCurie` design
+> (`.planning/milestones/v0.8-DESIGN-DRAFT.md`), which **reframes channels as labeled `sample_list`
+> entries (MS:1002602) and drops the `channel_list` construct** (§3.6 is superseded). The **v0.7** facets
+> — cv_list (§3.1), declared geometry / scan_settings_list (§3.2), source_files[] reverse copy (§3.3),
+> and L2 transform record (§3.8) — remain BINDING.
 
 ---
 
@@ -117,10 +126,10 @@ subsections that follow give the detailed binding contract for each facet.
 | cv_list | SPEC-03 | 24 | File-Level Metadata JSON | `metadata` KV, `"cv_list"` key |
 | Declared geometry / scan_settings_list | GEOF-01 | 25 | File-Level Metadata JSON + Column Name Inflection (IMS µm columns) | `metadata` KV, `"scan_settings_list"` key (spec TODO slot) |
 | source_files[] reverse copy | RSRC-01 | 26 | File-Level Metadata JSON | `metadata` KV, `file_description.source_files[]` (already a spec member) |
-| SDRF verbatim embed | SDRF-01, SDRF-02 | 27 | Adding a new Data Kind + File-Level Metadata JSON (back-ref) | new `sdrf` / `other` data-kind ZIP member + `metadata.sdrf` back-ref key |
-| sample_list characteristics + assay_ref | SDRF-03, SDRF-04 | 27 | File-Level Metadata JSON (sample_list) + Column Name Inflection or parameters (assay_ref) | `metadata` KV, `"sample_list"` key (existing spec member) |
-| channel_list + ms_run.channel_set/plex_id | CHAN-01, CHAN-02 | 27 | File-Level Metadata JSON | `metadata` KV, new `"channel_list"` key |
-| Reporter-ion quant | CHAN-03 | 27 | Auxiliary Data Arrays (spec section "Auxiliary Data Arrays") | `auxiliary_arrays` column in `spectra_metadata.parquet` |
+| SDRF verbatim embed **— deferred to v0.8** | SDRF-01, SDRF-02 | ~~27~~ → v0.8 | Adding a new Data Kind + File-Level Metadata JSON (back-ref) | new `sdrf` / `other` data-kind ZIP member + `metadata.sdrf` back-ref key |
+| sample_list characteristics + assay_ref **— deferred to v0.8** | SDRF-03, SDRF-04 | ~~27~~ → v0.8 | File-Level Metadata JSON (sample_list) + Column Name Inflection or parameters (assay_ref) | `metadata` KV, `"sample_list"` key (existing spec member) |
+| channel_list + ms_run.channel_set/plex_id **— deferred to v0.8 (superseded: v0.8 drops `channel_list`)** | CHAN-01, CHAN-02 | ~~27~~ → v0.8 | File-Level Metadata JSON | `metadata` KV, new `"channel_list"` key |
+| Reporter-ion quant **— deferred to v0.8** | CHAN-03 | ~~27~~ → v0.8 | Auxiliary Data Arrays (spec section "Auxiliary Data Arrays") | `auxiliary_arrays` column in `spectra_metadata.parquet` |
 | L2 transform record | L2-01 | 28 | Array Index `transform` field + File-Level Metadata JSON | `spectrum_array_index` `entries[].transform` CURIE + `metadata` transform record |
 
 ### 3.1 cv_list (Phase 24 / SPEC-03)
@@ -174,7 +183,10 @@ them into the reverse writer.
 
 **No new archive member, no new JSON key.** This facet is entirely within the existing spec member.
 
-### 3.4 SDRF Verbatim Embed (Phase 27 / SDRF-01, SDRF-02)
+### 3.4 SDRF Verbatim Embed (ex-Phase 27 / SDRF-01, SDRF-02) — DEFERRED TO v0.8
+
+> **DEFERRED TO v0.8 (2026-06-09).** Provenance only; v0.8 redoes this from the unified `StudyMetadata`
+> design. Not a v0.7 deliverable.
 
 **Mechanism:** Adding a new Data Kind — a typed ZIP member registered in `mzpeak_index.json`.
 
@@ -195,7 +207,10 @@ the dataset accession, SDRF URI, and the archive member name. Example:
 **Authority rule:** the canonical `*.sdrf.tsv` in the repository is the lossless source. The embedded
 copy is a convenience denormalized projection. When they conflict, the repository SDRF wins.
 
-### 3.5 sample_list Characteristics + assay_ref (Phase 27 / SDRF-03, SDRF-04)
+### 3.5 sample_list Characteristics + assay_ref (ex-Phase 27 / SDRF-03, SDRF-04) — DEFERRED TO v0.8
+
+> **DEFERRED TO v0.8 (2026-06-09).** Provenance only. In v0.8 the per-spectrum `assay_ref` is further
+> deferred to ≥v0.9 (run-level binding only). Not a v0.7 deliverable.
 
 **Mechanism (sample_list):** File-Level Metadata JSON — `metadata` KV, `"sample_list"` key. This is
 an already-documented spec member. Each sample entry: `{id: String, name: String, parameters: [...]}`.
@@ -212,7 +227,12 @@ Column name: `assay_ref` (integer foreign key into `sample_list` by index positi
 to its single sample. For isobaric runs, `assay_ref` points to the plex's run record; the per-channel
 sample binding lives in `channel_list` (Section 3.6).
 
-### 3.6 channel_list + ms_run.channel_set/plex_id (Phase 27 / CHAN-01, CHAN-02)
+### 3.6 channel_list + ms_run.channel_set/plex_id (ex-Phase 27 / CHAN-01, CHAN-02) — DEFERRED TO v0.8 (SUPERSEDED)
+
+> **DEFERRED TO v0.8 + SUPERSEDED (2026-06-09).** Provenance only. v0.8 **drops the `channel_list`
+> construct** entirely — channels become labeled `sample_list` entries (MS:1002602 "sample label") bound
+> by a list-valued `ms_run.sample_ref`; no `plex_id`/`channel_set`. The schema below does NOT reflect
+> the v0.8 design. Not a v0.7 deliverable.
 
 **Mechanism:** File-Level Metadata JSON — `metadata` KV, new `"channel_list"` key. This key does not
 exist in the current spec; it is an extension we add in the file-level JSON under the File-Level
@@ -244,7 +264,10 @@ accessions. Use stable free-text token + record in `docs/cv-requests.md`. TMT6pl
 labels use Unimod tags for the modification; per-channel reporter m/z values come from a reagent table
 `const` in `src/sdrf/`. See `docs/cv-requests.md` for the gap.
 
-### 3.7 Reporter-Ion Quant (Phase 27 / CHAN-03)
+### 3.7 Reporter-Ion Quant (ex-Phase 27 / CHAN-03) — DEFERRED TO v0.8
+
+> **DEFERRED TO v0.8 (2026-06-09).** Provenance only; optional + off by default in v0.8. Not a v0.7
+> deliverable.
 
 **Mechanism:** Auxiliary Data Arrays (spec section "Auxiliary Data Arrays"). A per-MS2 auxiliary
 array attached to the `auxiliary_arrays` list column in `spectra_metadata.parquet`.
@@ -289,9 +312,9 @@ inline. The current known gaps (as of Phase 24):
 | Gap | Stable token in use | Tracking |
 |-----|---------------------|----------|
 | IMS CV URI (`TODO(F9)`) | `imagingMS.obo` PURL placeholder | `docs/cv-requests.md` |
-| TMTpro 132–135 (18-plex) channel labels | Free-text fallback | `docs/cv-requests.md` |
-| SDRF `sample-metadata` entity type | `"other"` fallback | Batch proposal SPEC-02 |
-| SDRF `sdrf` data kind | `"other"` fallback | Batch proposal SPEC-02 |
+| TMTpro 132–135 (18-plex) channel labels *(→ v0.8)* | Free-text fallback | `docs/cv-requests.md` (v0.8) |
+| SDRF `sample-metadata` entity type *(→ v0.8)* | `"other"` fallback | v0.8 batch proposal |
+| SDRF `sdrf` data kind *(→ v0.8)* | `"other"` fallback | v0.8 batch proposal |
 
 ---
 
@@ -305,7 +328,7 @@ this document requires cross-phase review. The contract is archived at
 |-------|-----------------|
 | 25 | Section 3.2 (declared geometry / scan_settings_list) |
 | 26 | Section 3.3 (source_files[] reverse copy) |
-| 27 | Sections 3.4–3.7 (SDRF embed, sample_list, channel_list, reporter-quant) |
+| ~~27~~ → v0.8 | Sections 3.4–3.7 (SDRF embed, sample_list, channel_list, reporter-quant) — **deferred to v0.8** |
 | 28 | Section 3.8 (L2 transform record) |
 
 ---

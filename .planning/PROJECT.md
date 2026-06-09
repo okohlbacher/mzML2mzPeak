@@ -40,13 +40,18 @@ green in ~11 s, ~535 MB bounded. Milestone audit passed (15/15 reqs, 5/5 integra
 full real PXD001283 dataset: converts + masking-aware L1 roundtrip in ~7 s, 366 MB bounded.
 Tag `v0.3`; see `MILESTONES.md`.
 
-## Current Milestone: v0.7 — Upstreaming, de-vendoring & sample-metadata modeling
+## Current Milestone: v0.7 — Upstreaming, de-vendoring & spec-governed round-trip / conformance hardening
 
 **Goal:** Empty the upstreaming/de-vendoring backlog — land the prepared upstream fixes and fully
-de-vendor — then add SDRF/TMT sample + isobaric-channel modeling, close the geometry/provenance fidelity
-gaps, and add L2 conformance. **Re-scoped 2026-06-08:** the imaging-structure cluster (pixel facet, ROI
-polygons, continuous shared-axis, `images.parquet`) is **deferred beyond v1.0** — v0.7 is sample-metadata
-modeling + conformance + fidelity, NOT spatial structural modeling. **8 phases (22–29), 21 active reqs.**
+de-vendor — and harden the spec-governed round trip: CV governance, declared-geometry threading, reverse
+provenance, and L2 conformance. **Re-themed 2026-06-09 (owner + CODEX adversarial review):** the SDRF
+sample-metadata + isobaric-channel cluster (Phase 27) is **relocated to v0.8** (the 27-01 parser was
+reverted — already misaligned with the v0.8 design), so v0.7 is CV/spec governance + geometry/provenance
+fidelity + L2 conformance, NOT sample-metadata modeling. (Prior 2026-06-08 reshape deferred the
+imaging-structure cluster beyond v1.0.) **8 phases (22–29), 13 active reqs; NO new dependency** (the
+`csv` dep went with the SDRF revert). **Release gate:** v0.7 ships when Phases 24, 25, 26, 28 are done
+(24/25/26 ✅; Phase 28 / L2 next); Phases 22 (held PRs) + 29 (de-vendor, externally gated) are
+DEFERRED / NON-BLOCKING.
 
 **Target features:**
 - **Upstreaming & de-vendoring**: submit the 2 still-needed PRs (chunk_series index-desync → HUPO-PSI/mzPeak;
@@ -55,24 +60,34 @@ modeling + conformance + fidelity, NOT spatial structural modeling. **8 phases (
   IM/SONAR accessions + the `array_buffer` empty-spectrum bug were both fixed upstream on the rebase.)
 - **Spec alignment & CV governance** (SPEC/CVG, ex-F9): model every facet via the rewritten
   `HUPO-PSI/mzPeak-specification` mechanisms + stable CV tokens; resolve the v0.6 `TODO(F9)` IMS
-  placeholders; reconcile `cv_list`; submit extension write-ups as a BATCH at the END of v0.7.
+  placeholders; reconcile `cv_list`; submit extension write-ups as a BATCH at the END of v0.7 (narrowed
+  to v0.7-only items — cv_list + scan_settings_list/IMS geometry + L2 transform-record).
 - **Geometry & provenance round-trip** (GEO-F/RSRC): forward declared-geometry threading beyond parsed
   (imzML `<scanSettings>`); reverse `<sourceFileList>` copy into the emitted `.imzML`.
-- **SDRF + isobaric (TMT/iTRAQ) channel modeling + reporter-quant** (999.5): verbatim SDRF embed,
-  `sample_list`/`channel_list`, `assay_ref` + run→sample binding, reporter-ion quant (aux array keyed by
-  `channel_id`) — design in `docs/sdrf-mzpeak-integration.md`.
 - **L2 conformance** (F10): wire `--conformance l2` value-equal-under-recorded-transform onto the existing
   `ToleranceContract::L2`.
+
+**Relocated to v0.8 (sample-metadata):** SDRF verbatim embed, `sample_list`, `assay_ref` + run→sample
+binding, isobaric (TMT/iTRAQ) channel modeling, reporter-ion quant. See "## Next Milestone: v0.8" below.
 
 **Deferred beyond v1.0 (imaging structure, F6/F7/F8):** `pixel` facet / multi-spectrum-per-pixel + scan
 compound-key (PIX-01, ex-999.10); MSI ROI spatial-annotation polygon + region→sample (ROI-01);
 continuous-mode shared-axis + imzML emit (CONT-01); full `image` entity / `images.parquet` blob (IMG-01).
 See REQUIREMENTS.md → "Deferred beyond v1.0".
 
-## Next Milestone
+## Next Milestone: v0.8 — SDRF sample-metadata + isobaric channels
 
-v0.8+ / v1.0 imaging-structure milestone — the deferred imaging cluster (PIX-01, ROI-01, CONT-01, IMG-01)
-plus anything else deferred during scoping (e.g. perfectly-bijective descriptive optical round-trip).
+**Headline:** ingest a sibling **SDRF-Proteomics TSV (and ISA bundle)** during conversion so the
+sample ↔ data-file relationship and study context survive into the mzPeak archive — losslessly (verbatim
+embed) and queryably (scoped projections). Keystone is a format-agnostic unified `StudyMetadata` /
+`SourceCurie` internal model; channels are reframed as labeled `sample_list` entries (MS:1002602), the
+`channel_list` construct is dropped, and run→sample binding lands via an upstream-first list-valued
+`ms_run.sample_ref`. **Absorbs and supersedes v0.7's Phase 27** (SDRF-01..05, CHAN-01..03 migrate here as
+SM-* / CHAN-* / QUANT-*). Full design + phase breakdown (Phases 30–37):
+[`.planning/milestones/v0.8-DESIGN-DRAFT.md`](milestones/v0.8-DESIGN-DRAFT.md).
+
+Then later: a v1.0 imaging-structure milestone — the deferred imaging cluster (PIX-01, ROI-01, CONT-01,
+IMG-01) plus anything else deferred during scoping (e.g. perfectly-bijective descriptive optical round-trip).
 
 ## Requirements
 
@@ -101,13 +116,15 @@ plus anything else deferred during scoping (e.g. perfectly-bijective descriptive
   (ENV/IN/SPA/SCH/OUT/VER/CLI/DAT) delivered and proven on real data (full PXD001283, 34,840
   spectra, masking-aware L1 roundtrip). See `MILESTONES.md` / `milestones/v0.3-REQUIREMENTS.md`.
 
-### Active (v0.7 — Upstreaming, de-vendoring & sample-metadata modeling)
+### Active (v0.7 — Upstreaming, de-vendoring & spec-governed round-trip / conformance hardening)
 
-8 phases (22–29), 21 active requirements: UPS-01/03 (upstream PRs — Phase 22, deferred/held), REB-01
-(rebase — Phase 23, ✅ done), SPEC-01/02/03 + CVG-01/02 (spec alignment & CV governance — Phase 24),
-GEOF-01 (Phase 25), RSRC-01 (Phase 26), SDRF-01..05 + CHAN-01/02/03 (SDRF + channels + reporter-quant —
-Phase 27), L2-01 (Phase 28), DVN-01/02 (de-vendor — Phase 29, deferred/gated). UPS-02/UPS-04 are
-done-upstream (fixed by the rebase). See `.planning/REQUIREMENTS.md` + `.planning/ROADMAP.md`.
+8 phases (22–29), **13 active requirements**: UPS-01/03 (upstream PRs — Phase 22, deferred/held), REB-01
+(rebase — Phase 23, ✅ done), SPEC-01/02/03 + CVG-01/02 (spec alignment & CV governance — Phase 24, ✅
+done; SPEC-02 batch narrowed to v0.7-only items), GEOF-01 (Phase 25, ✅ done), RSRC-01 (Phase 26, ✅
+done), L2-01 (Phase 28, next buildable), DVN-01/02 (de-vendor — Phase 29, deferred/gated). UPS-02/UPS-04
+are done-upstream (fixed by the rebase). **Relocated to v0.8:** SDRF-01..05 + CHAN-01..03 (Phase 27 →
+v0.8; 27-01 parser reverted; no `csv` dep in v0.7). See `.planning/REQUIREMENTS.md` +
+`.planning/ROADMAP.md` + `.planning/milestones/v0.8-DESIGN-DRAFT.md`.
 
 ### Deferred beyond v1.0 (imaging structure — F6/F7/F8)
 
@@ -148,6 +165,7 @@ PIX-01 (pixel facet + scan compound-key, ex-999.10), ROI-01 (spatial-annotation 
 | Test against public PXD001283 (HR2MSI mouse urinary bladder) | Matches the existing local file; real, citable MSI dataset | — Pending |
 | Process: GSD harness + adversarial CODEX/CLI review at start & end of each phase | User-mandated quality process | — Pending |
 | Defer the imaging-structure cluster (pixel facet, ROI polygons, continuous shared-axis, `images.parquet`) beyond v1.0 | v0.7 owner decision (2026-06-08): focus the milestone on upstreaming, de-vendoring, sample/SDRF/channel modeling + conformance/fidelity; spatial structural modeling needs more committee alignment (F6 scan-PK, F7 buffer placement, F8 blob design) | ✓ Decided — moved to REQUIREMENTS "Deferred beyond v1.0" |
+| Relocate the SDRF sample-metadata + isobaric-channel cluster (Phase 27) from v0.7 to v0.8; re-theme v0.7 to "spec-governed round-trip / conformance hardening" | Owner + CODEX adversarial review (2026-06-09): the 27-01 SDRF parser was already misaligned with the v0.8 design draft (`channel_list` dropped → samples-as-channels; per-spectrum `assay_ref` deferred; `.mzML` `convert_mzml` seam; parser-rule changes). A clean v0.8 boundary (unified `StudyMetadata`/`SourceCurie` model + ISA) beats carrying dead/misaligned API in v0.7. Re-theming keeps v0.7 coherent (CV governance + geometry + provenance + L2). | ✓ Decided — SDRF code reverted (build green, 257 lib tests pass); reqs moved to REQUIREMENTS "Moved to v0.8"; v0.7 = 13 active reqs, no `csv` dep; phase numbering unchanged |
 
 ## Evolution
 
@@ -167,4 +185,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-08 — v0.7 reshaped to "Upstreaming, de-vendoring & sample-metadata modeling" (8 phases 22–29, 21 active reqs); imaging-structure cluster deferred beyond v1.0*
+*Last updated: 2026-06-09 — SDRF (Phase 27) relocated to v0.8 + v0.7 re-themed to "Upstreaming, de-vendoring & spec-governed round-trip / conformance hardening" (8 phases 22–29, 13 active reqs, no new dep); owner + CODEX adversarial review. (Prior: 2026-06-08 reshape deferred the imaging-structure cluster beyond v1.0.)*

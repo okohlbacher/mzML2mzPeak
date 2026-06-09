@@ -1,5 +1,10 @@
 # Stack Research — v0.7
 
+> **SNAPSHOT (2026-06-08) — partially superseded.** SDRF/TMT sample modeling (and the `csv = "=1.4.0"`
+> dep) was **relocated to v0.8** on 2026-06-09; the imaging-spec extensions were deferred beyond v1.0 on
+> 2026-06-08. **v0.7 adds NO new dependency.** This file is kept for provenance; the `csv` discussion
+> below applies to v0.8, not v0.7. Live state: `.planning/STATE.md` / `REQUIREMENTS.md` / `ROADMAP.md`.
+
 **Domain:** Rust MS-imaging converter (imzML ↔ mzPeak) — v0.7 stack ADDITIONS for SDRF/TMT sample modeling, imaging-spec extensions (pixel facet / continuous shared-axis / images.parquet), and CV governance / L2 conformance
 **Researched:** 2026-06-08
 **Confidence:** HIGH
