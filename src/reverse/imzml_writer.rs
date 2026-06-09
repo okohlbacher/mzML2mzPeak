@@ -42,7 +42,7 @@ use crate::read::record::Representation;
 use crate::reverse::error::ReverseError;
 use crate::reverse::optical_fold::RecoveredOptical;
 use crate::schema::cv;
-use crate::schema::metadata::ImagingMetadata;
+use crate::schema::metadata::{ImagingMetadata, PixelCountSource};
 use crate::schema::optical::{
     OPTICAL_ADJACENT_SECTION, OPTICAL_ALIGNMENT, OPTICAL_LOCATION, OPTICAL_MORPHOLOGY,
     OPTICAL_OF_ANALYSED, OPTICAL_STAINING,
@@ -517,9 +517,20 @@ impl ImzmlWriter {
         // count, IMS:1000043=y count only; no z-count term exists). The per-pixel z COORDINATE
         // IMS:1000052 is a separate concept and is emitted in write_spectrum. Fabricating a bogus
         // z-count accession would be a fidelity bug (threat T-14-FAB), so z is carried, never coined.
-        if let Some(pc) = meta.pixel_count {
-            emit_cv_param(sink, "IMS", "IMS:1000042", "max count of pixel x", &pc.x.to_string())?;
-            emit_cv_param(sink, "IMS", "IMS:1000043", "max count of pixel y", &pc.y.to_string())?;
+        //
+        // FIX-3: IMS:1000042/43 are "max count of pixel x/y" — DECLARED grid geometry. Emit them
+        // ONLY when `pixel_count_source == Declared` (the source imzML genuinely declared the
+        // grid). When the count is `observed_max` (the Phase-25 inconsistency-guard overwrite, or
+        // a file that never declared a grid) — or when the provenance is absent — re-declaring
+        // OBSERVED extents as DECLARED max-count geometry would defeat the Phase-25 guard and
+        // fabricate a declaration the source never made (threat T-09/T-14-FAB). In that case omit
+        // the max-count params entirely; the observed extent is recoverable from the per-pixel
+        // IMS:1000050/51 coordinates the reverse path still emits.
+        if meta.pixel_count_source == Some(PixelCountSource::Declared) {
+            if let Some(pc) = meta.pixel_count {
+                emit_cv_param(sink, "IMS", "IMS:1000042", "max count of pixel x", &pc.x.to_string())?;
+                emit_cv_param(sink, "IMS", "IMS:1000043", "max count of pixel y", &pc.y.to_string())?;
+            }
         }
         // max_dimension_um → IMS:1000044 (x) / IMS:1000045 (y), carrying the µm unit (FID-01).
         if let Some(md) = meta.max_dimension_um {
@@ -924,7 +935,7 @@ mod tests {
     }
 
     use crate::reverse::ArrayRef;
-    use crate::schema::metadata::{AxisPair, ImagingMetadata, PixelCount};
+    use crate::schema::metadata::{AxisPair, ImagingMetadata, PixelCount, PixelCountSource};
 
     /// Read the emitted document as a UTF-8 string (also proves valid UTF-8).
     fn read_text(path: &std::path::Path) -> String {
@@ -1198,7 +1209,8 @@ mod tests {
         let meta = ImagingMetadata {
             is_imaging: true,
             pixel_count: Some(PixelCount { x: 10, y: 20, z: None }),
-            pixel_count_source: None,
+            // Declared grid → IMS:1000042/43 max-count params are emitted (FIX-3).
+            pixel_count_source: Some(PixelCountSource::Declared),
             mz_range: None,
             images: None,
             pixel_size_um: Some(AxisPair { x: 50.0, y: 50.0 }),
@@ -1253,6 +1265,52 @@ mod tests {
         fs::remove_dir_all(&dir).ok();
     }
 
+    /// FIX-3: an `observed_max` pixel_count must NOT be re-declared as DECLARED grid geometry.
+    /// When the Phase-25 inconsistency guard overwrote `pixel_count` with the observed maxima (or a
+    /// file never declared a grid at all), `pixel_count_source == ObservedMax`. The reverse imzML
+    /// must then OMIT the IMS:1000042/43 "max count of pixel x/y" params entirely — emitting them
+    /// would fabricate a declaration the source never made and defeat the Phase-25 guard.
+    #[test]
+    fn observed_max_pixel_count_is_not_emitted_as_declared() {
+        let dir = tempdir();
+        let path = dir.join("observed.imzML");
+        let meta = ImagingMetadata {
+            is_imaging: true,
+            // Observed extents (e.g. from the guard overwrite) — NOT a declared grid.
+            pixel_count: Some(PixelCount { x: 99, y: 77, z: None }),
+            pixel_count_source: Some(PixelCountSource::ObservedMax),
+            mz_range: None,
+            images: None,
+            pixel_size_um: None,
+            max_dimension_um: None,
+            absolute_offset_um: None,
+            scan_pattern: None,
+            scan_type: None,
+            line_scan_direction: None,
+            linescan_sequence: None,
+            coordinate_base: 1,
+        };
+        let w = ImzmlWriter::new(&path, Uuid::new_v4(), "deadbeef", 0, Some(&meta)).unwrap();
+        w.finish().unwrap();
+
+        let text = read_text(&path);
+        assert!(
+            !text.contains("IMS:1000042"),
+            "observed_max grid must NOT emit IMS:1000042 as a declared max-count (FIX-3)"
+        );
+        assert!(
+            !text.contains("IMS:1000043"),
+            "observed_max grid must NOT emit IMS:1000043 as a declared max-count (FIX-3)"
+        );
+        // The observed extents must not leak into the document as the declared counts either.
+        assert!(
+            !text.contains("value=\"99\"") && !text.contains("value=\"77\""),
+            "observed extents must not appear as declared grid-count values"
+        );
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
     /// FID-03: z carry-through — `pixel_count.z = Some(N)` survives serde onto the
     /// `ImagingMetadata` the reverse path feeds the emitter, and NO fabricated z-grid-COUNT IMS
     /// accession appears in the emitted document (there is no standard z-count term; the per-pixel
@@ -1264,7 +1322,8 @@ mod tests {
         let meta = ImagingMetadata {
             is_imaging: true,
             pixel_count: Some(PixelCount { x: 10, y: 20, z: Some(3) }),
-            pixel_count_source: None,
+            // Declared grid → IMS:1000042/43 max-count params are emitted (FIX-3).
+            pixel_count_source: Some(PixelCountSource::Declared),
             mz_range: None,
             images: None,
             pixel_size_um: None,
@@ -1864,7 +1923,8 @@ mod tests {
         let meta = ImagingMetadata {
             is_imaging: true,
             pixel_count: Some(PixelCount { x: 2, y: 1, z: Some(1) }),
-            pixel_count_source: None,
+            // Declared grid → IMS:1000042/43 max-count params are emitted (FIX-3).
+            pixel_count_source: Some(PixelCountSource::Declared),
             mz_range: None,
             images: None,
             pixel_size_um: Some(AxisPair { x: 50.0, y: 50.0 }),
