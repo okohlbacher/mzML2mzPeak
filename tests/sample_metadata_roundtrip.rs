@@ -276,15 +276,23 @@ fn isa_fixtures_available() -> bool {
 #[test]
 fn val01_isa_tab_mtbls5358_byte_roundtrip() {
     if !isa_fixtures_available() {
+        // Mirror isa_fixtures_available()'s real condition: directory must exist AND contain
+        // at least one .mzML/.mzml file (not just an empty directory).
+        let mzml_file_present = std::fs::read_dir(Path::new(ISA_DIR_MTBLS5358).join("mzml"))
+            .map(|entries| {
+                entries.filter_map(|e| e.ok()).any(|e| {
+                    let ext = e.path().extension().and_then(|x| x.to_str()).unwrap_or("").to_lowercase();
+                    ext == "mzml"
+                })
+            })
+            .unwrap_or(false);
         eprintln!(
             "SKIP val01_isa_tab_mtbls5358_byte_roundtrip — \
              ISA-Tab fixtures not fully available ({ISA_INV_MTBLS5358} present={}, \
-             MTBLS5358 mzML present={}). \
+             MTBLS5358 mzML file present={}). \
              Download spectral data to enable this arm.",
             Path::new(ISA_INV_MTBLS5358).exists(),
-            std::fs::read_dir(Path::new(ISA_DIR_MTBLS5358).join("mzml"))
-                .map(|_| true)
-                .unwrap_or(false)
+            mzml_file_present
         );
         return;
     }
