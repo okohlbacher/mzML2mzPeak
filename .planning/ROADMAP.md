@@ -74,7 +74,7 @@
 - [x] **Phase 25: Forward declared-geometry threading (GEO-F)** - Thread imzML `<scanSettings>` declared grid; flip `pixel_count_source` to "declared". **✅ DONE** (both plans complete — GEOF-01).
 - [x] **Phase 26: Reverse `<sourceFileList>` copy (RSRC)** - Re-emit `file_description.source_files[]` provenance into the reverse `.imzML`. **✅ DONE** (RSRC-01).
 - [ ] **Phase 27: SDRF sample model + isobaric channels + reporter-quant** - **MOVED TO v0.8** (2026-06-09, owner + CODEX adversarial review). SDRF code reverted (27-01 parser misaligned with the v0.8 design); the 27-CONTEXT + 27-01..06 plans are kept as v0.8 groundwork. v0.7 carries NO SDRF code/dep. See Phase Details (prefixed RELOCATED) + `.planning/milestones/v0.8-DESIGN-DRAFT.md`.
-- [ ] **Phase 28: L2 conformance verify path (F10)** - **Next buildable.** `--conformance l2` value-equal-under-recorded-transform arm on the existing `ToleranceContract::L2`.
+- [x] **Phase 28: L2 conformance verify path (F10)** ✅ DONE 2026-06-09 (`6f729a3`) - `--conformance l2` value-equal-under-recorded-transform arm on `ToleranceContract::L2`; transform recorded (file-level + array-index, single CURIE source). L2-01 closed.
 - [ ] **Phase 29: De-vendor — drop both vendored forks** *(DEFERRED — gated on external merges)* - Remove `[patch]` blocks + `vendor/`; gated on chunk_series upstreamed (DVN-01; needs Phase 22's PR merged) + mzdata 0.64.2 published to crates.io (DVN-02). file_index serde already fixed upstream. LAST.
 
 <details>

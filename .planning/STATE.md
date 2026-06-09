@@ -38,24 +38,15 @@ phase is **Phase 28 (L2 conformance, L2-01)**.
 
 ## Current Position
 
-Phase: **28 (L2 conformance verify path)** — next buildable
-Plan: none yet (Phases 24/25/26 complete)
-Status: Phase 23 (rebase) ✅ DONE (`5021eed`). Phase 24 ✅ DONE (SPEC-01/02/03 + CVG-01/02; SPEC-02 batch narrowed to v0.7-only items). Phase 25 ✅ DONE (GEOF-01). Phase 26 ✅ DONE (RSRC-01). Phase 27 (SDRF) **RELOCATED TO v0.8** — code reverted. Phase 22 (PRs) DEFERRED — held by owner (UPS-02/04 done-upstream). Phase 29 (de-vendor) DEFERRED — gated on external merges. Both 22/29 are **non-blocking** for shipping v0.7. **Next: Phase 28 (L2).**
-Last activity: 2026-06-09 — Relocated SDRF (Phase 27) to v0.8 + re-themed v0.7 (owner + CODEX adversarial review); SDRF code reverted (build green, 257 lib tests pass); 21→13 active reqs; csv dep dropped.
+Phase: **v0.7 BUILDABLE-COMPLETE** — all 4 buildable phases done (24, 25, 26, 28) + rebase (23).
+Plan: —
+Status: Release gate MET (24/25/26/28 ✅). 11 reqs done; 4 open are NON-BLOCKING deferred — UPS-01/UPS-03
+(chunk_series + validator PRs, HELD by owner) + DVN-01/DVN-02 (Phase 29 de-vendor, gated on chunk_series
+upstreamed + mzdata 0.64.2 on crates.io). SDRF (Phase 27) relocated to v0.8. Full suite: 374 tests green.
+Next: owner submits the held PRs → then Phase 29 de-vendor → milestone audit + complete/tag v0.7. SDRF →
+v0.8 (`.planning/milestones/v0.8-DESIGN-DRAFT.md`, Phases 30–37).
+Last activity: 2026-06-09 — Phase 28 (L2 conformance, L2-01) complete; v0.7 buildable scope done + green.
 
-### Rebase findings (2026-06-08, commit 5021eed)
-
-- Vendored mzpeak_prototyping `8435967`→`a5c222c`; mzdata `0.64.1/eb70388`→`0.64.2/f9abc00` (main).
-- **Fixed upstream (patches dropped):** mzdata SONAR/IM accessions (dedicated ArrayType variants → UPS-02
-  done-upstream); file_index FileEntry serde (PR #20 → upstream `#[serde(untagged)]`, round-trip verified);
-  array_buffer empty-first-spectrum (B2 → writer rewrite; pwiz 138→139/139 → UPS-04 done-upstream).
-
-- **Remaining vendored patch:** chunk_series intensity/mz index-desync only (PR pending = UPS-01, held).
-- **De-vendor (Phase 29) now gated only on:** chunk_series upstreamed (DVN-01) + mzdata 0.64.2 on
-  crates.io (DVN-02). file_index serde blocker already fixed upstream — DVN-01 only needs chunk_series.
-
-- Spec moved to `HUPO-PSI/mzPeak-specification` (rewritten 2026-06-08; defines none of our extensions but
-  provides the Data-Kind/Entity-Type + file-level-JSON + CV-inflection extension mechanisms).
 
 ## v0.7 Roadmap (Phases 22–29)
 
