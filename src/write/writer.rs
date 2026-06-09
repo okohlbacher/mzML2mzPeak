@@ -792,19 +792,61 @@ impl IndexAccumulator {
     /// Merge the accumulated aggregates into a cloned `metadata.imaging` block, just before it
     /// is written to the index (IDX-01 index-last seam).
     ///
-    /// `pixel_count` / `pixel_count_source` (IDX-02):
-    ///   * if `block.pixel_count` is already `Some` (geometry declared `IMS:1000042/43`) → keep
-    ///     the declared counts untouched and set `pixel_count_source = Declared`;
-    ///   * else if any spectrum was observed → set `pixel_count` from the observed coordinate
-    ///     maxima and `pixel_count_source = ObservedMax` (never fabricated beyond observed);
-    ///   * else (empty run) → leave both `None`.
+    /// Returns a [`FoldOutcome`] indicating whether the declared grid was inconsistent with the
+    /// observed coordinates (GEOF-01 "do NOT fabricate" rule).
+    ///
+    /// Three-way `pixel_count` / `pixel_count_source` rule (IDX-02 / GEOF-01):
+    ///
+    ///   * **Declared-consistent** (`block.pixel_count` is `Some` AND `self.seen_any` AND observed
+    ///     extent ≤ declared on both x and y): keep the declared counts untouched, set
+    ///     `pixel_count_source = Declared`. `declared_inconsistent = false`.
+    ///   * **Declared-inconsistent** (`block.pixel_count` is `Some` AND `self.seen_any` AND
+    ///     observed x_max > declared.x OR observed y_max > declared.y): OVERWRITE `pixel_count`
+    ///     with the observed maxima, set `pixel_count_source = ObservedMax`. Return
+    ///     `declared_inconsistent = true` so the caller can emit a counted warning (GEOF-01 "do
+    ///     NOT fabricate" — a wrong declared grid must never silently overwrite the truth the
+    ///     pixels themselves prove).
+    ///   * **Declared + empty run** (`block.pixel_count` is `Some` AND NOT `self.seen_any`):
+    ///     nothing observed to contradict it — keep declared, set `Declared`.
+    ///     `declared_inconsistent = false`.
+    ///   * **No declared grid + observed**: set `pixel_count` from observed coordinate maxima,
+    ///     set `ObservedMax`. `declared_inconsistent = false`.
+    ///   * **No declared grid + empty run**: leave both `None`. `declared_inconsistent = false`.
     ///
     /// `mz_range` (IDX-03): set from the MS1 min/max when at least one finite MS1 m/z was seen,
     /// otherwise left `None` (the caller in `convert.rs` logs the no-MS1 omission).
-    pub fn fold_into(&self, block: &mut ImagingMetadata) {
-        if block.pixel_count.is_some() {
+    pub fn fold_into(&self, block: &mut ImagingMetadata) -> FoldOutcome {
+        if let Some(declared) = block.pixel_count.as_ref() {
+            // A declared grid is present. Check consistency only when spectra were observed —
+            // an empty run cannot contradict the declared grid (no pixels to disagree with it).
+            if self.seen_any
+                && (self.x_max > declared.x || self.y_max > declared.y)
+            {
+                // INCONSISTENT: observed pixel extent exceeds the declared grid on at least
+                // one axis. Drop the declared count; use observed maxima. GEOF-01.
+                let declared_x = declared.x;
+                let declared_y = declared.y;
+                block.pixel_count = Some(PixelCount {
+                    x: self.x_max,
+                    y: self.y_max,
+                    z: self.z_max,
+                });
+                block.pixel_count_source = Some(PixelCountSource::ObservedMax);
+                if let (Some(min), Some(max)) = (self.mz_min, self.mz_max) {
+                    block.mz_range = Some(MzRange { min, max });
+                }
+                return FoldOutcome {
+                    declared_inconsistent: true,
+                    declared_x,
+                    declared_y,
+                    observed_x_max: self.x_max,
+                    observed_y_max: self.y_max,
+                };
+            }
+            // CONSISTENT (or empty run): trust the declared grid.
             block.pixel_count_source = Some(PixelCountSource::Declared);
         } else if self.seen_any {
+            // No declared grid, but spectra were observed.
             block.pixel_count = Some(PixelCount {
                 x: self.x_max,
                 y: self.y_max,
@@ -812,11 +854,34 @@ impl IndexAccumulator {
             });
             block.pixel_count_source = Some(PixelCountSource::ObservedMax);
         }
+        // Empty run with no declared grid: leave pixel_count / pixel_count_source both None.
 
         if let (Some(min), Some(max)) = (self.mz_min, self.mz_max) {
             block.mz_range = Some(MzRange { min, max });
         }
+        FoldOutcome::default()
     }
+}
+
+/// Outcome of [`IndexAccumulator::fold_into`], carrying the GEOF-01 consistency-guard result.
+///
+/// When `declared_inconsistent` is `true`, the caller MUST emit a counted, non-fatal warning
+/// naming the declared grid extent (`declared_x`×`declared_y`) vs the observed pixel extent
+/// (`observed_x_max`×`observed_y_max`) and stating that `pixel_count_source` was kept as
+/// `observed_max` — the declared grid was NOT trusted. When `false`, no warning is needed.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct FoldOutcome {
+    /// `true` iff the declared grid was INCONSISTENT with observed coordinates (observed extent
+    /// exceeded the declared grid on at least one axis). `false` in all other cases.
+    pub declared_inconsistent: bool,
+    /// The declared grid x extent (only meaningful when `declared_inconsistent == true`).
+    pub declared_x: i64,
+    /// The declared grid y extent (only meaningful when `declared_inconsistent == true`).
+    pub declared_y: i64,
+    /// The observed x_max (only meaningful when `declared_inconsistent == true`).
+    pub observed_x_max: i64,
+    /// The observed y_max (only meaningful when `declared_inconsistent == true`).
+    pub observed_y_max: i64,
 }
 
 #[cfg(test)]
@@ -881,20 +946,66 @@ mod tests {
         assert_eq!(block.pixel_count_source, Some(PixelCountSource::ObservedMax));
     }
 
-    /// Declared path: a block already carrying pixel_count (from geometry) keeps its counts
-    /// untouched and sets source Declared.
+    /// Declared path — CONSISTENT: observed extent ≤ declared grid on both axes keeps the
+    /// declared counts and sets source Declared.
     #[test]
     fn accumulator_declared_path_leaves_counts_sets_declared() {
         let mut acc = IndexAccumulator::new();
-        // The accumulator observed larger coords, but a DECLARED block must win unchanged.
-        acc.observe(99, 99, None, 1, &NumArray::F64(vec![100.0]));
+        // observed 11×7 ≤ declared 13×9 ⇒ CONSISTENT — declared wins unchanged.
+        acc.observe(11, 7, None, 1, &NumArray::F64(vec![100.0]));
         let mut block = minimal_block();
         block.pixel_count = Some(PixelCount { x: 13, y: 9, z: None });
-        acc.fold_into(&mut block);
+        let outcome = acc.fold_into(&mut block);
         let pc = block.pixel_count.expect("declared pixel_count preserved");
         assert_eq!(pc.x, 13, "declared x untouched");
         assert_eq!(pc.y, 9, "declared y untouched");
         assert_eq!(block.pixel_count_source, Some(PixelCountSource::Declared));
+        assert!(!outcome.declared_inconsistent, "consistent declared grid is not flagged");
+    }
+
+    /// Declared path — INCONSISTENT: observed extent EXCEEDS the declared grid on at least one
+    /// axis. The declared count is DROPPED, pixel_count is set from the observed maxima, source
+    /// is ObservedMax, and declared_inconsistent is true (GEOF-01 "do NOT fabricate").
+    #[test]
+    fn accumulator_declared_inconsistent_drops_declared_uses_observed() {
+        let mut acc = IndexAccumulator::new();
+        // observed 9×7 > declared 5×5 on both x and y ⇒ INCONSISTENT.
+        acc.observe(9, 7, None, 1, &NumArray::F64(vec![100.0]));
+        let mut block = minimal_block();
+        block.pixel_count = Some(PixelCount { x: 5, y: 5, z: None });
+        let outcome = acc.fold_into(&mut block);
+        // Declared count must be OVERWRITTEN by observed maxima.
+        let pc = block.pixel_count.expect("pixel_count set from observed maxima");
+        assert_eq!(pc.x, 9, "x replaced with observed_max x");
+        assert_eq!(pc.y, 7, "y replaced with observed_max y");
+        assert_eq!(pc.z, None, "z unchanged (None — none observed)");
+        assert_eq!(
+            block.pixel_count_source,
+            Some(PixelCountSource::ObservedMax),
+            "inconsistent declared → source is ObservedMax"
+        );
+        assert!(
+            outcome.declared_inconsistent,
+            "inconsistency must be flagged (declared_inconsistent == true)"
+        );
+    }
+
+    /// Declared path — EMPTY RUN (no spectra observed): a declared grid with seen_any == false
+    /// is NOT an inconsistency — keep the declared count, set Declared, not flagged.
+    #[test]
+    fn accumulator_declared_empty_run_keeps_declared_not_flagged() {
+        let acc = IndexAccumulator::new(); // no observe calls
+        let mut block = minimal_block();
+        block.pixel_count = Some(PixelCount { x: 10, y: 8, z: None });
+        let outcome = acc.fold_into(&mut block);
+        let pc = block.pixel_count.expect("declared kept in empty run");
+        assert_eq!(pc.x, 10, "declared x kept");
+        assert_eq!(pc.y, 8, "declared y kept");
+        assert_eq!(block.pixel_count_source, Some(PixelCountSource::Declared));
+        assert!(
+            !outcome.declared_inconsistent,
+            "empty run with declared grid is NOT an inconsistency"
+        );
     }
 
     /// MS1-only m/z range: MS1 [100.0, 350.25] + a non-MS1 (ms_level 0) [5.0, 9999.0] →
