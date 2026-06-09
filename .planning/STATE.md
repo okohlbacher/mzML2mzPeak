@@ -4,14 +4,14 @@ milestone: v0.7
 milestone_name: — Upstreaming, de-vendoring & spec-governed round-trip / conformance hardening
 status: completed
 stopped_at: SDRF (Phase 27) relocated to v0.8; v0.7 re-themed to spec-governed round-trip / conformance hardening; 13 active reqs; next buildable = Phase 28 (L2)
-last_updated: "2026-06-09T05:30:09.023Z"
+last_updated: "2026-06-09T05:48:07.393Z"
 last_activity: 2026-06-09 — Relocated SDRF (Phase 27) to v0.8 + re-themed v0.7 (owner + CODEX adversarial review); SDRF code reverted (build green, 257 lib tests pass); 21→13 active reqs; csv dep dropped.
 progress:
   total_phases: 8
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 14
-  completed_plans: 7
-  percent: 38
+  completed_plans: 8
+  percent: 50
 ---
 
 # Project State
@@ -306,7 +306,7 @@ Items deferred out of v0.7:
 
 ## Session Continuity
 
-Last session: 2026-06-09T05:30:09.020Z
+Last session: 2026-06-09T05:48:07.390Z
 Stopped at: SDRF (Phase 27) relocated to v0.8; v0.7 re-themed to spec-governed round-trip / conformance hardening; 13 active reqs; next buildable = Phase 28 (L2)
 Resume file: None
 

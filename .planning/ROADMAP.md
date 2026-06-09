@@ -252,7 +252,7 @@ Plans:
 Plans:
 
 - [x] 28-01-PLAN.md — L2 transform record: TransformRecord type + single-source numpress-linear CURIE (MS:1002312) in cv.rs + schema/transform.json + file-level metadata.transform emit from convert_mzml + spec write-up (three-places) (L2-01)
-- [ ] 28-02-PLAN.md — --conformance l1|l2 CLI flag (default l1, byte-unchanged) + L2 verify-arm wiring + integration test: numpress fails L1 / passes L2-within-bounds / carries transform record; --no-numpress stays L1-clean (L2-01)
+- [x] 28-02-PLAN.md — --conformance l1|l2 CLI flag (default l1, byte-unchanged) + L2 verify-arm wiring + integration test: numpress fails L1 / passes L2-within-bounds / carries transform record; --no-numpress stays L1-clean (L2-01)
 
 ### Phase 29: De-vendor — drop both vendored forks
 
@@ -277,7 +277,7 @@ Plans:
 | 25. Forward declared-geometry threading | 2/2 | ✅ Done | 2026-06-09 |
 | 26. Reverse `<sourceFileList>` copy | 1/1 | ✅ Done   | 2026-06-09 |
 | 27. SDRF sample model + channels + reporter-quant | — | **RELOCATED TO v0.8** | 2026-06-09 |
-| 28. L2 conformance verify path | 1/2 | In Progress|  |
+| 28. L2 conformance verify path | 2/2 | Complete   | 2026-06-09 |
 | 29. De-vendor both forks | 0/? | Deferred (gated — non-blocking) | - |
 
 **Release gate:** v0.7 ships when Phases 24, 25, 26, 28 are done (24/25/26 ✅; 28 next). Phases 22 + 29
