@@ -282,7 +282,10 @@ Plans:
   2. Run→sample binding emits via list-valued `ms_run.sample_ref` (or the `metadata.study.run_sample_binding` shadow until merge); a documented repo-wins precedence rule resolves embedded-vs-repo.
   3. Label-free 1:1 SDRF (MTBLS1129) roundtrips + the projection reads back.
 
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 32-01-PLAN.md — sample_list projection (one entry per source name, lean id+name) + metadata.study retained + run_sample_binding provenance shadow (native ms_run.sample_ref gated on Phase 30b) + PXD020187 read-back
 
 ### Phase 33: ISA reader (Tab + JSON)
 
