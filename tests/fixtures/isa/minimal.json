@@ -1,0 +1,135 @@
+{
+  "identifier": "MZPK-TEST-001",
+  "title": "Minimal ISA-JSON test investigation for mzml2mzpeak",
+  "studies": [
+    {
+      "identifier": "MZPK-TEST-001",
+      "title": "Minimal MS metabolomics study",
+      "materials": {
+        "sources": [
+          {
+            "@id": "#source/QC-1",
+            "name": "QC-1",
+            "characteristics": [
+              {
+                "category": {
+                  "@id": "#characteristic_category/Organism"
+                },
+                "value": {
+                  "annotationValue": "Homo sapiens",
+                  "termSource": "NCBITAXON",
+                  "termAccession": "http://purl.obolibrary.org/obo/NCBITaxon_9606"
+                }
+              }
+            ]
+          },
+          {
+            "@id": "#source/CTR-1",
+            "name": "CTR-1",
+            "characteristics": [
+              {
+                "category": {
+                  "@id": "#characteristic_category/Organism"
+                },
+                "value": {
+                  "annotationValue": "Homo sapiens",
+                  "termSource": "NCBITAXON",
+                  "termAccession": "http://purl.obolibrary.org/obo/NCBITaxon_9606"
+                }
+              },
+              {
+                "category": {
+                  "@id": "#characteristic_category/Instrument"
+                },
+                "value": {
+                  "annotationValue": "TSQ 9000",
+                  "termSource": "MS",
+                  "termAccession": "MS:1000389"
+                }
+              }
+            ]
+          }
+        ],
+        "samples": [
+          {
+            "@id": "#sample/QC-1",
+            "name": "QC-1",
+            "derivesFrom": [
+              {
+                "@id": "#source/QC-1"
+              }
+            ],
+            "characteristics": []
+          },
+          {
+            "@id": "#sample/CTR-1",
+            "name": "CTR-1",
+            "derivesFrom": [
+              {
+                "@id": "#source/CTR-1"
+              }
+            ],
+            "characteristics": []
+          }
+        ]
+      },
+      "assays": [
+        {
+          "@id": "#assay/a_metabolomics",
+          "measurementType": {
+            "annotationValue": "metabolite profiling",
+            "termSource": "OBI",
+            "termAccession": "http://purl.obolibrary.org/obo/OBI_0000366"
+          },
+          "technologyType": {
+            "annotationValue": "mass spectrometry",
+            "termSource": "OBI",
+            "termAccession": "MS:1000031"
+          },
+          "dataFiles": [
+            {
+              "@id": "#data/QC-1.raw",
+              "name": "QC-1.raw",
+              "type": "Raw Spectral Data File"
+            },
+            {
+              "@id": "#data/CTR-1.raw",
+              "name": "CTR-1.raw",
+              "type": "Raw Spectral Data File"
+            }
+          ]
+        }
+      ],
+      "processSequence": [
+        {
+          "@id": "#process/p1",
+          "name": "sample-QC-1-to-raw",
+          "inputs": [
+            {
+              "@id": "#sample/QC-1"
+            }
+          ],
+          "outputs": [
+            {
+              "@id": "#data/QC-1.raw"
+            }
+          ]
+        },
+        {
+          "@id": "#process/p2",
+          "name": "sample-CTR-1-to-raw",
+          "inputs": [
+            {
+              "@id": "#sample/CTR-1"
+            }
+          ],
+          "outputs": [
+            {
+              "@id": "#data/CTR-1.raw"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
