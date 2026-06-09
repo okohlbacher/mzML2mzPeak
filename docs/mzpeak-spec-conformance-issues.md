@@ -255,3 +255,84 @@ Four issues bear directly on this project's imaging extension and should be trea
 **Major (15):** A3, A4, A5, A6, A7, B2, B3, B4 *(addressed 2026-06-08)*, B5, C2, C3, D3, D4, D5, D6 · *(+ NEW-1: `scan_index`/`spectrum_reference` not yet emitted)*
 **Minor (18):** A8, A9, A10, B6, B7, B8, B9, B10, C4, C5, C6, C7, D7, D8, D9, D10, D11, E1
 **Informational (3):** E2, E3, E4
+
+---
+
+## cv_list reconciliation (SPEC-03)
+
+**Date:** 2026-06-09
+**Decision status:** LOCKED (Phase 24, owner decision — see `24-CONTEXT.md`)
+**Cross-reference:** `docs/mzpeak-extension-contract.md` Section 3.1
+
+### Background
+
+The rewritten HUPO-PSI/mzPeak-specification (nominal v0.9) defines **no `cv_list` block**. The
+spec instead relies on column-name inflection (`${CV_CODE}_${CV_ACCESSION}_${CLEANED_NAME}`) and
+the `parameters` list to carry controlled vocabulary terms. However, the spec does not enumerate
+which CVs/URIs a reader must resolve — a reader following only the spec cannot know where to fetch
+`IMS:*` or `UO:*` OBO files for semantic validation.
+
+The v0.6 implementation has a `cv_list` block in the file-level JSON footer. This section records
+the reconciliation decision.
+
+### (a) Expressibility under the spec's File-Level Metadata mechanism
+
+The spec defines File-Level Metadata as: *"Some metadata is descriptive of the entire run … stored
+as JSON in the Parquet key-value metadata of the `metadata` data kind files."* (spec section
+"File-Level Metadata"). Any JSON-serializable block can be placed there.
+
+The v0.6 `cv_list` already serializes into the `spectra_metadata.parquet` footer under the
+`"cv_list"` key via two cooperating source files:
+
+- **`src/schema/cv.rs`** — defines `cv_list()` returning `[{id, full_name, uri, version?}]`; this
+  is the single source shared by the forward writer and the reverse `<cvList>` emit. The IMS `uri`
+  carries the `TODO(F9)` placeholder (pending canonical OBO PURL — tracked in `docs/cv-requests.md`).
+- **`src/write/convert.rs`** — calls `add_index_metadata("cv_list", &cv_list_value)` after
+  `finish_parquet()` to write the block into the Parquet footer; the read-back path confirms the
+  block is present via `MzPeakReader.file_index().metadata["cv_list"]`.
+
+Both files implement the Footer-JSON block seam, which is the same seam used by `scan_settings_list`
+and (in v0.7) `channel_list`. The `cv_list` block therefore falls squarely within File-Level Metadata
+as defined by the spec. No ad-hoc mechanism is needed.
+
+### (b) Field alignment to the spec's CV conventions
+
+The existing `cv_list` fields map to the spec's CV conventions as follows:
+
+| Field | Role in cv_list | Alignment to spec |
+|-------|-----------------|-------------------|
+| `id` | CV code (e.g. `"MS"`, `"IMS"`, `"UO"`) | Matches `${CV_CODE}` in the spec's column-name inflection rule; this is the primary lookup key. |
+| `full_name` | Human-readable CV name | No spec constraint; informational. |
+| `uri` | Resolvable ontology URI (OBO PURL or equivalent) | Aligns to the spec's implicit expectation that CV terms be resolvable; confirms the source for `id`-prefixed accessions. |
+| `version` | Ontology release version (optional, nullable) | No spec constraint; `null` is valid (UO omits it). |
+
+The `id` field is the critical alignment: it is exactly the `${CV_CODE}` token used in every
+inflected column name, so a reader can reconstruct `${CV_CODE}` → URI lookups from `cv_list`
+deterministically. This closes the spec's implicit gap: the spec's inflection rule names `MS` and `UO`
+as examples, but the spec text does not enumerate them exhaustively — `cv_list` does.
+
+### (c) Decision
+
+**KEEP `cv_list` as a file-level JSON block locally**, and **QUEUE a proposal that the spec adopt
+a CV-declaration block**.
+
+Rationale for keeping locally:
+- The block is already implemented (v0.6), expressed cleanly as File-Level Metadata JSON, and aligns
+  all its fields to spec conventions.
+- It closes a real gap: the spec's column-name inflection rule (`${CV_CODE}_…`) and `parameters` list
+  reference CV codes without providing a reader with the URI to resolve them. `cv_list` fills that gap.
+- Removing it would regress interoperability for `IMS:*` columns (the Python reader already crashes on
+  non-MS/UO CURIEs — conformance issue C1 — because it lacks exactly this enumeration).
+- The Footer-JSON seam is the most de-vendor-safe seam (no FileEntry type changes required); the block
+  survives Phase 29 de-vendor unchanged.
+
+Rationale for queuing a spec proposal:
+- The spec currently makes no provision for CV declaration; every reader that needs to resolve
+  `IMS:*` URIs must guess or hard-code. A formal `cv_list` block (or equivalent) makes mzPeak
+  self-describing for multi-CV deployments.
+- The proposal is a targeted addition: one new file-level JSON member with a simple schema. It does
+  not change the column-name inflection rule, the `parameters` list, or any existing member.
+- The proposal is queued for the **end-of-v0.7 batch** (SPEC-02), not submitted now. Premature
+  submission before the imaging/SDRF facets are stable could require a revision.
+
+**Status:** "kept locally + queued for the batch proposal" (Plan 03 = the spec proposal stub).
