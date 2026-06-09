@@ -347,6 +347,22 @@ pub fn convert_mzml(
                     &composite_id,
                 );
                 arrays.add(da);
+
+                // The upstream writer's centroid/unknown path (write_peaks) processes only the
+                // standard m/z+intensity columns from the raw BinaryArrayMap and does NOT route
+                // NonStandardDataArray entries to the auxiliary_arrays facet. To ensure the
+                // reporter_intensity array is written, we force the raw-array write path by clearing
+                // any pre-decoded peak sets and setting signal_continuity to Profile. The m/z and
+                // intensity data are identical; only the write path changes. For centroid MS2
+                // data read from mzML (which always has raw arrays, no pre-decoded peaks), this is
+                // a no-op on entry.peaks (already None) and resets signal_continuity.
+                if entry.description.signal_continuity == SignalContinuity::Centroid
+                    || entry.description.signal_continuity == SignalContinuity::Unknown
+                {
+                    entry.peaks = None;
+                    entry.deconvoluted_peaks = None;
+                    entry.description.signal_continuity = SignalContinuity::Profile;
+                }
             }
         }
 

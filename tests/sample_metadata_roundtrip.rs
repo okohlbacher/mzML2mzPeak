@@ -31,7 +31,7 @@ use std::path::Path;
 
 use mzml2mzpeak::{
     sdrf::extract_sample_metadata_member,
-    write::{EncodingOptions, convert_mzml},
+    write::{EncodingOptions, convert_mzml, reporter_quant::ReporterQuantContract},
 };
 use mzpeak_prototyping::MzPeakReader;
 
@@ -236,6 +236,44 @@ fn val01_tmt_sdrf_pxd011799_byte_roundtrip() {
     );
 
     drop(reader);
+
+    // ── (d) reporter_intensity aux arrays present on MS2 spectra ─────────────────────────────
+    // Mirror the XRT pattern from src/write/mzml.rs::reporter_quant_roundtrip_recovers_channel_id_and_intensities.
+    // Open the archive, find the first MS2 spectrum by index, and assert a reporter_intensity
+    // aux array is present — proving the full pipeline actually wrote the arrays and they survive
+    // the mzPeak roundtrip.
+    {
+        let mut rq_reader = MzPeakReader::new(&out)
+            .expect("MzPeakReader must re-open for reporter_intensity check");
+        let n = rq_reader.len() as u64;
+        let reporter_type = ReporterQuantContract::array_type();
+
+        // Find the first MS2 spectrum index.
+        let ms2_index = (0..n).find(|&i| {
+            rq_reader
+                .get_spectrum_metadata(i)
+                .ok()
+                .flatten()
+                .map(|desc| desc.ms_level > 1)
+                .unwrap_or(false)
+        });
+
+        let ms2_index = ms2_index.expect(
+            "TMT fr8.mzML must contain at least one MS2 spectrum (reporter_intensity check requires it)"
+        );
+
+        let arrays = rq_reader
+            .get_spectrum_arrays(ms2_index)
+            .expect("get_spectrum_arrays must succeed for MS2 spectrum")
+            .expect("MS2 spectrum arrays must be Some");
+
+        assert!(
+            arrays.get(&reporter_type).is_some(),
+            "VAL-01 TMT full-pipeline: reporter_intensity aux array must be present on MS2 \
+             spectrum index {ms2_index} (T-37-02 — reporter_quant=true produces aux arrays)"
+        );
+    }
+
     let _ = std::fs::remove_file(&out);
 }
 
