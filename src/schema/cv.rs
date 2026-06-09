@@ -261,4 +261,81 @@ mod tests {
             );
         }
     }
+
+    /// CVG-02: the converter decodes CV concepts by CURIE, not by inflected column name.
+    ///
+    /// Context: the mzPeak reference readers (Python/R) in the spec conformance issue list have
+    /// documented drift classes B1/B2/B3/C1/C3/D11 that arise from keying on COLUMN NAMES
+    /// (e.g. `"IMS_1000050"`) rather than on the CURIE value of the CV parameter. This converter
+    /// does NOT have that bug — it decodes coordinates via `get_param_by_curie(curie!(IMS:1000050))`
+    /// etc. This guard test prevents regression back to name-keyed decode.
+    ///
+    /// The B1/B2/B3/C1/C3/D11 classes are UPSTREAM REFERENCE READER issues, not this converter's
+    /// bugs. See docs/mzpeak-spec-conformance-issues.md for the full classification.
+    ///
+    /// Asserts for each of the three decode modules (source.rs, convert.rs, verify.rs):
+    /// 1. The module uses `get_param_by_curie` for coordinate/CV decode (CURIE-keyed accessor).
+    /// 2. The module does NOT contain the inflected column-name decode key form `"IMS_1000050"` /
+    ///    `"IMS_1000051"` used as a lookup string in non-comment code.
+    ///
+    /// Comment lines (// ...) are stripped before the inflected-name check so a doc-comment
+    /// mention of `"IMS_1000050"` (as a warning example, say) does not self-invalidate the gate.
+    #[test]
+    fn cvg_02_decode_is_curie_keyed() {
+        let decode_modules = [
+            "src/reverse/source.rs",
+            "src/reverse/convert.rs",
+            "src/verify/verify.rs",
+        ];
+
+        // Inflected column-name decode keys that MUST NOT appear as lookup strings.
+        // The form `IMS_XXXXXXX` is the Python/R reader convention for keying on a column name
+        // rather than on a CV CURIE. If any of these appear in non-comment code as a string
+        // literal used for lookup, the module has regressed to name-keyed decode (B1/B3 class).
+        let banned_name_keys = [
+            "\"IMS_1000050\"",
+            "\"IMS_1000051\"",
+            "\"IMS_1000052\"",
+        ];
+
+        for module_path in &decode_modules {
+            let source = std::fs::read_to_string(std::path::Path::new(module_path))
+                .unwrap_or_else(|_| String::new()); // missing module → no cv decode → pass
+
+            // Strip comment lines (lines beginning with optional whitespace + //).
+            let non_comment: String = source
+                .lines()
+                .filter(|line| !line.trim_start().starts_with("//"))
+                .collect::<Vec<_>>()
+                .join("\n");
+
+            // Gate 1: if the module performs coordinate decode (reads coordinates), it MUST use
+            // get_param_by_curie. A module that reads coordinates without this accessor is
+            // silently regressing to some other lookup mechanism. We skip modules that contain
+            // neither the accessor nor any IMS:100005x reference at all (they may be
+            // non-decode modules that legitimately don't touch coordinates).
+            let touches_coords = non_comment.contains("IMS:1000050")
+                || non_comment.contains("IMS:1000051")
+                || non_comment.contains("IMS:1000052");
+
+            if touches_coords {
+                assert!(
+                    non_comment.contains("get_param_by_curie"),
+                    "module {} references IMS coordinate accessions but does not use \
+                     get_param_by_curie — this is a name-keyed decode regression (CVG-02 / B1/B3)",
+                    module_path
+                );
+            }
+
+            // Gate 2: no inflected-name decode key of the form "IMS_1000050" in non-comment code.
+            for banned in &banned_name_keys {
+                assert!(
+                    !non_comment.contains(banned),
+                    "module {} contains banned column-name decode key {} in non-comment code \
+                     (CVG-02: use get_param_by_curie instead — B1/B2/B3/C1/C3/D11 upstream bug classes)",
+                    module_path, banned
+                );
+            }
+        }
+    }
 }
