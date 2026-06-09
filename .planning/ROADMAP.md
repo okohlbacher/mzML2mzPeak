@@ -1,17 +1,25 @@
 # Roadmap: mzML2mzPeak
 
-> **Active milestone: v0.7 — Upstreaming, de-vendoring & spec-governed round-trip / conformance
-> hardening.** Phases 22–29, **13 active requirements** (UPS / REB / SPEC / CVG / GEOF / RSRC / L2 / DVN).
+> **Active milestone: v0.7 — Upstream rebase, CV governance & spec-governed conformance hardening.**
+> Phases 22–29, **9 active requirements** (REB / SPEC / CVG / GEOF / RSRC / L2), **all DONE**.
 > Numbering continues from v0.6's Phase 21 (do **not** reset). v0.3 (forward), v0.4 (reverse), v0.5
 > (index enrichment + optical import), and v0.6 (spec conformance) are shipped.
+>
+> **Phases 22 + 29 relocated to v0.8 — 2026-06-09 (owner, closing the v0.7 milestone).** The upstream-PR
+> prep (Phase 22 — UPS-01 chunk_series PR + UPS-03 mzPeakValidator PR) and the de-vendor (Phase 29 —
+> DVN-01 + DVN-02) are **moved to v0.8** (its upstreaming/de-vendoring finish), exactly like the SDRF
+> Phase 27 relocation. They are non-blocking external work (held PRs + de-vendor gated on chunk_series
+> upstreamed + mzdata 0.64.2 on crates.io). With them gone, **every remaining v0.7 requirement is DONE**;
+> v0.7 is a fully-complete milestone. Phases 22/27/29 become "relocated to v0.8" stubs (numbering
+> unchanged). UPS-02/UPS-04 stay as done-upstream notes.
 >
 > **SDRF relocated to v0.8 + v0.7 re-themed — 2026-06-09 (owner + CODEX adversarial review).** The SDRF
 > sample-metadata + isobaric-channel cluster (Phase 27, SDRF-01..05 + CHAN-01..03) is **moved to v0.8**;
 > the SDRF code was reverted (27-01 parser misaligned with the v0.8 design draft). v0.7 is re-themed from
-> "sample-metadata modeling" to **spec-governed round-trip / conformance hardening** — CV governance +
-> declared-geometry threading + reverse provenance + L2 conformance. The milestone stays **8 phases
-> (22–29)** (Phase 27 becomes a "relocated to v0.8" stub; numbering unchanged) and drops from 21 to
-> **13 active requirements**. **v0.7 carries NO new dependency** (the `csv` dep went with the SDRF revert).
+> "sample-metadata modeling" to **spec-governed conformance hardening** — the Phase-23 rebase onto current
+> upstream + CV governance + declared-geometry threading + reverse provenance + L2 conformance. The
+> milestone stays **8 phases (22–29)** (Phases 22/27/29 become "relocated to v0.8" stubs; numbering
+> unchanged). **v0.7 carries NO new dependency** (the `csv` dep went with the SDRF revert).
 >
 > **Re-scoped 2026-06-08 (owner decision).** The imaging-structure cluster (pixel facet, ROI polygons,
 > continuous shared-axis, `images.parquet`) is **deferred beyond v1.0** — v0.7 is not spatial/imaging
@@ -23,9 +31,10 @@
 > repo's "vast torrents" rewrite + PSI-committee notes added REB-01 + SPEC-01/02/03 and changed UPS-04 /
 > ROI-01. That review's findings stand.)*
 >
-> **Release semantics.** v0.7 **ships when Phases 24, 25, 26, and 28 are done** (24/25/26 ✅ DONE; Phase
-> 28 / L2-01 is the next buildable). Phase 22 (held upstream PRs) and Phase 29 (de-vendor, externally
-> gated) are **DEFERRED / NON-BLOCKING** for the v0.7 release — tracked, not gating.
+> **Release semantics.** v0.7 is **COMPLETE** — all 9 active requirements DONE (REB-01, SPEC-01/02/03,
+> CVG-01/02, GEOF-01, RSRC-01, L2-01); Phases 23/24/25/26/28 done. Phases 22 (held upstream PRs) and 29
+> (de-vendor, externally gated) are **RELOCATED TO v0.8** (its upstreaming/de-vendoring finish); Phase 27
+> (SDRF) relocated to v0.8. Ready to archive/tag.
 
 ## Shipped Milestones
 
@@ -57,25 +66,26 @@
 > (`arrow`/`parquet` = 57.0.0, `zip` = 4.1.0, `mzpeaks` = 1.0.9) holds every phase; **v0.7 adds NO new
 > dependency** (the `csv` dep was reverted with the SDRF relocation to v0.8).
 
-### v0.7 — Upstreaming, de-vendoring & spec-governed round-trip / conformance hardening (Phases 22–29)
+### v0.7 — Upstream rebase, CV governance & spec-governed conformance hardening (Phases 22–29)
 
 > **Rebase outcome (2026-06-08, commit `5021eed`).** Phase 23 done early (owner request). Rebased onto
 > mzpeak `a5c222c` + mzdata `0.64.2`. **3 of 4 upstream issues were already fixed upstream:** mzdata
 > SONAR/IM (B1, dedicated variants), file_index serde (PR #20 → upstream `#[serde(untagged)]`), and the
 > `array_buffer` empty-spectrum bug (B2 → writer rewrite; pwiz now **139/139**). Only the **chunk_series**
-> patch remains vendored. Net effect: **Phase 22** reduces to UPS-01 (chunk_series PR) + UPS-03 (validator
-> PR) — UPS-02/UPS-04 are **done-upstream** (note, not active work). **Phase 29** de-vendor now only waits
-> on chunk_series upstreamed (DVN-01) + mzdata 0.64.2 published to crates.io (DVN-02); the file_index serde
-> blocker is already fixed upstream, so DVN-01 only needs chunk_series. 245 lib + all integration tests green.
+> patch remains vendored. The Phase-23 rebase (adopting current upstream + dropping 2 of 3 patches) STAYS
+> in v0.7. The remaining PR-submission (Phase 22 — UPS-01/UPS-03) and fork-removal (Phase 29 — DVN-01/02)
+> are **relocated to v0.8** (its upstreaming/de-vendoring finish): non-blocking external work — held PRs +
+> de-vendor gated on chunk_series upstreamed (DVN-01) + mzdata 0.64.2 published to crates.io (DVN-02).
+> UPS-02/UPS-04 are **done-upstream** (note, not active work). 245 lib + all integration tests green.
 
-- [ ] **Phase 22: Upstream PR prep** *(DEFERRED — held)* - Submit the chunk_series PR (UPS-01) + the mzPeakValidator PR (UPS-03). UPS-02 (mzdata SONAR/IM) + UPS-04 (array_buffer B2) are **done-upstream** (fixed by the rebase) — no action. Owner is holding PR submission for now (writes PR text when ready). No fork removal.
+- [ ] **Phase 22: Upstream PR prep** *(RELOCATED TO v0.8)* - **MOVED TO v0.8** (2026-06-09, owner — closing the v0.7 milestone). Submit the chunk_series PR (UPS-01) + the mzPeakValidator PR (UPS-03); non-blocking external work the owner is holding. UPS-02 (mzdata SONAR/IM) + UPS-04 (array_buffer B2) are **done-upstream** (fixed by the rebase) — no action. UPS-01/UPS-03 now live in REQUIREMENTS.md "Moved to v0.8 — upstreaming & de-vendoring" + the v0.8 upstreaming work stream. See Phase Details (prefixed RELOCATED).
 - [x] **Phase 23: Upstream rebase + re-verify** - ✅ DONE 2026-06-08 (`5021eed`). mzpeak→`a5c222c`, mzdata→`0.64.2`; 2 of 3 patches dropped (upstreamed); only chunk_series remains; build + full test suite green; pwiz 139/139.
 - [x] **Phase 24: Spec alignment & CV governance** - **✅ DONE 2026-06-09** (all 3 plans — SPEC-01/02/03 + CVG-01/02). TODO(F9) resolved; reverse `<cvList>` driven from `cv_list()` (no-drift by construction); CVG-02 guard test; imagingMS.obo confirmed current; docs/cv-requests.md created (IMS home + TMTpro 132–135 gap). SPEC-02 batch narrowed to v0.7-only items (SDRF/channel proposals moved to v0.8). 247 tests green.
 - [x] **Phase 25: Forward declared-geometry threading (GEO-F)** - Thread imzML `<scanSettings>` declared grid; flip `pixel_count_source` to "declared". **✅ DONE** (both plans complete — GEOF-01).
 - [x] **Phase 26: Reverse `<sourceFileList>` copy (RSRC)** - Re-emit `file_description.source_files[]` provenance into the reverse `.imzML`. **✅ DONE** (RSRC-01).
 - [ ] **Phase 27: SDRF sample model + isobaric channels + reporter-quant** - **MOVED TO v0.8** (2026-06-09, owner + CODEX adversarial review). SDRF code reverted (27-01 parser misaligned with the v0.8 design); the 27-CONTEXT + 27-01..06 plans are kept as v0.8 groundwork. v0.7 carries NO SDRF code/dep. See Phase Details (prefixed RELOCATED) + `.planning/milestones/v0.8-DESIGN-DRAFT.md`.
 - [x] **Phase 28: L2 conformance verify path (F10)** ✅ DONE 2026-06-09 (`6f729a3`) - `--conformance l2` value-equal-under-recorded-transform arm on `ToleranceContract::L2`; transform recorded (file-level + array-index, single CURIE source). L2-01 closed.
-- [ ] **Phase 29: De-vendor — drop both vendored forks** *(DEFERRED — gated on external merges)* - Remove `[patch]` blocks + `vendor/`; gated on chunk_series upstreamed (DVN-01; needs Phase 22's PR merged) + mzdata 0.64.2 published to crates.io (DVN-02). file_index serde already fixed upstream. LAST.
+- [ ] **Phase 29: De-vendor — drop both vendored forks** *(RELOCATED TO v0.8)* - **MOVED TO v0.8** (2026-06-09, owner — closing the v0.7 milestone). Remove `[patch]` blocks + `vendor/`; gated on chunk_series upstreamed (DVN-01; needs Phase 22's PR merged) + mzdata 0.64.2 published to crates.io (DVN-02). file_index serde already fixed upstream. DVN-01/DVN-02 now live in REQUIREMENTS.md "Moved to v0.8 — upstreaming & de-vendoring" + the v0.8 upstreaming/de-vendoring work stream. See Phase Details (prefixed RELOCATED).
 
 <details>
 <summary>✅ v0.6 Spec conformance — dtypes + CV/geometry/provenance (Phases 16–21) — SHIPPED 2026-06-06</summary>
@@ -114,7 +124,15 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 
 ## Phase Details
 
-### Phase 22: Upstream PR prep
+### Phase 22: Upstream PR prep — RELOCATED TO v0.8
+
+> **RELOCATED TO v0.8 — 2026-06-09 (owner, closing the v0.7 milestone).** This phase is **moved out of
+> v0.7 into milestone v0.8** (its upstreaming/de-vendoring finish), exactly like the SDRF Phase 27
+> relocation. UPS-01 (chunk_series PR) + UPS-03 (mzPeakValidator PR) are **non-blocking external work**
+> (held PRs — the owner writes the PR text when ready); UPS-02/UPS-04 are done-upstream. v0.7 carries no
+> active upstream-PR work; its requirements (UPS-01, UPS-03) now live in REQUIREMENTS.md "## Moved to
+> v0.8 — upstreaming & de-vendoring" and the v0.8 upstreaming work stream. The block below is kept
+> verbatim for history; do NOT execute it under v0.7.
 
 **Goal**: Open the remaining upstream surface — the two still-needed prepared fixes — so merge latency overlaps the rest of v0.7 and the de-vendor merge clock (Phase 29) starts ticking. **DEFERRED / HELD:** the owner is holding PR submission for now and will write the final PR text when ready; the phase stays in the milestone as deferred/blocked. No forks are removed here.
 **Depends on**: Phase 23 (rebase already done; the rebase determined which patches survived — only chunk_series remains vendored). Runs early so PRs age while later phases proceed.
@@ -254,7 +272,16 @@ Plans:
 - [x] 28-01-PLAN.md — L2 transform record: TransformRecord type + single-source numpress-linear CURIE (MS:1002312) in cv.rs + schema/transform.json + file-level metadata.transform emit from convert_mzml + spec write-up (three-places) (L2-01)
 - [x] 28-02-PLAN.md — --conformance l1|l2 CLI flag (default l1, byte-unchanged) + L2 verify-arm wiring + integration test: numpress fails L1 / passes L2-within-bounds / carries transform record; --no-numpress stays L1-clean (L2-01)
 
-### Phase 29: De-vendor — drop both vendored forks
+### Phase 29: De-vendor — drop both vendored forks — RELOCATED TO v0.8
+
+> **RELOCATED TO v0.8 — 2026-06-09 (owner, closing the v0.7 milestone).** This phase is **moved out of
+> v0.7 into milestone v0.8** (its upstreaming/de-vendoring finish), exactly like the SDRF Phase 27
+> relocation. De-vendor is **non-blocking external work**, gated on chunk_series upstreamed (DVN-01; needs
+> Phase 22's PR merged) + mzdata 0.64.2 published to crates.io (DVN-02) — it belongs with the v0.8
+> upstreaming effort that submits those PRs. v0.7 carries no active de-vendor work; its requirements
+> (DVN-01, DVN-02) now live in REQUIREMENTS.md "## Moved to v0.8 — upstreaming & de-vendoring" and the
+> v0.8 de-vendoring work stream. The block below is kept verbatim for history; do NOT execute it under
+> v0.7.
 
 **Goal**: Fully de-vendor — remove both `[patch]` blocks and the `vendor/` trees, depending on upstream directly with zero fork divergence. **DEFERRED — gated on external merges; NON-BLOCKING for the v0.7 release.** Sequenced LAST so the gate exercises the worst case `Other`-typed ZIP member (the embedded TIFF; the embedded-SDRF `Other` member moved to v0.8 with the SDRF relocation).
 **Depends on**: Phases 22–28 (the v0.7 `Other`-typed member — embedded TIFF — in existence) + upstream merges. DVN-01 gated on Phase 22's chunk_series PR being merged; DVN-02 gated on mzdata 0.64.2 published to crates.io. (file_index serde is already fixed upstream — so DVN-01 only needs chunk_series.) Non-negotiable gate, but NON-BLOCKING for shipping v0.7.
@@ -267,32 +294,172 @@ Plans:
 
 **Plans**: TBD
 
+---
+
+## v0.8 — Sample-metadata ingestion (SDRF + ISA) AND upstreaming / de-vendoring finish (Phases 22, 29, 30–37)
+
+> **Laid down 2026-06-09 (owner) — ADDITIVE to active v0.7 (per "don't touch v0.7"); no state reset, no
+> phases.clear.** Formalized from the ratified, adversarially-reviewed
+> [`.planning/milestones/v0.8-DESIGN-DRAFT.md`](milestones/v0.8-DESIGN-DRAFT.md) (cornerstones A–G + §0c).
+> Numbering continues from v0.7's Phase 29. **Two work streams:** (1) **SDRF + ISA sample-metadata**
+> ingestion (Phases 30, 30b, 31–37) — given an mzML + a sibling SDRF or ISA file, pull the global/study
+> metadata + the applicable sample rows into the mzPeak archive losslessly (verbatim blob anchor) and
+> queryably (minimal projections) so the binding survives the roundtrip; (2) the **upstreaming /
+> de-vendoring finish** relocated from v0.7 — submit the chunk_series + mzPeakValidator PRs (Phase 22 /
+> UPS-01 + UPS-03) and drop both vendored forks once merged/published (Phase 29 / DVN-01 + DVN-02). The
+> two streams interlock: the upstream `ms_run.sample_ref` PR (Phase 30b) and the held chunk_series PR
+> (Phase 22) are both upstream merge-clock work, and de-vendor (Phase 29) clears the fork the v0.8 native
+> binding builds on. Only new dep: **`csv`**. The standing **XRT** criterion applies to every emitting
+> phase. v0.8 Phase 30 depends on v0.7 Phase 24 (`src/schema/cv.rs` pattern — ✅ DONE). **DEFERRED:**
+> Phase 38 / post-deposition injection (INJECT-*) → **v1.0**; SCOPE-* (comment-scope / factor_values) →
+> **≥v0.9**.
+>
+> **Relocated from v0.7 (numbering unchanged) — upstreaming / de-vendoring:**
+>
+> - **Phase 22: Upstream PR prep** *(relocated from v0.7; held by owner)* — submit the chunk_series PR (UPS-01) + the mzPeakValidator `index_files_present` non-Parquet-skip PR (UPS-03). UPS-02/UPS-04 are done-upstream (no action). Drafts in `/tmp/mzpeak-prs/`. Owner-gated PR submission. Full detail in the v0.7 Phase Details (RELOCATED stub).
+> - **Phase 29: De-vendor — drop both vendored forks** *(relocated from v0.7; gated)* — remove the `[patch]` blocks + `vendor/` trees; DVN-01 gated on the chunk_series PR (Phase 22) merged, DVN-02 on mzdata 0.64.2 published to crates.io. Sequenced LAST so the gate exercises the worst-case `Other`-typed member. Full detail in the v0.7 Phase Details (RELOCATED stub).
+
+- [ ] **Phase 30: Sample-metadata spec alignment & CV governance** — Q1–Q10 ratified vs canonical spec; `SourceCurie` + CV passthrough strategy; `metadata.study`/`metadata.sample_list` KV + `sample-metadata`/`sdrf|isa` member contracts + `schema/*.json`; confirm `MS:1002602` "sample label" (NO `channel_list`). *(SMSPEC-01..03, SMCVG-01..02.)*
+- [ ] **Phase 30b: Upstream list-valued `ms_run.sample_ref` PR prep** *(EARLY, owner-gated, parallel)* — draft spec + reference-impl + open PR so the merge clock overlaps non-blocked phases. Gates only Phase 32's native binding. *(UPSTREAM-BIND-01.)*
+- [ ] **Phase 31: Unified model + SDRF reader + verbatim embed (MVP)** — `StudyMetadata`+`SourceCurie`+`csv` reader + the `convert_mzml` finalize-seam refactor + typed-member helper + `--sdrf` CLI + verbatim member + back-ref + precedence + file-row matching. *(SM-01..04.)*
+- [ ] **Phase 32: Lean `sample_list`/study projection + list-valued run binding** — minimal `sample_list` + `metadata.study`; native list-valued `ms_run.sample_ref` (gated on Phase 30b; `run_sample_binding` shadow interim). *(SM-05..07.)*
+- [ ] **Phase 33: ISA reader (Tab + JSON)** — pure-Rust hand parser (no Python) + ISA-JSON deserialize; whole-bundle verbatim embed (`data_kind: isa`); protocol-graph preserved in blob. *(SM-08..10.)*
+- [ ] **Phase 34: Isobaric channels as labeled samples (NO new construct)** — `sample label` cvParam (MS:1002602) + reporter-m/z/role/tag params on `sample_list`; bound via list-valued `sample_ref`. *(CHAN-01..03.)*
+- [ ] **Phase 35: Reporter-ion quantitation** *(optional, off by default; first-to-cut)* — `auxiliary` array `channel_id` column; own-reader read-back spike; `--reporter-quant`. *(QUANT-01..02.)*
+- [ ] **Phase 36: `comment[…]` scope decomposition + factor-value/CV completeness** — **DEFERRED ≥v0.9** (blob holds fidelity; lean posture). *(SCOPE-01..02.)*
+- [ ] **Phase 37: Round-trip + validation + batch spec/upstream submission** — internal Rust roundtrip-parity = hard gate; optional `--validate-sample-metadata` oracle (never required); submit the batched spec proposals + the upstream `sample_ref` PR (owner-gated). *(VAL-01..02.)*
+
+### Phase 30: Sample-metadata spec alignment & CV governance
+**Goal**: A single authoritative source of sample-metadata CV facts + spec-aligned contracts before any term lands — so no ad-hoc structure is baked in. Confirm `MS:1002602` "sample label" (+ reagent children) covers channels (no `channel_list`); declare the small additional structural terms (channel role, reporter-ion m/z) in `src/schema/cv.rs`; fix CV strategy = passthrough + own `SourceCurie`.
+**Depends on**: v0.7 Phase 24 (`src/schema/cv.rs` single-source pattern — ✅ DONE). Precedes Phases 32+.
+**Requirements**: SMSPEC-01, SMSPEC-02, SMSPEC-03, SMCVG-01, SMCVG-02
+**Success Criteria**:
+  1. The `entity_type: sample-metadata` / `data_kind: sdrf|isa` open-enum members + the `metadata.study` / `metadata.sample_list` index.json KV contracts are defined with matching `schema/*.json` (built locally against stable CV tokens).
+  2. CV strategy is fixed: own verbatim-string `SourceCurie`; cvParam-when-accession-present else userParam-keyed-by-column; no OBO bundle. `MS:1002602` + channel-role/reporter-m/z terms declared once in `src/schema/cv.rs`.
+  3. The sample-metadata + samples-as-channels write-ups are queued for the END-of-v0.8 batch proposal (not submitted incrementally).
+**Plans**: TBD
+
+### Phase 30b: Upstream list-valued `ms_run.sample_ref` PR prep
+**Goal**: Open the upstream surface early so merge latency overlaps the rest of v0.8. Add a **list-valued** `ms_run.sample_ref` to HUPO-PSI/mzPeak (spec + reference impl) — multiplexing falls out of the list (JK; mzML `<run>` precedent). **Owner-gated** (push-policy: HUPO-PSI is outside `okohlbacher` → explicit authorization).
+**Depends on**: Phase 30 (the binding term defined). Runs as a parallel merge-clock track; gates only Phase 32's native-binding step.
+**Requirements**: UPSTREAM-BIND-01
+**Success Criteria**:
+  1. The list-valued `ms_run.sample_ref` change is an open PR against HUPO-PSI/mzPeak (URL recorded) — OR an explicit recorded "held" determination by the owner.
+  2. The Phase-32 gate is recorded: native binding waits on this merge; `metadata.study.run_sample_binding` index.json shadow is the interim carrier.
+**Plans**: TBD
+
+### Phase 31: Unified model + SDRF reader + verbatim embed (TRUE MVP)
+**Goal**: A label-free SDRF embeds losslessly and re-serves byte-identical — a complete, demoable, upstream-independent vertical. Carries the heavier-than-it-looks groundwork: the `convert_mzml` finalize-seam refactor (plain-mzML path has no post-spectrum embed seam today), the typed-member helper (`start_for_entry`, not `start_other`), the own `SourceCurie`, and the `--sdrf` CLI layer.
+**Depends on**: Phase 30 (member/KV contracts + CV strategy). Nothing upstream.
+**Requirements**: SM-01, SM-02, SM-03, SM-04
+**Success Criteria**:
+  1. `--sdrf <PATH>` ingests a sibling SDRF (csv parse: tab, `flexible`, `quoting(false)`, real token set); file-row matching binds the input by path-stripped basename across sibling extensions; zero/multi-match emits a loud diagnostic.
+  2. The SDRF is embedded **verbatim** as a typed `sample-metadata`/`sdrf` ZIP member + a `metadata.sample_metadata` back-ref (`accession`, `source_uri`, `sha256`, `retrieved_at`).
+  3. Round-trip re-serves the embedded bytes byte-for-byte; the spectral L1 round-trip is unchanged (XRT).
+**Plans**: TBD
+
+### Phase 32: Lean `sample_list`/study projection + list-valued run binding
+**Goal**: Label-free 1:1 is readable + roundtrips. Emit minimal `sample_list` entries (per source name) + `metadata.study` global context; bind run→sample via the native list-valued `ms_run.sample_ref` once Phase 30b merges (shadow in the interim). Full `characteristics→Param` + `factor_values` are deferred ≥v0.9 (blob holds them).
+**Depends on**: Phase 31. Native-binding step gated on Phase 30b's upstream merge.
+**Requirements**: SM-05, SM-06, SM-07
+**Success Criteria**:
+  1. `sample_list` entries (one per `source name`) carry id + name + minimal params; `metadata.study` records accession/title/back-ref.
+  2. Run→sample binding emits via list-valued `ms_run.sample_ref` (or the `metadata.study.run_sample_binding` shadow until merge); a documented repo-wins precedence rule resolves embedded-vs-repo.
+  3. Label-free 1:1 SDRF (MTBLS1129) roundtrips + the projection reads back.
+**Plans**: TBD
+
+### Phase 33: ISA reader (Tab + JSON)
+**Goal**: A native MetaboLights ISA bundle ingests + roundtrips. Pure-Rust hand parser (NO Python) for ISA-Tab `i_/s_/a_` (+ Ontology Source Reference registry) and a separate ISA-JSON deserialize (`@id` resolution), both into the one `StudyMetadata`; the protocol/process graph is preserved in the verbatim bundle + a diagnostic, never dropped.
+**Depends on**: Phase 31 (model + embed) + Phase 32 (projection plumbing). Independent of channels. *Consider splitting ISA-Tab and ISA-JSON.*
+**Requirements**: SM-08, SM-09, SM-10
+**Success Criteria**:
+  1. ISA-Tab (`data/sdrf-examples/MTBLS5358`) parses into `StudyMetadata`; assay-row→file matching on `Raw/Derived Spectral Data File`; factor values harvested from study + assay files.
+  2. The whole ISA bundle embeds verbatim (`data_kind: isa`) + roundtrips byte-for-byte; ISA-JSON deserializes into the same model.
+  3. The protocol/process graph + multi-assay grouping are preserved (in the blob) with a diagnostic — never silently dropped.
+**Plans**: TBD
+
+### Phase 34: Isobaric channels as labeled samples (NO new construct)
+**Goal**: TMT/iTRAQ multiplexing modeled by reusing `sample_list` + PSI-MS CV — no new `channel_list`. Each isobaric channel is a `sample_list` entry with a `sample label` cvParam (MS:1002602 + reagent child) + reporter-m/z + role + `tag_modification` (Unimod); the run references them via the list-valued `ms_run.sample_ref`.
+**Depends on**: Phase 32 (sample_list + list-valued binding). Independent breadth-track with Phase 33.
+**Requirements**: CHAN-01, CHAN-02, CHAN-03
+**Success Criteria**:
+  1. A TMT-10plex SDRF (PXD011799) emits N labeled `sample_list` entries + a list-valued `ms_run.sample_ref`; SILAC/label-free excluded from the channel path.
+  2. Carrier/reference/pooled roles derived from `comment[carrier/reference channel]` + pooled flags; `reporter_mz: Option<f64>` with source recorded; TMTpro 16/18-plex honest free-text fallback.
+  3. No `channel_list`/`plex_id`/`channel_set` is emitted; channel→sample resolves through the labeled samples.
+**Plans**: TBD
+
+### Phase 35: Reporter-ion quantitation (optional, off by default)
+**Goal**: Optional per-MS2 reporter quant, channel-keyed. **First-to-cut if the milestone overruns** (serves breadth, not the core sample↔file value).
+**Depends on**: Phase 34.
+**Requirements**: QUANT-01, QUANT-02
+**Success Criteria**:
+  1. With `--reporter-quant`, reporter intensities are stored as an `auxiliary` array with a `channel_id` column.
+  2. A read-back spike proves `channel_id` survives through **this repo's own reader**; peak → channel → sample resolves.
+**Plans**: TBD
+
+### Phase 36: `comment[…]` scope decomposition + factor-value/CV completeness — DEFERRED ≥v0.9
+**Goal**: *(Deferred.)* Native re-serialization of per-`comment[*]` true-scope placement, `factor_values` block, full `characteristics→Param` shaping (incl. `MT/TA/PP` modification sub-fields). The verbatim blob carries this fidelity losslessly in v0.8; JK's "don't make the reader an SDRF writer" posture defers native projection. Kept as a v0.9 candidate if a query need materializes.
+**Requirements**: SCOPE-01, SCOPE-02 *(deferred ≥v0.9)*
+**Plans**: deferred
+
+### Phase 37: Round-trip + validation + batch spec/upstream submission
+**Goal**: Close the milestone — prove the roundtrip, run optional external validation, and submit the batched spec proposal + upstream PR.
+**Depends on**: Phases 31–34 (the emitted facets). Phase 35 optional.
+**Requirements**: VAL-01, VAL-02 (+ SMSPEC-02 batch, UPSTREAM-BIND-01 submission)
+**Success Criteria**:
+  1. The internal Rust round-trip-parity assertion (re-serve embedded bytes byte-for-byte) passes on all three fixtures (MTBLS1129 label-free SDRF, PXD011799 TMT-10plex SDRF, MTBLS5358 native ISA-Tab) — the hard gate.
+  2. The optional `--validate-sample-metadata` oracle (sdrf-pipelines/isa-api) runs only when present, non-blocking, never required at runtime (no Python dependency); results recorded when available.
+  3. The batched sample-metadata + samples-as-channels spec proposals are submitted to `HUPO-PSI/mzPeak-specification` and the upstream `ms_run.sample_ref` PR is submitted (both owner-gated).
+**Plans**: TBD
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 22. Upstream PR prep | 0/? | Deferred (held — non-blocking) | - |
+| 22. Upstream PR prep | — | **RELOCATED TO v0.8** | 2026-06-09 |
 | 23. Upstream rebase + re-verify | inline | ✅ Done | 2026-06-08 |
 | 24. Spec alignment & CV governance | 3/3 | ✅ Done   | 2026-06-09 |
 | 25. Forward declared-geometry threading | 2/2 | ✅ Done | 2026-06-09 |
 | 26. Reverse `<sourceFileList>` copy | 1/1 | ✅ Done   | 2026-06-09 |
 | 27. SDRF sample model + channels + reporter-quant | — | **RELOCATED TO v0.8** | 2026-06-09 |
-| 28. L2 conformance verify path | 2/2 | Complete   | 2026-06-09 |
-| 29. De-vendor both forks | 0/? | Deferred (gated — non-blocking) | - |
+| 28. L2 conformance verify path | 2/2 | ✅ Done   | 2026-06-09 |
+| 29. De-vendor both forks | — | **RELOCATED TO v0.8** | 2026-06-09 |
 
-**Release gate:** v0.7 ships when Phases 24, 25, 26, 28 are done (24/25/26 ✅; 28 next). Phases 22 + 29
-are DEFERRED / NON-BLOCKING (tracked, not gating). Phase 27 relocated to v0.8.
+**Status:** v0.7 is **COMPLETE** — all 9 active requirements DONE (REB-01, SPEC-01/02/03, CVG-01/02,
+GEOF-01, RSRC-01, L2-01); Phases 23/24/25/26/28 done. Phases 22 (upstream PRs) + 29 (de-vendor) +
+27 (SDRF) relocated to v0.8. Ready to archive/tag.
+
+### v0.8 — Sample-metadata ingestion (SDRF + ISA) + upstreaming/de-vendoring finish — laid down 2026-06-09 (additive)
+
+| Phase | Plans | Status | Notes |
+|-------|-------|--------|-------|
+| 22. Upstream PR prep (relocated from v0.7) | 0/? | **Relocated — held (owner-gated)** | UPS-01 chunk_series + UPS-03 validator PRs |
+| 29. De-vendor both forks (relocated from v0.7) | 0/? | **Relocated — gated** | DVN-01 (chunk_series merged) + DVN-02 (mzdata 0.64.2 on crates.io); LAST |
+| 30. Sample-metadata spec alignment & CV governance | 0/? | Not started | precedes 32+; deps v0.7 Phase 24 (✅) |
+| 30b. Upstream list-valued `ms_run.sample_ref` PR | 0/? | Not started | early/parallel, owner-gated |
+| 31. Unified model + SDRF reader + verbatim embed (MVP) | 0/? | Not started | upstream-independent |
+| 32. Lean `sample_list`/study projection + run binding | 0/? | Not started | native binding gated on 30b |
+| 33. ISA reader (Tab + JSON) | 0/? | Not started | pure-Rust, no Python |
+| 34. Isobaric channels as labeled samples | 0/? | Not started | MS:1002602, no channel_list |
+| 35. Reporter-ion quantitation (optional) | 0/? | Not started | first-to-cut |
+| 36. comment-scope + factor-value | — | **Deferred ≥v0.9** | blob holds fidelity |
+| 37. Round-trip + validation + batch submission | 0/? | Not started | internal roundtrip = hard gate |
+
+**v0.8 next buildable:** Phase 30 (deps met — v0.7 Phase 24 done). **Relocated from v0.7 (non-blocking
+external work):** Phase 22 (upstream PRs — held) + Phase 29 (de-vendor — gated). **Deferred to v1.0:**
+post-deposition injection (Phase 38 / INJECT-*). Canonical design:
+[`milestones/v0.8-DESIGN-DRAFT.md`](milestones/v0.8-DESIGN-DRAFT.md).
 
 ## Backlog
 
 ### Imaging structure (pixel facet, ROI polygons, continuous shared-axis, images.parquet) — DEFERRED beyond v1.0
 
-> **Owner decision (2026-06-08):** the whole imaging-structure cluster is post-1.0. v0.7 focuses on
-> upstreaming, de-vendoring, sample/SDRF/channel modeling + conformance/fidelity — **not** spatial
-> structural modeling. These are recorded under REQUIREMENTS.md → "Deferred beyond v1.0" and are NOT
-> v0.7 phases. PSI-committee notes to carry forward: ROI as a spatial-annotation **polygon** model
-> (PSI spring-2026 feedback); a `pixel` = coords + scan-PK (the `scan.scan_index` /
-> `scan.spectrum_reference` compound-key, ex-999.10).
+> **Owner decision (2026-06-08):** the whole imaging-structure cluster is post-1.0. v0.7 focuses on the
+> upstream rebase, CV governance, geometry/provenance round-trip + L2 conformance — **not** spatial
+> structural modeling (and upstreaming/de-vendoring + SDRF moved to v0.8). These are recorded under
+> REQUIREMENTS.md → "Deferred beyond v1.0" and are NOT v0.7 phases. PSI-committee notes to carry forward:
+> ROI as a spatial-annotation **polygon** model (PSI spring-2026 feedback); a `pixel` = coords + scan-PK
+> (the `scan.scan_index` / `scan.spectrum_reference` compound-key, ex-999.10).
 
 | Item | Description | Realizes |
 |------|-------------|----------|
@@ -306,19 +473,20 @@ See REQUIREMENTS.md → "Deferred beyond v1.0 — imaging structure (F6/F7/F8)" 
 ## Backlog — Realized in v0.7
 
 > The 999.x backlog below is realized across v0.7 phases 22–29 (history preserved, not deleted).
-> Pointers map each open backlog item to its v0.7 phase. The DONE items (999.2/3/4) are kept as
-> shipped history. The collapsed sections retain the original analysis for provenance.
+> Pointers map each open backlog item to its phase. The upstreaming/de-vendoring items (999.1/999.6/999.8
+> → Phases 22 + 29) are **relocated to v0.8** (non-blocking external work). The DONE items (999.2/3/4) are
+> kept as shipped history. The collapsed sections retain the original analysis for provenance.
 
 **Backlog → v0.7 phase rollup:**
 
 | Backlog item | Realized as | Requirement(s) |
 |--------------|-------------|----------------|
-| 999.1 — de-vendor both forks | **Phase 29** (DEFERRED — gated) | DVN-01, DVN-02 |
+| 999.1 — de-vendor both forks | **Phase 29 — RELOCATED TO v0.8** | DVN-01, DVN-02 |
 | (upstream rebase before new facets — spec-review 2026-06-08) | **Phase 23** ✅ DONE | REB-01 |
 | 999.5 — SDRF + isobaric channel modeling | **RELOCATED TO v0.8** (was Phase 27) | SDRF-01..05, CHAN-01..03 (→ v0.8 SM-*/CHAN-*) |
-| 999.6 — chunk_series index-desync PR | **Phase 22** (DEFERRED — held) | UPS-01 |
+| 999.6 — chunk_series index-desync PR | **Phase 22 — RELOCATED TO v0.8** | UPS-01 |
 | 999.7 — mzdata IM/SONAR accession PR | **DONE-UPSTREAM** (rebase) — UPS-02, not mapped | — |
-| 999.8 — mzPeakValidator non-Parquet-skip PR | **Phase 22** (DEFERRED — held) | UPS-03 |
+| 999.8 — mzPeakValidator non-Parquet-skip PR | **Phase 22 — RELOCATED TO v0.8** | UPS-03 |
 | 999.9 — array_buffer empty-spectrum (re-validate, then file if still broken) | **DONE-UPSTREAM** (writer rewrite) — UPS-04, not mapped | — |
 | (new-spec alignment + F9 CV governance — spec-review 2026-06-08) | **Phase 24** | SPEC-01/02/03, CVG-01, CVG-02 |
 | (GEO-F / RSRC — from `## Next`) | **Phases 25 + 26** | GEOF-01, RSRC-01 |
@@ -328,7 +496,7 @@ See REQUIREMENTS.md → "Deferred beyond v1.0 — imaging structure (F6/F7/F8)" 
 
 The 999.2/999.3/999.4 items below are already DONE (kept as shipped history); their content is unchanged.
 
-### Phase 999.1: Drop the vendored mzpeak_prototyping patches once their upstream PRs merge — → rolled into **Phase 29 (v0.7, DEFERRED — gated)**
+### Phase 999.1: Drop the vendored mzpeak_prototyping patches once their upstream PRs merge — → **Phase 29, RELOCATED TO v0.8 (gated)**
 
 **Goal:** Fully de-vendor — delete `vendor/mzpeak_prototyping` + the
 `[patch."https://github.com/HUPO-PSI/mzPeak"]` redirect and depend on upstream `HUPO-PSI/mzPeak`
@@ -408,7 +576,7 @@ the pixel keystone (PIX-01), also deferred.
 - Per-spectrum `assay_ref`. (MSI ROI→sample deferred beyond v1.0.)
 - Embed the file's SDRF rows **verbatim** as the lossless source + dataset back-ref.
 
-### Phase 999.6: Submit the `chunk_series` intensity/mz index-desync PR to HUPO-PSI/mzPeak — → rolled into **Phase 22 (UPS-01, DEFERRED — held)**
+### Phase 999.6: Submit the `chunk_series` intensity/mz index-desync PR to HUPO-PSI/mzPeak — → **Phase 22 (UPS-01), RELOCATED TO v0.8 (held)**
 
 **Goal:** Open the PR for the `ArrowArrayChunk::from_arrays` fix (index the filtered `arrow_arrays`
 by `arrow_arrays.len()`, not the source-map enumerate index). Took the pwiz sweep 123→136/139.
@@ -423,7 +591,7 @@ PR body drafted, **not yet submitted** (owner holding). Currently the lone vendo
 variants + MS:1003157/1003158 reader mappings — better than our `NonStandardDataArray` patch. No PR
 needed; our patch dropped on the 2026-06-08 rebase.
 
-### Phase 999.8: Submit the mzPeakValidator `index_files_present` non-Parquet-skip PR — → rolled into **Phase 22 (UPS-03, DEFERRED — held)**
+### Phase 999.8: Submit the mzPeakValidator `index_files_present` non-Parquet-skip PR — → **Phase 22 (UPS-03), RELOCATED TO v0.8 (held)**
 
 **Goal:** In the separate `~/Claude/mzPeakValidator` repo, the `index_files_present` rule opened every
 `files[]` member as Parquet — false-positive failure on non-Parquet members (e.g. embedded
