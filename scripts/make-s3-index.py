@@ -25,6 +25,13 @@ MZPEAKIV = "https://okohlbacher.github.io/mzPeakIV/"         # imaging (MSI) .mz
 # Friendly metadata per top-level prefix (the "example subsets"). Unknown prefixes get a default card.
 # `blurb` = short card text; `prov` = provenance paragraph shown on the subset page (archives/accessions).
 SUBSETS = OrderedDict([
+    ("mzML-examples", dict(slug="mass-spec", title="General MS Data", icon="\U0001F4C8", accent="#1558d6",
+        blurb="Non-imaging LC-/GC-MS instrument-vendor examples (Thermo, Bruker, SCIEX, Agilent, Shimadzu, "
+              "Waters) — published mzML converted to mzPeak.", imaging=False,
+        prov="<b>Provenance.</b> Openly published runs from <b>PRIDE</b>, <b>MetaboLights</b>, <b>MassIVE</b> "
+             "and <b>Zenodo</b> spanning 6 vendors and the major analyzer classes — Orbitrap, Q-TOF / UHR-QTOF, "
+             "FT-ICR, pure ion trap, triple-quad (SRM/MRM), QqLIT, TIMS &amp; DTIMS ion mobility, DIA, and "
+             "GC electron-ionization. Each dataset below names its accession and source publication.")),
     ("imzml-examples", dict(slug="imaging", title="Imaging MS (MSI)", icon="\U0001F52C", accent="#1a7f37",
         blurb="Mass-spectrometry imaging — imzML datasets with per-pixel spatial coordinates and embedded "
               "optical images, converted to the imaging mzPeak extension.", imaging=True,
@@ -34,14 +41,7 @@ SUBSETS = OrderedDict([
              "Zenodo <b>18187395</b> — glioblastoma MALDI phenomics, the multi-optical case (H&amp;E whole-slide "
              "+ bright-field per section); and the ms-imaging.org <b>Example 1</b> 3×3-pixel pairs "
              "(Schramm et al. 2012). All are openly licensed public deposits.")),
-    ("mzML-examples", dict(slug="mass-spec", title="Mass spectrometry", icon="\U0001F4C8", accent="#1558d6",
-        blurb="Non-imaging LC-/GC-MS instrument-vendor examples (Thermo, Bruker, SCIEX, Agilent, Shimadzu, "
-              "Waters) — published mzML converted to mzPeak.", imaging=False,
-        prov="<b>Provenance.</b> Openly published runs from <b>PRIDE</b>, <b>MetaboLights</b>, <b>MassIVE</b> "
-             "and <b>Zenodo</b> spanning 6 vendors and the major analyzer classes — Orbitrap, Q-TOF / UHR-QTOF, "
-             "FT-ICR, pure ion trap, triple-quad (SRM/MRM), QqLIT, TIMS &amp; DTIMS ion mobility, DIA, and "
-             "GC electron-ionization. Each dataset below names its accession and source publication.")),
-    ("sdrf-examples", dict(slug="sdrf", title="SDRF sample-metadata", icon="\U0001F9EC", accent="#8250df",
+    ("sdrf-examples", dict(slug="sdrf", title="Study Design Embedding", icon="\U0001F9EC", accent="#8250df",
         blurb="Proteomics &amp; metabolomics studies shipping an SDRF / ISA-Tab sample annotation, kept "
               "alongside the original vendor RAW and the mzML → mzPeak conversions.", imaging=False,
         prov="<b>Provenance.</b> HUPO-PSI / bigbio community-curated SDRF annotations over PRIDE "
@@ -109,7 +109,7 @@ DATASETS = {
     "Waters": "ProteoWizard <code>vendor_readers</code> · Waters (.raw / MassLynx) reader-regression files.",
 }
 
-HIDE_PREFIXES = {"demo"}          # legacy duplicate — not shown
+HIDE_PREFIXES = {"demo", "pwiz-examples"}   # legacy duplicate + ProteoWizard corpus — not shown in the index
 # Loose test artifacts / per-dir READMEs that surfaced as fake one-file "datasets" — not examples.
 SKIP_GROUP_NAMES = {"README.md", "small.mzpeak", "small.chunked.mzpeak", "small.numpress.mzpeak", "has_uv.mzpeak"}
 SELF_SUFFIX = (".html", ".png", ".tsv")   # generated site assets at bucket root (index/subpages, ratio plots, ratios.tsv) — not example data
@@ -135,45 +135,64 @@ def hs(n):
 
 PLOT_MIN_MB = 50                       # only datasets whose original input exceeds this are plotted
 _IMG_EXT = (".tif", ".tiff", ".png", ".jpg", ".jpeg", ".svs", ".bmp")
-_RAW_EXT = (".raw", ".wiff", ".wiff.scan", ".wiff2", ".tdf", ".tdf_bin",
-            ".baf", ".yep", ".uimf", ".imzml", ".ibd")
+_VENDOR_RAW_EXT = (".raw", ".wiff", ".wiff.scan", ".wiff2", ".tdf", ".tdf_bin", ".baf", ".yep", ".uimf")
+_META_EXT = (".md", ".csv", ".xml", ".xlsx", ".txt", ".json", ".orig-published-checksum", ".tsv")
 
 
-def classify(rel):
-    """Bucket one file into raw / mzml / mzpeak / other for the size triple.
-    Imaging RAW = spectrum (imzML+ibd) + optical images; vendor RAW = native files or
-    anything inside a `.d` / `.raw` bundle directory."""
+def _kind(rel):
+    """Classify one member into a file-kind used by the size tiers."""
     low = rel.lower()
+    base = low.rsplit("/", 1)[-1]
     if low.endswith(".mzpeak"):
         return "mzpeak"
-    if low.endswith(".imzml") or low.endswith(".ibd"):
-        return "raw"
+    if low.endswith(_IMG_EXT):
+        return "image"
+    if low.endswith(".imzml"):
+        return "imzml"
     if low.endswith(".mzml"):
         return "mzml"
-    if low.endswith(_IMG_EXT) or low.endswith(_RAW_EXT):
-        return "raw"
-    if any(seg.endswith((".d", ".raw")) for seg in low.split("/")[:-1]):
-        return "raw"                   # vendor-bundle internals (.method/.sqlite/.bin/.tdf_bin…)
+    if low.endswith(".ibd"):
+        return "ibd"
+    if low.endswith(_VENDOR_RAW_EXT) or any(seg.endswith((".d", ".raw")) for seg in low.split("/")[:-1]):
+        return "vraw"
+    if low.endswith(_META_EXT):
+        return "meta"
+    if "." not in base:                    # extension-less binary inside a dataset = raw spectral binary (e.g. DESI .ibd)
+        return "ibd"
     return "other"
 
 
-def size_triple(files):
-    """(raw_bytes, mzml_bytes, mzpeak_bytes) summed over a dataset's files."""
-    b = {"raw": 0, "mzml": 0, "mzpeak": 0, "other": 0}
+def size_tiers(files, imaging):
+    """Return (raw_b, mzml_b, mzpeak_b) under the Raw / mzML(imzML) / mzPeak tier definitions.
+
+    Non-imaging:  Raw  = vendor RAW (.raw/.d/.wiff …) + optical images
+                  mzML = the .mzML file + optical images
+    Imaging:      Raw  = .ibd raw spectral binary + optical images
+                  mzML = .imzML XML + .ibd + optical images   ('imzML + raw images')
+    mzPeak = the .mzpeak.  Images are counted in BOTH Raw and the mzML tier; for imaging the .ibd is
+    shared too (imzML keeps its binary external, so the tier difference is just the XML overhead — unlike
+    mzML, which re-encodes the vendor binary as base64 XML)."""
+    b = {"mzpeak": 0, "image": 0, "imzml": 0, "mzml": 0, "ibd": 0, "vraw": 0, "meta": 0, "other": 0}
     for rel, _key, s in files:
-        b[classify(rel)] += s
-    return b["raw"], b["mzml"], b["mzpeak"]
+        b[_kind(rel)] += s
+    if imaging:
+        raw = b["ibd"] + b["image"]
+        mzml = b["imzml"] + b["ibd"] + b["image"]
+    else:
+        raw = b["vraw"] + b["image"]
+        mzml = b["mzml"] + b["image"]
+    return raw, mzml, b["mzpeak"]
 
 
-def input_size(files):
-    """Original-input size used for the >50 MB plot filter: vendor/imaging RAW if present, else mzML."""
-    raw, mzml, _ = size_triple(files)
+def input_size(files, imaging):
+    """Original-input size used for the >50 MB plot filter: RAW if present, else mzML."""
+    raw, mzml, _ = size_tiers(files, imaging)
     return raw if raw > 0 else mzml
 
 
-def head_sizes(files):
+def head_sizes(files, imaging):
     """Accordion-header string: 'raw R, mzML M, mzPeak P (P/R%/P/M%)' with n.a. fallbacks."""
-    raw, mzml, mzp = size_triple(files)
+    raw, mzml, mzp = size_tiers(files, imaging)
     if raw == 0 and mzml == 0 and mzp == 0:
         return ""                      # metadata-only dataset (e.g. SDRF/ISA tsv) — no size line
     raw_s = f"raw {hs(raw)}" if raw > 0 else "Raw n.a."
@@ -240,10 +259,11 @@ def stats(prefix):
 def qualifying(prefix):
     """Datasets in a category whose original input exceeds PLOT_MIN_MB (and that produced a mzPeak).
     Returns [(dataset, raw_b, mzml_b, mzpeak_b, input_b)] — the rows that get plotted."""
+    imaging = meta_for(prefix).get("imaging", False)
     out = []
     for g, files in subsets[prefix].items():
         ds = g.split("/", 1)[1] if "/" in g else g
-        raw, mzml, mzp = size_triple(files)
+        raw, mzml, mzp = size_tiers(files, imaging)
         inp = raw if raw > 0 else mzml
         if inp > PLOT_MIN_MB * 1024 * 1024 and mzp > 0:
             out.append((ds, raw, mzml, mzp, inp))
@@ -297,9 +317,13 @@ summary .dsdesc{color:var(--mut);font-size:12px;font-weight:400;line-height:1.45
 summary .dsdesc i{color:#9a6a14}
 summary .meta{color:var(--mut);font-size:12.5px;text-align:right;padding-top:.15rem;flex:0 0 auto;max-width:46ch}
 summary .meta .sizes{font-size:11.5px;font-variant-numeric:tabular-nums;color:#52606d}
+.toprow{display:flex;gap:1rem;align-items:flex-start;margin:.4rem 0 1.4rem}
+.toprow .prov{flex:1 1 auto;margin:0;max-width:none}
+.toprow .ratiofig{flex:0 0 auto;margin:0;text-align:center}
 .ratiofig{margin:1.1rem 0 1.4rem;text-align:center}
-.ratiofig img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:10px;background:#fff}
-.ratiofig figcaption{color:var(--mut);font-size:12px;margin-top:.4rem;max-width:78ch;margin-left:auto;margin-right:auto}
+.ratiofig img{height:auto;max-height:200px;width:auto;max-width:100%;border:1px solid var(--line);border-radius:10px;background:#fff}
+.ratiofig figcaption{color:var(--mut);font-size:11px;margin-top:.3rem;line-height:1.35;max-width:30ch;margin-left:auto;margin-right:auto}
+@media(max-width:680px){.toprow{flex-direction:column}.ratiofig img{max-height:170px}}
 .plotnote{color:var(--mut);font-size:12.5px;font-style:italic;margin:.6rem 0 1rem}
 ul.files{list-style:none;margin:0;padding:.25rem .6rem .5rem}
 ul.files li{display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:5px 4px;border-bottom:1px dotted #eef0f2}
@@ -363,7 +387,7 @@ def render_files(groups, imaging):
         ds = g.split("/", 1)[1] if "/" in g else g
         desc = DATASETS.get(ds, "")
         deschtml = f'<span class="dsdesc">{desc}</span>' if desc else ""
-        hsz = head_sizes(files)
+        hsz = head_sizes(files, imaging)
         sizes_html = f'<br><span class="sizes">{html.escape(hsz)}</span>' if hsz else ""
         rows.append(f'<details><summary><span class="dsname"><span class="ds">{html.escape(ds)}</span>{deschtml}</span>'
                     f'<span class="meta">{len(files)} files{sizes_html}</span></summary><ul class="files">')
@@ -414,19 +438,17 @@ for p in order:
     provhtml = f'<p class="prov">{m["prov"]}</p>' if m.get("prov") else ""
     q = qualifying(p)
     if len(q) >= 2:
-        plot_html = (f'<figure class="ratiofig"><img class="ratioplot" src="{m["slug"]}-ratios.png" '
-                     f'alt="mzPeak compression ratios for {html.escape(m["title"])}">'
-                     f'<figcaption>Compression ratio (mzPeak ÷ original input) for the {len(q)} '
-                     f'{html.escape(m["title"])} dataset(s) larger than {PLOT_MIN_MB} MB input. '
-                     f'Input = vendor RAW where present, else mzML; imaging input = imzML + .ibd + optical '
-                     f'images. Box = median/IQR, points = individual datasets (lower = smaller mzPeak).'
-                     f'</figcaption></figure>')
+        fig_html = ('<figure class="ratiofig"><img class="ratioplot" src="%s-ratios.png" '
+                    'alt="Raw / mzML / mzPeak sizes for %s">'
+                    '<figcaption>Size vs vendor RAW (=100%%) across %d dataset(s) &gt; %d MB &middot; '
+                    'bars = mean, dots = runs.</figcaption></figure>'
+                    % (m["slug"], html.escape(m["title"]), len(q), PLOT_MIN_MB))
     else:
-        plot_html = (f'<p class="plotnote">Fewer than two {html.escape(m["title"])} datasets exceed '
-                     f'{PLOT_MIN_MB} MB input — no compression plot for this category.</p>')
+        fig_html = ""
+    toprow = ('<div class="toprow">%s%s</div>' % (provhtml, fig_html)) if (provhtml or fig_html) else ""
     body = (f'<section class="section-head"><span class="ic">{m["icon"]}</span>'
             f'<h2>{m["title"]}</h2><span class="badge" style="background:{m["accent"]}">{nds} datasets · {hs(nb)}</span></section>'
-            f'<p class="lead">{m["blurb"]}</p>{provhtml}{plot_html}'
+            f'<p class="lead">{m["blurb"]}</p>{toprow}'
             f'{render_files(subsets[p], m["imaging"])}')
     with open(os.path.join(outdir, f'{m["slug"]}.html'), "w") as f:
         f.write(page(f'{m["title"]} — mzPeak examples', m["slug"], body))
@@ -470,7 +492,7 @@ with open(os.path.join(outdir, "ratios.tsv"), "w") as f:
         for g in sorted(subsets[p]):
             files = sorted(subsets[p][g])
             ds = g.split("/", 1)[1] if "/" in g else g
-            raw, mzml, mzp = size_triple(files)
+            raw, mzml, mzp = size_tiers(files, m["imaging"])
             inp = raw if raw > 0 else mzml
             f.write(f"{m['slug']}\t{m['title']}\t{ds}\t{raw}\t{mzml}\t{mzp}\t{inp}\n")
 
