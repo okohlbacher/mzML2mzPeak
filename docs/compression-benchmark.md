@@ -14,32 +14,28 @@ raw sizes are from each repository's file API or a downloaded copy. The underlyi
 the git-ignored `data/raw-examples/` (working notes in its local `README.md`); this doc is the tracked
 record.
 
-> **Regenerated 2026-06-06** on the migrated stack (mzdata 0.64.1 + upstream mzpeak `8435967`, with
-> m/z sort-on-write and the explicit spectrum-type CV). Full corpus e2e: **32/32 PASS**. The 17
-> centroided rows are **unchanged** from the previous run at 0.1 MB resolution. The **Astral row was
-> switched to PROFILE** (†): its `.raw` was re-converted with peak-picking off (ThermoRawFileParser
-> `--noPeakPicking`) and that profile mzML + mzPeak now replace the centroided ones on the bucket.
+> **Regenerated 2026-06-10** on the de-vendored stack (crates.io mzdata 0.64.1 + upstream mzpeak `fec8c2d5`). The four Thermo rows with a vendor `.raw` on disk — **FT-ICR, LTQ-XL, Orbitrap Velos, Fusion Lumos** — plus **Astral** are now **profile end-to-end** (†): each `.raw` re-converted with peak-picking OFF (ThermoRawFileParser `-p`), so their `mzPeak/raw` is a true like-for-like number (FT-ICR jumps from a misleading 0.02× to **0.41×**). Rows marked ‡ (bruker-timstof, sciex-zenotof) keep a centroided published mzML against a profile raw, so their `mzPeak/raw` is **indicative only**. The mzML-only rows are unchanged.
 
 | dataset | raw MB | mzML MB | mzPeak MB | mzPeak/mzML | mzPeak/raw | raw source |
 |---|--:|--:|--:|--:|--:|---|
-| agilent-qtof | — | 2.3 | 0.8 | 0.35× | — | Zenodo: mzML-only |
-| sciex-qtrap-6500 | — | 3.0 | 0.3 | 0.10× | — | PRIDE: mzML-only |
-| agilent-6560-dtims-imqtof | — | 3.3 | 0.3 | 0.09× | — | Zenodo: mzML-only |
-| agilent-6490-triplequad | — | 5.3 | 0.9 | 0.17× | — | PRIDE: mzML-only |
-| agilent-8890-gc-ei | — | 15.9 | 1.6 | 0.10× | — | MetaboLights: mzML-only |
-| thermo-ltq-ft-ultra-fticr | 221 | 30.2 | 5.5 | 0.18× | 0.02× | `.RAW` on disk |
-| bruker-impact-ii-qtof | — | 31.3 | 20.4 | 0.65× | — | MetaboLights: mzML-only |
-| shimadzu-lcms-9030-qtof | — | 36.2 | 2.4 | 0.07× | — | MetaboLights: mzML-only |
-| bruker-microtof-q2 | — | 56.6 | 36.0 | 0.64× | — | MetaboLights: mzML-only |
-| waters-xevo-g2s-qtof | — | 81.8 | 44.8 | 0.55× | — | MetaboLights: mzML-only |
-| sciex-zenotof-7600 | 73 | 89.8 | 50.9 | 0.57× | 0.69× | MassIVE wiff triple (size) |
-| thermo-ltq-xl-iontrap | 70 | 173.5 | 55.6 | 0.32× | 0.80× | `.raw` on disk |
-| thermo-qexactive-plus | — | 242.1 | 98.4 | 0.41× | — | Zenodo: mzML-only |
-| sciex-tripletof-6600 | — | 243.1 | 138.1 | 0.57× | — | Zenodo: mzML-only |
-| thermo-ltq-orbitrap-velos | 210 | 429.2 | 101.5 | 0.24× | 0.48× | `.raw` on disk |
-| thermo-fusion-lumos | 659 | 588.6 | 156.5 | 0.27× | 0.24× | PRIDE (size-only) |
-| bruker-timstof-pro | 2106 | 1386.5 | 677.2 | 0.49× | 0.32× | MassIVE `.d`, 52 files (size) |
-| thermo-orbitrap-astral † | 8638 | 7481.3 | 3566.4 | 0.48× | 0.41× | MassIVE `.raw` on disk |
+| agilent-qtof | — | 2.4 | 0.8 | 0.35× | — | Zenodo: mzML-only |
+| sciex-qtrap-6500 | — | 3.1 | 0.3 | 0.08× | — | PRIDE: mzML-only |
+| agilent-6560-dtims-imqtof | — | 3.4 | 0.3 | 0.09× | — | Zenodo: mzML-only |
+| agilent-6490-triplequad | — | 5.5 | 1.0 | 0.18× | — | PRIDE: mzML-only |
+| agilent-8890-gc-ei | — | 16.7 | 1.6 | 0.10× | — | MetaboLights: mzML-only |
+| bruker-impact-ii-qtof | — | 32.9 | 21.4 | 0.65× | — | MetaboLights: mzML-only |
+| shimadzu-lcms-9030-qtof | — | 37.9 | 2.5 | 0.07× | — | MetaboLights: mzML-only |
+| bruker-microtof-q2 | — | 59.3 | 37.8 | 0.64× | — | MetaboLights: mzML-only |
+| waters-xevo-g2s-qtof | — | 85.8 | 47.0 | 0.55× | — | MetaboLights: mzML-only |
+| sciex-zenotof-7600 | 77 | 94.2 | 53.4 | 0.57× | 0.69×‡ | MassIVE wiff triple (size) |
+| thermo-ltq-xl-iontrap | 73 | 182.0 | 58.3 | 0.32× | 0.80× | `.raw` on disk |
+| thermo-qexactive-plus | — | 253.9 | 103.2 | 0.41× | — | Zenodo: mzML-only |
+| sciex-tripletof-6600 | — | 254.9 | 144.8 | 0.57× | — | Zenodo: mzML-only |
+| thermo-ltq-ft-ultra-fticr | 232† | 483.0 | 95.2 | 0.20× | 0.41× | `.RAW` on disk |
+| thermo-ltq-orbitrap-velos | 220† | 596.3 | 140.4 | 0.24× | 0.64× | `.raw` on disk |
+| thermo-fusion-lumos | 691† | 1436.6 | 365.9 | 0.25× | 0.53× | PRIDE (size-only) |
+| bruker-timstof-pro | 2208 | 1453.8 | 710.1 | 0.49× | 0.32×‡ | MassIVE `.d`, 52 files (size) |
+| thermo-orbitrap-astral | 9057† | 7844.8 | 3739.6 | 0.48× | 0.41× | — |
 
 **Directory-slug caveat:** the `dataset` column is the corpus *directory name*, not the verified
 instrument. Two slugs are misnomers (kept to avoid S3-layout churn — see `docs/mzml-examples.md`):
