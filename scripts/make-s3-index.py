@@ -112,7 +112,7 @@ DATASETS = {
 HIDE_PREFIXES = {"demo"}          # legacy duplicate — not shown
 # Loose test artifacts / per-dir READMEs that surfaced as fake one-file "datasets" — not examples.
 SKIP_GROUP_NAMES = {"README.md", "small.mzpeak", "small.chunked.mzpeak", "small.numpress.mzpeak", "has_uv.mzpeak"}
-SELF_SUFFIX = (".html",)
+SELF_SUFFIX = (".html", ".png", ".tsv")   # generated site assets at bucket root (index/subpages, ratio plots, ratios.tsv) — not example data
 SELF_NAMES = {"README.md"}
 
 
@@ -396,7 +396,7 @@ landing = (
     'imzML / mzML / RAW + sample metadata, alongside the converted <code>.mzpeak</code> files. '
     'Pick an example type to browse; every <code>.mzpeak</code> opens directly in a browser viewer.</p>'
     f'<div class="stat"><code>s3://v09</code> · public read · {total_n} objects · {hs(total_b)}</div></section>'
-    f'<section class="grid">{"".join(cards)}</section>'
+    f'<section class="grid" style="grid-template-columns:repeat({len(cards)},minmax(0,1fr))">{"".join(cards)}</section>'
     '<div class="legend">Each <code>.mzpeak</code> streams into a browser viewer over HTTP range (no download): '
     f'<a class="viewer ex" target="_blank" rel="noopener" href="{EXPLORER}">▶ Explorer</a> = mzPeak Explorer '
     f'(any file) · <a class="viewer iv" target="_blank" rel="noopener" href="{MZPEAKIV}">▦ mzPeakIV</a> = '
