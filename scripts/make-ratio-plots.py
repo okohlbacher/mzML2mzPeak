@@ -74,7 +74,7 @@ def main(outdir):
         means = [100.0 if v is None else float(np.mean(v)) for _, v in tiers]
         labels = [name for name, _ in tiers]
 
-        fig, ax = plt.subplots(figsize=(1.25 + 1.05 * len(tiers), 2.7))
+        fig, ax = plt.subplots(figsize=(4.6, 2.9))      # FIXED size for every category -> identical PNG dimensions
         bar_colors = ["#9aa0a6"] + [color] * (len(tiers) - 1)
         bar_alpha = [0.30] + [0.32 if labels[i] != "mzPeak" else 0.42 for i in range(1, len(tiers))]
         for x, mn, c, a in zip(xs, means, bar_colors, bar_alpha):
@@ -102,8 +102,11 @@ def main(outdir):
         ax.set_ylabel("% of vendor RAW", fontsize=8)
         ax.set_title("%s" % titles[slug], fontsize=9)
 
+        # fixed margins (NOT bbox_inches="tight") so every category PNG has IDENTICAL pixel dimensions
+        # and therefore the same height when embedded side by side.
+        fig.subplots_adjust(left=0.135, right=0.965, top=0.865, bottom=0.115)
         out = os.path.join(outdir, f"{slug}-ratios.png")
-        fig.savefig(out, dpi=150, bbox_inches="tight")
+        fig.savefig(out, dpi=150)
         plt.close(fig)
         written.append(os.path.basename(out))
         print("make-ratio-plots: wrote %s (n=%d, boxes=%s, means=%s)"
