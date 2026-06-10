@@ -42,18 +42,17 @@ parquet = { version = "=57.0.0", features = ["encryption"] }
 zip = "=4.1.0"
 # imzml is the NON-default addition that makes `mzdata::io::imzml` exist; the other
 # features mirror upstream so the unioned single copy is identical to upstream + imzml.
-# 0.64.2: the latest mzdata (main HEAD f9abc00) — NOT yet published on crates.io (max published is
-# 0.64.0), so it is VENDORED as an unmodified pinned snapshot via [patch.crates-io] below. Satisfies
-# upstream mzpeak_prototyping@a5c222c's `mzdata = 0.64.1` (^0.64) requirement; both unify to one copy.
-# Clean snapshot, no patches (our former SONAR/ion-mobility patch is upstreamed in main — see the
-# [patch.crates-io] note below). Drop the vendoring once 0.64.2 is published to crates.io.
-mzdata = { version = "=0.64.2", features = ["imzml", "serde", "bruker_tdf", "nalgebra", "zstd", "numpress"] }
+# DE-VENDORED (was a vendor/mzdata 0.64.2 main-HEAD snapshot): published crates.io 0.64.1 carries
+# the SONAR ScanningQuadrupolePosition variants mzpeak_prototyping HEAD requires (verified in
+# encodings.rs), and satisfies upstream's `mzdata = 0.64.1` (^0.64). Both our crate and the vendored
+# writer unify to one crates.io copy (`cargo tree -d`: no duplicate). No [patch] needed for mzdata.
+mzdata = { version = "=0.64.1", features = ["imzml", "serde", "bruker_tdf", "nalgebra", "zstd", "numpress"] }
 mzpeaks = "=1.0.9"
 
 # --- Write path: git-only reference implementation, pinned to a CONCRETE commit rev.
 # default-features = false drops the async/object_store/opendal/tokio stack
 # (STACK.md local-file-only v1 variant). ---
-mzpeak_prototyping = { git = "https://github.com/HUPO-PSI/mzPeak", rev = "a5c222c", default-features = false }
+mzpeak_prototyping = { git = "https://github.com/HUPO-PSI/mzPeak", rev = "fec8c2d5", default-features = false }
 
 # --- Integrity digest crates (Plan 02-02, IN-07): canonical RustCrypto LEAF crates,
 # pure-Rust with NO shared transitive types with arrow/mzdata, so they cannot fracture
@@ -125,27 +124,26 @@ env_logger = "=0.11.8"
 # CLI (Phase 06-02), never in a library module (mirrors the anyhow binary-only boundary). ---
 indicatif = "=0.17.11"
 
-# --- VENDORED SNAPSHOT (CLEAN — no local patches): mzdata 0.64.2 (main HEAD f9abc00) is not yet
-# published on crates.io (max published 0.64.0), so we pin a snapshot here. As of mzdata main our
-# former B1 patch is FULLY UPSTREAMED: the SONAR scanning-quadrupole arrays MS:1003157/1003158 now
-# have dedicated `ArrayType::ScanningQuadrupolePosition{Lower,Upper}BoundMZ` variants + reader
-# mappings (better than our old NonStandardDataArray patch), which upstream mzpeak_prototyping HEAD
-# also requires. This snapshot is therefore unmodified. Drop the whole [patch] once mzdata 0.64.2 is
-# published to crates.io (Phase 31 / DVN-02). ---
+# --- mzdata is now DE-VENDORED (DVN-02 done): published crates.io 0.64.1 carries the SONAR
+# scanning-quadrupole ScanningQuadrupolePosition{Lower,Upper}BoundMZ variants that both our reader
+# and mzpeak_prototyping HEAD require (our former B1 patch was upstreamed). No vendor/mzdata, no
+# [patch.crates-io]. ---
 # --- Dev-only dependencies (test helpers, not shipped in the library crate). ---
 [dev-dependencies]
 # tempfile is already in the graph transitively via mzpeak_prototyping@3.27.0;
 # declaring it here as a dev-dep pins the shared copy and makes it explicit for test use.
 tempfile = "=3.27.0"
 
-[patch.crates-io]
-mzdata = { path = "vendor/mzdata" }
+# mzdata DE-VENDORED: uses published crates.io 0.64.1 (verified to carry the SONAR
+# ScanningQuadrupolePosition variants mzpeak_prototyping HEAD requires). vendor/mzdata removed.
 
-# --- VENDORED FORK (mzpeak_prototyping @ HUPO-PSI/mzPeak HEAD a5c222c): now carries exactly ONE
-# local patch — `src/chunk_series.rs` (the ArrowArrayChunk intensity/mz index-desync; index the
-# filtered `arrow_arrays` by len(), not the source-map enumerate index — else profile ion-mobility
-# spectra panic). PR not yet submitted (Phase 22 / UPS-01); drop this edit + the whole [patch] once
-# merged (Phase 31 / DVN-01).
+# --- VENDORED FORK (mzpeak_prototyping @ HUPO-PSI/mzPeak HEAD fec8c2d5 — updated from a5c222c,
+# picking up upstream's "sorting rank for real this time" fix: peak_series.rs declares sorted-array
+# sorting_rank 0, not 1): STILL carries exactly ONE local patch — `src/chunk_series.rs` (the
+# ArrowArrayChunk intensity/mz index-desync; index the filtered `arrow_arrays` by len(), not the
+# source-map enumerate index — else profile ion-mobility spectra panic). This patch is NOT in
+# upstream HEAD (verified: HEAD still has `Some(i)`), so the fork CANNOT be dropped yet. PR not yet
+# submitted (UPS-01, owner-gated push to HUPO-PSI); drop this edit + the whole [patch] once merged.
 #   The other two former patches are GONE — fixed upstream as of a5c222c: (1) the FileEntry
 #   `DataKind`/`EntityType` serde asymmetry is fixed by upstream `#[serde(untagged)]` on the `Other`
 #   variants (round-trip verified by tests/file_index_roundtrip.rs); (2) the `array_buffer.rs`
