@@ -122,6 +122,19 @@ pub fn reporter_ion_mz_token() -> &'static str {
     "mzml2mzpeak:reporter-ion-mz"
 }
 
+/// The project-local CV-reference namespace id (`"mzml2mzpeak"`).
+///
+/// The sample-metadata projection emits two structural attributes — [`channel_role_token`]
+/// and [`reporter_ion_mz_token`] — that have no canonical PSI-MS accession (SMCVG-02 Locked
+/// Rule 5). Those params carry `cv_ref: "mzml2mzpeak"` so a reader can tell a project-local
+/// term from a real CV term. This accessor is the single source for that namespace id; both
+/// the tokens above are `"{local_namespace()}:..."` by construction and
+/// [`cv_entry_for`] declares it in the file-level `cv_list` (so the `cv_ref` is never
+/// undeclared — CVL-02 declared ⊇ referenced).
+pub fn local_namespace() -> &'static str {
+    "mzml2mzpeak"
+}
+
 /// One controlled-vocabulary declaration in the file-level `cv_list`.
 ///
 /// Serializes to `{id, full_name, uri, version?}`; `version` is OPTIONAL and OMITTED from the
@@ -150,36 +163,117 @@ pub struct CvEntry {
 /// change ONLY this function — the change propagates automatically to the reverse path.
 /// No independent CV literals exist in `imzml_writer.rs` (asserted by `no_drift_reverse_cvlist_reads_cv_list`).
 pub fn cv_list() -> Vec<CvEntry> {
-    vec![
-        CvEntry {
-            id: "MS".to_string(),
-            full_name: "PSI-MS controlled vocabulary".to_string(),
-            uri: "https://raw.githubusercontent.com/HUPO-PSI/psi-ms-CV/master/psi-ms.obo"
-                .to_string(),
-            version: Some("4.1.x".to_string()),
-        },
-        CvEntry {
-            id: "IMS".to_string(),
-            full_name: "Mass Spectrometry Imaging controlled vocabulary".to_string(),
-            // The IMS imaging CV has no OBO-Foundry PURL yet (CVG-01 — resolved 2026-06-09).
-            // This stable imzML/imzML raw URL is the recorded local token used until a canonical
-            // home is minted; the canonical-CURIE request is tracked in docs/cv-requests.md.
-            // The reverse <cvList> reads this value from cv_list() so forward and reverse are
-            // guaranteed to agree (no independent literal in imzml_writer.rs).
-            uri: "https://raw.githubusercontent.com/imzML/imzML/master/imagingMS.obo".to_string(),
-            version: Some("1.1.x".to_string()),
-        },
-        CvEntry {
-            id: "UO".to_string(),
-            full_name: "Unit Ontology".to_string(),
-            uri:
-                "https://raw.githubusercontent.com/bio-ontology-research-group/unit-ontology/master/unit.obo"
-                    .to_string(),
-            // UO version intentionally None — `version` is OPTIONAL and the reverse <cvList>
-            // carries no UO version either.
-            version: None,
-        },
-    ]
+    ["MS", "IMS", "UO"]
+        .into_iter()
+        .map(|id| cv_entry_for(id).expect("base CV id is always registered"))
+        .collect()
+}
+
+/// The single-source registry mapping a `cv_ref` id to its declared [`CvEntry`].
+///
+/// This is the ONE place every CV's `id`/`full_name`/`uri`/`version` lives (CVG-01). Both
+/// [`cv_list`] (the imaging/base set MS/IMS/UO, also read by the reverse imzML `<cvList>`) and
+/// [`cv_list_for_sample_metadata`] (the run-filtered sample-metadata set) build from it, so the
+/// declared block can never drift from an independent copy. Returns `None` for an id this
+/// converter never emits — an unknown `cv_ref` is surfaced (not silently declared) by the caller.
+///
+/// Registered ids:
+/// - **MS** — PSI-MS (column-name inflection + `MS:1002602` sample-label umbrella).
+/// - **IMS** — imaging coordinate columns (`IMS:1000050/51`). No OBO-Foundry PURL yet
+///   (CVG-01); the stable imzML raw URL is the recorded token until a canonical home is minted.
+/// - **UO** — Unit Ontology (`UO:0000017` µm). `version` intentionally `None` (the reverse
+///   `<cvList>` carries no UO version either).
+/// - **UNIMOD** — protein-modification CV (`UNIMOD:NNN` isobaric tag modifications, §3.12).
+/// - **mzml2mzpeak** — the project-local namespace ([`local_namespace`]) for the channel-role /
+///   reporter-ion-mz structural tokens that have no PSI-MS accession. The `uri` points at the
+///   converter's CV-request doc (mirrors the IMS no-OBO pattern); the canonical-CURIE request is
+///   tracked in `docs/cv-requests.md`.
+pub fn cv_entry_for(id: &str) -> Option<CvEntry> {
+    let entry = |id: &str, full_name: &str, uri: &str, version: Option<&str>| CvEntry {
+        id: id.to_string(),
+        full_name: full_name.to_string(),
+        uri: uri.to_string(),
+        version: version.map(str::to_string),
+    };
+    Some(match id {
+        "MS" => entry(
+            "MS",
+            "PSI-MS controlled vocabulary",
+            "https://raw.githubusercontent.com/HUPO-PSI/psi-ms-CV/master/psi-ms.obo",
+            Some("4.1.x"),
+        ),
+        "IMS" => entry(
+            "IMS",
+            "Mass Spectrometry Imaging controlled vocabulary",
+            "https://raw.githubusercontent.com/imzML/imzML/master/imagingMS.obo",
+            Some("1.1.x"),
+        ),
+        "UO" => entry(
+            "UO",
+            "Unit Ontology",
+            "https://raw.githubusercontent.com/bio-ontology-research-group/unit-ontology/master/unit.obo",
+            None,
+        ),
+        "UNIMOD" => entry(
+            "UNIMOD",
+            "UNIMOD protein modification database",
+            "http://www.unimod.org/obo/unimod.obo",
+            None,
+        ),
+        "mzml2mzpeak" => entry(
+            local_namespace(),
+            "mzML2mzPeak local terms (project-local namespace pending PSI-MS CV minting)",
+            "https://github.com/okohlbacher/mzML2mzPeak/blob/main/docs/cv-requests.md",
+            None,
+        ),
+        _ => return None,
+    })
+}
+
+/// Build the file-level `cv_list` for a **sample-metadata** (SDRF/ISA) archive by declaring
+/// exactly the controlled vocabularies the emitted `sample_list` params reference — so
+/// `declared == referenced` by construction (CVL-02 declared ⊇ referenced, no spurious decl).
+///
+/// The mzML write path emits no fixed `cv_list` (unlike the imaging path's MS/IMS/UO); instead
+/// the sample-metadata projection ([`crate::sdrf::project_sample_list`]) attaches per-param
+/// `cv_ref`s — `MS` (sample-label `MS:1002602`), `UNIMOD` (tag modifications), and the
+/// project-local `mzml2mzpeak` (channel-role / reporter-ion-mz tokens). This scans the actual
+/// projected entries for every distinct `cv_ref`/`unit_cv_ref`, always includes **MS** (the
+/// column-name inflection + sample-label umbrella reference even a label-free run carries), and
+/// maps each id through [`cv_entry_for`]. An id with no registry entry is logged and skipped
+/// (it would be a bug — every `cv_ref` this converter emits is registered).
+pub fn cv_list_for_sample_metadata(sample_list: &[serde_json::Value]) -> Vec<CvEntry> {
+    use std::collections::BTreeSet;
+    let mut refs: BTreeSet<String> = BTreeSet::new();
+    // MS is ALWAYS referenced (column-name inflection + the MS:1002602 sample-label umbrella),
+    // so it is declared even for a label-free / zero-match sample_list.
+    refs.insert("MS".to_string());
+    for entry in sample_list {
+        let Some(params) = entry.get("parameters").and_then(|p| p.as_array()) else {
+            continue;
+        };
+        for p in params {
+            for key in ["cv_ref", "unit_cv_ref"] {
+                if let Some(cv) = p.get(key).and_then(|v| v.as_str()) {
+                    if !cv.is_empty() {
+                        refs.insert(cv.to_string());
+                    }
+                }
+            }
+        }
+    }
+    refs.iter()
+        .filter_map(|id| {
+            let resolved = cv_entry_for(id);
+            if resolved.is_none() {
+                log::warn!(
+                    "sample_list references cv_ref '{id}' with no cv_list registry entry — \
+                     emitting it undeclared; add it to cv_entry_for() (CVL-02)"
+                );
+            }
+            resolved
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -470,6 +564,91 @@ mod tests {
             "mzml2mzpeak:reporter-ion-mz",
             "reporter_ion_mz_token() must return the pinned stable token"
         );
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Item-1 (999.14 residual): conditional cv_list for sample-metadata archives
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /// The channel-role / reporter-ion-mz tokens are `"{local_namespace()}:..."` by construction,
+    /// and the namespace id matches the `cv_ref` `build_isobaric_params` emits.
+    #[test]
+    fn local_namespace_prefixes_the_structural_tokens() {
+        let ns = local_namespace();
+        assert_eq!(ns, "mzml2mzpeak");
+        assert!(channel_role_token().starts_with(&format!("{ns}:")));
+        assert!(reporter_ion_mz_token().starts_with(&format!("{ns}:")));
+    }
+
+    /// `cv_entry_for` is the single-source registry: every id the converter emits as a `cv_ref`
+    /// resolves to a schema-valid entry (id echoes the key, full_name/uri non-empty); an
+    /// unregistered id returns None so the caller can surface it rather than declare it blind.
+    #[test]
+    fn cv_entry_for_registers_every_emitted_cv_ref() {
+        for id in ["MS", "IMS", "UO", "UNIMOD", "mzml2mzpeak"] {
+            let e = cv_entry_for(id).unwrap_or_else(|| panic!("cv_entry_for({id}) must be Some"));
+            assert_eq!(e.id, id, "entry id must echo the lookup key");
+            assert!(!e.full_name.is_empty(), "{id} full_name non-empty");
+            assert!(!e.uri.is_empty(), "{id} uri non-empty");
+        }
+        assert!(cv_entry_for("BOGUS").is_none(), "unknown cv_ref must be None");
+        // The base cv_list() is exactly the registry's MS/IMS/UO entries (no drift after refactor).
+        assert_eq!(
+            cv_list(),
+            ["MS", "IMS", "UO"].map(|id| cv_entry_for(id).unwrap()).to_vec()
+        );
+    }
+
+    /// `cv_list_for_sample_metadata` declares EXACTLY the CVs the sample_list params reference —
+    /// MS always (even label-free), plus mzml2mzpeak + UNIMOD when a channel entry carries them.
+    /// This is the declared ⊇ referenced guarantee that closes the undeclared-cv_ref gap.
+    #[test]
+    fn cv_list_for_sample_metadata_declares_referenced_and_only_referenced() {
+        // A label-free entry (no params) → MS only.
+        let label_free = vec![serde_json::json!({"id": "sample-1", "name": "S1", "parameters": []})];
+        let ids: Vec<String> = cv_list_for_sample_metadata(&label_free)
+            .into_iter()
+            .map(|e| e.id)
+            .collect();
+        assert_eq!(ids, vec!["MS".to_string()], "label-free declares MS only");
+
+        // A labeled channel entry carrying MS:1002602 + a mzml2mzpeak token + a UNIMOD tag mod.
+        let labeled = vec![serde_json::json!({
+            "id": "sample-1",
+            "name": "S1",
+            "parameters": [
+                {"cv_ref": "MS", "accession": "MS:1002602", "name": "sample label", "value": "TMT126"},
+                {"cv_ref": "mzml2mzpeak", "accession": reporter_ion_mz_token(), "name": "reporter ion m/z", "value": "126.1277"},
+                {"cv_ref": "mzml2mzpeak", "accession": channel_role_token(), "name": "channel role", "value": "sample"},
+                {"cv_ref": "UNIMOD", "accession": "UNIMOD:737", "name": "tag modification", "value": "TMT6plex"}
+            ]
+        })];
+        let ids: std::collections::BTreeSet<String> = cv_list_for_sample_metadata(&labeled)
+            .into_iter()
+            .map(|e| e.id)
+            .collect();
+        let want: std::collections::BTreeSet<String> = ["MS", "UNIMOD", "mzml2mzpeak"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        assert_eq!(ids, want, "declared set must equal the referenced cv_refs (MS/UNIMOD/mzml2mzpeak)");
+        // IMS/UO are imaging-only and must NOT leak into a sample-metadata cv_list.
+        assert!(!ids.contains("IMS") && !ids.contains("UO"), "no imaging CVs in a sample-metadata cv_list");
+    }
+
+    /// An unknown `cv_ref` in the sample_list is skipped (not declared blind) — the declared set
+    /// never invents an entry it can't describe. (MS is still always present.)
+    #[test]
+    fn cv_list_for_sample_metadata_skips_unknown_cv_ref() {
+        let with_bogus = vec![serde_json::json!({
+            "id": "sample-1", "name": "S1",
+            "parameters": [{"cv_ref": "BOGUS", "accession": "BOGUS:1", "name": "x"}]
+        })];
+        let ids: Vec<String> = cv_list_for_sample_metadata(&with_bogus)
+            .into_iter()
+            .map(|e| e.id)
+            .collect();
+        assert_eq!(ids, vec!["MS".to_string()], "unknown cv_ref dropped; MS always present");
     }
 
     /// No-drift gate: the string "1002602" (the accession for `sample_label_curie()`)

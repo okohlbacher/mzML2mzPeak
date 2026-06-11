@@ -573,6 +573,16 @@ pub fn convert_mzml(
         let sample_list = crate::sdrf::project_sample_list(&doc, &match_result);
         zip.add_index_metadata("sample_list", &sample_list)
             .map_err(MzmlConvertError::Json)?;
+
+        // 8. Emit metadata.cv_list — declare every CV the sample_list params reference (MS always;
+        //    UNIMOD for tag modifications; the project-local mzml2mzpeak namespace for the
+        //    channel-role / reporter-ion-mz tokens). Derived from the just-emitted sample_list so
+        //    declared == referenced by construction — no undeclared cv_ref (CVL-02). The mzML path
+        //    otherwise emits no cv_list; the imaging path (src/write/convert.rs) emits its own fixed
+        //    MS/IMS/UO and never reaches here.
+        let cv_list = crate::schema::cv::cv_list_for_sample_metadata(&sample_list);
+        zip.add_index_metadata("cv_list", &cv_list)
+            .map_err(MzmlConvertError::Json)?;
     }
 
     // ── ISA verbatim embed + metadata.study back-ref (Plan 33-03 / SM-08..10) ─────────────────
@@ -670,6 +680,15 @@ pub fn convert_mzml(
         // 8. Emit metadata.sample_list (SM-05 query surface) — run-filtered (v0.8.1).
         let sample_list = crate::sdrf::project_sample_list(&doc, &match_result);
         zip.add_index_metadata("sample_list", &sample_list)
+            .map_err(MzmlConvertError::Json)?;
+
+        // 9. Emit metadata.cv_list — declare exactly the CVs the sample_list params reference
+        //    (MS always; UNIMOD for tag modifications; the project-local mzml2mzpeak namespace for
+        //    the channel-role / reporter-ion-mz tokens). Derived from the just-emitted sample_list so
+        //    declared == referenced by construction — no undeclared cv_ref (CVL-02). Same emission as
+        //    the SDRF branch above; the imaging path emits its own fixed MS/IMS/UO and never reaches here.
+        let cv_list = crate::schema::cv::cv_list_for_sample_metadata(&sample_list);
+        zip.add_index_metadata("cv_list", &cv_list)
             .map_err(MzmlConvertError::Json)?;
     }
 

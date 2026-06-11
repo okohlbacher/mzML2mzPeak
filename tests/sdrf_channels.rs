@@ -214,6 +214,51 @@ fn synthetic_tmt_sdrf_sample_list_has_labeled_entries() {
     assert!(!sl_bytes.contains("plex_id"), "plex_id in sample_list bytes");
     assert!(!sl_bytes.contains("channel_set"), "channel_set in sample_list bytes");
 
+    // ── (D) cv_list declares every cv_ref the sample_list references (CVL-02, 999.14) ─────────
+    //   A sample-metadata archive emits its own cv_list (the mzML path otherwise has none),
+    //   declaring exactly MS + UNIMOD + mzml2mzpeak here — never undeclared, never spurious.
+    let cv_val = reader
+        .file_index()
+        .metadata
+        .get("cv_list")
+        .cloned()
+        .expect("metadata.cv_list must be present for a sample-metadata archive (999.14)");
+    let declared: std::collections::BTreeSet<String> = cv_val
+        .as_array()
+        .expect("cv_list must be a JSON array")
+        .iter()
+        .map(|e| e["id"].as_str().expect("cv_list entry needs an id").to_string())
+        .collect();
+    // Referenced cv_refs across every projected sample_list param (declared ⊇ referenced).
+    let mut referenced: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    referenced.insert("MS".to_string()); // always (column inflection + MS:1002602)
+    for e in sl_arr {
+        if let Some(params) = e["parameters"].as_array() {
+            for p in params {
+                if let Some(cv) = p.get("cv_ref").and_then(|v| v.as_str()) {
+                    referenced.insert(cv.to_string());
+                }
+            }
+        }
+    }
+    assert!(
+        referenced.contains("mzml2mzpeak") && referenced.contains("UNIMOD"),
+        "synthetic TMT archive must reference mzml2mzpeak + UNIMOD cv_refs; got {referenced:?}"
+    );
+    assert!(
+        referenced.is_subset(&declared),
+        "every referenced cv_ref must be declared in cv_list (no undeclared); declared={declared:?} referenced={referenced:?}"
+    );
+    assert!(
+        declared.is_subset(&referenced),
+        "cv_list must declare no spurious CV; declared={declared:?} referenced={referenced:?}"
+    );
+    // Imaging-only CVs must not leak into a sample-metadata archive's cv_list.
+    assert!(
+        !declared.contains("IMS") && !declared.contains("UO"),
+        "sample-metadata cv_list must not declare imaging CVs (IMS/UO); got {declared:?}"
+    );
+
     // ── (E) Schema validation (three-places / sample_list.json) ──────────────
     let schema_raw = std::fs::read_to_string(Path::new("schema/sample_list.json"))
         .expect("schema/sample_list.json must exist at repo root");

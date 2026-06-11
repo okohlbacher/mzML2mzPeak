@@ -206,6 +206,21 @@ impl ImagingReader {
         &self.inner
     }
 
+    /// Run-constant imaging geometry typed from the `<scanSettings>` params this reader already
+    /// holds — the `.ibd`-backed counterpart of the standalone `parse_scan_settings()` header
+    /// re-parse (999.14 item 2). The forward convert path calls this so geometry derives from the
+    /// SAME open mzdata reader that streams the spectra, with no second file open. Folds every
+    /// `scan_settings` entry's params through the shared typing core
+    /// ([`crate::schema::imaging_run_metadata_from_params`]); an all-`None` struct when the run
+    /// declares no geometry. Equivalence with the quick-xml re-parse is locked by
+    /// `tests/geometry_mzdata_equiv.rs`.
+    pub fn imaging_geometry(&self) -> crate::schema::ImagingRunMetadata {
+        use mzdata::prelude::MSDataFileMetadata;
+        let settings = self.inner.scan_settings();
+        let params = settings.into_iter().flatten().flat_map(|s| s.params.iter());
+        crate::schema::imaging_run_metadata_from_params(params)
+    }
+
     /// Map a fully-read mzdata spectrum into an [`ImagingSpectrum`], decoding each axis at
     /// its declared dtype. `index` is the stream position (for error context).
     fn to_imaging(

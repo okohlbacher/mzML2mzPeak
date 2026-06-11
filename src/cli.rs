@@ -655,16 +655,18 @@ fn run_forward(cli: ConvertCli) -> anyhow::Result<()> {
         }
         e
     };
-    // Parse the run-constant <scanSettings> geometry on the forward path (reusing the same
-    // lenient fallible call the dry-run preview uses). The parse is LENIENT: absent terms ⇒ None,
-    // so a file with no <scanSettings> yields an all-None struct. We pass `Some(&geom)` ALWAYS so
-    // the facet + imaging-block geometry derive from exactly what the source declared — an
-    // all-None geom yields a scan_settings_list with one empty-parameters entry, the imaging
-    // block geometry stays None, and observed_max still drives pixel_count via fold_into.
-    let geom = parse_scan_settings(&cli.input)
-        .with_context(|| format!("failed to parse scan settings for {}", cli.input.display()))?;
+    // Open the imzML via mzdata, then type the run-constant <scanSettings> geometry from the
+    // params THIS reader already holds — no second file open / quick-xml re-parse on the forward
+    // path (999.14 item 2). The typing is LENIENT: absent terms ⇒ None, so a file with no
+    // <scanSettings> yields an all-None struct. We pass `Some(&geom)` ALWAYS so the facet +
+    // imaging-block geometry derive from exactly what the source declared — an all-None geom
+    // yields a scan_settings_list with one empty-parameters entry, the imaging block geometry
+    // stays None, and observed_max still drives pixel_count via fold_into. (The standalone
+    // parse_scan_settings() quick-xml parser is retained for the .ibd-free dry-run + verify
+    // paths; the two read sources are proven equivalent by tests/geometry_mzdata_equiv.rs.)
     let reader = ImagingReader::open_with(&cli.input, cli.allow_checksum_mismatch)
         .with_context(|| format!("failed to open imzML reader for {}", cli.input.display()))?;
+    let geom = reader.imaging_geometry();
     // SRC-01: thread the input `.imzML` path so convert_with records file_description.source_files
     // provenance (.imzML + sibling .ibd; the .ibd carrying the reused UUID/checksum CURIE params).
     let outcome = convert_with(reader, out, &cli.images, &enc, Some(&geom), Some(&cli.input))

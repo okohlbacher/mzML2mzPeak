@@ -32,7 +32,9 @@ pub mod transform;
 
 pub use columns::{ImagingColumnSpec, imaging_scan_fields};
 pub use cv::{CvEntry, cv_list, numpress_linear_curie};
-pub use geometry::{GeometryParseError, ImagingRunMetadata, parse_scan_settings};
+pub use geometry::{
+    GeometryParseError, ImagingRunMetadata, imaging_run_metadata_from_params, parse_scan_settings,
+};
 pub use metadata::ImagingMetadata;
 pub use optical::{
     OpticalImageRef, OpticalParseError, parse_optical_images, resolve_optical_location,

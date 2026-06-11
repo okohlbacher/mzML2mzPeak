@@ -10,10 +10,16 @@
 //!
 //! **What this module adds locally:** the TYPED parsing of those raw terms into
 //! [`ImagingRunMetadata`] (numeric grid counts, pixel sizes as `f64`, scan-pattern presence
-//! flags). It currently does this via a direct quick-xml re-parse of `<scanSettings>` — a
-//! self-contained read that predates the mzdata accessor. Because mzdata now surfaces the same
-//! raw params, this re-parse is redundant *input* (not redundant typing); switching the read to
-//! consume `scan_settings().params` is a tracked simplification (deferred — see 999.13 REVIEW).
+//! flags) — mzdata surfaces the raw params but not a numerically-typed geometry struct.
+//!
+//! **Two read sources, ONE typing core (999.14 item 2):** the accession→field mapping + lenient
+//! numeric parse live once in [`apply_geometry_term`]. The forward *convert* path — which already
+//! has an open mzdata reader — types geometry from `ScanSettings.params` via
+//! [`imaging_run_metadata_from_params`] (no second file open). [`parse_scan_settings`] keeps the
+//! self-contained quick-xml `<scanSettings>` read for the `.ibd`-FREE paths where no mzdata reader
+//! exists — the L2 verify round-trip (re-parses our reverse-emitted imzML, which has no sibling
+//! `.ibd`) and `--dry-run`. mzdata's reader requires the `.ibd` + a UUID match, so it cannot
+//! replace those. Equivalence of the two sources is locked by `tests/geometry_mzdata_equiv.rs`.
 //!
 //! Per D-03 the parser is LENIENT: it never hard-fails on missing/partial geometry; every
 //! term is optional and absent terms stay `None`. [`GeometryParseError`] carries only
@@ -151,11 +157,26 @@ fn apply_cv_param(meta: &mut ImagingRunMetadata, e: &BytesStart<'_>) {
     }
 
     let Some(acc) = accession else { return };
-    // Numeric geometry: lenient str::parse, error -> None (handles "" and "abc" alike).
-    let num_i64 = || value.as_deref().and_then(|v| v.trim().parse::<i64>().ok());
-    let num_f64 = || value.as_deref().and_then(|v| v.trim().parse::<f64>().ok());
+    apply_geometry_term(meta, &acc, value.as_deref());
+}
 
-    match acc.as_str() {
+/// The SHARED typing core (999.14 item 2): map one geometry CV term — `accession` (a CURIE
+/// string, e.g. `"IMS:1000042"`) plus its optional raw `value` string — into the typed
+/// [`ImagingRunMetadata`]. This is the single place the accession→field mapping and the lenient
+/// numeric parse live; BOTH the quick-xml header parse ([`apply_cv_param`]) and the mzdata-param
+/// typer ([`imaging_run_metadata_from_params`]) call it, so the two read sources can never type
+/// the same `<scanSettings>` differently (locked by the `mzdata_params_geometry_equals_quickxml`
+/// equivalence test).
+///
+/// Numeric values are parsed leniently: any parse error (empty, non-numeric) maps to `None`,
+/// never a panic (D-03 + Security Domain T-03-05). Scan-geometry child terms are presence flags —
+/// the value is ignored and the accession CURIE recorded.
+fn apply_geometry_term(meta: &mut ImagingRunMetadata, accession: &str, value: Option<&str>) {
+    // Numeric geometry: lenient str::parse, error -> None (handles "" and "abc" alike).
+    let num_i64 = || value.and_then(|v| v.trim().parse::<i64>().ok());
+    let num_f64 = || value.and_then(|v| v.trim().parse::<f64>().ok());
+
+    match accession {
         "IMS:1000042" => meta.grid_x = num_i64(),
         "IMS:1000043" => meta.grid_y = num_i64(),
         "IMS:1000044" => meta.max_dimension_x = num_i64(),
@@ -165,12 +186,39 @@ fn apply_cv_param(meta: &mut ImagingRunMetadata, e: &BytesStart<'_>) {
         "IMS:1000053" => meta.absolute_offset_x = num_i64(),
         "IMS:1000054" => meta.absolute_offset_y = num_i64(),
         // Scan-geometry CHILD terms: presence flags — record the accession, ignore value.
-        "IMS:1000401" => meta.linescan_sequence = Some(acc),
-        "IMS:1000413" => meta.scan_pattern = Some(acc),
-        "IMS:1000480" => meta.scan_type = Some(acc),
-        "IMS:1000491" => meta.line_scan_direction = Some(acc),
+        "IMS:1000401" => meta.linescan_sequence = Some(accession.to_string()),
+        "IMS:1000413" => meta.scan_pattern = Some(accession.to_string()),
+        "IMS:1000480" => meta.scan_type = Some(accession.to_string()),
+        "IMS:1000491" => meta.line_scan_direction = Some(accession.to_string()),
         _ => {}
     }
+}
+
+/// Type run-level imaging geometry from mzdata `<scanSettings>` params — the `.ibd`-backed
+/// counterpart of [`parse_scan_settings`] (999.14 item 2).
+///
+/// As of mzdata 0.64.1 the imzML reader already surfaces every `<scanSettings>` cvParam
+/// (Latin-1-decoded) via `ScanSettings.params`, so a converter that has an open mzdata reader
+/// (the forward convert path) does NOT need a second file open + quick-xml re-parse to recover
+/// geometry — it folds those params through the SHARED [`apply_geometry_term`] core here. Each
+/// param's accession is taken from its CURIE (`param.curie()`); a param with no CURIE (a
+/// userParam) is skipped. The value is the param's `Value` rendered to a string (an empty/absent
+/// value parses to `None`, mirroring a missing `value=""` attribute).
+///
+/// The standalone [`parse_scan_settings`] quick-xml parser is RETAINED for the `.ibd`-free paths
+/// where no mzdata reader exists (the L2 verify round-trip re-parses our reverse-emitted imzML,
+/// which has no sibling `.ibd`; the `--dry-run` preview). Equivalence of the two read sources is
+/// asserted by `tests/geometry_mzdata_equiv.rs`.
+pub fn imaging_run_metadata_from_params<'a>(
+    params: impl IntoIterator<Item = &'a mzdata::params::Param>,
+) -> ImagingRunMetadata {
+    let mut meta = ImagingRunMetadata::default();
+    for param in params {
+        let Some(curie) = param.curie() else { continue };
+        let value = param.value.to_string();
+        apply_geometry_term(&mut meta, &curie.to_string(), Some(value.as_str()));
+    }
+    meta
 }
 
 /// Decode raw attribute bytes as ISO-8859-1 (Latin-1) via `encoding_rs::WINDOWS_1252`, a
