@@ -1,1 +1,0 @@
-These files are from the `pyimzml` repository (https://github.com/alexandrovteam/pyimzML)'s test dataset.

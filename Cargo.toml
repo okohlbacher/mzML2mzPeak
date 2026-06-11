@@ -52,7 +52,7 @@ mzpeaks = "=1.0.9"
 # --- Write path: git-only reference implementation, pinned to a CONCRETE commit rev.
 # default-features = false drops the async/object_store/opendal/tokio stack
 # (STACK.md local-file-only v1 variant). ---
-mzpeak_prototyping = { git = "https://github.com/HUPO-PSI/mzPeak", rev = "fec8c2d5", default-features = false }
+mzpeak_prototyping = { git = "https://github.com/HUPO-PSI/mzPeak", rev = "29e59b24", default-features = false }
 
 # --- Integrity digest crates (Plan 02-02, IN-07): canonical RustCrypto LEAF crates,
 # pure-Rust with NO shared transitive types with arrow/mzdata, so they cannot fracture
@@ -137,17 +137,8 @@ tempfile = "=3.27.0"
 # mzdata DE-VENDORED: uses published crates.io 0.64.1 (verified to carry the SONAR
 # ScanningQuadrupolePosition variants mzpeak_prototyping HEAD requires). vendor/mzdata removed.
 
-# --- VENDORED FORK (mzpeak_prototyping @ HUPO-PSI/mzPeak HEAD fec8c2d5 — updated from a5c222c,
-# picking up upstream's "sorting rank for real this time" fix: peak_series.rs declares sorted-array
-# sorting_rank 0, not 1): STILL carries exactly ONE local patch — `src/chunk_series.rs` (the
-# ArrowArrayChunk intensity/mz index-desync; index the filtered `arrow_arrays` by len(), not the
-# source-map enumerate index — else profile ion-mobility spectra panic). This patch is NOT in
-# upstream HEAD (verified: HEAD still has `Some(i)`), so the fork CANNOT be dropped yet. PR not yet
-# submitted (UPS-01, owner-gated push to HUPO-PSI); drop this edit + the whole [patch] once merged.
-#   The other two former patches are GONE — fixed upstream as of a5c222c: (1) the FileEntry
-#   `DataKind`/`EntityType` serde asymmetry is fixed by upstream `#[serde(untagged)]` on the `Other`
-#   variants (round-trip verified by tests/file_index_roundtrip.rs); (2) the `array_buffer.rs`
-#   empty-first-spectrum type mismatch is fixed by the upstream writer rewrite (pwiz corpus now
-#   139/139, was 138/139). ---
-[patch."https://github.com/HUPO-PSI/mzPeak"]
-mzpeak_prototyping = { path = "vendor/mzpeak_prototyping" }
+# --- mzpeak_prototyping is now FULLY DE-VENDORED (DVN-01 done): pinned to upstream HUPO-PSI/mzPeak
+# rev 29e59b24 fetched directly from git — NO vendor/, NO [patch]. Our last local patch (the
+# chunk_series.rs intensity/mz index-by-output-position fix) was upstreamed as b9269029
+# "fix(chunk_series): index intensity/mz by output position, not source"; 29e59b24 adds the
+# "JSON metadata in the index" feature on top. All three former local patches are now upstream. ---

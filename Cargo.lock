@@ -1490,6 +1490,7 @@ dependencies = [
 [[package]]
 name = "mzpeak_prototyping"
 version = "0.1.0"
+source = "git+https://github.com/HUPO-PSI/mzPeak?rev=29e59b24#29e59b24f0ae9447a7f5fcf5c0606dce697b7847"
 dependencies = [
  "arrow",
  "base64-simd",

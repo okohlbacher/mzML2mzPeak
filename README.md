@@ -78,11 +78,10 @@ cargo build --release
 The binary is produced at `target/release/mzml2mzpeak`. (Optionally `cargo install --path .` to place
 it on your `PATH`.)
 
-> **Note on dependencies:** the reference writer
-> [`mzpeak_prototyping`](https://github.com/HUPO-PSI/mzPeak) is git-only and `mzdata 0.64.2` is not yet
-> published to crates.io, so both are pinned/vendored under `vendor/` (clean snapshots — no local
-> patches except one small `chunk_series` fix pending upstream). The build is fully reproducible from a
-> clean checkout — no extra steps.
+> **Note on dependencies:** no vendoring — `mzdata` is the published crates.io `0.64.1`, and the
+> reference writer [`mzpeak_prototyping`](https://github.com/HUPO-PSI/mzPeak) is pinned to a concrete
+> upstream git rev (`29e59b24`). All our former local patches are now merged upstream, so there is no
+> `vendor/` tree and no `[patch]`. The build is fully reproducible from a clean checkout — no extra steps.
 
 ## Usage
 
