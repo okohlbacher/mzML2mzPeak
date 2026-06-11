@@ -22,6 +22,12 @@ BASE = "https://object.storage.eu01.onstackit.cloud/v09"
 EXPLORER = "https://okohlbacher.github.io/mzPeakExplorer/"   # general LC-MS / any .mzpeak
 MZPEAKIV = "https://okohlbacher.github.io/mzPeakIV/"         # imaging (MSI) .mzpeak
 
+# Parent project site — every page links back here (header brand, hero CTA, footer).
+MZPEAK_SITE = "https://www.mzpeak.org/"
+MARK = "https://www.mzpeak.org/mark.png"                     # mzPeak logo mark (hosted on the site)
+WHITEPAPER = "https://pubs.acs.org/doi/full/10.1021/acs.jproteome.5c00435"
+GITHUB = "https://github.com/okohlbacher/mzML2mzPeak"
+
 # Friendly metadata per top-level prefix (the "example subsets"). Unknown prefixes get a default card.
 # `blurb` = short card text; `prov` = provenance paragraph shown on the subset page (archives/accessions).
 SUBSETS = OrderedDict([
@@ -270,53 +276,128 @@ def qualifying(prefix):
     return out
 
 
-# ---- shared chrome ----------------------------------------------------------
+# ---- shared chrome (ported from the mzpeak.org design system) ---------------
+# Inlines the mzpeak.org tokens (IBM Plex, OpenMS blue #3157e9, the dark "data stage"
+# hero) so this static S3 site is visually consistent with www.mzpeak.org.
 CSS = """
-:root{--ink:#1b1b1b;--mut:#6a737d;--line:#e4e6ea;--bg:#fbfcfd;--card:#fff;}
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+:root{
+  --font-sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --gray-0:#fff;--gray-25:#fafbfc;--gray-50:#f4f6f8;--gray-100:#eceff2;--gray-150:#e3e7eb;
+  --gray-200:#dde2e7;--gray-300:#c5ccd3;--gray-400:#9aa4ad;--gray-500:#6b757e;--gray-600:#4b545c;
+  --gray-700:#353c43;--gray-800:#232a30;--gray-900:#151a1e;
+  --blue-50:#f0f3ff;--blue-300:#839af6;--blue-400:#5675f0;--blue-600:#3157e9;--blue-700:#1e42d2;
+  --ink:#0e1216;--ink-line:#2a323a;
+  --accent:var(--blue-600);--accent-hover:var(--blue-700);--accent-soft:var(--blue-50);
+  --heading:var(--gray-900);--body:var(--gray-700);--sec:var(--gray-600);--mut:var(--gray-500);--faint:var(--gray-400);
+  --line:var(--gray-200);--line-soft:var(--gray-150);--line-strong:var(--gray-300);
+  --card:var(--gray-0);--panel:var(--gray-50);--bg:var(--gray-25);
+  --spectrum:linear-gradient(90deg,#ff9101 0%,#ff6f12 12%,#ff4a48 26%,#ff2f74 37%,#ff15ab 49%,#f804ce 57%,#d203e6 65%,#a814f3 74%,#762bf5 84%,#4848ed 93%,#3355ea 100%);
+}
 *{box-sizing:border-box}
-body{font:15px/1.6 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;color:var(--ink);background:var(--bg);}
-a{color:#1558d6;text-decoration:none}a:hover{text-decoration:underline}
-.wrap{max-width:1040px;margin:0 auto;padding:0 1.1rem}
-header.nav{position:sticky;top:0;z-index:10;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);}
-.nav .wrap{display:flex;align-items:center;gap:.7rem;height:54px;flex-wrap:wrap}
-.brand{font-weight:700;color:var(--ink);font-size:1.02rem;margin-right:.4rem;white-space:nowrap}
-.brand .dot{color:#1558d6}
-.pills{display:flex;gap:.35rem;flex-wrap:wrap}
-.pill{font-size:13px;padding:4px 11px;border-radius:999px;border:1px solid var(--line);background:#fff;color:#3a3f45;white-space:nowrap}
-.pill:hover{text-decoration:none;border-color:#cfd4da;background:#f6f8fa}
-.pill.active{color:#fff;border-color:transparent}
-.hero{padding:2.4rem 0 1.4rem}
-.hero h1{font-size:1.7rem;margin:.1rem 0 .35rem}
-.hero p{color:var(--mut);max-width:62ch;margin:.2rem 0}
-.stat{color:var(--mut);font-size:13px;margin-top:.5rem}
-.stat code{background:#eef1f4;padding:1px 6px;border-radius:5px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:1rem;margin:1.4rem 0 2rem}
-.card{position:relative;display:block;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:1.1rem 1.15rem 1.15rem;overflow:hidden;transition:transform .08s ease,box-shadow .12s ease;color:var(--ink)}
-.card:hover{text-decoration:none;transform:translateY(-2px);box-shadow:0 6px 22px rgba(20,30,50,.09)}
-.card .stripe{position:absolute;left:0;top:0;bottom:0;width:5px}
-.card .ic{font-size:1.5rem}
-.card h3{margin:.5rem 0 .25rem;font-size:1.12rem}
-.card p{color:var(--mut);font-size:13.5px;margin:.2rem 0 .8rem}
-.card .nums{display:flex;gap:.9rem;font-size:12.5px;color:#444;flex-wrap:wrap}
-.card .nums b{font-weight:650}
+body{font-family:var(--font-sans);font-size:14px;line-height:1.6;margin:0;color:var(--body);background:var(--bg)}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+.mono{font-family:var(--font-mono)}
+.wrap{max-width:1100px;margin:0 auto;padding:0 24px}
+h1,h2,h3{color:var(--heading);letter-spacing:-.02em;line-height:1.2;margin:0}
+code{font-family:var(--font-mono);background:var(--gray-100);padding:1px 6px;border-radius:5px;font-size:.92em}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
+.eyebrow .dot{width:6px;height:6px;border-radius:999px;background:currentColor}
+
+/* header */
+header.nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.82);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.nav .wrap{display:flex;align-items:center;gap:16px;min-height:60px;flex-wrap:wrap;padding-top:6px;padding-bottom:6px}
+.brand{display:flex;align-items:center;gap:9px;text-decoration:none}
+.brand img{height:24px;display:block}
+.brand b{font-size:17px;font-weight:600;color:var(--heading);letter-spacing:-.01em}
+.brand .ex{font-size:13px;font-weight:500;color:var(--mut);border-left:1px solid var(--line-strong);padding-left:9px;margin-left:1px}
+.pills{display:flex;gap:7px;flex-wrap:wrap}
+.pill{font-size:12.5px;font-weight:500;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--sec);white-space:nowrap}
+.pill:hover{text-decoration:none;border-color:var(--line-strong);color:var(--accent)}
+.pill.active{color:#fff;background:var(--accent);border-color:var(--accent)}
+.hdr-actions{margin-left:auto;display:flex;align-items:center;gap:10px}
+.spectrum-strip{height:2px;background:var(--spectrum)}
+.btn{display:inline-flex;align-items:center;gap:7px;font-family:var(--font-sans);font-size:13px;font-weight:600;padding:8px 15px;border-radius:8px;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap;transition:.15s}
+.btn:hover{text-decoration:none}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+.btn-ghost{background:transparent;color:var(--sec)}.btn-ghost:hover{color:var(--accent)}
+.btn-lg{font-size:14px;padding:11px 20px}
+.on-dark .btn-secondary{background:rgba(255,255,255,.06);color:#fff;border-color:rgba(255,255,255,.22)}
+.on-dark .btn-secondary:hover{border-color:#fff;background:rgba(255,255,255,.12)}
+.on-dark .btn-ghost{color:#c2cbd6}.on-dark .btn-ghost:hover{color:#fff}
+
+/* hero — dark "data stage" */
+.hero{position:relative;background-color:var(--ink);background-image:radial-gradient(rgba(86,117,240,.12) 1px,transparent 1px);background-size:22px 22px;color:var(--gray-100);overflow:hidden;border-bottom:1px solid var(--ink-line)}
+.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(120% 80% at 72% 0%,rgba(49,87,233,.30),transparent 60%);pointer-events:none}
+.hero-in{position:relative;display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center;padding:60px 0 54px}
+.hero h1{color:#fff;font-size:clamp(2rem,4.4vw,3.3rem);font-weight:600;line-height:1.06}
+.hero h1 .acc{color:var(--blue-300)}
+.hero-lead{margin:20px 0 0;font-size:clamp(1rem,1.4vw,1.16rem);line-height:1.5;color:#c2cbd6;max-width:48ch}
+.hero-eyebrow{color:#9fb0f5}.hero-eyebrow .dot{background:#9fb0f5}
+.hero-cta{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap}
+.hero-trust{margin-top:28px;display:flex;align-items:center;gap:14px;font-size:11.5px;color:#8b97a3;flex-wrap:wrap}
+.hero-trust b{color:#c2cbd6;font-weight:500}
+.hero-trust .sep{width:1px;height:12px;background:var(--ink-line)}
+.scope{position:relative;background:rgba(13,17,22,.6);border:1px solid var(--ink-line);border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.45);overflow:hidden}
+.scope-bar{display:flex;align-items:center;gap:7px;padding:9px 12px;border-bottom:1px solid var(--ink-line)}
+.scope-bar .t{font-family:var(--font-mono);font-size:11px;color:#8b97a3}
+.scope-bar .grow{flex:1}
+.scope-tag{font-family:var(--font-mono);font-size:10px;color:var(--blue-300);border:1px solid rgba(86,117,240,.4);border-radius:999px;padding:2px 8px}
+.scope-body{position:relative;padding:10px 12px 4px}
+.scope-read{position:absolute;top:14px;right:16px;z-index:3;font-family:var(--font-mono);font-size:11px;color:#fff;background:rgba(14,18,22,.82);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:4px 8px;line-height:1.4}
+.scope-read .k{color:#8b97a3}
+.scope svg.spec{display:block;width:100%;height:200px}
+.spec-line{fill:none;stroke:var(--blue-400);stroke-width:2}
+.spec-area{fill:url(#specfill);stroke:none}
+.spec-marker{stroke:#c00000;stroke-width:1.5;stroke-dasharray:4 4}
+.scope-axis{display:flex;justify-content:space-between;padding:2px 12px 10px;font-family:var(--font-mono);font-size:10px;color:#8b97a3}
+
+/* stat band */
+.stats{background:var(--gray-900);color:#fff;border-bottom:1px solid var(--ink-line)}
+.stats-in{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--ink-line)}
+.statc{background:var(--gray-900);padding:20px 22px}
+.statc .v{font-family:var(--font-mono);font-size:clamp(1.3rem,2.2vw,1.75rem);font-weight:600;color:#fff;letter-spacing:-.02em}
+.statc .v .u{color:var(--blue-300)}
+.statc .k{margin-top:5px;font-size:11.5px;color:#8b97a3;line-height:1.3}
+
+/* sub-hero (category pages) */
+.subhero{position:relative;background-color:var(--ink);background-image:radial-gradient(rgba(86,117,240,.10) 1px,transparent 1px);background-size:22px 22px;color:var(--gray-100);border-bottom:1px solid var(--ink-line);overflow:hidden}
+.subhero::before{content:"";position:absolute;inset:0;background:radial-gradient(90% 90% at 80% 0%,rgba(49,87,233,.22),transparent 62%);pointer-events:none}
+.subhero-in{position:relative;padding:30px 0 32px}
+.crumb{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:#8b97a3;margin-bottom:12px}
+.crumb a{color:#9fb0f5}.crumb a:hover{color:#fff}
+.subhero h1{color:#fff;font-size:1.7rem;display:flex;align-items:center;gap:12px}
+.subhero .sub-badge{font-size:12px;color:#fff;border-radius:999px;padding:3px 11px;font-weight:500;font-family:var(--font-mono)}
+.subhero p{color:#c2cbd6;max-width:78ch;margin:12px 0 0;font-size:14px;line-height:1.55}
+
+/* content */
+.grid{display:grid;gap:16px;margin:28px 0 32px}
+.card{position:relative;display:block;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;overflow:hidden;transition:transform .12s,box-shadow .12s,border-color .12s;color:var(--body)}
+.card:hover{text-decoration:none;transform:translateY(-3px);box-shadow:0 10px 30px rgba(20,30,50,.10);border-color:var(--line-strong)}
+.card .stripe{position:absolute;left:0;top:0;bottom:0;width:4px}
+.card .ic{font-size:1.6rem}
+.card h3{margin:.5rem 0 .25rem;font-size:1.12rem;font-weight:600}
+.card p{color:var(--sec);font-size:13.5px;margin:.2rem 0 .8rem;line-height:1.5}
+.card .nums{display:flex;gap:.9rem;font-size:12.5px;color:var(--mut);flex-wrap:wrap}
+.card .nums b{font-weight:600;color:var(--body)}
 .card .go{margin-top:.7rem;font-size:13px;font-weight:600}
-.section-head{display:flex;align-items:center;gap:.6rem;margin:1.6rem 0 .3rem}
-.section-head .ic{font-size:1.5rem}
-.section-head h2{margin:0;font-size:1.35rem}
-.section-head .badge{font-size:12px;color:#fff;border-radius:999px;padding:2px 9px}
-.lead{color:var(--mut);max-width:70ch;margin:.1rem 0 .4rem}
-.prov{color:#52606d;max-width:78ch;margin:.1rem 0 1.1rem;font-size:13px;background:#f6f8fa;border:1px solid var(--line);border-left:3px solid var(--line);border-radius:8px;padding:.6rem .8rem}
-.prov b{color:#3a4350}
-details{border:1px solid var(--line);border-radius:10px;margin:.55rem 0;background:#fff}
-details>summary{cursor:pointer;list-style:none;padding:.6rem .9rem;display:flex;justify-content:space-between;gap:.6rem;align-items:flex-start;border-radius:10px}
+.lead{color:var(--sec);max-width:74ch;margin:1.2rem 0 .4rem;font-size:14px}
+.prov{color:var(--sec);max-width:80ch;margin:.1rem 0 1.1rem;font-size:13px;background:var(--panel);border:1px solid var(--line-soft);border-left:3px solid var(--accent);border-radius:8px;padding:.7rem .9rem}
+.prov b{color:var(--heading)}
+details{border:1px solid var(--line);border-radius:12px;margin:.55rem 0;background:#fff;transition:border-color .12s}
+details[open]{border-color:var(--line-strong)}
+details>summary{cursor:pointer;list-style:none;padding:.7rem .95rem;display:flex;justify-content:space-between;gap:.6rem;align-items:flex-start;border-radius:12px}
 details>summary::-webkit-details-marker{display:none}
 details[open]>summary{border-bottom:1px solid var(--line)}
+summary:hover{background:var(--panel)}
 summary .dsname{display:flex;flex-direction:column;gap:.15rem;min-width:0}
-summary .ds{font-weight:600;word-break:break-all}
+summary .ds{font-weight:600;word-break:break-all;color:var(--heading)}
 summary .dsdesc{color:var(--mut);font-size:12px;font-weight:400;line-height:1.45;max-width:80ch}
 summary .dsdesc i{color:#9a6a14}
 summary .meta{color:var(--mut);font-size:12.5px;text-align:right;padding-top:.15rem;flex:0 0 auto;max-width:46ch}
-summary .meta .sizes{font-size:11.5px;font-variant-numeric:tabular-nums;color:#52606d}
+summary .meta .sizes{font-family:var(--font-mono);font-size:11px;font-variant-numeric:tabular-nums;color:var(--sec)}
 .toprow{display:flex;gap:1rem;align-items:flex-start;margin:.4rem 0 1.4rem}
 .toprow .prov{flex:1 1 auto;margin:0;max-width:none}
 .toprow .ratiofig{flex:0 0 auto;margin:0;text-align:center}
@@ -324,49 +405,111 @@ summary .meta .sizes{font-size:11.5px;font-variant-numeric:tabular-nums;color:#5
 .ratiofig img{height:auto;max-height:200px;width:auto;max-width:100%;border:1px solid var(--line);border-radius:10px;background:#fff}
 .ratiofig figcaption{color:var(--mut);font-size:11px;margin-top:.3rem;line-height:1.35;max-width:30ch;margin-left:auto;margin-right:auto}
 @media(max-width:680px){.toprow{flex-direction:column}.ratiofig img{max-height:170px}}
-.plotnote{color:var(--mut);font-size:12.5px;font-style:italic;margin:.6rem 0 1rem}
-ul.files{list-style:none;margin:0;padding:.25rem .6rem .5rem}
-ul.files li{display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:5px 4px;border-bottom:1px dotted #eef0f2}
+ul.files{list-style:none;margin:0;padding:.25rem .7rem .5rem}
+ul.files li{display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:6px 4px;border-bottom:1px dotted var(--line)}
 ul.files li:last-child{border-bottom:0}
 .fname{flex:1 1 auto;min-width:0;word-break:break-all}
-.tag{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:#5a626b;background:#eef1f4;border-radius:4px;padding:1px 5px;margin-right:.45rem;font-weight:600}
-.tag.mzpeak{background:#e7efff;color:#1558d6}
+.fname a{font-family:var(--font-mono);font-size:12.5px}
+.tag{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--sec);background:var(--gray-100);border-radius:4px;padding:1px 6px;margin-right:.45rem;font-weight:600}
+.tag.mzpeak{background:var(--blue-50);color:var(--accent)}
 .tag.sdrf{background:#f1eaff;color:#8250df}
 .right{display:flex;align-items:center;gap:.45rem;white-space:nowrap;flex:0 0 auto}
 .viewer{font-size:12px;line-height:1.6;padding:1px 9px;border-radius:12px;border:1px solid transparent}
-.viewer.ex{background:#e7efff;color:#1558d6;border-color:#c7d9ff}
+.viewer.ex{background:var(--blue-50);color:var(--accent);border-color:#c7d4fb}
 .viewer.iv{background:#e8f7ec;color:#1a7f37;border-color:#bfe6c9}
-.viewer:hover{filter:brightness(.96);text-decoration:none}
-.sz{color:#98a0a8;font-variant-numeric:tabular-nums}
-.legend{margin:1.6rem 0;padding:.9rem 1rem;background:#fff;border:1px solid var(--line);border-radius:10px;color:var(--mut);font-size:13px}
-footer{color:var(--mut);font-size:12.5px;border-top:1px solid var(--line);margin-top:2.2rem;padding:1.2rem 0 2.4rem}
-code{background:#eef1f4;padding:1px 5px;border-radius:5px}
+.viewer:hover{filter:brightness(.97);text-decoration:none}
+.sz{font-family:var(--font-mono);color:var(--faint);font-variant-numeric:tabular-nums;font-size:12px}
+.legend{margin:1.6rem 0;padding:.9rem 1rem;background:#fff;border:1px solid var(--line);border-radius:12px;color:var(--mut);font-size:13px}
+
+/* footer — dark, mirrors mzpeak.org */
+footer.ftr{background:var(--gray-900);color:#8b97a3;margin-top:48px;padding:40px 0 36px;font-size:13px}
+footer.ftr a{color:#c2cbd6}footer.ftr a:hover{color:#fff}
+.ftr-in{display:flex;gap:32px;flex-wrap:wrap;justify-content:space-between;align-items:flex-start}
+.ftr .brand b{color:#fff}
+.ftr-tag{margin-top:12px;max-width:42ch;line-height:1.5;color:#8b97a3}
+.ftr-links{display:flex;gap:40px;flex-wrap:wrap}
+.ftr-col h4{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#c2cbd6;margin:0 0 12px}
+.ftr-col a{display:block;margin-bottom:8px;color:#8b97a3}
+.ftr-base{border-top:1px solid var(--ink-line);margin-top:30px;padding-top:20px;font-size:12px;display:flex;gap:16px;justify-content:space-between;flex-wrap:wrap}
+
+@media(max-width:900px){.hero-in{grid-template-columns:1fr;gap:36px;padding:44px 0 40px}.hero-lead{max-width:none}.stats-in{grid-template-columns:repeat(2,1fr)}.scope{max-width:520px}}
+@media(max-width:560px){.stats-in{grid-template-columns:1fr}}
 """
 
 
+# The hero "scope" visual — a self-contained spectrum panel (ported from mzpeak.org Home.vue).
+SCOPE = (
+    '<div class="scope"><div class="scope-bar"><span class="t">spectrum</span>'
+    '<span class="scope-tag">MS1 · profile</span><span class="grow"></span>'
+    '<span class="t mono">run.mzpeak</span></div>'
+    '<div class="scope-body"><div class="scope-read"><span class="k">m/z</span> 478.9213 '
+    '· <span class="k">int</span> 1.42e8</div>'
+    '<svg class="spec" viewBox="0 0 560 200" preserveAspectRatio="none" aria-hidden="true">'
+    '<defs><linearGradient id="specfill" x1="0" y1="0" x2="0" y2="1">'
+    '<stop offset="0%" stop-color="rgba(49,87,233,0.34)"/>'
+    '<stop offset="100%" stop-color="rgba(49,87,233,0)"/></linearGradient></defs>'
+    '<path class="spec-area" d="M0,192 L40,190 L80,186 L120,187 L150,162 L170,136 L185,178 '
+    'L210,184 L240,108 L255,36 L268,136 L290,182 L320,170 L350,178 L380,136 L400,86 L412,16 '
+    'L424,100 L450,172 L480,182 L520,188 L560,192 L560,200 L0,200 Z"/>'
+    '<path class="spec-line" d="M0,192 L40,190 L80,186 L120,187 L150,162 L170,136 L185,178 '
+    'L210,184 L240,108 L255,36 L268,136 L290,182 L320,170 L350,178 L380,136 L400,86 L412,16 '
+    'L424,100 L450,172 L480,182 L520,188 L560,192"/>'
+    '<line class="spec-marker" x1="412" y1="16" x2="412" y2="192"/></svg>'
+    '<div class="scope-axis"><span>120</span><span>500</span><span>900</span>'
+    '<span>1400</span><span>1804 m/z</span></div></div></div>')
+
+
 def nav(active_slug):
+    """Sticky header — brand links to www.mzpeak.org (parent site); local pills for the example
+    subsets; explicit mzpeak.org + GitHub actions on the right."""
     home_active = active_slug is None
-    home_style = ' style="background:#1b1b1b"' if home_active else ""
-    pills = [f'<a class="pill{" active" if home_active else ""}"{home_style} href="index.html">Home</a>']
+    pills = [f'<a class="pill{" active" if home_active else ""}" href="index.html">Home</a>']
     for p in order:
         m = meta_for(p)
         act = (m["slug"] == active_slug)
-        style = f' style="background:{m["accent"]}"' if act else ""
-        pills.append(f'<a class="pill{" active" if act else ""}"{style} href="{m["slug"]}.html">{m["icon"]} {m["title"]}</a>')
+        pills.append(f'<a class="pill{" active" if act else ""}" href="{m["slug"]}.html">{m["icon"]} {m["title"]}</a>')
     return ('<header class="nav"><div class="wrap">'
-            '<a class="brand" href="index.html">mzPeak<span class="dot"> ·</span> examples</a>'
-            f'<nav class="pills">{"".join(pills)}</nav></div></header>')
+            f'<a class="brand" href="{MZPEAK_SITE}" title="Back to mzpeak.org">'
+            f'<img src="{MARK}" alt="mzPeak"><b>mzPeak</b><span class="ex">examples</span></a>'
+            f'<nav class="pills">{"".join(pills)}</nav>'
+            '<div class="hdr-actions">'
+            f'<a class="btn btn-ghost" href="{MZPEAK_SITE}">↗ mzpeak.org</a>'
+            f'<a class="btn btn-primary" href="{GITHUB}">GitHub</a></div>'
+            '</div><div class="spectrum-strip"></div></header>')
+
+
+FOOTER = (
+    '<footer class="ftr"><div class="wrap"><div class="ftr-in">'
+    '<div><a class="brand" href="%s"><img src="%s" alt="mzPeak" style="height:22px"><b>mzPeak</b></a>'
+    '<p class="ftr-tag">Open example datasets for the mzML2mzPeak converter — originals + converted '
+    '<span class="mono">.mzpeak</span>. Part of the mzPeak format, governed by HUPO-PSI.</p></div>'
+    '<div class="ftr-links">'
+    '<div class="ftr-col"><h4>mzPeak</h4>'
+    '<a href="%s">mzpeak.org</a>'
+    '<a href="%s">White paper</a>'
+    '<a href="https://hupo-psi.github.io/mzPeak-specification/">Specification</a></div>'
+    '<div class="ftr-col"><h4>This corpus</h4>'
+    '<a href="index.html">Examples home</a>'
+    '<a href="README.md">README.md</a>'
+    '<a href="%s">mzML2mzPeak on GitHub</a></div>'
+    '<div class="ftr-col"><h4>Viewers</h4>'
+    '<a href="%s">mzPeak Explorer</a>'
+    '<a href="%s">mzPeakIV (imaging)</a></div>'
+    '</div></div>'
+    '<div class="ftr-base"><span>Public-read example data · <span class="mono">s3://v09</span> · '
+    '%d objects · %s</span>'
+    '<span><a href="%s">← Back to mzpeak.org</a></span></div>'
+    '</div></footer>'
+) % (MZPEAK_SITE, MARK, MZPEAK_SITE, WHITEPAPER, GITHUB, EXPLORER, MZPEAKIV, total_n, hs(total_b), MZPEAK_SITE)
 
 
 def page(title, active_slug, body):
+    """body is full-bleed content (its own hero/subhero + a <main class="wrap"> block)."""
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width, initial-scale=1">'
+            f'<link rel="icon" type="image/png" href="{MARK}">'
             f'<title>{html.escape(title)}</title><style>{CSS}</style></head><body>'
-            f'{nav(active_slug)}<main class="wrap">{body}</main>'
-            f'<footer class="wrap">Public-read example datasets for the '
-            f'<a href="https://github.com/okohlbacher/mzML2mzPeak">mzML2mzPeak</a> project · '
-            f'<code>s3://v09</code> · {total_n} objects · {hs(total_b)} · '
-            f'<a href="README.md">README.md</a></footer></body></html>')
+            f'{nav(active_slug)}{body}{FOOTER}</body></html>')
 
 
 def tag_for(rel):
@@ -414,17 +557,40 @@ for p in order:
         f'<span><b>{hs(nb)}</b></span></div>'
         f'<div class="go" style="color:{m["accent"]}">Browse {m["title"]} →</div></a>')
 
+n_cat = len(order)
+hero = (
+    '<section class="hero on-dark"><div class="wrap hero-in"><div>'
+    '<span class="eyebrow hero-eyebrow"><span class="dot"></span> mzPeak · example corpus</span>'
+    '<h1>Browse the live<br /><span class="acc">mzPeak example data</span></h1>'
+    '<p class="hero-lead">Real mass-spectrometry datasets for the <b>mzML2mzPeak</b> converter — the '
+    'original imzML / mzML / vendor RAW and sample metadata, alongside the converted '
+    '<span class="mono">.mzpeak</span> files. Every <span class="mono">.mzpeak</span> opens straight '
+    'in a browser viewer, streamed over HTTP — no download.</p>'
+    '<div class="hero-cta">'
+    f'<a class="btn btn-primary btn-lg" href="{MZPEAK_SITE}">← Back to mzpeak.org</a>'
+    '<a class="btn btn-secondary btn-lg" href="#browse">Browse the corpus ↓</a></div>'
+    f'<div class="hero-trust"><span>Part of <b>mzPeak</b>, governed by <b>HUPO-PSI</b></span>'
+    f'<span class="sep"></span><span><b>{total_n}</b> objects · <b>{hs(total_b)}</b> · public read</span></div>'
+    f'</div>{SCOPE}</div></section>')
+
+stat_band = (
+    '<section class="stats"><div class="wrap stats-in">'
+    f'<div class="statc"><div class="v">{n_cat}<span class="u"> kinds</span></div>'
+    '<div class="k">data families — general MS, imaging, study-design, vendor corpus</div></div>'
+    f'<div class="statc"><div class="v">{total_n}</div><div class="k">objects in the public bucket (s3://v09)</div></div>'
+    f'<div class="statc"><div class="v">{hs(total_b)}</div><div class="k">originals + converted mzPeak, end to end</div></div>'
+    '<div class="statc"><div class="v">2 <span class="u">viewers</span></div>'
+    '<div class="k">browser-native — mzPeak Explorer &amp; mzPeakIV, streamed over HTTP</div></div>'
+    '</div></section>')
+
 landing = (
-    '<section class="hero"><h1>mzPeak example data</h1>'
-    '<p>Open mass-spectrometry example datasets for the <b>mzML2mzPeak</b> converter — original '
-    'imzML / mzML / RAW + sample metadata, alongside the converted <code>.mzpeak</code> files. '
-    'Pick an example type to browse; every <code>.mzpeak</code> opens directly in a browser viewer.</p>'
-    f'<div class="stat"><code>s3://v09</code> · public read · {total_n} objects · {hs(total_b)}</div></section>'
+    hero + stat_band +
+    '<main class="wrap" id="browse">'
     f'<section class="grid" style="grid-template-columns:repeat({len(cards)},minmax(0,1fr))">{"".join(cards)}</section>'
     '<div class="legend">Each <code>.mzpeak</code> streams into a browser viewer over HTTP range (no download): '
     f'<a class="viewer ex" target="_blank" rel="noopener" href="{EXPLORER}">▶ Explorer</a> = mzPeak Explorer '
     f'(any file) · <a class="viewer iv" target="_blank" rel="noopener" href="{MZPEAKIV}">▦ mzPeakIV</a> = '
-    'imaging viewer (MSI datasets).</div>')
+    'imaging viewer (MSI datasets).</div></main>')
 
 outdir = sys.argv[1] if len(sys.argv) > 1 else "."
 os.makedirs(outdir, exist_ok=True)
@@ -446,10 +612,16 @@ for p in order:
     else:
         fig_html = ""
     toprow = ('<div class="toprow">%s%s</div>' % (provhtml, fig_html)) if (provhtml or fig_html) else ""
-    body = (f'<section class="section-head"><span class="ic">{m["icon"]}</span>'
-            f'<h2>{m["title"]}</h2><span class="badge" style="background:{m["accent"]}">{nds} datasets · {hs(nb)}</span></section>'
-            f'<p class="lead">{m["blurb"]}</p>{toprow}'
-            f'{render_files(subsets[p], m["imaging"])}')
+    subhero = (
+        '<section class="subhero"><div class="wrap subhero-in">'
+        f'<div class="crumb"><a href="{MZPEAK_SITE}">mzpeak.org</a> <span>›</span> '
+        '<a href="index.html">examples</a> <span>›</span> '
+        f'<span>{html.escape(m["title"])}</span></div>'
+        f'<h1><span>{m["icon"]}</span> {html.escape(m["title"])}'
+        f'<span class="sub-badge" style="background:{m["accent"]}">{nds} datasets · {hs(nb)}</span></h1>'
+        f'<p>{m["blurb"]}</p></div></section>')
+    body = (subhero + '<main class="wrap">'
+            f'{toprow}{render_files(subsets[p], m["imaging"])}</main>')
     with open(os.path.join(outdir, f'{m["slug"]}.html'), "w") as f:
         f.write(page(f'{m["title"]} — mzPeak examples', m["slug"], body))
 
