@@ -200,6 +200,23 @@ Plans:
 
 Scope: document the v0.8 sample-metadata model — verbatim SDRF/ISA embed (`data_kind: sdrf`/`isa`, byte-identical anchor), the run-filtered projections (`metadata.sample_list`, `metadata.study`, the `phase32_shadow` `run_sample_binding`), channels-as-labeled-samples (`MS:1002602` + reporter-mz, no `channel_list`), and the unified `SampleMetadataDoc` that both the SDRF and ISA readers fill. **Mostly doc/spec, but must be verified against the actual implementation** (`src/sdrf/`, `src/isa/`, `schema/study.json`, `schema/sample_list.json`, `schema/source_curie.json`) and the `docs/` extension contract — flag any doc-vs-code drift. Likely feeds the held HUPO-PSI spec batch ([[999.11]]).
 
+### Phase 999.13: Analyze upstreaming MSI + SDRF/ISA support into mzdata (BACKLOG — v1.0 scope)
+
+**Goal:** [Captured for future planning] Analyze which parts of **(A) MSI support** and **(B) SDRF/ISA study-design support** should be pushed **upstream into `mzdata`** (the shared reader/data-model crate) to enable broader ecosystem support — then have mzML2mzPeak consume those capabilities **via upstream mzdata** instead of carrying them locally.
+
+**Requirements:** TBD
+
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
+
+Scope (v1.0): an architecture/design analysis, not yet implementation. For each capability cluster decide *what belongs in mzdata vs. what stays in mzML2mzPeak*:
+- **(A) MSI / imaging** — per-pixel IMS coordinates (`IMS:1000050/51/52`) are already surfaced by mzdata's imzML reader; assess whether the spatial extension model (coordinate grid, `metadata.imaging` shape, optical-image linkage, continuous-vs-processed handling) should become first-class in mzdata's data model so other tools inherit it. Ties to the imaging-structure cluster (PIX-01/ROI-01/CONT-01/IMG-01).
+- **(B) SDRF/ISA study design** — our unified `SampleMetadataDoc` + the SDRF/ISA readers (`src/sdrf/`, `src/isa/`) currently live in mzML2mzPeak. Assess whether a sample-metadata model + reader belongs in mzdata (shared by the whole `mzdata` ecosystem) vs. staying converter-local. Coordinate with the held HUPO-PSI spec work ([[999.11]], [[999.12]]).
+
+Outcome: a recommendation per cluster (upstream / keep-local / hybrid), the mzdata API surface it would need, and a thin-out plan for mzML2mzPeak once upstream lands. Now that the project is **fully de-vendored** (mzdata = crates.io 0.64.1, mzpeak = upstream git), this is the natural next consolidation step. Owner-gated where it implies PRs to `mobiusklein/mzdata` (outside okohlbacher).
+
 ### Imaging structure (pixel facet, ROI polygons, continuous shared-axis, images.parquet) — DEFERRED beyond v1.0
 
 > **Owner decision (2026-06-08):** the whole imaging-structure cluster is post-1.0. v0.7 focuses on the
