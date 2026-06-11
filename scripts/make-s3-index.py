@@ -354,14 +354,6 @@ header.nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.82);bac
 .spec-marker{stroke:#c00000;stroke-width:1.5;stroke-dasharray:4 4}
 .scope-axis{display:flex;justify-content:space-between;padding:2px 12px 10px;font-family:var(--font-mono);font-size:10px;color:#8b97a3}
 
-/* stat band */
-.stats{background:var(--gray-900);color:#fff;border-bottom:1px solid var(--ink-line)}
-.stats-in{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--ink-line)}
-.statc{background:var(--gray-900);padding:20px 22px}
-.statc .v{font-family:var(--font-mono);font-size:clamp(1.3rem,2.2vw,1.75rem);font-weight:600;color:#fff;letter-spacing:-.02em}
-.statc .v .u{color:var(--blue-300)}
-.statc .k{margin-top:5px;font-size:11.5px;color:#8b97a3;line-height:1.3}
-
 /* sub-hero (category pages) */
 .subhero{position:relative;background-color:var(--ink);background-image:radial-gradient(rgba(86,117,240,.10) 1px,transparent 1px);background-size:22px 22px;color:var(--gray-100);border-bottom:1px solid var(--ink-line);overflow:hidden}
 .subhero::before{content:"";position:absolute;inset:0;background:radial-gradient(90% 90% at 80% 0%,rgba(49,87,233,.22),transparent 62%);pointer-events:none}
@@ -432,8 +424,8 @@ footer.ftr a{color:#c2cbd6}footer.ftr a:hover{color:#fff}
 .ftr-col a{display:block;margin-bottom:8px;color:#8b97a3}
 .ftr-base{border-top:1px solid var(--ink-line);margin-top:30px;padding-top:20px;font-size:12px;display:flex;gap:16px;justify-content:space-between;flex-wrap:wrap}
 
-@media(max-width:900px){.hero-in{grid-template-columns:1fr;gap:36px;padding:44px 0 40px}.hero-lead{max-width:none}.stats-in{grid-template-columns:repeat(2,1fr)}.scope{max-width:520px}}
-@media(max-width:560px){.stats-in{grid-template-columns:1fr}}
+@media(max-width:900px){.hero-in{grid-template-columns:1fr;gap:36px;padding:44px 0 40px}.hero-lead{max-width:none}.scope{max-width:520px}}
+
 """
 
 
@@ -557,7 +549,6 @@ for p in order:
         f'<span><b>{hs(nb)}</b></span></div>'
         f'<div class="go" style="color:{m["accent"]}">Browse {m["title"]} →</div></a>')
 
-n_cat = len(order)
 hero = (
     '<section class="hero on-dark"><div class="wrap hero-in"><div>'
     '<span class="eyebrow hero-eyebrow"><span class="dot"></span> mzPeak · example corpus</span>'
@@ -573,18 +564,8 @@ hero = (
     f'<span class="sep"></span><span><b>{total_n}</b> objects · <b>{hs(total_b)}</b> · public read</span></div>'
     f'</div>{SCOPE}</div></section>')
 
-stat_band = (
-    '<section class="stats"><div class="wrap stats-in">'
-    f'<div class="statc"><div class="v">{n_cat}<span class="u"> kinds</span></div>'
-    '<div class="k">data families — general MS, imaging, study-design, vendor corpus</div></div>'
-    f'<div class="statc"><div class="v">{total_n}</div><div class="k">objects in the public bucket (s3://v09)</div></div>'
-    f'<div class="statc"><div class="v">{hs(total_b)}</div><div class="k">originals + converted mzPeak, end to end</div></div>'
-    '<div class="statc"><div class="v">2 <span class="u">viewers</span></div>'
-    '<div class="k">browser-native — mzPeak Explorer &amp; mzPeakIV, streamed over HTTP</div></div>'
-    '</div></section>')
-
 landing = (
-    hero + stat_band +
+    hero +
     '<main class="wrap" id="browse">'
     f'<section class="grid" style="grid-template-columns:repeat({len(cards)},minmax(0,1fr))">{"".join(cards)}</section>'
     '<div class="legend">Each <code>.mzpeak</code> streams into a browser viewer over HTTP range (no download): '
