@@ -187,6 +187,19 @@ Drafts are ready in `docs/upstream/` (docs-only, never submitted, per push polic
 
 Context: the third held item (the `chunk_series` patch) was upstreamed independently (HUPO-PSI/mzPeak PR #24), which let us **fully de-vendor** (no more `vendor/`, no `[patch]`). These two spec/writer drafts are the **only** remaining held upstream items. Promote to active work only when the owner authorizes submitting to HUPO-PSI.
 
+### Phase 999.12: Draft documentation for the SDRF/ISA study-design integration (BACKLOG)
+
+**Goal:** [Captured for future planning] Write a draft spec/doc describing how SDRF + ISA study-design / sample metadata integrates into mzPeak — the design contract, mostly prose, **cross-checked against the implementation** so the doc matches the code.
+
+**Requirements:** TBD
+
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
+
+Scope: document the v0.8 sample-metadata model — verbatim SDRF/ISA embed (`data_kind: sdrf`/`isa`, byte-identical anchor), the run-filtered projections (`metadata.sample_list`, `metadata.study`, the `phase32_shadow` `run_sample_binding`), channels-as-labeled-samples (`MS:1002602` + reporter-mz, no `channel_list`), and the unified `SampleMetadataDoc` that both the SDRF and ISA readers fill. **Mostly doc/spec, but must be verified against the actual implementation** (`src/sdrf/`, `src/isa/`, `schema/study.json`, `schema/sample_list.json`, `schema/source_curie.json`) and the `docs/` extension contract — flag any doc-vs-code drift. Likely feeds the held HUPO-PSI spec batch ([[999.11]]).
+
 ### Imaging structure (pixel facet, ROI polygons, continuous shared-axis, images.parquet) — DEFERRED beyond v1.0
 
 > **Owner decision (2026-06-08):** the whole imaging-structure cluster is post-1.0. v0.7 focuses on the
