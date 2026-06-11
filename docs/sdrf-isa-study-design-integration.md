@@ -466,9 +466,13 @@ The native **`ms_run.sample_ref`** field is not yet emitted: it is gated on the 
 
 ## 10. Drift appendix (contract vs code)
 
-These are concrete disagreements between **`docs/mzpeak-extension-contract.md` §3.9–§3.14** and the
-**shipped code**, found while grounding this doc. They are documentation drift in the contract
-prose; the code is the ground truth. Listed so the contract can be reconciled.
+> **✅ RECONCILED 2026-06-11 (999.14b).** All five drifts below have been corrected in
+> `docs/mzpeak-extension-contract.md` §3.9–§3.14 to match the shipped code. The table is retained as a
+> record of what was fixed; the contract is now consistent with the emit literals.
+
+These were concrete disagreements between **`docs/mzpeak-extension-contract.md` §3.9–§3.14** and the
+**shipped code**, found while grounding this doc. They were documentation drift in the contract
+prose; the code is the ground truth.
 
 | # | Contract says | Code does | Source |
 |---|---------------|-----------|--------|

@@ -345,32 +345,39 @@ These values are **descriptive-only open-enum strings** — any unknown value de
 by the deterministic archive name (see below), exactly the shipped imaging-TIFF precedent
 (`metadata.imaging.images[].archive_path`).
 
-**Deterministic archive names:**
+**Deterministic archive names** (as emitted — verified against `src/isa/mod.rs:84`, `:62-69`, `:90`):
 - SDRF: `sample_metadata/sdrf.tsv`
-- ISA-Tab bundle: `sample_metadata/isa/i_Investigation.txt` (+ sibling `s_*.txt` / `a_*.txt` in the same
-  virtual directory)
-- ISA-JSON: `sample_metadata/isa.json`
+- ISA-Tab bundle: `sample_metadata/isa/<verbatim-source-basename>` for each member — the investigation
+  file keeps its on-disk name (commonly `i_Investigation.txt`, fallback lowercase `i_investigation.txt`),
+  plus sibling `s_*.txt` / `a_*.txt` in the same `sample_metadata/isa/` virtual directory.
+- ISA-JSON: `sample_metadata/isa/isa.json` (under the `isa/` subdirectory, same as the Tab bundle —
+  NOT `sample_metadata/isa.json`).
 
 **Layout:** raw bytes (verbatim source file content). For ISA the whole bundle (investigation + applicable
 study + applicable assay files) is the embed unit — a single assay file is meaningless without its
 investigation.
 
 **Mechanism 2 — File-Level Metadata JSON (§2.1) — back-reference and provenance:**
-A `"sample_metadata"` key in the file-level `metadata` KV records:
+A `"sample_metadata"` key in the file-level `metadata` KV records (as emitted —
+`src/write/mzml.rs:554-562`, `:661-666`):
 ```json
 {
-  "dataset_accession": "PXD… | MTBLS…",
-  "source_uri": "https://…",
-  "format": "sdrf | isa-tab | isa-json",
-  "embed_scope": "applicable_rows | full",
-  "precedence": "repo_wins",
+  "member": "sample_metadata/sdrf.tsv",
   "sha256": "<hex>",
-  "retrieved_at": "<ISO-8601>",
-  "archive_name": "sample_metadata/sdrf.tsv"
+  "size_bytes": 12345,
+  "precedence": "repo_wins",
+  "embed_scope": "full",
+  "projection_scope": "run",
+  "dataset_accession": "PXD… | MTBLS…"
 }
 ```
-The `sha256` + `retrieved_at` guard against the embedded snapshot going stale vs. a later repository
-correction. `precedence: "repo_wins"` is the ratified authority rule (Q1 — RATIFIED).
+The `sha256` + `size_bytes` guard against the embedded snapshot going stale vs. a later repository
+correction (the back-reference member name lives in `metadata.study.sample_metadata_ref`, §3.10).
+`precedence: "repo_wins"` is the ratified authority rule (Q1 — RATIFIED). `embed_scope: "full"` means
+the whole source was embedded verbatim; `projection_scope: "run"` means the *projected* fields
+(`sample_list`, `run_sample_binding`) are scoped to this run's matched rows (v0.8.1 run-filter). There is
+no `source_uri` / `format` / `retrieved_at` / `archive_name` key — the format is implicit in the member
+extension and the member name is in `study.sample_metadata_ref`.
 
 **Implementation note (Phase 31 cost):** the typed-member insert requires
 `start_for_entry(FileEntry::new(name, EntityType::Other("sample-metadata"), DataKind::Other("sdrf")))` +
@@ -388,19 +395,22 @@ Governance tracking in `docs/cv-requests.md` (the carve-out token registration).
 Written via `add_index_metadata("study", &serde_value)` after `finish_parquet()`.
 Read-back: `MzPeakReader.file_index().metadata["study"]`.
 
-**Minimal schema** (contract; full JSON Schema in `schema/study.json` — Plan 30-03):
+**Schema** (as emitted — `src/schema/study.rs:65-83`, `deny_unknown_fields`; full JSON Schema in
+`schema/study.json`). Exactly three required keys + one optional sub-block — there is **no** `source_uri`
+or `format` key (the struct rejects unknown fields):
 ```json
 {
-  "accession": "PXD… | MTBLS… | null",
-  "title": "string | null",
-  "source_uri": "https://…",
-  "format": "sdrf | isa-tab | isa-json",
+  "dataset_accession": "PXD… | MTBLS…",
+  "title": "string",
+  "sample_metadata_ref": "sample_metadata/sdrf.tsv",
   "run_sample_binding": {
-    "sample_ids": ["<source_name_1>", …],
-    "note": "provenance shadow — native list-valued ms_run.sample_ref binding gated on Phase 30b merge"
+    "run_id": "<run stem>",
+    "sample_ids": ["<source_name_1>", …]
   }
 }
 ```
+`sample_metadata_ref` is the back-reference to the verbatim embedded member (§3.9). `run_sample_binding`
+is OPTIONAL — omitted entirely when no run→sample binding is known (`skip_serializing_if`).
 
 The `run_sample_binding` sub-block is the **interim provenance shadow**: it records the run→sample
 association in the index.json KV until the upstream `ms_run.sample_ref` list-valued field (Phase 30b)
@@ -441,14 +451,18 @@ already-documented spec member.** v0.8 fills it with sample entries derived from
 
 Each isobaric channel = one `sample_list` entry whose `parameters` list carries:
 1. **`MS:1002602` "sample label" cvParam** — the PSI-MS umbrella term for labeled-quantification
-   reagents (confirmed via OLS). The specific reagent (e.g. TMT126, TMTpro131C, iTRAQ114) is a child
-   term of MS:1002602 and also stored as a cvParam in the `parameters` list.
-2. **Reporter-ion m/z** — a cvParam with the numeric value; `reporter_mz_source` (reagent-table |
-   vendor-method | unresolved) recorded alongside. `reporter_mz: Option<f64>` — `null` when unresolved
-   (TMTpro 16/18-plex gap); NEVER a sentinel float (RATIFIED, R1-M4).
-3. **Channel role** — one of `experimental | reference | carrier | normalization | empty`, stored as a
-   cvParam / userParam. Derived from SDRF `comment[carrier channel]` / `comment[reference channel]`
-   (primary, R1-H2); pooled via `pool_member_refs`.
+   reagents (confirmed via OLS). Its `value` is the **verbatim reagent label** (e.g. `"TMT126"`).
+   The specific reagent child accession (e.g. `MS:1002616`) is *computed* internally to resolve the
+   reporter-ion m/z, but only the umbrella `MS:1002602` param is **emitted** — the child accession is
+   NOT written as a separate cvParam (`src/sdrf/project.rs:205-256`).
+2. **Reporter-ion m/z** — a `mzml2mzpeak:reporter-ion-mz` param with the numeric value;
+   `reporter_mz_source` (reagent-table | vendor-method | unresolved) recorded alongside.
+   `reporter_mz: Option<f64>` — the param is OMITTED when unresolved (TMTpro 16/18-plex gap); NEVER a
+   sentinel float (RATIFIED, R1-M4).
+3. **Channel role** — a `mzml2mzpeak:channel-role` param whose value is one of
+   `sample | pooled | carrier | reference` (`src/sdrf/channels.rs:241`; default `sample` when no
+   carrier/reference/pool columns are present). Carrier/reference derived from SDRF
+   `comment[carrier channel]` / `comment[reference channel]`; pooled via `pool_member_refs`.
 4. **`tag_modification` (Unimod)** — e.g. `UNIMOD:737` (TMT6plex). Stored as a cvParam when accession
    known, else a userParam keyed by the exact column (Cornerstone A passthrough).
 
@@ -459,6 +473,13 @@ the association. The `channel_set` / `plex_id` KV extensions to the `"run"` bloc
 **CV single source:** `src/schema/cv.rs` is the single-source for MS:1002602 + reagent children + the
 small additional structural-term set (role tokens, reporter-ion m/z attribute). All pending CURIEs for
 TMTpro 16/18-plex labels tracked in `docs/cv-requests.md`.
+
+**cv_ref coherence + declaration (999.14):** each emitted param's `cv_ref` matches its accession namespace
+— `"MS"` for `MS:1002602`, `"UNIMOD"` for `UNIMOD:NNN`, and the project-local `"mzml2mzpeak"` for the
+two `mzml2mzpeak:`-prefixed structural tokens (channel-role, reporter-ion-mz). A sample-metadata archive
+emits a `metadata.cv_list` declaring exactly those referenced CVs (MS + UNIMOD + mzml2mzpeak), derived
+from the projected `sample_list` so declared == referenced (`src/schema/cv.rs::cv_list_for_sample_metadata`,
+`src/write/mzml.rs`). The imaging path's fixed MS/IMS/UO `cv_list` is unaffected.
 
 **Non-isobaric runs** (label-free, SILAC/MS1) MUST NOT emit isobaric-channel entries. SILAC labels
 are recorded as a run/assay metadata `Diagnostic` only — the verbatim blob holds the fidelity.
