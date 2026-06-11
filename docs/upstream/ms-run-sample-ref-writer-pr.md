@@ -1,13 +1,23 @@
 # PR: List-Valued `ms_run.sample_ref` — HUPO-PSI/mzPeak Writer + Spec
 
-> **STATUS: PREPARED AND HELD — NOT SUBMITTED.**
+> **STATUS: RECONCILED & HELD — NOT SUBMITTED.**
 >
 > Owner-gated: `HUPO-PSI/mzPeak` and `HUPO-PSI/mzPeak-specification` are outside
 > `github.com/okohlbacher` → **explicit interactive owner authorization is required before
 > filing this PR or any push to HUPO-PSI repos.** This document is an in-repo preparation
 > artefact only.
+>
+> **Reconciled 2026-06-11 (999.11 prep):** (1) since assembly, the codebase **fully de-vendored**
+> — `mzdata = =0.64.1` (crates.io) and `mzpeak_prototyping` at upstream rev `29e59b24`; the held
+> chunk_series patch (UPS-01) **merged as PR #24** (`b9269029`) and is now CLOSED-superseded, so
+> this `sample_ref` field is the **only remaining writer ask**. (2) This is plausibly a **two-repo
+> PR**: the schema lands in `HUPO-PSI/mzPeak-specification` (canonical `schema/`) AND the impl-repo
+> mirror `HUPO-PSI/mzPeak schema/ms_run.json` (a confirmed *subset* of the spec schema — already out
+> of sync), plus the writer emit. Confirm the canonical home with the maintainer before filing.
+> (3) The spec is **CC-BY-ND** — frame the `index.md` edit as a *suggested edit the author folds in*,
+> not a normative change. Filing posture + cluster routing: [`FILING-PLAN.md`](./FILING-PLAN.md).
 
-**Prepared:** 2026-06-09 (Phase 37, Plan 03)
+**Prepared:** 2026-06-09 (Phase 37, Plan 03) · **Reconciled:** 2026-06-11 (999.11 prep)
 **Phase origin:** Phase 30b (UPSTREAM-BIND-01)
 **Spec bundle cross-ref:** P-09 in [`docs/upstream/v0.8-spec-batch-bundle.md`](./v0.8-spec-batch-bundle.md)
 **Extension contract:** `docs/mzpeak-extension-contract.md §3.12`
