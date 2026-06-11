@@ -170,6 +170,23 @@ done; **565 tests green**. Phases 22/29/30b carried to v0.9; Phase 36 deferred �
 
 ## Backlog
 
+### Phase 999.11: Submit the held upstream PR drafts to HUPO-PSI (BACKLOG)
+
+**Goal:** [Captured for future planning] Submit the two prepared-and-held upstream PR drafts to HUPO-PSI — **owner-gated**: pushing outside `github.com/okohlbacher` requires explicit interactive authorization.
+
+**Requirements:** TBD
+
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
+
+Drafts are ready in `docs/upstream/` (docs-only, never submitted, per push policy):
+- `v0.8-spec-batch-bundle.md` — the batched sample-metadata spec proposals (P-02..P-09) → `HUPO-PSI/mzPeak-specification`.
+- `ms-run-sample-ref-writer-pr.md` — the list-valued `ms_run.sample_ref` writer change (Phase 30b) → `HUPO-PSI/mzPeak`.
+
+Context: the third held item (the `chunk_series` patch) was upstreamed independently (HUPO-PSI/mzPeak PR #24), which let us **fully de-vendor** (no more `vendor/`, no `[patch]`). These two spec/writer drafts are the **only** remaining held upstream items. Promote to active work only when the owner authorizes submitting to HUPO-PSI.
+
 ### Imaging structure (pixel facet, ROI polygons, continuous shared-axis, images.parquet) — DEFERRED beyond v1.0
 
 > **Owner decision (2026-06-08):** the whole imaging-structure cluster is post-1.0. v0.7 focuses on the
