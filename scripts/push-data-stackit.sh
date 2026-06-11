@@ -33,6 +33,19 @@ sync_dir(){ # localdir destprefix
 sync_dir data/imzml-examples imzml-examples
 sync_dir data/mzML-examples  mzML-examples
 
+# 1b) SDRF / ISA sample-metadata tile — sync the full chain IN PLACE: metadata + vendor RAW + mzML +
+#     mzpeak. Only internal working notes (CANDIDATES.md) + junk are excluded. Unlike the other tiles,
+#     mzpeak is in-place here, so we do NOT exclude *.mzpeak.
+if [ "$DRYRUN" = "1" ]; then
+  say "PLAN sync data/sdrf-examples -> $B/sdrf-examples (excl CANDIDATES.md,*.log,*.DS_Store)"
+  find data/sdrf-examples -type f ! -name 'CANDIDATES.md' ! -name '*.log' ! -name '*.DS_Store' | wc -l | sed 's/^/    files: /'
+else
+  say "sync data/sdrf-examples -> $B/sdrf-examples (incl vendor RAW)"
+  "${AWS[@]}" s3 sync data/sdrf-examples "$B/sdrf-examples" \
+    --exclude 'CANDIDATES.md' --exclude '*.log' --exclude '*.DS_Store' \
+    --only-show-errors && say "  synced sdrf-examples"
+fi
+
 # 2) IMAGING mzpeak -> next to source, renamed to source stem
 put "$MZ/PXD001283-HR2MSI-urinary-bladder_HR2MSImouseurinarybladderS096.mzpeak" "imzml-examples/PXD001283-HR2MSI-urinary-bladder/HR2MSImouseurinarybladderS096.mzpeak"
 put "$MZ/imzML_AP_SMALDI_HR2MSImouseurinarybladderS096.mzpeak"                   "imzml-examples/zenodo-AP-SMALDI/imzML_AP_SMALDI/HR2MSImouseurinarybladderS096.mzpeak"
@@ -69,11 +82,11 @@ done
 
 say "ALL DONE (DRYRUN=$DRYRUN)"
 
-# 5) Regenerate the browsable index.html + README.md manifest from the final listing, upload both
+# 5) Regenerate + deploy the browsable multi-page site (index.html + per-class subpages + README.md).
+#    Delegated to push-index-stackit.sh, which re-lists the bucket and uploads every generated page with
+#    correct content-types. (The old inline call used make-s3-index.py's superseded two-arg signature;
+#    the generator now takes a single OUTDIR and emits subpages too.)
 if [ "$DRYRUN" != "1" ]; then
-  say "regenerating index.html + README.md"
-  "${AWS[@]}" s3api list-objects-v2 --bucket v09 --output json \
-    | python3 scripts/make-s3-index.py out/v09-index.html out/v09-README.md
-  "${AWS[@]}" s3 cp out/v09-index.html "$B/index.html" --content-type "text/html; charset=utf-8" --only-show-errors && say "  put index.html"
-  "${AWS[@]}" s3 cp out/v09-README.md  "$B/README.md"  --content-type "text/markdown; charset=utf-8" --only-show-errors && say "  put README.md"
+  say "regenerating + deploying site (index.html + subpages + README.md)"
+  bash scripts/push-index-stackit.sh
 fi
