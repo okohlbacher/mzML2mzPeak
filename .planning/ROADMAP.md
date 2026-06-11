@@ -187,20 +187,28 @@ done; **565 tests green**. Phases 22/29/30b carried to v0.9; Phase 36 deferred �
 >   explicit interactive authorization, warn first). The in-repo prep for each item is un-gated.
 > - **999.14** captures the small correctness/doc fixes the 999.11/13 research surfaced.
 >
-> **Suggested ordering (local-now → gated), as of 2026-06-11:**
-> | # | Item | Local-now? | Upstream effect | Effort |
+> **Suggested ordering (local-now → gated). Items 1–3 SHIPPED 2026-06-11:**
+> | # | Item | Local-now? | Upstream effect | Status |
 > |---|------|-----------|-----------------|--------|
-> | 1 | **999.14 residual** — conditional `cv_list()` declares `mzml2mzpeak` for channel-bearing archives | ✅ **fully local** | none (closes a self-introduced gap; PR-clean end state) | 0.5–1 d |
-> | 2 | **999.13(A) local refactor** — drop the redundant quick-xml geometry re-parse, consume mzdata 0.64.1 `scan_settings().params` directly | ✅ **fully local** | none — the accessor *already exists* upstream; this is pure local simplification (the *upstreaming* of a typed accessor is the separate gated step) | S (1–2 d, load-bearing → careful) |
-> | 3 | **999.12** — SDRF/ISA study-design integration docs | ✅ **fully local** | none (feeds 999.11's spec text but ships as in-repo docs) | 2.5–3.5 d |
-> | 4 | **999.11 prep** — reconcile both held drafts vs shipped v0.8.2 + draft issue/PR bodies | ✅ **local prep** | the *submission* to HUPO-PSI is **owner-gated** | ~1 d prep + gated submit |
-> | 5 | **SM-07 / factor_values native projection** (if still open in v0.9) | ✅ **fully local** | none (converter feature) | M |
-> | 6 | **999.13(B/C) upstreaming** — geometry → optical → imzML/.ibd writer into mzdata | ❌ | **all owner-gated** (`mobiusklein/mzdata`), socialize-first; writer may stay local permanently | S→L (weeks) |
-> | 7 | **Imaging structure cluster** (PIX/ROI/CONT/IMG) | ✅ local but **post-1.0** | none | L |
+> | 1 | **999.14 residual** — sample-metadata archives now emit a `cv_list` declaring their `cv_refs` (MS/UNIMOD/mzml2mzpeak) | ✅ | none | ✅ **DONE** (`8368db6`) — declared==referenced by construction; TMT archive validates 0-err |
+> | 2 | **999.13(A)** — forward path types geometry from mzdata `scan_settings().params`; quick-xml retained for `.ibd`-free verify/dry-run | ✅ | none | ✅ **DONE** (`8368db6`) — equivalence locked by `tests/geometry_mzdata_equiv.rs` |
+> | 3 | **999.12** — SDRF/ISA study-design integration doc | ✅ | none (feeds 999.11 spec text) | ✅ **DONE** (`6422e61`) — `docs/sdrf-isa-study-design-integration.md`, +5-item drift appendix |
+> | 4 | **999.11 prep** — reconcile both held drafts vs shipped v0.8.2 + draft issue/PR bodies | ✅ prep | *submission* owner-gated | open — local prep un-gated, ~1 d |
+> | 4b | **999.14b (NEW)** — reconcile the 5 contract(§3.9–3.14)-prose drifts the 999.12 doc surfaced (D1–D5; code is ground truth) | ✅ | none | open — quick doc fix, ~0.5 d; do before 999.11 PR text |
+> | 5 | **SM-07 / factor_values native projection** (if still open in v0.9) | ✅ | none (converter feature) | open |
+> | 6 | **999.13(B/C) upstreaming** — geometry → optical → imzML/.ibd writer into mzdata | ❌ | **all owner-gated** (`mobiusklein/mzdata`); writer may stay local | open — gated |
+> | 7 | **Imaging structure cluster** (PIX/ROI/CONT/IMG) | ✅ local but **post-1.0** | none | open — post-1.0 |
 >
-> **Pull-off-now without any upstream effect: items 1, 2, 3, 5** (and the local *prep* half of 4). Items 4-submit
-> and 6 are the only ones touching `okohlbacher`-external remotes → owner-gated. Recommended next: **1 → 2** (small
-> local de-risk + simplification that make the eventual PRs clean), then **3** (the doc, highest standalone value).
+> **Remaining pull-off-now (no upstream effect): 4b, 5** (+ the local *prep* half of 4). The 999.13(A) geometry
+> *typing core* (`imaging_run_metadata_from_params`) is now the exact artifact a future mzdata typed-accessor PR
+> would contribute — item 1+2 made the eventual PRs cleaner, as intended.
+>
+> **New follow-up 999.14b — contract-prose drift (from the 999.12 doc's appendix, all code-verified):**
+> D1 ISA member names (`sample_metadata/isa/isa.json` + verbatim Tab basenames, not `.../isa.json` / `i_Investigation.txt`);
+> D2 `metadata.study` has no `source_uri`/`format` keys (`deny_unknown_fields`); D3 provenance keys are
+> `member`/`sha256`/`size_bytes`/`precedence`/`embed_scope`/`projection_scope`/`dataset_accession`; D4 channel-role
+> vocabulary is `sample|pooled|carrier|reference`; D5 only the `MS:1002602` umbrella is written (the reagent child
+> accession is computed but not emitted as a param). Fix = edit `docs/mzpeak-extension-contract.md` §3.9–3.14 to match code.
 
 ### Phase 999.11: Submit the held upstream PR drafts to HUPO-PSI (BACKLOG — RESEARCHED 2026-06-11)
 
@@ -355,16 +363,17 @@ validator still PASS; (b) geometry.rs + optical.rs doc-comments corrected; (c) C
 + indicatif/serde/serde_json versions reconciled to Cargo.toml; (d) docs path/`source_curie.json` sweep clean.
 Also retired the stale `docs/sdrf-mzpeak-integration.md` (SUPERSEDED banner) + status-banner on `sdrf-open-questions.md`.
 
-**Residual follow-up (NEW, deferred — NOT quick):** the namespaced channel params now carry `cv_ref:"mzml2mzpeak"`,
-but the file-level `cv_list()` is a static `{MS,IMS,UO}` single-source and does NOT declare `mzml2mzpeak` → an
-**undeclared cv_ref** for channel-bearing archives (the `mzpeak_index.json` references it without a `cv_list` entry).
-The `tests/cv_list.rs` `declared==referenced` invariant pins `cv_list()` to exactly `{MS,IMS,UO}` using an imaging
-fixture, and the reverse imzML `<cvList>` shares `cv_list()` — so a clean declaration needs `cv_list()` to be
-**conditionally parameterized** (include `mzml2mzpeak` only when channel/sample-metadata params are emitted, never
-in the imaging reverse path) + a channel-archive test. This is a real change to the CVG-01 single-source design,
-not a quick fix — do it as part of preparing P-04 in **999.11** (it's the genuinely PR-clean end state).
+**Residual follow-up — ✅ DONE 2026-06-11 (`8368db6`).** Resolved more cleanly than the deferred plan assumed:
+the mzML write path emitted **no** `cv_list` at all (only the imaging path did), so the channel `cv_ref`s
+(`MS`/`UNIMOD`/`mzml2mzpeak`) were undeclared for the whole sample-metadata path — not just `mzml2mzpeak`. Rather
+than conditionally parameterize the shared `cv_list()` (which would have touched the reverse imzML path + the
+`declared==referenced` imaging test), added a separate `cv_list_for_sample_metadata()` that **derives** the
+declared set from the actual emitted `sample_list` params (declared == referenced by construction) and wired it
+into the SDRF + ISA blocks. `cv_list()` (imaging base + reverse `<cvList>`) is **untouched** — the static
+`{MS,IMS,UO}` invariant + `tests/cv_list.rs` still hold; the imaging reverse path never sees the new namespace.
+Verified: a TMT archive declares `['MS','UNIMOD','mzml2mzpeak']` and passes the external mzPeakValidator (0 errors).
 
-**Effort:** (a)–(d) done; the cv_list-declaration residual ≈ 0.5–1 day with the reverse/test care. **Requirements:** TBD · **Plans:** TBD (promote when ready)
+**Effort:** (a)–(d) + the cv_list residual all DONE. **Requirements:** met · **Plans:** n/a (shipped via quick path)
 
 ### Imaging structure (pixel facet, ROI polygons, continuous shared-axis, images.parquet) — DEFERRED beyond v1.0
 
