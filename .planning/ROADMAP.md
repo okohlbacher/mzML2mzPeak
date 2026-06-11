@@ -7,8 +7,9 @@
 >
 > **v0.8 shipped 2026-06-09 (tag `v0.8`).** Archived to
 > [`milestones/v0.8-ROADMAP.md`](milestones/v0.8-ROADMAP.md) +
-> [`milestones/v0.8-REQUIREMENTS.md`](milestones/v0.8-REQUIREMENTS.md). Phases **22, 29, 30b carried to v0.9**
-> (owner-gated / externally-gated); Phase 36 / SM-07 deferred ≥v0.9 (verbatim blob holds fidelity).
+> [`milestones/v0.8-REQUIREMENTS.md`](milestones/v0.8-REQUIREMENTS.md). Phases **22, 30b carried to v0.9**
+> (owner-gated); **Phase 29 / DVN-01/02 (de-vendor) DONE** (fully de-vendored 2026-06-11, `vendor/` removed);
+> Phase 36 / SM-07 deferred ≥v0.9 (verbatim blob holds fidelity).
 
 ## Shipped Milestones
 
@@ -50,7 +51,7 @@
 > every phase; v0.8's only new dependency is `csv`.
 
 <details>
-<summary>✅ v0.8 Sample-metadata ingestion: SDRF + ISA, channels-as-samples, reporter-quant, roundtrip validation (Phases 22, 29–37; 30/31/32/33/34/35/37 done; 22/29/30b → v0.9; 36 deferred ≥v0.9) — SHIPPED 2026-06-09</summary>
+<summary>✅ v0.8 Sample-metadata ingestion: SDRF + ISA, channels-as-samples, reporter-quant, roundtrip validation (Phases 22, 29–37; 29/30/31/32/33/34/35/37 done; 22/30b → v0.9; 36 deferred ≥v0.9) — SHIPPED 2026-06-09</summary>
 
 - [x] Phase 30: Sample-metadata spec alignment & CV governance (4/4, SMSPEC-01..03 + SMCVG-01..02) — 2026-06-09
 - [x] Phase 31: Unified model + SDRF reader + verbatim embed (3/3, SM-01..04) — 2026-06-09
@@ -61,7 +62,7 @@
 - [x] Phase 37: Round-trip + validation + batch submission (3/3, VAL-01..02; UPSTREAM-PR HELD) — 2026-06-09
 - [→] Phase 22: Upstream PR prep — **CARRIED TO v0.9** (UPS-01/03, held by owner)
 - [→] Phase 30b: Upstream list-valued `ms_run.sample_ref` PR — **CARRIED TO v0.9** (owner-gated)
-- [→] Phase 29: De-vendor — drop both vendored forks — **CARRIED TO v0.9** (DVN-01/02, gated)
+- [x] Phase 29: De-vendor — drop both vendored forks — **DONE 2026-06-11** (DVN-01/02; fully de-vendored, `vendor/` + `[patch]` removed; mzpeak = upstream git `29e59b24`, mzdata = crates.io `0.64.1`)
 - [⬜] Phase 36: comment-scope + factor-value — **DEFERRED ≥v0.9** (blob holds fidelity)
 
 Full detail: [`milestones/v0.8-ROADMAP.md`](milestones/v0.8-ROADMAP.md).
@@ -134,13 +135,15 @@ Full detail: [`milestones/v0.3-ROADMAP.md`](milestones/v0.3-ROADMAP.md)
 
 **Requirements**: UPS-01, UPS-03 · **Plans**: TBD
 
-### Phase 29: De-vendor — drop both vendored forks — CARRIED TO v0.9
+### Phase 29: De-vendor — drop both vendored forks — ✅ DONE 2026-06-11
 
-> **CARRIED TO v0.9 (externally gated).** DVN-01 gated on chunk_series PR (UPS-01) merged + DVN-02 gated
-> on mzdata 0.64.2 published to crates.io. Sequenced LAST (worst-case `Other`-typed member: embedded TIFF
-> + embedded SDRF/ISA). Full history: [`milestones/v0.8-ROADMAP.md`](milestones/v0.8-ROADMAP.md).
+> **DONE 2026-06-11 (DVN-01/02).** Fully de-vendored: `vendor/mzpeak_prototyping` tree + the
+> `[patch."https://github.com/HUPO-PSI/mzPeak"]` redirect removed. The project now depends directly on
+> upstream `mzpeak_prototyping` (git `HUPO-PSI/mzPeak@29e59b24` — all three former local patches merged
+> upstream, incl. chunk_series via PR #24) and mzdata (crates.io `=0.64.1`). No `vendor/`, no `[patch]`.
+> Full history: [`milestones/v0.8-ROADMAP.md`](milestones/v0.8-ROADMAP.md).
 
-**Requirements**: DVN-01, DVN-02 · **Plans**: TBD
+**Requirements**: DVN-01 ✅, DVN-02 ✅ · **Plans**: done
 
 ### Phase 30b: Upstream list-valued `ms_run.sample_ref` PR — CARRIED TO v0.9
 
@@ -170,52 +173,168 @@ done; **565 tests green**. Phases 22/29/30b carried to v0.9; Phase 36 deferred �
 
 ## Backlog
 
-### Phase 999.11: Submit the held upstream PR drafts to HUPO-PSI (BACKLOG)
+> **Cross-item synthesis (2026-06-11 deep research + adversarial review of 999.11/12/13).**
+> The three items were researched together; the reviews corrected several research conclusions. Net sequencing:
+> - **999.13's analysis CONFIRMS SDRF/ISA stays converter-local** (all four scope/demand/coupling/spec-binding
+>   reasons hold) — this **de-risks 999.12** (no "is this moving to mzdata?" ambiguity to document) and means
+>   the ~5,700 lines of `src/sdrf/` + `src/isa/` stay local *by design*.
+> - The **mzdata typed geometry accessor is the low-risk FIRST upstreaming step** (the duplication against
+>   mzdata 0.64.1 is total — params *and* Latin-1 decode already upstream); the optical read accessor is a
+>   hybrid; the imzML/.ibd **writer is the large, socialize-first, possibly-keep-local** last step.
+> - **999.11 (HUPO-PSI PRs) and 999.12 (docs) are independent of mzdata work** and of each other's blocking
+>   (999.12 feeds 999.11's spec text but neither gates the other).
+> - **All HUPO-PSI and mzdata pushes are owner-gated** (push policy: outside `github.com/okohlbacher` →
+>   explicit interactive authorization, warn first). The in-repo prep for each item is un-gated.
+> - **999.14** captures the small correctness/doc fixes the 999.11/13 research surfaced.
 
-**Goal:** [Captured for future planning] Submit the two prepared-and-held upstream PR drafts to HUPO-PSI — **owner-gated**: pushing outside `github.com/okohlbacher` requires explicit interactive authorization.
+### Phase 999.11: Submit the held upstream PR drafts to HUPO-PSI (BACKLOG — RESEARCHED 2026-06-11)
 
-**Requirements:** TBD
+> Research: [`phases/999.11-submit-held-upstream-pr-drafts-to-hupo-psi/RESEARCH.md`](phases/999.11-submit-held-upstream-pr-drafts-to-hupo-psi/RESEARCH.md)
+> + adversarial [`REVIEW.md`](phases/999.11-submit-held-upstream-pr-drafts-to-hupo-psi/REVIEW.md) (REVIEW overrides RESEARCH where they conflict).
 
-**Plans:** 0 plans
+**Goal:** Reconcile the two held upstream drafts against the shipped v0.8.2 code + live upstream schemas, then file them to HUPO-PSI — **owner-gated**.
 
-Plans:
-- [ ] TBD (promote with /gsd:review-backlog when ready)
+**Corrected recommendation / plan:**
+- **PR-first, not issue-first** (review correction). The owner's prior engagement (spec #1/#2; impl #19–#24)
+  is **entirely pull requests** — there are zero plain issues. Route by proposal shape: PR for the additive/decided
+  clusters (A, B); issue-or-draft-PR only for cluster C where the samples-as-channels modeling + CV-token home are
+  genuine design questions.
+- **Reconcile drafts before filing** (un-gated, in-repo): the drafts are stale (assembled `f2ad0ca`; run-filtered
+  projections + ISA structural matching + full de-vendor all landed after). Fix P-03/P-08 to describe **run-filtered**
+  projection + **ISA structural assay matching**; fix P-04's JSON to the real `{cv_ref,accession,name,value}` shape;
+  fix P-05 to `reporter_quant.json` reality — **emitted `channel_id` is a bare `sample-1` (semicolon-joined
+  `sample-1;sample-2`), NOT `sample-1::TMT126`** (that compound form is schema-example/test-fixture only); drop P-09's
+  vendored-fork language (writer is now plain upstream `29e59b24`).
+- **4-cluster filing plan:** **A** = P-02 (additive Data Kind `sdrf`/`isa` + Entity Type `sample-metadata`; fills the
+  live "Adding a new Entity Type" TODO stub) — lowest risk, file first, direct PR. **B** = P-09 (optional list-valued
+  `ms_run.sample_ref` — upstream `schema/ms_run.json` provably lacks it; **likely a two-repo change** since the
+  spec-repo and impl-repo schemas are already out of sync). **C** = P-03/P-04/P-08 reconciled (sample/study surface).
+  **D** = P-05 reporter-quant aux-array reshape — deferrable to a follow-up.
+- **Prerequisite fix (blocks filing P-04/C):** `build_isobaric_params` emits `cv_ref:"MS"` paired with a
+  `mzml2mzpeak:`-prefixed accession — an internal mismatch a maintainer will bounce. Set `cv_ref:"mzml2mzpeak"`
+  (or drop `cv_ref`) for the two namespaced params before filing. (Tracked in **999.14**.)
+- **UPS-01 is CLOSED, not an open question:** the held chunk_series draft is **superseded by PR #24 (merged) +
+  the full de-vendor** — mark it closed/merged in the proposal queue as part of prep.
 
-Drafts are ready in `docs/upstream/` (docs-only, never submitted, per push policy):
-- `v0.8-spec-batch-bundle.md` — the batched sample-metadata spec proposals (P-02..P-09) → `HUPO-PSI/mzPeak-specification`.
-- `ms-run-sample-ref-writer-pr.md` — the list-valued `ms_run.sample_ref` writer change (Phase 30b) → `HUPO-PSI/mzPeak`.
+**Key risks:** (1) owner-authorization gate is the only hard gate — `checkpoint:human-verify` must precede any
+HUPO-PSI remote op; (2) filing stale JSON/model would burn credibility (reconciliation mandatory); (3) the
+samples-as-channels modeling decision (P-04) has a larger blast radius than P-05's encoding if a committee member
+dissents; (4) canonical-schema-repo ambiguity → anticipate a two-repo P-09.
 
-Context: the third held item (the `chunk_series` patch) was upstreamed independently (HUPO-PSI/mzPeak PR #24), which let us **fully de-vendor** (no more `vendor/`, no `[patch]`). These two spec/writer drafts are the **only** remaining held upstream items. Promote to active work only when the owner authorizes submitting to HUPO-PSI.
+**Effort:** ~1 day of un-gated in-repo prep (reconcile both drafts + draft issue/PR bodies + confirm canonical
+repo). HUPO-PSI submission is **owner-gated** (out-of-band, owner's schedule).
 
-### Phase 999.12: Draft documentation for the SDRF/ISA study-design integration (BACKLOG)
+**Requirements:** UPSTREAM-PR, UPSTREAM-BIND-01 · **Plans:** TBD (promote with /gsd:review-backlog when ready)
 
-**Goal:** [Captured for future planning] Write a draft spec/doc describing how SDRF + ISA study-design / sample metadata integrates into mzPeak — the design contract, mostly prose, **cross-checked against the implementation** so the doc matches the code.
+Drafts in `docs/upstream/` (docs-only, never submitted, per push policy): `v0.8-spec-batch-bundle.md`
+(P-02..P-09 → `HUPO-PSI/mzPeak-specification`); `ms-run-sample-ref-writer-pr.md` (list-valued `ms_run.sample_ref`
+→ `HUPO-PSI/mzPeak`).
 
-**Requirements:** TBD
+### Phase 999.12: Draft documentation for the SDRF/ISA study-design integration (BACKLOG — RESEARCHED 2026-06-11)
 
-**Plans:** 0 plans
+> Research: [`phases/999.12-draft-sdrf-isa-study-design-integration-documentation/RESEARCH.md`](phases/999.12-draft-sdrf-isa-study-design-integration-documentation/RESEARCH.md)
+> + adversarial [`REVIEW.md`](phases/999.12-draft-sdrf-isa-study-design-integration-documentation/REVIEW.md).
 
-Plans:
-- [ ] TBD (promote with /gsd:review-backlog when ready)
+**Goal:** Write the authoritative v0.8 sample-metadata integration spec/doc, mirroring the code's component
+boundaries and pinned to source + schema (verified against the shipped implementation, drift flagged).
 
-Scope: document the v0.8 sample-metadata model — verbatim SDRF/ISA embed (`data_kind: sdrf`/`isa`, byte-identical anchor), the run-filtered projections (`metadata.sample_list`, `metadata.study`, the `phase32_shadow` `run_sample_binding`), channels-as-labeled-samples (`MS:1002602` + reporter-mz, no `channel_list`), and the unified `SampleMetadataDoc` that both the SDRF and ISA readers fill. **Mostly doc/spec, but must be verified against the actual implementation** (`src/sdrf/`, `src/isa/`, `schema/study.json`, `schema/sample_list.json`, `schema/source_curie.json`) and the `docs/` extension contract — flag any doc-vs-code drift. Likely feeds the held HUPO-PSI spec batch ([[999.11]]).
+**Corrected recommendation / plan:**
+- **Single authoritative doc** (suggest `docs/sdrf-isa-mzpeak-integration-spec.md`) structured as the unified model
+  → readers → embed → run-match/filter → projections → channels → **reporter-quant** → CV → binding → scope, each
+  section pinned to its `src/…` + `schema/*.json` surface.
+- **Add a dedicated reporter-quant / reporter-intensity aux-array section (Phase 35)** — the research omitted it.
+  `--reporter-quant` (off by default) emits a `reporter_intensity` NonStandardDataArray (Float64, MS2-only,
+  semicolon-joined `channel_id`, `0.0` missing sentinel, TMTpro-null channels omitted, schema `reporter_quant.json`).
+  This brings the outline to **~15 sections** and makes it the 5th archive output the doc must cover.
+- **Doc reconciliation is lighter than the research implied:** only `docs/sdrf-mzpeak-integration.md` is genuinely
+  un-bannered stale and should be **retired/reconciled** (banner + pointer). `docs/mzpeak-extension-contract.md
+  §3.4–§3.7` are **already self-superseding (banner-marked)** — prune as marked legacy provenance, don't re-litigate;
+  §3.9–§3.14 are the correct v0.8 binding sections.
+- **All 8 drift items (D1–D8) are real** and must be resolved: no `channel_list` (D1), run-level-only binding /
+  `assay_ref` deferred (D2), `SampleMetadataDoc` rename vs `StudyMetadata` (D3), run-filtering first-class (D4), ISA
+  structural matching (D5), two-block back-ref split + member name `sample_metadata/sdrf.tsv` **slash** (D6),
+  `MS:1002602` + free-text tokens not PRIDE accessions (D7), factor_values parsed-but-not-projected (D8).
+- **ROADMAP fix:** `schema/source_curie.json` does **not exist** (`SourceCurie` is Rust-only, `src/schema/source_curie.rs`).
+  Drop it from any "verifies against" line; the stale ROADMAP reference is corrected here (see scope note below) and
+  tracked in **999.14**.
 
-### Phase 999.13: Analyze upstreaming MSI + SDRF/ISA support into mzdata (BACKLOG — v1.0 scope)
+**Key risks:** external-spec citation accuracy (SDRF/ISA/PSI-MS/UNIMOD anchors must be re-confirmed at write time —
+the doc's credibility to the HUPO-PSI audience depends on it); the `study.json` "three-places rule"
+(`src/schema/study.rs` + `docs/mzpeak-imaging-spec-suggestions.md` + the schema) must not be invalidated when the
+new doc becomes authoritative for `metadata.study`.
 
-**Goal:** [Captured for future planning] Analyze which parts of **(A) MSI support** and **(B) SDRF/ISA study-design support** should be pushed **upstream into `mzdata`** (the shared reader/data-model crate) to enable broader ecosystem support — then have mzML2mzPeak consume those capabilities **via upstream mzdata** instead of carrying them locally.
+**Effort:** ~**2.5–3.5 days** (not 2) — pure code-mapped prose is ~1.5 days, plus the un-scoped reporter-quant
+section, careful contract reconciliation, and external-anchor verification.
 
-**Requirements:** TBD
+**Requirements:** TBD · **Plans:** TBD (promote with /gsd:review-backlog when ready)
 
-**Plans:** 0 plans
+Feeds the held HUPO-PSI spec batch ([[999.11]]) and the upstreaming analysis ([[999.13]]). Verifies against
+`src/sdrf/`, `src/isa/`, `src/schema/{study,cv,source_curie}.rs`, `schema/{study,sample_list,reporter_quant}.json`,
+and the `docs/` extension contract.
 
-Plans:
-- [ ] TBD (promote with /gsd:review-backlog when ready)
+### Phase 999.13: Analyze upstreaming MSI + SDRF/ISA support into mzdata (BACKLOG — RESEARCHED 2026-06-11, v1.0 scope)
 
-Scope (v1.0): an architecture/design analysis, not yet implementation. For each capability cluster decide *what belongs in mzdata vs. what stays in mzML2mzPeak*:
-- **(A) MSI / imaging** — per-pixel IMS coordinates (`IMS:1000050/51/52`) are already surfaced by mzdata's imzML reader; assess whether the spatial extension model (coordinate grid, `metadata.imaging` shape, optical-image linkage, continuous-vs-processed handling) should become first-class in mzdata's data model so other tools inherit it. Ties to the imaging-structure cluster (PIX-01/ROI-01/CONT-01/IMG-01).
-- **(B) SDRF/ISA study design** — our unified `SampleMetadataDoc` + the SDRF/ISA readers (`src/sdrf/`, `src/isa/`) currently live in mzML2mzPeak. Assess whether a sample-metadata model + reader belongs in mzdata (shared by the whole `mzdata` ecosystem) vs. staying converter-local. Coordinate with the held HUPO-PSI spec work ([[999.11]], [[999.12]]).
+> Research: [`phases/999.13-analyze-upstreaming-msi-and-sdrf-isa-support-into-mzdata/RESEARCH.md`](phases/999.13-analyze-upstreaming-msi-and-sdrf-isa-support-into-mzdata/RESEARCH.md)
+> + adversarial [`REVIEW.md`](phases/999.13-analyze-upstreaming-msi-and-sdrf-isa-support-into-mzdata/REVIEW.md).
 
-Outcome: a recommendation per cluster (upstream / keep-local / hybrid), the mzdata API surface it would need, and a thin-out plan for mzML2mzPeak once upstream lands. Now that the project is **fully de-vendored** (mzdata = crates.io 0.64.1, mzpeak = upstream git), this is the natural next consolidation step. Owner-gated where it implies PRs to `mobiusklein/mzdata` (outside okohlbacher).
+**Goal:** Per-cluster recommendation (upstream / keep-local / hybrid) for moving MSI + SDRF/ISA support into
+`mzdata`, with the mzdata API surface each needs and a thin-out estimate. Analysis only, not implementation.
+
+**Corrected recommendation / plan:**
+- **(A) MSI — upstream the typed `<scanSettings>`-geometry accessor FIRST** (CONFIRMED, lowest risk). mzdata 0.64.1
+  already surfaces those params via `scan_settings().params` **and already Latin-1-decodes them** (`reading_shared.rs`
+  unconditional `add_param` + `decode_latin1`) — our `src/schema/geometry.rs` re-parse is **redundant typing-only
+  duplication** and its doc-comment ("mzdata does NOT surface scanSettings") is **stale**. Cleanest PR.
+- **(A) Optical read accessor = hybrid, but for the corrected reason.** mzdata DOES capture `<sample>` cvParams incl.
+  `IMS:1006008` into `Sample.params` (the research's "mzdata doesn't surface these" premise is wrong). The genuine
+  local value is the **ordered multi-image grouping + a path-escape security guard**, not the data. Keep that local;
+  optionally upstream an *ordered* `optical_images()`.
+- **(A) imzML/.ibd writer = upstream but LAST, socialize-first** — and keep-local is a **legitimate permanent
+  choice**, not just a fallback (single-maintainer maintenance-trap risk; no imzML writer exists anywhere, so ours is
+  unique but costly to hand over).
+- **(B) SDRF/ISA = KEEP ENTIRELY LOCAL** (CONFIRMED — strongest finding; all four reasons hold). mzdata's `Sample` is
+  mzML-native `{id,name,params}`, unrelated to `SampleMetadataDoc`; zero upstream demand signal; the only shareable
+  piece (`ms_run.sample_ref`) upstreams to **mzPeak, not mzdata** (held in 999.11).
+- **Thin-out math corrected:** low-risk geometry+optical read accessors ≈ **~480 lines** (sound). The research's
+  "aggressive ~2,500–2,900 lines / 13–15% of `src`" is **wrong** — the writer is ~**1,030 non-test lines** (the rest
+  is test code that gets deleted, not handed to mzdata); the tree is **26,621 lines (~42% tests)**, so the writer is
+  ~9–11%, not 13–15%. **Strike the "15% reduction" headline** — the writer's value is "nobody else has it," not line
+  count. SDRF/ISA contributes 0 to thin-out by design.
+- Note: the "a reader shouldn't be an SDRF writer" line is the **project's own paraphrase** of JK's posture
+  (DESIGN-DRAFT decision G), not a sourced Klein quote.
+
+**Key risks:** push-policy (all mzdata PRs target `mobiusklein/mzdata`, outside okohlbacher → owner-gated); an
+upstream geometry accessor may land with a different shape than `ImagingRunMetadata` (keep a thin adapter); writer
+upstreaming risks a perpetual maintenance commitment for a single-maintainer crate (watch the #45 monorepo decision).
+
+**Effort:** analysis is **done** (this research). Downstream PRs: geometry **S** (1–2 days), optical **S–M**, writer
+**L** (weeks). All owner-gated.
+
+**Requirements:** TBD · **Plans:** TBD (promote with /gsd:review-backlog when ready)
+
+Now that the project is fully de-vendored (mzdata = crates.io `0.64.1`, mzpeak = upstream git), this is the natural
+next consolidation step. Coordinate the imaging-geometry placement question with the imaging-structure cluster
+(PIX-01/ROI-01/CONT-01/IMG-01, deferred beyond v1.0) and the spec work ([[999.11]], [[999.12]]).
+
+### Phase 999.14: Small correctness/doc fixes surfaced by the 999.11/13 research (BACKLOG — RESEARCHED 2026-06-11)
+
+**Goal:** Land the quick correctness/doc fixes the 999.11 + 999.13 research turned up — small, in-repo, un-gated
+(no HUPO-PSI/mzdata push). Each is a confirmed mismatch between code/docs and reality.
+
+**Quick wins:**
+- **(a) `build_isobaric_params` cv_ref/accession mismatch** — emits `cv_ref:"MS"` with a `mzml2mzpeak:`-prefixed
+  accession for the `channel-role` / `reporter-ion-mz` params. Set `cv_ref:"mzml2mzpeak"` (or drop `cv_ref`).
+  **Prerequisite for filing P-04/cluster C in 999.11.** (`src/sdrf/project.rs`.)
+- **(b) Stale `src/schema/geometry.rs` doc-comment** — claims mzdata does NOT surface `<scanSettings>` geometry;
+  mzdata 0.64.1 **does** (`scan_settings().params`, Latin-1-decoded). Correct the comment (the re-parse is now
+  typing-only duplication, pending the 999.13 geometry upstreaming). Same stale-comment pattern in
+  `src/schema/optical.rs` (mzdata captures `<sample>` cvParams).
+- **(c) CLAUDE.md says mzdata `0.63.3`** but `Cargo.toml` pins **`=0.64.1`** — update the stack note to match.
+- **(d) ROADMAP's non-existent `schema/source_curie.json` reference** — `SourceCurie` is Rust-only
+  (`src/schema/source_curie.rs`); no JSON schema exists. (Already removed from 999.12's verifies-against list above;
+  sweep for any other stray references.)
+
+**Effort:** ~half a day, in-repo, no external push. **Requirements:** TBD · **Plans:** TBD (promote when ready)
 
 ### Imaging structure (pixel facet, ROI polygons, continuous shared-axis, images.parquet) — DEFERRED beyond v1.0
 
@@ -247,7 +366,7 @@ See REQUIREMENTS.md → "Deferred beyond v1.0 — imaging structure (F6/F7/F8)" 
 
 | Backlog item | Realized as | Requirement(s) |
 |--------------|-------------|----------------|
-| 999.1 — de-vendor both forks | **Phase 29 — RELOCATED TO v0.8** | DVN-01, DVN-02 |
+| 999.1 — de-vendor both forks | **Phase 29 — ✅ DONE 2026-06-11** (fully de-vendored) | DVN-01 ✅, DVN-02 ✅ |
 | (upstream rebase before new facets — spec-review 2026-06-08) | **Phase 23** ✅ DONE | REB-01 |
 | 999.5 — SDRF + isobaric channel modeling | **RELOCATED TO v0.8** (was Phase 27) | SDRF-01..05, CHAN-01..03 (→ v0.8 SM-*/CHAN-*) |
 | 999.6 — chunk_series index-desync PR | **Phase 22 — RELOCATED TO v0.8** | UPS-01 |
@@ -262,7 +381,12 @@ See REQUIREMENTS.md → "Deferred beyond v1.0 — imaging structure (F6/F7/F8)" 
 
 The 999.2/999.3/999.4 items below are already DONE (kept as shipped history); their content is unchanged.
 
-### Phase 999.1: Drop the vendored mzpeak_prototyping patches once their upstream PRs merge — → **Phase 29, RELOCATED TO v0.8 (gated)**
+### Phase 999.1: Drop the vendored mzpeak_prototyping patches once their upstream PRs merge — → **Phase 29, ✅ DONE 2026-06-11**
+
+> **✅ DONE 2026-06-11.** Both gates cleared: chunk_series merged upstream (PR #24, DVN-01) and the project
+> now pins mzpeak `HUPO-PSI/mzPeak@29e59b24` + mzdata crates.io `=0.64.1` (DVN-02). `vendor/mzpeak_prototyping`
+> tree and the `[patch]` redirect are removed; the converter depends on upstream directly. History below is
+> retained for provenance.
 
 **Goal:** Fully de-vendor — delete `vendor/mzpeak_prototyping` + the
 `[patch."https://github.com/HUPO-PSI/mzPeak"]` redirect and depend on upstream `HUPO-PSI/mzPeak`
