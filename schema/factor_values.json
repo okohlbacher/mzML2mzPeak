@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "mzPeak metadata.factor_values",
+  "description": "Governs mzpeak_index.json.metadata.factor_values — the OPT-IN (SM-07) projection of SDRF `factor value[*]` columns. Emitted ONLY under the --project-factor-values flag; default conversions omit this key entirely (lean projection posture, Q9/RATIFIED-G — the verbatim embedded SDRF/ISA blob is the authoritative carrier). Run-filtered: only the matched run's samples appear (same scope as metadata.sample_list). SDRF only in v0.8 (ISA factor projection is a tracked follow-up). One entry per factor column, each carrying the per-sample levels (deduplicated by (sample, value), first-seen order). Three-places rule: this file + src/sdrf/project.rs (project_factor_values) + docs/sdrf-isa-study-design-integration.md (§9).",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "description": "One SDRF study factor (from a `factor value[NAME]` column) and the per-sample levels observed for the in-scope rows.",
+    "required": ["factor_name", "levels"],
+    "properties": {
+      "factor_name": {
+        "type": "string",
+        "description": "The factor name extracted from the SDRF header `factor value[NAME]` (e.g. \"disease\", \"time\"). Lowercased, matching the stored verbatim header."
+      },
+      "levels": {
+        "type": "array",
+        "description": "The per-sample factor level for each in-scope sample, deduplicated by (sample, value) in first-seen row order. Empty factor cells are skipped.",
+        "items": {
+          "type": "object",
+          "required": ["sample", "value"],
+          "properties": {
+            "sample": {
+              "type": "string",
+              "description": "The SDRF `source name` of the sample this level applies to (matches a metadata.sample_list entry's `name`)."
+            },
+            "value": {
+              "type": "string",
+              "description": "The verbatim factor level value for this sample, e.g. \"lung adenocarcinoma\" or \"24h\"."
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "additionalProperties": false
+  }
+}

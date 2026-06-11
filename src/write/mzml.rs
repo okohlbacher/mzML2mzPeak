@@ -189,6 +189,26 @@ pub fn convert_mzml(
     isa: Option<&Path>,
     reporter_quant: bool,
 ) -> Result<MzmlConvertReport, MzmlConvertError> {
+    // Thin wrapper preserving the established 6-arg signature for the ~30 existing callers; the
+    // opt-in factor-values projection (SM-07) defaults OFF here. Mirrors the convert/convert_with
+    // split in convert.rs.
+    convert_mzml_with(input, output, opts, sdrf, isa, reporter_quant, false)
+}
+
+/// Like [`convert_mzml`] but with the opt-in `project_factor_values` flag (SM-07). When `true` AND
+/// the input is SDRF with `factor value[*]` columns, a run-filtered `metadata.factor_values` block
+/// is emitted; default (`false`) output is byte-identical to [`convert_mzml`] (lean posture,
+/// RATIFIED-G). Plumbed from the CLI `--project-factor-values` flag.
+#[allow(clippy::too_many_arguments)]
+pub fn convert_mzml_with(
+    input: &Path,
+    output: &Path,
+    opts: &crate::write::EncodingOptions,
+    sdrf: Option<&Path>,
+    isa: Option<&Path>,
+    reporter_quant: bool,
+    project_factor_values: bool,
+) -> Result<MzmlConvertReport, MzmlConvertError> {
     // `_xml_guard` keeps the transcoded temp file (if any) alive for the reader's lifetime.
     let (read_path, _xml_guard) = readable_path(input)?;
     let mut reader = MZReaderType::<File, CentroidPeak, DeconvolutedPeak>::open_path(&read_path)
@@ -583,6 +603,18 @@ pub fn convert_mzml(
         let cv_list = crate::schema::cv::cv_list_for_sample_metadata(&sample_list);
         zip.add_index_metadata("cv_list", &cv_list)
             .map_err(MzmlConvertError::Json)?;
+
+        // 9. OPT-IN (SM-07): metadata.factor_values — run-filtered SDRF `factor value[*]` projection.
+        //    Emitted ONLY under --project-factor-values AND when non-empty; default conversions omit
+        //    the key entirely (lean posture, RATIFIED-G — the verbatim blob is the carrier). The key
+        //    is omitted on empty so a no-factor SDRF stays byte-identical to the no-flag output.
+        if project_factor_values {
+            let factor_values = crate::sdrf::project_factor_values(&doc, &match_result);
+            if !factor_values.is_empty() {
+                zip.add_index_metadata("factor_values", &factor_values)
+                    .map_err(MzmlConvertError::Json)?;
+            }
+        }
     }
 
     // ── ISA verbatim embed + metadata.study back-ref (Plan 33-03 / SM-08..10) ─────────────────

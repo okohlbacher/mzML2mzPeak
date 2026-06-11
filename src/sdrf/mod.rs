@@ -36,6 +36,8 @@ pub use model::{
 pub use match_rows::match_rows_for_data_file;
 pub use parse::parse_sdrf;
 pub use embed::{embed_sdrf_member, extract_sample_metadata_member, EmbedError, EmbedFacts};
-pub use project::{build_run_sample_binding, collect_channel_refs, project_sample_list};
+pub use project::{
+    build_run_sample_binding, collect_channel_refs, project_factor_values, project_sample_list,
+};
 pub use channels::{ChannelReagent, is_isobaric_label, resolve_reagent};
 pub use validate::{SampleMetadataFormat, ValidationOutcome, detect_validator, run_validator};

@@ -157,6 +157,86 @@ pub fn project_sample_list(doc: &SampleMetadataDoc, match_result: &MatchResult) 
         .collect()
 }
 
+/// Project run-filtered SDRF `factor value[*]` columns into a `metadata.factor_values` block
+/// (SM-07, **OPT-IN**).
+///
+/// Default conversions do NOT call this: the lean projection posture (Q9 / RATIFIED-G) keeps
+/// factor values in the verbatim blob, and the upstream spec drafts describe that default. This is
+/// emitted only under the `--project-factor-values` flag, for callers who want a queryable factor
+/// facet alongside the verbatim source. Run-filtered to the matched run's samples (same
+/// `match_result.rows` scope as [`project_sample_list`]).
+///
+/// **SDRF only (v0.8).** ISA inputs (whose factor columns are not in the SDRF verbatim row grid)
+/// return an empty `Vec` — the verbatim ISA bundle remains the carrier; per-format ISA factor
+/// projection is a tracked follow-up.
+///
+/// Shape — one entry per `factor value[NAME]` column present, each with the per-sample levels for
+/// the in-scope rows (deduplicated by (sample, value), first-seen order):
+/// ```json
+/// [ { "factor_name": "disease",
+///     "levels": [ { "sample": "<source name>", "value": "tumor" }, … ] } ]
+/// ```
+/// A zero-match run, no factor columns, or all-empty cells → empty `Vec` (caller omits the key).
+/// Governed by `schema/factor_values.json`. Infallible (reads the in-memory doc only).
+pub fn project_factor_values(
+    doc: &SampleMetadataDoc,
+    match_result: &MatchResult,
+) -> Vec<serde_json::Value> {
+    // ISA path (structural matcher fills sample_names) is out of scope for v0.8 — the ISA factor
+    // columns are not in the SDRF verbatim grid. Return empty (the verbatim ISA bundle holds them).
+    if !match_result.sample_names.is_empty() || match_result.rows.is_empty() {
+        return vec![];
+    }
+    let Some(source_name_col) = doc.header_index("source name") else {
+        return vec![];
+    };
+    // Factor columns in encounter order: (col_index, factor_name). Matches the `parse.rs` detection
+    // (`factor value[` prefix; headers are stored lowercased) — case-insensitive here for safety.
+    let factor_cols: Vec<(usize, String)> = doc
+        .verbatim
+        .header
+        .iter()
+        .enumerate()
+        .filter_map(|(i, h)| {
+            let trimmed = h.trim();
+            let lower = trimmed.to_ascii_lowercase();
+            if lower.starts_with("factor value[") && trimmed.ends_with(']') {
+                let name = trimmed["factor value[".len()..trimmed.len() - 1].trim().to_string();
+                (!name.is_empty()).then_some((i, name))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    factor_cols
+        .iter()
+        .filter_map(|(col, name)| {
+            let mut levels: Vec<serde_json::Value> = Vec::new();
+            let mut seen: Vec<(String, String)> = Vec::new();
+            for &row_idx in &match_result.rows {
+                let Some(row) = doc.verbatim.rows.get(row_idx) else { continue };
+                let sample = match row.get(source_name_col) {
+                    Some(s) if !s.is_empty() => s.clone(),
+                    _ => continue,
+                };
+                let value = match row.get(*col) {
+                    Some(v) if !v.is_empty() => v.clone(),
+                    _ => continue,
+                };
+                let key = (sample.clone(), value.clone());
+                if seen.contains(&key) {
+                    continue;
+                }
+                seen.push(key);
+                levels.push(serde_json::json!({ "sample": sample, "value": value }));
+            }
+            (!levels.is_empty())
+                .then(|| serde_json::json!({ "factor_name": name, "levels": levels }))
+        })
+        .collect()
+}
+
 /// Collect all distinct non-empty values from a named column in `doc.verbatim.rows`.
 fn collect_column_values(doc: &SampleMetadataDoc, col_idx: Option<usize>) -> Vec<String> {
     let Some(idx) = col_idx else { return vec![] };
@@ -1427,5 +1507,86 @@ mod tests {
         binding_ids.sort();
         assert_eq!(list_ids, binding_ids,
             "INVARIANT: ISA-JSON QC-1 sample_list ids == binding.sample_ids");
+    }
+
+    // ── project_factor_values tests (SM-07, opt-in, run-filtered) ─────────────
+
+    /// A 2-factor SDRF doc (3 rows, 2 distinct samples). disease has 2 distinct sample/value
+    /// pairs; time repeats a value but for a distinct sample, so dedup is by (sample,value).
+    fn two_factor_doc() -> SampleMetadataDoc {
+        SampleMetadataDoc {
+            source_format: SourceFormat::Sdrf,
+            samples: vec![
+                Sample { id: "sample-1".to_string(), name: "S1".to_string(), characteristics: vec![] },
+                Sample { id: "sample-2".to_string(), name: "S2".to_string(), characteristics: vec![] },
+            ],
+            assays: vec![],
+            factor_levels: vec![],
+            verbatim: VerbatimBundle {
+                header: vec![
+                    "source name".to_string(),
+                    "comment[data file]".to_string(),
+                    "factor value[disease]".to_string(),
+                    "factor value[time]".to_string(),
+                ],
+                rows: vec![
+                    vec!["S1".to_string(), "f.raw".to_string(), "tumor".to_string(), "0h".to_string()],
+                    vec!["S1".to_string(), "f.raw".to_string(), "tumor".to_string(), "0h".to_string()], // dup row → deduped
+                    vec!["S2".to_string(), "f.raw".to_string(), "normal".to_string(), "0h".to_string()],
+                ],
+            },
+            diagnostics: vec![],
+        }
+    }
+
+    #[test]
+    fn project_factor_values_two_factors_run_filtered_deduped() {
+        let doc = two_factor_doc();
+        let out = project_factor_values(&doc, &match_rows(vec![0, 1, 2]));
+        assert_eq!(out.len(), 2, "two factor columns → two entries");
+        let disease = out.iter().find(|f| f["factor_name"] == "disease").expect("disease factor");
+        let levels = disease["levels"].as_array().unwrap();
+        assert_eq!(levels.len(), 2, "disease: (S1,tumor)+(S2,normal); the dup S1/tumor row is deduped");
+        let time = out.iter().find(|f| f["factor_name"] == "time").expect("time factor");
+        // S1/0h (deduped across the two S1 rows) + S2/0h = 2 distinct (sample,value) pairs.
+        assert_eq!(time["levels"].as_array().unwrap().len(), 2, "time deduped by (sample,value)");
+        assert_eq!(levels[0]["sample"], "S1");
+        assert_eq!(levels[0]["value"], "tumor");
+    }
+
+    #[test]
+    fn project_factor_values_run_filter_subset() {
+        let doc = two_factor_doc();
+        // Only row 2 (S2/normal) in scope.
+        let out = project_factor_values(&doc, &match_row(2));
+        let disease = out.iter().find(|f| f["factor_name"] == "disease").unwrap();
+        let levels = disease["levels"].as_array().unwrap();
+        assert_eq!(levels.len(), 1, "run-filtered to row 2 only");
+        assert_eq!(levels[0]["sample"], "S2");
+        assert_eq!(levels[0]["value"], "normal");
+    }
+
+    #[test]
+    fn project_factor_values_no_factor_columns_is_empty() {
+        // pxd020187_like_doc has no factor value[*] columns.
+        let doc = pxd020187_like_doc();
+        assert!(project_factor_values(&doc, &full_match(&doc)).is_empty(),
+            "a doc with no factor columns must project no factor_values");
+    }
+
+    #[test]
+    fn project_factor_values_zero_match_is_empty() {
+        let doc = two_factor_doc();
+        assert!(project_factor_values(&doc, &no_match()).is_empty(),
+            "zero-match run → empty factor_values (honest absence)");
+    }
+
+    #[test]
+    fn project_factor_values_isa_path_is_empty() {
+        // ISA path (sample_names non-empty) is out of scope for v0.8 → empty.
+        let doc = two_factor_doc();
+        let isa_match = MatchResult { rows: vec![], sample_names: vec!["S1".to_string()], diagnostics: vec![] };
+        assert!(project_factor_values(&doc, &isa_match).is_empty(),
+            "ISA path returns empty (factors stay in the verbatim ISA bundle)");
     }
 }

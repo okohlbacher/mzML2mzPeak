@@ -180,6 +180,14 @@ pub struct ConvertCli {
     #[arg(long = "reporter-quant")]
     pub reporter_quant: bool,
 
+    /// Project SDRF `factor value[*]` columns into a run-filtered `metadata.factor_values` block
+    /// (SM-07). OFF by default — the lean projection posture (RATIFIED-G) keeps factors in the
+    /// verbatim embedded blob, and a bare invocation leaves default output byte-identical. Only
+    /// meaningful on the plain-mzML forward path with `--sdrf`; SDRF-only (ISA factors stay in the
+    /// verbatim bundle). A no-factor SDRF still omits the key entirely.
+    #[arg(long = "project-factor-values")]
+    pub project_factor_values: bool,
+
     /// Run the reference sample-metadata oracle (VAL-02, NON-BLOCKING BONUS).
     ///
     /// When paired with `--sdrf`, shells to `sdrf-pipelines` (`parse_sdrf --validate`) ONLY if
@@ -454,13 +462,14 @@ fn run_forward_mzml(cli: ConvertCli) -> anyhow::Result<()> {
     })?;
 
     log::info!("converting {} (plain mzML)", cli.input.display());
-    let report = crate::write::convert_mzml(
+    let report = crate::write::convert_mzml_with(
         &cli.input,
         out,
         &cli.encoding_options(),
         cli.sdrf.as_deref(),
         cli.isa.as_deref(),
         cli.reporter_quant,
+        cli.project_factor_values,
     )
     .with_context(|| format!("plain-mzML conversion failed for {}", cli.input.display()))?;
     log::info!(

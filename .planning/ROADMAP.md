@@ -194,14 +194,16 @@ done; **565 tests green**. Phases 22/29/30b carried to v0.9; Phase 36 deferred �
 > | 2 | **999.13(A)** — forward path types geometry from mzdata `scan_settings().params`; quick-xml retained for `.ibd`-free verify/dry-run | ✅ | none | ✅ **DONE** (`8368db6`) — equivalence locked by `tests/geometry_mzdata_equiv.rs` |
 > | 3 | **999.12** — SDRF/ISA study-design integration doc | ✅ | none (feeds 999.11 spec text) | ✅ **DONE** (`6422e61`) — `docs/sdrf-isa-study-design-integration.md`, +5-item drift appendix |
 > | 4 | **999.11 prep** — reconcile both held drafts vs shipped v0.8.2 + draft issue/PR bodies | ✅ prep | *submission* owner-gated | open — local prep un-gated, ~1 d |
-> | 4b | **999.14b (NEW)** — reconcile the 5 contract(§3.9–3.14)-prose drifts the 999.12 doc surfaced (D1–D5; code is ground truth) | ✅ | none | open — quick doc fix, ~0.5 d; do before 999.11 PR text |
-> | 5 | **SM-07 / factor_values native projection** (if still open in v0.9) | ✅ | none (converter feature) | open |
+> | 4b | **999.14b** — reconcile the 5 contract(§3.9–3.14)-prose drifts the 999.12 doc surfaced (D1–D5; code is ground truth) | ✅ | none | ✅ **DONE** (`ecb82e7`) |
+> | 5 | **SM-07 / factor_values projection** | ✅ | none (opt-in converter feature; default unchanged) | ✅ **DONE** — `--project-factor-values` emits run-filtered `metadata.factor_values` (SDRF); default omits it (lean posture preserved); `schema/factor_values.json` + tests + validator-clean |
 > | 6 | **999.13(B/C) upstreaming** — geometry → optical → imzML/.ibd writer into mzdata | ❌ | **all owner-gated** (`mobiusklein/mzdata`); writer may stay local | open — gated |
 > | 7 | **Imaging structure cluster** (PIX/ROI/CONT/IMG) | ✅ local but **post-1.0** | none | open — post-1.0 |
 >
-> **Remaining pull-off-now (no upstream effect): 4b, 5** (+ the local *prep* half of 4). The 999.13(A) geometry
-> *typing core* (`imaging_run_metadata_from_params`) is now the exact artifact a future mzdata typed-accessor PR
-> would contribute — item 1+2 made the eventual PRs cleaner, as intended.
+> **All local pull-off-now work is DONE** (items 1, 2, 3, 4b, 5 + the local *prep* half of 4 = the reconciled
+> drafts + [`FILING-PLAN.md`](upstream/FILING-PLAN.md)). The 999.13(A) geometry *typing core*
+> (`imaging_run_metadata_from_params`) is now the exact artifact a future mzdata typed-accessor PR would contribute.
+> **Only owner-gated work remains:** 4-submit (file the held HUPO-PSI PRs — needs explicit owner authorization) and
+> 6 (mzdata upstreaming). Item 7 (imaging structure cluster) stays post-1.0.
 >
 > **New follow-up 999.14b — contract-prose drift (from the 999.12 doc's appendix, all code-verified):**
 > D1 ISA member names (`sample_metadata/isa/isa.json` + verbatim Tab basenames, not `.../isa.json` / `i_Investigation.txt`);

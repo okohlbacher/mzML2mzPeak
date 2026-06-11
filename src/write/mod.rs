@@ -31,7 +31,8 @@ pub use spectrum::{to_mzdata, to_mzdata_canonical, CastNarrowing};
 pub use writer::{ImagingWriter, WriteError};
 pub use convert::{convert, convert_with, ConversionOutcome};
 pub use mzml::{
-    convert_mzml, inspect_mzml, CentroidNonMonotonic, MzmlConvertError, MzmlConvertReport,
+    convert_mzml, convert_mzml_with, inspect_mzml, CentroidNonMonotonic, MzmlConvertError,
+    MzmlConvertReport,
 };
 
 use mzpeak_prototyping::chunk_series::ChunkingStrategy;

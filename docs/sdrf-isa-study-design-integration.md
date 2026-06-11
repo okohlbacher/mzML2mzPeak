@@ -279,6 +279,25 @@ nested under `metadata.study.run_sample_binding` and omitted entirely when `None
 binding naturally lists all N channel sample-ids (each channel is a distinct source name)
 (`src/sdrf/project.rs:306-308`).
 
+### 4.5 `metadata.factor_values` (opt-in — SM-07)
+
+By default, SDRF `factor value[*]` columns are **not** projected — they live in the verbatim blob
+(lean posture, Q9/RATIFIED-G). Passing `--project-factor-values` emits an additional run-filtered
+`metadata.factor_values` block (`src/sdrf/project.rs::project_factor_values`,
+`schema/factor_values.json`): one entry per factor column, each carrying the per-sample levels for
+the in-scope rows (deduplicated by (sample, value)):
+
+```json
+[ { "factor_name": "disease",
+    "levels": [ { "sample": "S1", "value": "tumor" }, { "sample": "S2", "value": "normal" } ] } ]
+```
+
+It is **additive and off by default** (a bare conversion is byte-identical), **run-filtered** like
+`sample_list`, and **SDRF only** in v0.8 — ISA factor columns are not in the SDRF verbatim row grid,
+so ISA inputs project no factor block (the verbatim ISA bundle remains the carrier). Because the
+default omits it, the upstream spec drafts (which describe default behaviour) are unaffected; a
+future spec proposal would standardise the block before it becomes a default.
+
 ---
 
 ## 5. Isobaric labeling: channels as labeled samples
@@ -457,7 +476,7 @@ The native **`ms_run.sample_ref`** field is not yet emitted: it is gated on the 
 |------|--------|----------|
 | `channel_list` / `plex_id` / `channel_set` | **dropped** (RATIFIED-E) — never emitted | `src/sdrf/project.rs:27-29` |
 | Per-spectrum `assay_ref` column | deferred ≥v0.9; binding is run-level only | contract §3.11 |
-| `factor_values` projection | **parsed** into `factor_levels` but **not projected** to any key | `src/sdrf/model.rs:356`; never read by `project.rs` |
+| `factor_values` projection | **OPT-IN** (SM-07): default omits it (lean posture); `--project-factor-values` emits a run-filtered `metadata.factor_values` block (SDRF only) | `src/sdrf/project.rs::project_factor_values`; `schema/factor_values.json` |
 | Full `characteristics→Param` on sample entries | demoted (lean posture); blob holds it | `src/sdrf/project.rs:13-14` |
 | Reagent child accession as a param | not emitted (see Drift D5) | `src/sdrf/project.rs:205-211` |
 | Native `ms_run.sample_ref` | gated on upstream Phase 30b; shadow ships now | §8 |
