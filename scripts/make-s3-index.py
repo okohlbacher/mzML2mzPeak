@@ -429,28 +429,6 @@ footer.ftr a{color:#c2cbd6}footer.ftr a:hover{color:#fff}
 """
 
 
-# The hero "scope" visual — a self-contained spectrum panel (ported from mzpeak.org Home.vue).
-SCOPE = (
-    '<div class="scope"><div class="scope-bar"><span class="t">spectrum</span>'
-    '<span class="scope-tag">MS1 · profile</span><span class="grow"></span>'
-    '<span class="t mono">run.mzpeak</span></div>'
-    '<div class="scope-body"><div class="scope-read"><span class="k">m/z</span> 478.9213 '
-    '· <span class="k">int</span> 1.42e8</div>'
-    '<svg class="spec" viewBox="0 0 560 200" preserveAspectRatio="none" aria-hidden="true">'
-    '<defs><linearGradient id="specfill" x1="0" y1="0" x2="0" y2="1">'
-    '<stop offset="0%" stop-color="rgba(49,87,233,0.34)"/>'
-    '<stop offset="100%" stop-color="rgba(49,87,233,0)"/></linearGradient></defs>'
-    '<path class="spec-area" d="M0,192 L40,190 L80,186 L120,187 L150,162 L170,136 L185,178 '
-    'L210,184 L240,108 L255,36 L268,136 L290,182 L320,170 L350,178 L380,136 L400,86 L412,16 '
-    'L424,100 L450,172 L480,182 L520,188 L560,192 L560,200 L0,200 Z"/>'
-    '<path class="spec-line" d="M0,192 L40,190 L80,186 L120,187 L150,162 L170,136 L185,178 '
-    'L210,184 L240,108 L255,36 L268,136 L290,182 L320,170 L350,178 L380,136 L400,86 L412,16 '
-    'L424,100 L450,172 L480,182 L520,188 L560,192"/>'
-    '<line class="spec-marker" x1="412" y1="16" x2="412" y2="192"/></svg>'
-    '<div class="scope-axis"><span>120</span><span>500</span><span>900</span>'
-    '<span>1400</span><span>1804 m/z</span></div></div></div>')
-
-
 def nav(active_slug):
     """Sticky header — brand links to www.mzpeak.org (parent site); local pills for the example
     subsets; explicit mzpeak.org + GitHub actions on the right."""
@@ -549,24 +527,10 @@ for p in order:
         f'<span><b>{hs(nb)}</b></span></div>'
         f'<div class="go" style="color:{m["accent"]}">Browse {m["title"]} →</div></a>')
 
-hero = (
-    '<section class="hero on-dark"><div class="wrap hero-in"><div>'
-    '<span class="eyebrow hero-eyebrow"><span class="dot"></span> mzPeak · example corpus</span>'
-    '<h1>Browse the live<br /><span class="acc">mzPeak example data</span></h1>'
-    '<p class="hero-lead">Real mass-spectrometry datasets for the <b>mzML2mzPeak</b> converter — the '
-    'original imzML / mzML / vendor RAW and sample metadata, alongside the converted '
-    '<span class="mono">.mzpeak</span> files. Every <span class="mono">.mzpeak</span> opens straight '
-    'in a browser viewer, streamed over HTTP — no download.</p>'
-    '<div class="hero-cta">'
-    f'<a class="btn btn-primary btn-lg" href="{MZPEAK_SITE}">← Back to mzpeak.org</a>'
-    '<a class="btn btn-secondary btn-lg" href="#browse">Browse the corpus ↓</a></div>'
-    f'<div class="hero-trust"><span>Part of <b>mzPeak</b>, governed by <b>HUPO-PSI</b></span>'
-    f'<span class="sep"></span><span><b>{total_n}</b> objects · <b>{hs(total_b)}</b> · public read</span></div>'
-    f'</div>{SCOPE}</div></section>')
-
+# No hero block — the page is the light card grid straight under the header (back-links to
+# mzpeak.org live in the header brand / "↗ mzpeak.org" action and the footer).
 landing = (
-    hero +
-    '<main class="wrap" id="browse">'
+    '<main class="wrap" id="browse" style="padding-top:28px">'
     f'<section class="grid" style="grid-template-columns:repeat({len(cards)},minmax(0,1fr))">{"".join(cards)}</section>'
     '<div class="legend">Each <code>.mzpeak</code> streams into a browser viewer over HTTP range (no download): '
     f'<a class="viewer ex" target="_blank" rel="noopener" href="{EXPLORER}">▶ Explorer</a> = mzPeak Explorer '
