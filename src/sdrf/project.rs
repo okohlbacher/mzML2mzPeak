@@ -178,10 +178,17 @@ fn collect_column_values(doc: &SampleMetadataDoc, col_idx: Option<usize>) -> Vec
 /// required: [cv_ref, accession, name]; optional: value, unit_cv_ref, unit_accession).
 ///
 /// Emits (in order):
-/// 1. Sample-label cvParam (MS:1002602 umbrella; value = verbatim reagent label).
-/// 2. Reporter-ion-mz param (ONLY when reporter_mz is Some — omitted for TMTpro fallback).
-/// 3. Channel-role param (value = "sample"/"pooled"/"carrier"/"reference").
-/// 4. tag_modification UNIMOD param (ONLY when present in assay parameters).
+/// 1. Sample-label cvParam (MS:1002602 umbrella; value = verbatim reagent label; `cv_ref: "MS"`).
+/// 2. Reporter-ion-mz param (ONLY when reporter_mz is Some — omitted for TMTpro fallback;
+///    `cv_ref: "mzml2mzpeak"` — namespaced stable token, NOT a PSI-MS CV term).
+/// 3. Channel-role param (value = "sample"/"pooled"/"carrier"/"reference";
+///    `cv_ref: "mzml2mzpeak"` — namespaced stable token, NOT a PSI-MS CV term).
+/// 4. tag_modification UNIMOD param (ONLY when present in assay parameters; `cv_ref: "UNIMOD"`).
+///
+/// **cv_ref/accession coherence (999.11 REVIEW):** each param's `cv_ref` matches its accession
+/// namespace — `"MS"` for `MS:1002602`, `"UNIMOD"` for `UNIMOD:NNN`, and `"mzml2mzpeak"` for the
+/// two `mzml2mzpeak:`-prefixed structural tokens. Pairing `cv_ref: "MS"` with a `mzml2mzpeak:`
+/// accession would be an internal mismatch.
 fn build_isobaric_params(
     label: &str,
     assay: Option<&crate::sdrf::model::Assay>,
@@ -206,8 +213,13 @@ fn build_isobaric_params(
     // 2. Reporter-ion-mz param (OMIT when reporter_mz is None — TMTpro fallback, CHAN-03).
     if let Some(reagent) = &reagent {
         if let Some(mz) = reagent.reporter_mz {
+            // cv_ref MUST match the accession namespace. `reporter_ion_mz_token()` returns
+            // a `mzml2mzpeak:`-prefixed stable token (no PSI-MS CV accession exists), so the
+            // cv_ref is "mzml2mzpeak", NOT "MS" — pairing "MS" with a non-MS accession is an
+            // internal mismatch a maintainer would reject (999.11 REVIEW). The param stays
+            // schema-valid: cv_ref/accession/name are all present (sample_list.json required).
             let mz_param = serde_json::json!({
-                "cv_ref": "MS",
+                "cv_ref": "mzml2mzpeak",
                 "accession": reporter_ion_mz_token(),
                 "name": "reporter ion m/z",
                 "value": format!("{mz:.6}")
@@ -221,8 +233,12 @@ fn build_isobaric_params(
     //    Default false (absent carrier/reference columns → "sample").
     let is_pooled = false; // Conservative default; pool detection via characteristics deferred.
     let role = derive_role(label, carrier_channels, reference_channels, is_pooled);
+    // cv_ref MUST match the accession namespace. `channel_role_token()` returns a
+    // `mzml2mzpeak:`-prefixed stable token (no PSI-MS CV accession exists), so the cv_ref
+    // is "mzml2mzpeak", NOT "MS" (999.11 REVIEW: "MS" + a non-MS accession is an internal
+    // mismatch). Still schema-valid — cv_ref/accession/name all present.
     let role_param = serde_json::json!({
-        "cv_ref": "MS",
+        "cv_ref": "mzml2mzpeak",
         "accession": channel_role_token(),
         "name": "channel role",
         "value": role
@@ -900,6 +916,49 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// The namespaced structural params (channel-role, reporter-ion-mz) must NOT claim
+    /// `cv_ref: "MS"` — their accessions are `mzml2mzpeak:`-prefixed stable tokens, not PSI-MS
+    /// CV terms. A `cv_ref` of "MS" paired with a `mzml2mzpeak:` accession is an internal
+    /// mismatch (999.11 REVIEW). The matching cv_ref is "mzml2mzpeak". Conversely the real CV
+    /// terms (MS:1002602 sample label, UNIMOD:NNN tag modification) keep their proper cv_ref.
+    #[test]
+    fn namespaced_params_cv_ref_matches_accession_namespace() {
+        let doc = isobaric_tmt_doc();
+        let mr = full_match(&doc);
+        let list = project_sample_list(&doc, &mr);
+        let mut saw_role = false;
+        let mut saw_mz = false;
+        for entry in &list {
+            let params = entry["parameters"].as_array().unwrap();
+            for p in params {
+                let acc = p["accession"].as_str().unwrap_or("");
+                let cv_ref = p["cv_ref"].as_str().unwrap_or("");
+                if acc == channel_role_token() {
+                    saw_role = true;
+                    assert_eq!(
+                        cv_ref, "mzml2mzpeak",
+                        "channel-role param must use cv_ref 'mzml2mzpeak', not 'MS' (accession is {acc})"
+                    );
+                    assert_ne!(cv_ref, "MS", "channel-role param must NOT claim cv_ref 'MS'");
+                }
+                if acc == reporter_ion_mz_token() {
+                    saw_mz = true;
+                    assert_eq!(
+                        cv_ref, "mzml2mzpeak",
+                        "reporter-ion-mz param must use cv_ref 'mzml2mzpeak', not 'MS' (accession is {acc})"
+                    );
+                    assert_ne!(cv_ref, "MS", "reporter-ion-mz param must NOT claim cv_ref 'MS'");
+                }
+                // The real PSI-MS sample-label term keeps cv_ref "MS" (untouched).
+                if acc == sample_label_curie().to_string() {
+                    assert_eq!(cv_ref, "MS", "sample-label (MS:1002602) must keep cv_ref 'MS'");
+                }
+            }
+        }
+        assert!(saw_role, "expected a channel-role param in the isobaric fixture");
+        assert!(saw_mz, "expected a reporter-ion-mz param in the isobaric fixture");
     }
 
     /// No channel_list / plex_id / channel_set key is emitted anywhere in the output (RATIFIED-E).

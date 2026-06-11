@@ -35,8 +35,8 @@ A command-line converter that reads imzML mass spectrometry **imaging** (MSI) fi
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
 | **Rust toolchain** | **1.96.0** (pinned) | Compiler | `mzpeak_prototyping` is `edition = "2024"`. 1.85 is edition-2024's floor, NOT the build floor: the writer `mzpeak_prototyping@d1aaaf84` has an undeclared ~1.87 MSRV (`io_error_more` + const `String::as_bytes`, both stabilized in 1.87). Project pins **1.96.0** via `rust-toolchain.toml`. |
-| **mzdata** | `0.63.5` (latest on crates.io; pin to **`0.63.3`** to match upstream — see compat note) | imzML reader + shared spectrum data model | Only actively-maintained Rust imzML reader; same author as mzPeak; exposes IMS coordinates (verified above). Updated 2026-05-12. |
-| **mzpeak_prototyping** | git `HUPO-PSI/mzPeak`, branch `main` (crate version `0.1.0`) | mzPeak writer/reader we extend | The reference mzPeak implementation. **NOT published to crates.io** — git-only. Repo moved from `mobiusklein/mzpeak_prototyping` → `HUPO-PSI/mzPeak` (pushed 2026-06-03); crate name unchanged. |
+| **mzdata** | **`=0.64.1`** (pinned in `Cargo.toml`; published crates.io) | imzML reader + shared spectrum data model | Only actively-maintained Rust imzML reader; same author as mzPeak; exposes IMS coordinates (verified above). **DE-VENDORED**: was briefly a `vendor/mzdata` 0.64.2 main-HEAD snapshot; published 0.64.1 carries the SONAR `ScanningQuadrupolePosition` variants mzpeak_prototyping HEAD requires and satisfies upstream's `mzdata = 0.64.1`. No `vendor/`, no `[patch]` — both our crate and the writer unify to one crates.io copy. |
+| **mzpeak_prototyping** | git `HUPO-PSI/mzPeak`, pinned rev **`29e59b24`** (crate version `0.1.0`) | mzPeak writer/reader we extend | The reference mzPeak implementation. **NOT published to crates.io** — git-only, fetched directly from upstream. **FULLY DE-VENDORED**: no `vendor/`, no `[patch]`. All three former local patches are now merged upstream (the last, the chunk_series index-by-output-position fix, landed as `b9269029`; rev `29e59b24` adds JSON-metadata-in-the-index on top). Repo moved from `mobiusklein/mzpeak_prototyping` → `HUPO-PSI/mzPeak`; crate name unchanged. |
 | **mzpeaks** | `1.0.9` | Peak/centroid types (`CentroidPeak`, `DeconvolutedPeak`) shared by both halves | Transitive requirement of both crates; pin to the exact version mzpeak_prototyping uses to avoid two incompatible copies in the dep graph. |
 | **arrow** | `57.0.0` | Columnar in-memory model for Parquet | **Must match `mzpeak_prototyping`'s pin exactly.** crates.io is at 58.3.0, but mixing arrow majors with the writer's pinned 57 causes type-mismatch errors. Use 57.0.0. |
 | **parquet** | `57.0.0` (features `["encryption"]`) | Parquet file writing | Same — pinned by upstream; the `encryption` feature is enabled there. Match it. |
@@ -47,12 +47,12 @@ A command-line converter that reads imzML mass spectrometry **imaging** (MSI) fi
 | Library | Version | Purpose | When to Use |
 |---------|---------|---------|-------------|
 | **clap** | `4.5.38` (derive feature) | CLI argument parsing | Match upstream's pin; `4.6.1` is current but stay aligned. Use the `derive` macro pattern as in `examples/convert.rs`. |
-| **serde** | `1.0.219` (derive) | (De)serialize schema structs | Already a transitive + direct dep of upstream. |
-| **serde_json** | `1.0.140` | Emit/parse `mzpeak_index.json` and JSON schema | Required for the index file mzPeak emits. |
+| **serde** | `1.0.228` (derive; pinned in `Cargo.toml`) | (De)serialize schema structs | Already a transitive + direct dep of upstream; pinned `=` at the resolved single-copy version. |
+| **serde_json** | `1.0.150` (pinned in `Cargo.toml`) | Emit/parse `mzpeak_index.json` and JSON schema | Required for the index file mzPeak emits. |
 | **serde_with** | `3.12.0` | Field-level serde adapters | Used by upstream; pull in if extending its serde structs. |
 | **anyhow** | `1.0.102` | Application-level error handling in `main`/CLI | Use in the binary crate for ergonomic `?`-propagation + context. mzdata/mzpeak use `io::Result`; wrap at the app boundary. |
 | **thiserror** | `2.0.18` | Typed library errors for our imaging-extension module | Use for our own error enum (e.g. `ConvertError`) so it composes cleanly; keep `anyhow` for the binary only. |
-| **indicatif** | `0.17.10` | Progress bar for the 34,840-spectrum conversion | Match upstream's pin (it already depends on indicatif 0.17). `0.18.4` is current but 0.17→0.18 has API breaks; stay on 0.17.10 to share one copy. |
+| **indicatif** | `0.17.11` (pinned in `Cargo.toml`) | Progress bar for the 34,840-spectrum conversion | Match the copy the lockfile resolves transitively via mzpeak_prototyping (`=0.17.11`, NOT 0.17.10 — that table value was stale). Stay on 0.17.x; 0.17→0.18 has API breaks. Binary-only. |
 | **log** + **env_logger** | `0.4.27` / `0.11.8` | Logging (upstream uses these) | Use the same logging facade as upstream rather than introducing `tracing`. |
 | **uuid** | (transitive via mzdata `imzml` feature) | UUID linkage imzML↔ibd↔mzPeak | Pulled in automatically by `mzdata`'s `imzml` feature; re-exported as `mzdata::io::imzml::Uuid`. No need to add directly unless we mint UUIDs. |
 
@@ -136,22 +136,21 @@ A command-line converter that reads imzML mass spectrometry **imaging** (MSI) fi
 
 | Package A | Compatible With | Notes |
 |-----------|-----------------|-------|
-| `mzpeak_prototyping` (main) | `mzdata = 0.63.3` | Upstream's exact pin. Our `0.63.3` request unifies to one copy. mzdata 0.63.5 *should* be semver-compatible (`^0.63.3`), but pin 0.63.3 to be safe and re-test if you bump. |
+| `mzpeak_prototyping` (rev `29e59b24`) | `mzdata = =0.64.1` | The project pins `=0.64.1` (crates.io); it satisfies upstream's `mzdata = 0.64.1` (`^0.64`) and carries the SONAR `ScanningQuadrupolePosition` variants the writer HEAD requires. Both halves unify to ONE crates.io copy (`cargo tree -d`: no duplicate). DE-VENDORED — no `vendor/`, no `[patch]`. |
 | `mzpeak_prototyping` | `arrow/parquet = 57.0.0`, `zip = 4.1.0`, `mzpeaks = 1.0.9` | Hard pins — match exactly. |
-| `mzdata 0.63.x` | feature `imzml` | `imzml` pulls `mzml` + `uuid`. Available since at least 0.63.3 (verified 2025-12-06 release). |
-| Rust toolchain | `edition 2024` | Requires Rust ≥ 1.85. |
-| `mzdata` master | `0.64.0` (unreleased; edition 2021) | Repo HEAD is ahead of crates.io 0.63.5. Don't track master unless upstream mzpeak does; stay on published 0.63.x. |
+| `mzdata 0.64.x` | feature `imzml` | `imzml` pulls `mzml` + `uuid`. Project enables `["imzml", "serde", "bruker_tdf", "nalgebra", "zstd", "numpress"]`. |
+| Rust toolchain | `edition 2024` | Requires Rust ≥ 1.85 (build floor 1.87; project pins 1.96.0). |
 
 ## Sources
 
-- crates.io API `mzdata` — version 0.63.5 (updated 2026-05-12), full feature table incl. `imzml => ["mzml", "dep:uuid"]` — HIGH
-- crates.io API `mzdata/0.63.3` — confirmed `imzml` feature present (release 2025-12-06) — HIGH
+- `Cargo.toml` (this repo) — `mzdata = "=0.64.1"` (DE-VENDORED, crates.io), `imzml`+`serde`+`bruker_tdf`+`nalgebra`+`zstd`+`numpress` features; `mzpeak_prototyping` git rev `29e59b24`, no `vendor/`, no `[patch]` — HIGH (ground truth)
+- crates.io API `mzdata/0.64.1` — carries SONAR `ScanningQuadrupolePosition` variants mzpeak_prototyping HEAD requires; `imzml` feature present — HIGH
 - https://github.com/mobiusklein/mzdata/blob/master/src/io/imzml/mod.rs — `#![cfg(feature = "imzml")]`, exports `ImzMLReader`/`ImzMLReaderType`/`is_imzml` — HIGH
 - https://github.com/mobiusklein/mzdata/blob/master/src/io/imzml/reader.rs (1481 lines) — `.ibd` IBD read logic, UUID check, IMS:1000102/103/104 external-data handling, `IbdDataMode` — HIGH
 - https://github.com/mobiusklein/mzdata/blob/master/src/io/imzml/tests.rs — `test_imzml_read_operation` proving IMS:1000050/1000051 coordinate exposure for continuous AND processed modes — HIGH (decisive evidence)
 - https://github.com/mobiusklein/mzdata/blob/master/src/params.rs — `curie!` macro (L1378), `get_param_by_curie` trait method (L2353) — HIGH
 - crates.io API `mzpeak` / `mzpeak_prototyping` — both "crate does not exist" (git-only) — HIGH
-- https://github.com/HUPO-PSI/mzPeak (former mobiusklein/mzpeak_prototyping, redirect repo id 990169501, pushed 2026-06-03) `Cargo.toml` — all dependency pins (arrow/parquet 57.0.0, zip 4.1.0, mzdata 0.63.3, mzpeaks 1.0.9, clap 4.5.38, indicatif 0.17.10, edition 2024) — HIGH
+- https://github.com/HUPO-PSI/mzPeak (former mobiusklein/mzpeak_prototyping) `Cargo.toml` — dependency pins (arrow/parquet 57.0.0, zip 4.1.0, mzdata 0.64.1, mzpeaks 1.0.9, clap 4.5.38, indicatif 0.17.x, edition 2024) — HIGH
 - https://github.com/HUPO-PSI/mzPeak/blob/main/src/lib.rs — module layout + `MzPeakWriter`/`MzPeakReader` exports — HIGH
 - https://github.com/HUPO-PSI/mzPeak/blob/main/examples/convert.rs — writer builder + `copy_metadata_from` + `write_spectrum` + `finish` flow — HIGH
 - https://github.com/HUPO-PSI/mzPeak/blob/main/src/writer/base.rs — `AbstractMzPeakWriter` method surface — HIGH

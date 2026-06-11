@@ -3,8 +3,20 @@
 //! Mirrors [`crate::schema::geometry::parse_scan_settings`]: a direct, structurally-aware
 //! quick-xml parse of the source imzML that extracts every `IMS:1006008` "optical image
 //! location" reference inside a `<sample>` (plus the descriptive sibling attributes that
-//! qualify it). mzdata does NOT surface these sample-level optical attributes, so we read
-//! them straight from the imzML header XML.
+//! qualify it).
+//!
+//! **What mzdata gives us (corrected 999.13 REVIEW):** mzdata DOES surface the sample-level
+//! optical attributes — every `<sample>` cvParam (including `IMS:1006008`) is captured into
+//! `Sample.params` by an unconditional `add_param` at `reading_shared.rs:1033-1035`, exposed
+//! via `samples()`, and already Latin-1-decoded. The earlier "mzdata does NOT surface these"
+//! note was stale.
+//!
+//! **What this module adds locally:** mzdata's `Sample.params` is a FLAT, untyped `Vec<Param>`
+//! with no grouping. The local value is (1) the ORDERED multi-image grouping below — each
+//! `IMS:1006008` opens a new [`OpticalImageRef`] and source-order siblings attach to it — and
+//! (2) the path-escape security guard (`resolve_optical_location`, T-20-01/02). Both depend on
+//! document order / are converter policy, not data mzdata withholds. (A typed, ordered
+//! `optical_images()` accessor would be the proper upstream home — deferred.)
 //!
 //! ## Multiple images per sample (multimodal case)
 //!

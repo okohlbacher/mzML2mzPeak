@@ -4,6 +4,17 @@ Oliver Kohlbacher (OK), Joshua Klein (JK), Tim Van Den Bossche (TVDB)
 
 draft 2026-06-08 — for discussion
 
+> **⚠️ HISTORICAL DISCUSSION ARTIFACT (status note added 2026-06-11).** This document records the open
+> questions and *draft positions* as they stood on 2026-06-08, before v0.8 was ratified and shipped.
+> **Several "draft positions" / "decisions needed" below have since been resolved and the resolution does
+> NOT match the draft** — most importantly **Q4: the proposed `channel_list` / `plex_id` / `channel_set`
+> construct was DROPPED (RATIFIED-E)**; isobaric channels ship as labeled `sample_list` entries via an
+> `MS:1002602` "sample label" cvParam + reporter-m/z + role + tag-mod params, bound run-level. Likewise the
+> per-spectrum `assay_ref` of Q3 was deferred ≥v0.9 (run-level binding only). For the **authoritative,
+> shipped v0.8 model** see [`docs/mzpeak-extension-contract.md`](mzpeak-extension-contract.md) §3.9–§3.14
+> and the resolution log in [`docs/mzpeak-spec-proposal-queue.md`](mzpeak-spec-proposal-queue.md). Read the
+> questions below as the framing that *led to* those decisions, not as current open issues.
+
 ## Background
 
 mzPeak is the proposed successor to mzML — compact, performant, cloud-native (Parquet-in-ZIP). Its current specification models **spectra, chromatograms, and wavelength spectra** plus a file-level `sample_list` (the mzML `sample` analog: `id`, `name`, `parameters`), but it has **no model for the sample↔data-file relationship** that SDRF captures, and **no representation of isobaric (TMT/iTRAQ) channel assignment**. This document collects the open questions that must be resolved before SDRF-grade sample metadata can live in mzPeak without loss.

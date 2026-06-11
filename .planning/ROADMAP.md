@@ -334,7 +334,22 @@ next consolidation step. Coordinate the imaging-geometry placement question with
   (`src/schema/source_curie.rs`); no JSON schema exists. (Already removed from 999.12's verifies-against list above;
   sweep for any other stray references.)
 
-**Effort:** ~half a day, in-repo, no external push. **Requirements:** TBD · **Plans:** TBD (promote when ready)
+**Status: (a)–(d) DONE 2026-06-11** (quick task `260611-prfix`): (a) `build_isobaric_params` now emits
+`cv_ref:"mzml2mzpeak"` matching the accession namespace (real CV terms `MS:1002602`/`UNIMOD:` untouched), +1 test,
+validator still PASS; (b) geometry.rs + optical.rs doc-comments corrected; (c) CLAUDE.md → `=0.64.1` + de-vendored
++ indicatif/serde/serde_json versions reconciled to Cargo.toml; (d) docs path/`source_curie.json` sweep clean.
+Also retired the stale `docs/sdrf-mzpeak-integration.md` (SUPERSEDED banner) + status-banner on `sdrf-open-questions.md`.
+
+**Residual follow-up (NEW, deferred — NOT quick):** the namespaced channel params now carry `cv_ref:"mzml2mzpeak"`,
+but the file-level `cv_list()` is a static `{MS,IMS,UO}` single-source and does NOT declare `mzml2mzpeak` → an
+**undeclared cv_ref** for channel-bearing archives (the `mzpeak_index.json` references it without a `cv_list` entry).
+The `tests/cv_list.rs` `declared==referenced` invariant pins `cv_list()` to exactly `{MS,IMS,UO}` using an imaging
+fixture, and the reverse imzML `<cvList>` shares `cv_list()` — so a clean declaration needs `cv_list()` to be
+**conditionally parameterized** (include `mzml2mzpeak` only when channel/sample-metadata params are emitted, never
+in the imaging reverse path) + a channel-archive test. This is a real change to the CVG-01 single-source design,
+not a quick fix — do it as part of preparing P-04 in **999.11** (it's the genuinely PR-clean end state).
+
+**Effort:** (a)–(d) done; the cv_list-declaration residual ≈ 0.5–1 day with the reverse/test care. **Requirements:** TBD · **Plans:** TBD (promote when ready)
 
 ### Imaging structure (pixel facet, ROI polygons, continuous shared-axis, images.parquet) — DEFERRED beyond v1.0
 

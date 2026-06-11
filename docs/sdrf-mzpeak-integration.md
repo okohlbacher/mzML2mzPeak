@@ -1,5 +1,42 @@
 # SDRF ↔ mzPeak integration — discussion draft
 
+> ## ⚠️ SUPERSEDED (2026-06-11) — pre-v0.8 discussion draft, do NOT treat as current
+>
+> This is an early **discussion draft** that predates the shipped v0.8 sample-metadata design. The
+> integration model below was **substantially superseded** and several constructs it proposes were
+> **dropped or never implemented**. It is retained for historical provenance only.
+>
+> **For the authoritative, shipped v0.8 model see**
+> [`docs/mzpeak-extension-contract.md`](mzpeak-extension-contract.md) **§3.9–§3.14** (the binding
+> sample-metadata facet contract).
+>
+> **What this draft gets wrong vs. shipped v0.8 code** (verified against `src/sdrf/`, `src/isa/`,
+> `src/schema/`, `src/write/mzml.rs`):
+> - **No `channel_list` / `plex_id` / `channel_set` construct exists** (RATIFIED-E dropped it). Isobaric
+>   channels are modeled as **labeled `sample_list` entries** carrying an `MS:1002602` "sample label"
+>   cvParam + reporter-m/z + role + tag-mod params. A test (`no_channel_list_or_plex_id_emitted`)
+>   forbids those keys.
+> - **No per-spectrum `assay_ref` column.** Binding is **run-level only** via `run_sample_binding`
+>   (`binding_provenance: "phase32_shadow"`); per-spectrum `assay_ref` is deferred ≥v0.9.
+> - Channel labels are **not `PRIDE:0000xxx`** — the umbrella term is `MS:1002602` with PSI-MS reagent
+>   children; channel-role and reporter-ion-m/z are **stable free-text tokens** (`mzml2mzpeak:channel-role`,
+>   `mzml2mzpeak:reporter-ion-mz`), not minted accessions — see `docs/cv-requests.md`.
+> - This draft is **SDRF-only**; the shipped code also reads **ISA-Tab and ISA-JSON** into the same
+>   unified `SampleMetadataDoc`, with structural assay-based run matching.
+> - The shipped `metadata.sample_list` is a **run-filtered** projection (`projection_scope: "run"`):
+>   only the samples mapped to *this* run's matched rows are projected; the verbatim embed keeps
+>   full-study fidelity.
+> - `factor value[…]` is **parsed but not projected** to any metadata key (deferred ≥v0.9); the
+>   verbatim blob holds it.
+> - The verbatim embed is a typed `sample-metadata` member (`data_kind` `sdrf`/`isa`) under deterministic
+>   names (`sample_metadata/sdrf.tsv` — slash, not the `sample_metadata.sdrf.tsv` dot form below),
+>   anchored by a separate `metadata.sample_metadata` provenance block (SHA-256 + size +
+>   `precedence: "repo_wins"` + `embed_scope: "full"` + `projection_scope: "run"`).
+>
+> Everything below the line is the original draft, **unmodified for provenance**.
+>
+> ---
+>
 > Discussion only, not a spec. RAG-verified vs `knowledge/`; CODEX-reviewed. See `knowledge/SDRF/`; mzPeak §5.7 = open question.
 
 ## Problem

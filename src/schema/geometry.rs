@@ -1,9 +1,19 @@
-//! Run-level imaging geometry parser (STUB — Plan 03-02 fills the body).
+//! Run-level imaging geometry parser.
 //!
-//! mzdata's `ImzMLFileMetadata` does NOT surface `<scanSettings>` geometry (grid counts,
-//! pixel size, scan-pattern child terms) — Phase-1 FINDINGS. This module owns a direct,
-//! structurally-aware quick-xml parse of the imzML `<scanSettings>` element (honoring the
-//! ISO-8859-1 prolog via quick-xml's `encoding` feature) that populates [`ImagingRunMetadata`].
+//! **What mzdata gives us (corrected 999.13 REVIEW):** as of mzdata 0.64.1 the imzML reader
+//! DOES surface every `<scanSettings>` cvParam — `scan_settings()` returns the `ScanSettings`
+//! whose `.params` holds the geometry terms (grid counts, pixel size, scan-pattern child
+//! terms), captured by an unconditional `add_param` at `reading_shared.rs:1069-1070` with no
+//! accession allowlist, and already Latin-1-decoded (`reading_shared.rs` `decode_latin1_escape`).
+//! So mzdata surfaces the raw params; it does NOT surface a *typed*, numerically-parsed
+//! geometry struct.
+//!
+//! **What this module adds locally:** the TYPED parsing of those raw terms into
+//! [`ImagingRunMetadata`] (numeric grid counts, pixel sizes as `f64`, scan-pattern presence
+//! flags). It currently does this via a direct quick-xml re-parse of `<scanSettings>` — a
+//! self-contained read that predates the mzdata accessor. Because mzdata now surfaces the same
+//! raw params, this re-parse is redundant *input* (not redundant typing); switching the read to
+//! consume `scan_settings().params` is a tracked simplification (deferred — see 999.13 REVIEW).
 //!
 //! Per D-03 the parser is LENIENT: it never hard-fails on missing/partial geometry; every
 //! term is optional and absent terms stay `None`. [`GeometryParseError`] carries only
