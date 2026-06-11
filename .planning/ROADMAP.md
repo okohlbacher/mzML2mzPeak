@@ -186,6 +186,21 @@ done; **565 tests green**. Phases 22/29/30b carried to v0.9; Phase 36 deferred �
 > - **All HUPO-PSI and mzdata pushes are owner-gated** (push policy: outside `github.com/okohlbacher` →
 >   explicit interactive authorization, warn first). The in-repo prep for each item is un-gated.
 > - **999.14** captures the small correctness/doc fixes the 999.11/13 research surfaced.
+>
+> **Suggested ordering (local-now → gated), as of 2026-06-11:**
+> | # | Item | Local-now? | Upstream effect | Effort |
+> |---|------|-----------|-----------------|--------|
+> | 1 | **999.14 residual** — conditional `cv_list()` declares `mzml2mzpeak` for channel-bearing archives | ✅ **fully local** | none (closes a self-introduced gap; PR-clean end state) | 0.5–1 d |
+> | 2 | **999.13(A) local refactor** — drop the redundant quick-xml geometry re-parse, consume mzdata 0.64.1 `scan_settings().params` directly | ✅ **fully local** | none — the accessor *already exists* upstream; this is pure local simplification (the *upstreaming* of a typed accessor is the separate gated step) | S (1–2 d, load-bearing → careful) |
+> | 3 | **999.12** — SDRF/ISA study-design integration docs | ✅ **fully local** | none (feeds 999.11's spec text but ships as in-repo docs) | 2.5–3.5 d |
+> | 4 | **999.11 prep** — reconcile both held drafts vs shipped v0.8.2 + draft issue/PR bodies | ✅ **local prep** | the *submission* to HUPO-PSI is **owner-gated** | ~1 d prep + gated submit |
+> | 5 | **SM-07 / factor_values native projection** (if still open in v0.9) | ✅ **fully local** | none (converter feature) | M |
+> | 6 | **999.13(B/C) upstreaming** — geometry → optical → imzML/.ibd writer into mzdata | ❌ | **all owner-gated** (`mobiusklein/mzdata`), socialize-first; writer may stay local permanently | S→L (weeks) |
+> | 7 | **Imaging structure cluster** (PIX/ROI/CONT/IMG) | ✅ local but **post-1.0** | none | L |
+>
+> **Pull-off-now without any upstream effect: items 1, 2, 3, 5** (and the local *prep* half of 4). Items 4-submit
+> and 6 are the only ones touching `okohlbacher`-external remotes → owner-gated. Recommended next: **1 → 2** (small
+> local de-risk + simplification that make the eventual PRs clean), then **3** (the doc, highest standalone value).
 
 ### Phase 999.11: Submit the held upstream PR drafts to HUPO-PSI (BACKLOG — RESEARCHED 2026-06-11)
 
