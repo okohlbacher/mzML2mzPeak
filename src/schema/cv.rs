@@ -180,9 +180,10 @@ pub fn cv_list() -> Vec<CvEntry> {
 /// Registered ids:
 /// - **MS** — PSI-MS (column-name inflection + `MS:1002602` sample-label umbrella).
 /// - **IMS** — imaging coordinate columns (`IMS:1000050/51`). No OBO-Foundry PURL yet
-///   (CVG-01); the stable imzML raw URL is the recorded token until a canonical home is minted.
-/// - **UO** — Unit Ontology (`UO:0000017` µm). `version` intentionally `None` (the reverse
-///   `<cvList>` carries no UO version either).
+///   (CVG-01); the stable imzML raw URL is the recorded token until a canonical home is minted
+///   (pinned at `1.1.0`).
+/// - **UO** — Unit Ontology (`UO:0000017` µm), pinned to the `2026-01-16` OBO release (matching
+///   the upstream writer's value so the index cv_list stays consistent across paths).
 /// - **UNIMOD** — protein-modification CV (`UNIMOD:NNN` isobaric tag modifications, §3.12).
 /// - **mzml2mzpeak** — the project-local namespace ([`local_namespace`]) for the channel-role /
 ///   reporter-ion-mz structural tokens that have no PSI-MS accession. The `uri` points at the
@@ -195,36 +196,43 @@ pub fn cv_entry_for(id: &str) -> Option<CvEntry> {
         uri: uri.to_string(),
         version: version.map(str::to_string),
     };
+    // CONCRETE versions + complete id/version/uri on every entry (mzPeakValidator findings #1-#3):
+    // the file-level cv_list MUST declare a `version` and `uri` for each CV. MS + UO mirror the
+    // EXACT strings the upstream mzpeak_prototyping writer emits on the plain path (so the imaging /
+    // sample-metadata paths, which OVERWRITE the index cv_list, stay byte-consistent with it instead
+    // of regressing to placeholders). IMS/UNIMOD/mzml2mzpeak are concrete project pins recorded in
+    // docs/cv-requests.md (the validator's profile only pins MS, so these values satisfy the schema;
+    // confirming the exact IMS/UNIMOD release strings is tracked there).
     Some(match id {
         "MS" => entry(
             "MS",
-            "PSI-MS controlled vocabulary",
-            "https://raw.githubusercontent.com/HUPO-PSI/psi-ms-CV/master/psi-ms.obo",
-            Some("4.1.x"),
+            "Proteomics Standards Initiative Mass Spectrometry Ontology",
+            "http://purl.obolibrary.org/obo/ms/4.1.248/ms.obo",
+            Some("4.1.248"),
         ),
         "IMS" => entry(
             "IMS",
             "Mass Spectrometry Imaging controlled vocabulary",
             "https://raw.githubusercontent.com/imzML/imzML/master/imagingMS.obo",
-            Some("1.1.x"),
+            Some("1.1.0"),
         ),
         "UO" => entry(
             "UO",
-            "Unit Ontology",
-            "https://raw.githubusercontent.com/bio-ontology-research-group/unit-ontology/master/unit.obo",
-            None,
+            "Units of measurement ontology",
+            "http://purl.obolibrary.org/obo/uo/releases/2026-01-16/uo.obo",
+            Some("2026-01-16"),
         ),
         "UNIMOD" => entry(
             "UNIMOD",
             "UNIMOD protein modification database",
             "http://www.unimod.org/obo/unimod.obo",
-            None,
+            Some("2024.01"),
         ),
         "mzml2mzpeak" => entry(
             local_namespace(),
             "mzML2mzPeak local terms (project-local namespace pending PSI-MS CV minting)",
             "https://github.com/okohlbacher/mzML2mzPeak/blob/main/docs/cv-requests.md",
-            None,
+            Some("0.9.0"),
         ),
         _ => return None,
     })
@@ -339,50 +347,51 @@ mod tests {
         );
     }
 
-    /// `cv_list()` yields exactly the three CVs MS/IMS/UO with the EXACT reverse-path uri
-    /// strings (the single-source-of-truth equality that prevents forward/reverse drift).
+    /// `cv_list()` yields exactly MS/IMS/UO, each with a CONCRETE version + a uri — and MS/UO mirror
+    /// the upstream writer's strings so the index cv_list stays consistent across paths (no regression
+    /// to placeholders). mzPeakValidator findings #1-#3: every entry MUST carry version + uri.
     #[test]
-    fn cv_list_is_ms_ims_uo_with_reverse_uris() {
+    fn cv_list_is_ms_ims_uo_with_concrete_versions() {
         let list = cv_list();
         assert_eq!(list.len(), 3, "cv_list declares exactly MS, IMS, UO");
 
         let ids: Vec<&str> = list.iter().map(|e| e.id.as_str()).collect();
         assert_eq!(ids, vec!["MS", "IMS", "UO"], "ids in MS/IMS/UO order");
 
-        // These literals MUST equal src/reverse/imzml_writer.rs <cvList> strings (T-17-02).
-        assert_eq!(list[0].full_name, "PSI-MS controlled vocabulary");
-        assert_eq!(
-            list[0].uri,
-            "https://raw.githubusercontent.com/HUPO-PSI/psi-ms-CV/master/psi-ms.obo"
-        );
-        assert_eq!(
-            list[1].full_name,
-            "Mass Spectrometry Imaging controlled vocabulary"
-        );
-        assert_eq!(
-            list[1].uri,
-            "https://raw.githubusercontent.com/imzML/imzML/master/imagingMS.obo"
-        );
-        assert_eq!(list[2].full_name, "Unit Ontology");
-        assert_eq!(
-            list[2].uri,
-            "https://raw.githubusercontent.com/bio-ontology-research-group/unit-ontology/master/unit.obo"
-        );
+        // Every entry has a non-empty version + uri (the validator-required fields).
+        for e in &list {
+            assert!(e.version.as_deref().is_some_and(|v| !v.is_empty()),
+                "cv_list entry {} must declare a concrete version", e.id);
+            assert!(!e.uri.is_empty(), "cv_list entry {} must declare a uri", e.id);
+        }
+        // MS + UO match the upstream mzpeak_prototyping writer EXACTLY (cross-path consistency).
+        assert_eq!(list[0].full_name, "Proteomics Standards Initiative Mass Spectrometry Ontology");
+        assert_eq!(list[0].uri, "http://purl.obolibrary.org/obo/ms/4.1.248/ms.obo");
+        assert_eq!(list[0].version.as_deref(), Some("4.1.248"));
+        assert_eq!(list[1].full_name, "Mass Spectrometry Imaging controlled vocabulary");
+        assert_eq!(list[1].version.as_deref(), Some("1.1.0"));
+        assert_eq!(list[2].full_name, "Units of measurement ontology");
+        assert_eq!(list[2].uri, "http://purl.obolibrary.org/obo/uo/releases/2026-01-16/uo.obo");
+        assert_eq!(list[2].version.as_deref(), Some("2026-01-16"));
     }
 
-    /// `version = None` (UO) is omitted from the JSON (`skip_serializing_if`); `Some` is present.
+    /// Every base CV now carries a concrete version (the `skip_serializing_if` still omits a `None`
+    /// version when one is genuinely absent — tested with a synthetic entry).
     #[test]
-    fn version_omitted_when_none() {
-        let list = cv_list();
-        // UO has version None → key absent.
-        let uo = serde_json::to_value(&list[2]).expect("serialize");
-        assert!(
-            !uo.as_object().unwrap().contains_key("version"),
-            "UO version is None and must be omitted from JSON"
-        );
-        // MS has version Some → key present.
-        let ms = serde_json::to_value(&list[0]).expect("serialize");
-        assert_eq!(ms["version"], Value::from("4.1.x"));
+    fn version_present_on_all_base_cvs_and_omitted_when_none() {
+        for e in cv_list() {
+            let v = serde_json::to_value(&e).expect("serialize");
+            assert!(v.as_object().unwrap().contains_key("version"),
+                "base CV {} must serialize a version", e.id);
+            assert_eq!(v["version"], Value::from(e.version.clone().unwrap()));
+        }
+        // A synthetic entry with version None omits the key (skip_serializing_if contract).
+        let none_entry = CvEntry {
+            id: "X".into(), full_name: "x".into(), uri: "u".into(), version: None,
+        };
+        let v = serde_json::to_value(&none_entry).expect("serialize");
+        assert!(!v.as_object().unwrap().contains_key("version"),
+            "a None version must be omitted from JSON");
     }
 
     /// additionalProperties discipline: every emitted key of every entry must be a declared

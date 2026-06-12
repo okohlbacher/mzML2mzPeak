@@ -29,6 +29,28 @@ sync_dir(){ # localdir destprefix
     && say "  synced $2"
 }
 
+# 0) METADATA-CONFORMANCE GUARD (REQUIRED). Every .mzpeak we publish must carry the JSON metadata
+#    mzPeakValidator requires (non-empty metadata + `version` + a complete `cv_list`); a stale
+#    old-converter archive has empty metadata and FAILS the validator while still opening, so the
+#    regression is invisible. Refuse to upload any data tile until every .mzpeak is conformant.
+#    ALLOW_NONCONFORMANT=1 overrides (deliberate partial push). See scripts/check-mzpeak-metadata.py.
+#    (NOTE: this does NOT check run.default_*_id nullability — validator finding #5 is an UPSTREAM
+#    mzpeak_prototyping issue we can't fix locally; gating on it would block valid chromatogram-only
+#    files. Tracked in docs/handoff-mzpeak-metadata-conformance.md + the backlog.)
+if [ "$DRYRUN" != "1" ]; then
+  say "verifying mzpeak JSON-metadata conformance (version + cv_list) across data/"
+  if ! python3 scripts/check-mzpeak-metadata.py --quiet data; then
+    if [ "${ALLOW_NONCONFORMANT:-0}" = "1" ]; then
+      say "  WARN ALLOW_NONCONFORMANT=1 — uploading despite non-conformant metadata (RECONVERT FIRST)"
+    else
+      echo "ERROR: some data/*.mzpeak fail metadata conformance (stale empty metadata or incomplete" >&2
+      echo "       cv_list) — refusing to upload. Reconvert with the current binary, or set" >&2
+      echo "       ALLOW_NONCONFORMANT=1 to override. See scripts/check-mzpeak-metadata.py." >&2
+      exit 1
+    fi
+  fi
+fi
+
 # 1) ORIGINALS
 sync_dir data/imzml-examples imzml-examples
 sync_dir data/mzML-examples  mzML-examples

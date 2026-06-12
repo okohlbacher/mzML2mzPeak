@@ -377,6 +377,31 @@ Verified: a TMT archive declares `['MS','UNIMOD','mzml2mzpeak']` and passes the 
 
 **Effort:** (a)–(d) + the cv_list residual all DONE. **Requirements:** met · **Plans:** n/a (shipped via quick path)
 
+### Phase 999.15: mzPeakValidator metadata-conformance follow-ups (BACKLOG — from the 2026-06-12 analysis)
+
+> Source: [`docs/handoff-mzpeak-metadata-conformance.md`](../docs/handoff-mzpeak-metadata-conformance.md)
+> (status update 2026-06-12). The converter-side fixes (#1–#3 + the cv_list concrete-version fix) landed
+> 2026-06-12; these are the residual OPEN items, none of which are fixable purely in the converter.
+
+- **(a) #5 — `run.default_source_file_id` / `default_data_processing_id` serialize as `null` (UPSTREAM).**
+  The `ms_run` blob is written by `mzpeak_prototyping`; it emits explicit `null` for these optional
+  `Option<String>` fields, violating `ms_run.json` (`type: string`). Fires on chromatogram-only / SRM
+  files (no `spectrumList defaultDataProcessingRef`). **Fix:** PR to `HUPO-PSI/mzPeak` adding
+  `#[serde(skip_serializing_if = "Option::is_none")]` to those fields (preferred), OR a spec change
+  relaxing `ms_run.json` to `["string","null"]`. **OWNER-GATED** (outside `okohlbacher`). Likely also
+  fixes a viewer crash on chromatogram-only files.
+- **(b) #4 — CV version pin mismatch (validator side).** Converter declares `MS 4.1.248`; the
+  validator's bundled profile pins `MS 4.1.217` → a per-file warning. Bump the validator's CV snapshot
+  (`~/Claude/mzPeakValidator`) to `4.1.248` (or whatever the chosen psi-ms release is). Warning-only.
+- **(c) `profile_resolution` warning (validator side).** The validator has no profile registered for
+  `metadata.version "0.9.0"` → defaults to latest. Register a `0.9.0 → mzpeak-0.9` mapping, or align the
+  declared version string. Cosmetic.
+- **(d) Confirm IMS/UNIMOD version pins.** `src/schema/cv.rs` now pins `IMS 1.1.0`, `UNIMOD 2024.01`,
+  `mzml2mzpeak 0.9.0` as concrete project values (the validator only checks MS). Confirm IMS + UNIMOD
+  against the actual ontology releases and record in `docs/cv-requests.md`.
+
+**Effort:** (a) S upstream PR (gated) · (b)/(c) S validator-repo edits · (d) XS. **Requirements:** TBD · **Plans:** TBD
+
 ### Imaging structure (pixel facet, ROI polygons, continuous shared-axis, images.parquet) — DEFERRED beyond v1.0
 
 > **Owner decision (2026-06-08):** the whole imaging-structure cluster is post-1.0. v0.7 focuses on the
