@@ -13,3 +13,6 @@ data/imzml-examples/
 
 # scheduled-task runtime lock (not source)
 .claude/scheduled_tasks.lock
+
+# Python bytecode cache
+__pycache__/
