@@ -319,6 +319,12 @@ impl ImagingWriter {
         //     it; building serde_json::to_value here is NOT required.
         self.imaging_block = Some(assemble_imaging_metadata(geom));
 
+        // (e) Fill run.default_source_file_id / default_data_processing_id from the now-populated
+        //     source_files + data_processing lists when the source left them unset (validator #5 / B).
+        //     Imaging source_files = [imzml, ibd] → default_source_file_id = "imzml"; the dp list
+        //     carries mzml2mzpeak_conversion (and any source dp) → first entry. Only fills None.
+        default_run_refs(&mut self.inner);
+
         Ok(())
     }
 
@@ -541,6 +547,40 @@ fn wire_metadata_into(target: &mut impl MSDataFileMetadata, prov: &RunProvenance
                 .build(),
         ),
         StorageMode::Unknown => {}
+    }
+}
+
+/// Default `run.default_source_file_id` / `default_data_processing_id` from the lists already present
+/// in the metadata, when the source left them unset (validator finding #5 / B; the 523-file
+/// re-validation's only remaining failure class).
+///
+/// The mzPeak `ms_run` schema types both ids as a required `string`. When the source mzML leaves
+/// `<run defaultSourceFileRef>` / `<spectrumList defaultDataProcessingRef>` implicit, mzdata carries
+/// `None` and the writer serializes JSON `null` → schema FAIL. We fill each `None` with the **first**
+/// entry of the corresponding list — matching the convention EVERY passing file uses
+/// (`default_source_file_id` = first `source_files[]`; `default_data_processing_id` = first
+/// `data_processing[]`, i.e. the source's primary processing, NOT our appended `mzml2mzpeak_*` step).
+///
+/// Discipline: ONLY fills a `None` (never overrides a source-declared ref — those stay verbatim), and
+/// only ever points at a REAL list entry's id (so the ref is referentially valid). When a list is empty
+/// (e.g. a source with no `sourceFileList` at all) the corresponding id is left `None` — there is nothing
+/// faithful to point at, so we do not invent one (that residual needs an emitted source_file or a spec
+/// relax, tracked in backlog 999.15a).
+///
+/// MUST run AFTER all metadata wiring (`copy_metadata_from` + `push_source_files` + any appended
+/// `data_processing`) and BEFORE the writer serializes the index — the first list entry is stable under
+/// later appends, so either call site works, but later is safe.
+pub(crate) fn default_run_refs(target: &mut impl MSDataFileMetadata) {
+    // Read the ids first (immutable borrows) so the &mut run_description borrow below doesn't clash.
+    let first_source_file_id = target.file_description().source_files.first().map(|sf| sf.id.clone());
+    let first_data_processing_id = target.data_processings().first().map(|dp| dp.id.clone());
+    if let Some(run) = target.run_description_mut() {
+        if run.default_source_file_id.is_none() {
+            run.default_source_file_id = first_source_file_id;
+        }
+        if run.default_data_processing_id.is_none() {
+            run.default_data_processing_id = first_data_processing_id;
+        }
     }
 }
 
@@ -1300,6 +1340,86 @@ mod tests {
         );
 
         let _ = std::fs::remove_file(&out);
+    }
+
+    /// Validator #5 / B: `write_run_metadata_from` fills `run.default_source_file_id` /
+    /// `default_data_processing_id` from the lists it just populated when the source left them unset.
+    /// Imaging source_files = [imzml, ibd] → default_source_file_id = "imzml"; the dp list carries
+    /// `mzml2mzpeak_conversion` (wired by `wire_metadata_into`) → default_data_processing_id points
+    /// at the FIRST entry. Both must be non-null so the `ms_run` schema (required strings) passes.
+    #[test]
+    fn write_run_metadata_defaults_run_refs_from_lists() {
+        use mzdata::meta::FileMetadataConfig;
+        use mzdata::prelude::MSDataFileMetadata;
+        use std::path::Path;
+
+        let mut out = std::env::temp_dir();
+        out.push(format!("mzml2mzpeak_writer_runrefs_{}.mzpeak", std::process::id()));
+        let mut w = ImagingWriter::new(&out, &[]).expect("build writer");
+
+        let prov = RunProvenance {
+            uuid: Some("0a1b2c3d-4e5f-6071-8293-a4b5c6d7e8f9".to_string()),
+            data_mode: StorageMode::Continuous,
+            ibd_checksum: None,
+            ibd_checksum_type: None,
+        };
+        let source = FileMetadataConfig::default();
+        let input = Path::new("/tmp/datasets/Run01.imzML");
+
+        w.write_run_metadata_from(&source, &prov, None, Some(input))
+            .expect("metadata wiring succeeds");
+
+        let run = w
+            .inner
+            .run_description()
+            .expect("a run description is present");
+        // default_source_file_id = first source_file = the .imzML entry's id.
+        assert_eq!(
+            run.default_source_file_id.as_deref(),
+            Some("imzml"),
+            "default_source_file_id defaulted to the first source_file (the .imzML)"
+        );
+        // default_data_processing_id = first data_processing entry's id (here mzml2mzpeak_conversion,
+        // the only dp on a no-source-dp imaging run). Must be a real, non-null id.
+        let dp_ids: Vec<&str> = w.inner.data_processings().iter().map(|d| d.id.as_str()).collect();
+        assert!(!dp_ids.is_empty(), "at least one data_processing entry exists");
+        assert_eq!(
+            run.default_data_processing_id.as_deref(),
+            Some(dp_ids[0]),
+            "default_data_processing_id defaulted to the FIRST data_processing entry"
+        );
+
+        let _ = std::fs::remove_file(&out);
+    }
+
+    /// `default_run_refs` ONLY fills a `None` — a source-declared ref is left verbatim, and an empty
+    /// list leaves the id `None` (the empty-source_files residual; no invented value).
+    #[test]
+    fn default_run_refs_only_fills_none_and_skips_empty() {
+        use mzdata::meta::{DataProcessing, FileMetadataConfig, MassSpectrometryRun, SourceFile};
+        use mzdata::prelude::MSDataFileMetadata;
+
+        // (a) Pre-set refs are NOT overridden.
+        let mut md = FileMetadataConfig::default();
+        *md.run_description_mut().unwrap() = MassSpectrometryRun {
+            default_source_file_id: Some("SOURCE_DECLARED".to_string()),
+            default_data_processing_id: Some("DP_DECLARED".to_string()),
+            ..Default::default()
+        };
+        md.file_description_mut().source_files.push(SourceFile { id: "first_sf".into(), ..Default::default() });
+        md.data_processings_mut().push(DataProcessing { id: "first_dp".into(), methods: vec![] });
+        super::default_run_refs(&mut md);
+        let run = md.run_description().unwrap();
+        assert_eq!(run.default_source_file_id.as_deref(), Some("SOURCE_DECLARED"), "existing ref not overridden");
+        assert_eq!(run.default_data_processing_id.as_deref(), Some("DP_DECLARED"), "existing ref not overridden");
+
+        // (b) Empty source_files → default_source_file_id stays None (no invented value); dp present → filled.
+        let mut md = FileMetadataConfig::default();
+        md.data_processings_mut().push(DataProcessing { id: "only_dp".into(), methods: vec![] });
+        super::default_run_refs(&mut md);
+        let run = md.run_description().unwrap();
+        assert!(run.default_source_file_id.is_none(), "empty source_files → id left None (residual)");
+        assert_eq!(run.default_data_processing_id.as_deref(), Some("only_dp"), "dp present → filled from first");
     }
 
     /// SRC-01 back-compat: `write_run_metadata` (the no-path entry point used by the back-compat

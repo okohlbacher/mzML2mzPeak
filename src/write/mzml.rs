@@ -457,6 +457,13 @@ pub fn convert_mzml_with(
         record_numpress_linear(&mut writer);
     }
 
+    // Fill run.default_source_file_id / default_data_processing_id from the now-complete
+    // source_files + data_processing lists when the source mzML left them unset (validator #5 / B).
+    // MUST be after all data_processing appends above (record_sort_peaks / record_numpress_linear)
+    // and before finish_parquet() serializes the run blob. Only fills None — a source-declared ref
+    // is left verbatim, so a file that already set them stays byte-identical.
+    crate::write::writer::default_run_refs(&mut writer);
+
     // Terminal sequence (mirror the imaging path in src/write/convert.rs): flush all Parquet
     // facets and hand back the still-open ZipArchiveWriter so typed members can be inserted
     // BEFORE the index is written. This is EQUIVALENT to the old one-liner writer.finish() —
