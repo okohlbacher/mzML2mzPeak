@@ -25,6 +25,26 @@ import sys, os, glob, zipfile, json
 from collections import defaultdict
 
 
+def _archive_references_uo(z, names):
+    """True if any archive column carries a UO unit (e.g. `*_unit_UO_0000031`).
+
+    The UO-unit columns (scan_start_time UO:0000031, ion_injection_time UO:0000028, …) live in the
+    small `*metadata.parquet` members — NOT the large data/peaks parquets — so we scan only those
+    and grep the raw bytes for the `_unit_UO_` token. Cheap + correct; no parquet lib dependency.
+    Mirrors the byte-level detection used to root-cause mzPeakValidator finding A.
+    """
+    token = b"_unit_UO_"
+    for n in names:
+        if not n.lower().endswith("metadata.parquet"):
+            continue
+        try:
+            if token in z.read(n):
+                return True
+        except Exception:
+            continue
+    return False
+
+
 def reasons(path):
     """Return a list of conformance problems for one archive ([] = conformant)."""
     try:
@@ -43,10 +63,17 @@ def reasons(path):
     if not isinstance(cvl, list) or not cvl:
         out.append("missing/empty metadata.cv_list")
     else:
+        declared = set()
         for i, e in enumerate(cvl):
+            declared.add(e.get("id"))
             miss = [k for k in ("id", "version", "uri") if not e.get(k)]
             if miss:
                 out.append(f"cv_list[{i}] ({e.get('id', '?')}) missing {miss}")
+        # CV-coherence (mzPeakValidator finding A): if the archive USES a UO unit anywhere, UO MUST
+        # be declared in cv_list. This is the check that would have caught the SDRF cv_list dropping
+        # UO; gating on it prevents regression of declared ⊉ referenced.
+        if "UO" not in declared and _archive_references_uo(z, names):
+            out.append("cv_list omits UO but archive uses UO-unit columns (*_unit_UO_*)")
     return out
 
 

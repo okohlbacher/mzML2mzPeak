@@ -238,24 +238,35 @@ pub fn cv_entry_for(id: &str) -> Option<CvEntry> {
     })
 }
 
-/// Build the file-level `cv_list` for a **sample-metadata** (SDRF/ISA) archive by declaring
-/// exactly the controlled vocabularies the emitted `sample_list` params reference — so
-/// `declared == referenced` by construction (CVL-02 declared ⊇ referenced, no spurious decl).
+/// Build the file-level `cv_list` for a **sample-metadata** (SDRF/ISA) archive: the base CVs the
+/// embedded mzML spectra always reference (**MS** + **UO**) PLUS every CV the projected
+/// `sample_list` params reference (`UNIMOD`, the project-local `mzml2mzpeak`). So `declared ⊇
+/// referenced` by construction across the WHOLE archive — not just the sample_list (CVL-02).
 ///
-/// The mzML write path emits no fixed `cv_list` (unlike the imaging path's MS/IMS/UO); instead
-/// the sample-metadata projection ([`crate::sdrf::project_sample_list`]) attaches per-param
-/// `cv_ref`s — `MS` (sample-label `MS:1002602`), `UNIMOD` (tag modifications), and the
-/// project-local `mzml2mzpeak` (channel-role / reporter-ion-mz tokens). This scans the actual
-/// projected entries for every distinct `cv_ref`/`unit_cv_ref`, always includes **MS** (the
-/// column-name inflection + sample-label umbrella reference even a label-free run carries), and
-/// maps each id through [`cv_entry_for`]. An id with no registry entry is logged and skipped
-/// (it would be a bug — every `cv_ref` this converter emits is registered).
+/// **Why MS + UO are seeded unconditionally** (mzPeakValidator finding A): this list OVERWRITES
+/// the upstream writer's base `cv_list` via `add_index_metadata("cv_list", …)`. The upstream
+/// writer (`mzpeak_prototyping@29e59b2`) seeds every writer with `controlled_vocabularies:
+/// vec![MS, UO]` because the embedded spectra carry UO-unit scan params — `scan_start_time`
+/// (`UO:0000031`) and `ion_injection_time` (`UO:0000028`), emitted as `*_unit_UO_*` columns in
+/// `spectra_metadata.parquet`. Seeding only MS here dropped that UO and failed all 172
+/// sdrf-examples. We mirror the upstream base vec exactly (MS + UO). **Not IMS** — SDRF/ISA runs
+/// are non-imaging, so an imaging-coordinate CV declaration would be spurious.
+///
+/// On top of the base, the sample-metadata projection ([`crate::sdrf::project_sample_list`])
+/// attaches per-param `cv_ref`s — `MS` (sample-label `MS:1002602`), `UNIMOD` (tag modifications),
+/// and `mzml2mzpeak` (channel-role / reporter-ion-mz tokens). This scans the projected entries
+/// for every distinct `cv_ref`/`unit_cv_ref` and maps each id through [`cv_entry_for`]. An id
+/// with no registry entry is logged and skipped (it would be a bug — every `cv_ref` this
+/// converter emits is registered).
 pub fn cv_list_for_sample_metadata(sample_list: &[serde_json::Value]) -> Vec<CvEntry> {
     use std::collections::BTreeSet;
     let mut refs: BTreeSet<String> = BTreeSet::new();
-    // MS is ALWAYS referenced (column-name inflection + the MS:1002602 sample-label umbrella),
-    // so it is declared even for a label-free / zero-match sample_list.
+    // Base non-imaging spectrum CVs the embedded mzML ALWAYS references — declared even for a
+    // label-free / zero-match sample_list. MS: column-name inflection + the MS:1002602 sample-label
+    // umbrella. UO: the unit ontology for UO-unit scan params (scan_start_time UO:0000031,
+    // ion_injection_time UO:0000028) the upstream writer emits on every spectrum (finding A).
     refs.insert("MS".to_string());
+    refs.insert("UO".to_string());
     for entry in sample_list {
         let Some(params) = entry.get("parameters").and_then(|p| p.as_array()) else {
             continue;
@@ -608,18 +619,22 @@ mod tests {
         );
     }
 
-    /// `cv_list_for_sample_metadata` declares EXACTLY the CVs the sample_list params reference —
-    /// MS always (even label-free), plus mzml2mzpeak + UNIMOD when a channel entry carries them.
-    /// This is the declared ⊇ referenced guarantee that closes the undeclared-cv_ref gap.
+    /// `cv_list_for_sample_metadata` declares the base spectrum CVs the embedded mzML always
+    /// references (MS + UO — even label-free) PLUS every CV the sample_list params reference
+    /// (mzml2mzpeak + UNIMOD when a channel entry carries them). This is the declared ⊇ referenced
+    /// guarantee, scoped to the WHOLE archive (spectra + sample_list), that closes the
+    /// undeclared-cv_ref gap (mzPeakValidator finding A: UO was being dropped).
     #[test]
     fn cv_list_for_sample_metadata_declares_referenced_and_only_referenced() {
-        // A label-free entry (no params) → MS only.
+        // A label-free entry (no params) → base spectrum CVs MS + UO.
         let label_free = vec![serde_json::json!({"id": "sample-1", "name": "S1", "parameters": []})];
-        let ids: Vec<String> = cv_list_for_sample_metadata(&label_free)
+        let ids: std::collections::BTreeSet<String> = cv_list_for_sample_metadata(&label_free)
             .into_iter()
             .map(|e| e.id)
             .collect();
-        assert_eq!(ids, vec!["MS".to_string()], "label-free declares MS only");
+        let want_label_free: std::collections::BTreeSet<String> =
+            ["MS", "UO"].iter().map(|s| s.to_string()).collect();
+        assert_eq!(ids, want_label_free, "label-free declares the base spectrum CVs MS + UO");
 
         // A labeled channel entry carrying MS:1002602 + a mzml2mzpeak token + a UNIMOD tag mod.
         let labeled = vec![serde_json::json!({
@@ -636,28 +651,30 @@ mod tests {
             .into_iter()
             .map(|e| e.id)
             .collect();
-        let want: std::collections::BTreeSet<String> = ["MS", "UNIMOD", "mzml2mzpeak"]
+        let want: std::collections::BTreeSet<String> = ["MS", "UO", "UNIMOD", "mzml2mzpeak"]
             .iter()
             .map(|s| s.to_string())
             .collect();
-        assert_eq!(ids, want, "declared set must equal the referenced cv_refs (MS/UNIMOD/mzml2mzpeak)");
-        // IMS/UO are imaging-only and must NOT leak into a sample-metadata cv_list.
-        assert!(!ids.contains("IMS") && !ids.contains("UO"), "no imaging CVs in a sample-metadata cv_list");
+        assert_eq!(ids, want, "declared set = base spectrum CVs (MS/UO) + referenced cv_refs (UNIMOD/mzml2mzpeak)");
+        // IMS is imaging-only and must NOT leak into a (non-imaging) sample-metadata cv_list.
+        assert!(!ids.contains("IMS"), "no imaging coordinate CV (IMS) in a sample-metadata cv_list");
     }
 
     /// An unknown `cv_ref` in the sample_list is skipped (not declared blind) — the declared set
-    /// never invents an entry it can't describe. (MS is still always present.)
+    /// never invents an entry it can't describe. (The base spectrum CVs MS + UO are still present.)
     #[test]
     fn cv_list_for_sample_metadata_skips_unknown_cv_ref() {
         let with_bogus = vec![serde_json::json!({
             "id": "sample-1", "name": "S1",
             "parameters": [{"cv_ref": "BOGUS", "accession": "BOGUS:1", "name": "x"}]
         })];
-        let ids: Vec<String> = cv_list_for_sample_metadata(&with_bogus)
+        let ids: std::collections::BTreeSet<String> = cv_list_for_sample_metadata(&with_bogus)
             .into_iter()
             .map(|e| e.id)
             .collect();
-        assert_eq!(ids, vec!["MS".to_string()], "unknown cv_ref dropped; MS always present");
+        let want: std::collections::BTreeSet<String> =
+            ["MS", "UO"].iter().map(|s| s.to_string()).collect();
+        assert_eq!(ids, want, "unknown cv_ref dropped; base spectrum CVs MS + UO always present");
     }
 
     /// No-drift gate: the string "1002602" (the accession for `sample_label_curie()`)

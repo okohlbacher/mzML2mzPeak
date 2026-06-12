@@ -214,9 +214,12 @@ fn synthetic_tmt_sdrf_sample_list_has_labeled_entries() {
     assert!(!sl_bytes.contains("plex_id"), "plex_id in sample_list bytes");
     assert!(!sl_bytes.contains("channel_set"), "channel_set in sample_list bytes");
 
-    // ── (D) cv_list declares every cv_ref the sample_list references (CVL-02, 999.14) ─────────
+    // ── (D) cv_list declares every cv_ref the archive references (CVL-02, 999.14) ─────────
     //   A sample-metadata archive emits its own cv_list (the mzML path otherwise has none),
-    //   declaring exactly MS + UNIMOD + mzml2mzpeak here — never undeclared, never spurious.
+    //   declaring the base spectrum CVs MS + UO PLUS UNIMOD + mzml2mzpeak here — never
+    //   undeclared, never spurious. UO is base because the embedded spectra carry UO-unit scan
+    //   params (scan_start_time UO:0000031, ion_injection_time UO:0000028) — mzPeakValidator
+    //   finding A: it must be declared even though no sample_list param references it.
     let cv_val = reader
         .file_index()
         .metadata
@@ -229,9 +232,13 @@ fn synthetic_tmt_sdrf_sample_list_has_labeled_entries() {
         .iter()
         .map(|e| e["id"].as_str().expect("cv_list entry needs an id").to_string())
         .collect();
-    // Referenced cv_refs across every projected sample_list param (declared ⊇ referenced).
+    // Referenced CVs across the WHOLE archive (declared ⊇ referenced):
+    //   - base spectrum CVs the embedded mzML always carries: MS (column inflection + MS:1002602)
+    //     and UO (UO-unit scan params on every spectrum), plus
+    //   - every distinct cv_ref on the projected sample_list params.
     let mut referenced: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-    referenced.insert("MS".to_string()); // always (column inflection + MS:1002602)
+    referenced.insert("MS".to_string());
+    referenced.insert("UO".to_string());
     for e in sl_arr {
         if let Some(params) = e["parameters"].as_array() {
             for p in params {
@@ -253,10 +260,10 @@ fn synthetic_tmt_sdrf_sample_list_has_labeled_entries() {
         declared.is_subset(&referenced),
         "cv_list must declare no spurious CV; declared={declared:?} referenced={referenced:?}"
     );
-    // Imaging-only CVs must not leak into a sample-metadata archive's cv_list.
+    // The imaging coordinate CV (IMS) must not leak into a (non-imaging) sample-metadata archive.
     assert!(
-        !declared.contains("IMS") && !declared.contains("UO"),
-        "sample-metadata cv_list must not declare imaging CVs (IMS/UO); got {declared:?}"
+        !declared.contains("IMS"),
+        "sample-metadata cv_list must not declare the imaging coordinate CV (IMS); got {declared:?}"
     );
 
     // ── (E) Schema validation (three-places / sample_list.json) ──────────────
