@@ -163,7 +163,24 @@ A command-line converter that reads imzML mass spectrometry **imaging** (MSI) fi
 
 ## Conventions
 
-Conventions not yet established. Will populate as patterns emerge during development.
+### SDRF/ISA-injection invariant (MUST CHECK — bucket data + any conversion/sync script)
+
+Every `.mzpeak` that belongs to an SDRF/ISA **study** (the `sdrf-examples/` corpus) MUST be produced
+with `--sdrf <file>` (or `--isa <dir>`). That flag embeds the verbatim source as a `sample_metadata/`
+ZIP member AND emits `metadata.study` + `metadata.sample_list` into `mzpeak_index.json`. A plain
+`mzML → mzpeak` conversion (no flag) **silently drops** the study annotation — the spectra are fine
+and the file still opens, and it even still has a `sample_list` (copied from the source mzML's own
+`<sampleList>`), so the failure is invisible without an explicit check. **The only reliable signal is
+the `sample_metadata/` embed + the `metadata.study` key.** (History: 143/172 `sdrf-examples` archives
+were once uploaded without it because the bulk conversions omitted `--sdrf` — see task 999/#34.)
+
+**Rules:**
+- Any script that converts study runs MUST pass `--sdrf`/`--isa`, never a bare conversion.
+- Any script that uploads/syncs `sdrf-examples` MUST verify injection first and refuse on failure.
+  `scripts/push-data-stackit.sh` already gates on this (`ALLOW_UNINJECTED=1` to override deliberately).
+- The single-source checker is **`scripts/check-sdrf-injection.py`** (exits non-zero if any archive
+  lacks the embed); run it after any reconvert and before any upload:
+  `python3 scripts/check-sdrf-injection.py data/sdrf-examples`.
 <!-- GSD:conventions-end -->
 
 <!-- GSD:architecture-start source:ARCHITECTURE.md -->

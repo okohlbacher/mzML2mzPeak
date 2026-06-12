@@ -36,6 +36,22 @@ sync_dir data/mzML-examples  mzML-examples
 # 1b) SDRF / ISA sample-metadata tile — sync the full chain IN PLACE: metadata + vendor RAW + mzML +
 #     mzpeak. Only internal working notes (CANDIDATES.md) + junk are excluded. Unlike the other tiles,
 #     mzpeak is in-place here, so we do NOT exclude *.mzpeak.
+#
+#     GUARD (REQUIRED): every sdrf-examples .mzpeak MUST carry its SDRF/ISA sample-metadata embed
+#     (converted with --sdrf/--isa, NOT plain mzML->mzpeak). A plain conversion silently drops the
+#     study annotation and still "looks" valid. We REFUSE to upload a tile that fails this check, so a
+#     non-injected archive can never reach the public bucket. To bypass for a deliberate partial upload,
+#     set ALLOW_UNINJECTED=1 (and fix it before the next run). See scripts/check-sdrf-injection.py.
+say "verifying SDRF/ISA injection in data/sdrf-examples/*.mzpeak (CLAUDE.md: SDRF-injection invariant)"
+if ! python3 scripts/check-sdrf-injection.py --quiet data/sdrf-examples; then
+  if [ "${ALLOW_UNINJECTED:-0}" = "1" ]; then
+    say "  WARN ALLOW_UNINJECTED=1 — proceeding despite missing SDRF/ISA injection (FIX BEFORE NEXT RUN)"
+  else
+    echo "ERROR: some sdrf-examples .mzpeak lack SDRF/ISA injection — refusing to upload. Reconvert with" >&2
+    echo "       --sdrf/--isa (or set ALLOW_UNINJECTED=1 to override). See scripts/check-sdrf-injection.py." >&2
+    exit 1
+  fi
+fi
 if [ "$DRYRUN" = "1" ]; then
   say "PLAN sync data/sdrf-examples -> $B/sdrf-examples (excl CANDIDATES.md,*.log,*.DS_Store)"
   find data/sdrf-examples -type f ! -name 'CANDIDATES.md' ! -name '*.log' ! -name '*.DS_Store' | wc -l | sed 's/^/    files: /'
