@@ -171,70 +171,78 @@ pub fn cv_list() -> Vec<CvEntry> {
 
 /// The single-source registry mapping a `cv_ref` id to its declared [`CvEntry`].
 ///
-/// This is the ONE place every CV's `id`/`full_name`/`uri`/`version` lives (CVG-01). Both
+/// This is the ONE place every CV's `id`/`full_name`/`uri`/`version` resolves (CVG-01). Both
 /// [`cv_list`] (the imaging/base set MS/IMS/UO, also read by the reverse imzML `<cvList>`) and
 /// [`cv_list_for_sample_metadata`] (the run-filtered sample-metadata set) build from it, so the
 /// declared block can never drift from an independent copy. Returns `None` for an id this
 /// converter never emits — an unknown `cv_ref` is surfaced (not silently declared) by the caller.
 ///
-/// Registered ids:
-/// - **MS** — PSI-MS (column-name inflection + `MS:1002602` sample-label umbrella).
-/// - **IMS** — imaging coordinate columns (`IMS:1000050/51`). No OBO-Foundry PURL yet
-///   (CVG-01); the stable imzML raw URL is the recorded token until a canonical home is minted
-///   (pinned at `1.1.0`).
-/// - **UO** — Unit Ontology (`UO:0000017` µm), pinned to the `2026-01-16` OBO release (matching
-///   the upstream writer's value so the index cv_list stays consistent across paths).
+/// ## CV identity is sourced from upstream (999.16 b/c/d — no local duplicate)
+///
+/// For every CV that mzdata's [`mzdata::params::ControlledVocabulary`] enum knows
+/// (MS / UO / IMS / EFO / OBI / BFO / NCIT / BTO / PRIDE / HANCESTRO), the `full_name` / `uri` /
+/// `version` are read DIRECTLY from the upstream writer's canonical registry
+/// (`mzpeak_prototyping::param::ControlledVocabularyEntry::from(ControlledVocabulary)`,
+/// `mzpeak_prototyping@29e59b2`). We do NOT keep a hand-mirrored copy of those strings — that copy
+/// is exactly what drifted and dropped/mis-versioned CVs (mzPeakValidator finding A). This also
+/// gives the sample-metadata projection free coverage of EFO/NCIT/BTO/OBI (SDRF/ISA characteristics
+/// reference them: organism→NCIT, disease→EFO, tissue→BTO) so the finding-A class cannot recur for
+/// a different CV. We map id→variant explicitly rather than via mzdata's `FromStr` because that
+/// `FromStr` resolves NCIT/BTO/PRIDE to `Unknown`.
+///
+/// Two ids are LOCAL literals (not in mzdata's enum, so they cannot come from upstream):
 /// - **UNIMOD** — protein-modification CV (`UNIMOD:NNN` isobaric tag modifications, §3.12).
 /// - **mzml2mzpeak** — the project-local namespace ([`local_namespace`]) for the channel-role /
 ///   reporter-ion-mz structural tokens that have no PSI-MS accession. The `uri` points at the
-///   converter's CV-request doc (mirrors the IMS no-OBO pattern); the canonical-CURIE request is
-///   tracked in `docs/cv-requests.md`.
+///   converter's CV-request doc; the canonical-CURIE request is tracked in `docs/cv-requests.md`.
 pub fn cv_entry_for(id: &str) -> Option<CvEntry> {
-    let entry = |id: &str, full_name: &str, uri: &str, version: Option<&str>| CvEntry {
-        id: id.to_string(),
-        full_name: full_name.to_string(),
-        uri: uri.to_string(),
-        version: version.map(str::to_string),
-    };
-    // CONCRETE versions + complete id/version/uri on every entry (mzPeakValidator findings #1-#3):
-    // the file-level cv_list MUST declare a `version` and `uri` for each CV. MS + UO mirror the
-    // EXACT strings the upstream mzpeak_prototyping writer emits on the plain path (so the imaging /
-    // sample-metadata paths, which OVERWRITE the index cv_list, stay byte-consistent with it instead
-    // of regressing to placeholders). IMS/UNIMOD/mzml2mzpeak are concrete project pins recorded in
-    // docs/cv-requests.md (the validator's profile only pins MS, so these values satisfy the schema;
-    // confirming the exact IMS/UNIMOD release strings is tracked there).
-    Some(match id {
-        "MS" => entry(
-            "MS",
-            "Proteomics Standards Initiative Mass Spectrometry Ontology",
-            "http://purl.obolibrary.org/obo/ms/4.1.248/ms.obo",
-            Some("4.1.248"),
-        ),
-        "IMS" => entry(
-            "IMS",
-            "Mass Spectrometry Imaging controlled vocabulary",
-            "https://raw.githubusercontent.com/imzML/imzML/master/imagingMS.obo",
-            Some("1.1.0"),
-        ),
-        "UO" => entry(
-            "UO",
-            "Units of measurement ontology",
-            "http://purl.obolibrary.org/obo/uo/releases/2026-01-16/uo.obo",
-            Some("2026-01-16"),
-        ),
-        "UNIMOD" => entry(
-            "UNIMOD",
-            "UNIMOD protein modification database",
-            "http://www.unimod.org/obo/unimod.obo",
-            Some("2024.01"),
-        ),
-        "mzml2mzpeak" => entry(
-            local_namespace(),
-            "mzML2mzPeak local terms (project-local namespace pending PSI-MS CV minting)",
-            "https://github.com/okohlbacher/mzML2mzPeak/blob/main/docs/cv-requests.md",
-            Some("0.9.0"),
-        ),
+    use mzdata::params::ControlledVocabulary as Cv;
+
+    // The two CVs mzdata's ControlledVocabulary enum does NOT carry — keep as local literals.
+    match id {
+        "UNIMOD" => {
+            return Some(CvEntry {
+                id: "UNIMOD".to_string(),
+                full_name: "UNIMOD protein modification database".to_string(),
+                uri: "http://www.unimod.org/obo/unimod.obo".to_string(),
+                version: Some("2024.01".to_string()),
+            });
+        }
+        "mzml2mzpeak" => {
+            return Some(CvEntry {
+                id: local_namespace().to_string(),
+                full_name: "mzML2mzPeak local terms (project-local namespace pending PSI-MS CV minting)"
+                    .to_string(),
+                uri: "https://github.com/okohlbacher/mzML2mzPeak/blob/main/docs/cv-requests.md"
+                    .to_string(),
+                version: Some("0.9.0".to_string()),
+            });
+        }
+        _ => {}
+    }
+
+    // Everything else: single-source the identity from upstream's canonical registry (no drift;
+    // covers EFO/OBI/BFO/NCIT/BTO/PRIDE/HANCESTRO automatically). Explicit id→variant map — NOT
+    // mzdata's FromStr, which resolves NCIT/BTO/PRIDE to Unknown.
+    let cv = match id {
+        "MS" => Cv::MS,
+        "UO" => Cv::UO,
+        "IMS" => Cv::IMS,
+        "EFO" => Cv::EFO,
+        "OBI" => Cv::OBI,
+        "BFO" => Cv::BFO,
+        "NCIT" => Cv::NCIT,
+        "BTO" => Cv::BTO,
+        "PRIDE" => Cv::PRIDE,
+        "HANCESTRO" => Cv::HANCESTRO,
         _ => return None,
+    };
+    let up = mzpeak_prototyping::param::ControlledVocabularyEntry::from(cv);
+    Some(CvEntry {
+        id: up.id,
+        full_name: up.full_name,
+        uri: up.uri,
+        version: up.version,
     })
 }
 
@@ -379,7 +387,9 @@ mod tests {
         assert_eq!(list[0].full_name, "Proteomics Standards Initiative Mass Spectrometry Ontology");
         assert_eq!(list[0].uri, "http://purl.obolibrary.org/obo/ms/4.1.248/ms.obo");
         assert_eq!(list[0].version.as_deref(), Some("4.1.248"));
-        assert_eq!(list[1].full_name, "Mass Spectrometry Imaging controlled vocabulary");
+        // IMS identity is now sourced from upstream's registry (999.16b) — upstream's full_name + URI.
+        assert_eq!(list[1].id, "IMS");
+        assert_eq!(list[1].full_name, "Imaging Mass Spectrometry Ontology");
         assert_eq!(list[1].version.as_deref(), Some("1.1.0"));
         assert_eq!(list[2].full_name, "Units of measurement ontology");
         assert_eq!(list[2].uri, "http://purl.obolibrary.org/obo/uo/releases/2026-01-16/uo.obo");
@@ -605,11 +615,22 @@ mod tests {
     /// unregistered id returns None so the caller can surface it rather than declare it blind.
     #[test]
     fn cv_entry_for_registers_every_emitted_cv_ref() {
-        for id in ["MS", "IMS", "UO", "UNIMOD", "mzml2mzpeak"] {
+        // The CVs the converter emits as cv_refs today (MS/IMS/UO/UNIMOD/mzml2mzpeak) PLUS the
+        // sample-metadata ontologies now covered via upstream's registry (999.16c: EFO/NCIT/BTO/
+        // OBI/PRIDE/HANCESTRO/BFO) — so a future SDRF characteristic referencing one is declared,
+        // not silently dropped (the finding-A class).
+        for id in [
+            "MS", "IMS", "UO", "UNIMOD", "mzml2mzpeak", "EFO", "NCIT", "BTO", "OBI", "PRIDE",
+            "HANCESTRO", "BFO",
+        ] {
             let e = cv_entry_for(id).unwrap_or_else(|| panic!("cv_entry_for({id}) must be Some"));
             assert_eq!(e.id, id, "entry id must echo the lookup key");
             assert!(!e.full_name.is_empty(), "{id} full_name non-empty");
             assert!(!e.uri.is_empty(), "{id} uri non-empty");
+            assert!(
+                e.version.as_deref().is_some_and(|v| !v.is_empty()),
+                "{id} must carry a concrete version"
+            );
         }
         assert!(cv_entry_for("BOGUS").is_none(), "unknown cv_ref must be None");
         // The base cv_list() is exactly the registry's MS/IMS/UO entries (no drift after refactor).
