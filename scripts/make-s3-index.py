@@ -22,8 +22,7 @@ def md_text(s):
 # set CDN_BASE to serve every generated link through the CDN, e.g.
 #   CDN_BASE=https://data.mzpeak.org/v09 bash scripts/push-index-stackit.sh
 BASE = os.environ.get("CDN_BASE", "https://object.storage.eu01.onstackit.cloud/v09")
-EXPLORER = "https://www.mzpeak.org/view/"   # general LC-MS / any .mzpeak
-MZPEAKIV = "https://www.mzpeak.org/IV/"         # imaging (MSI) .mzpeak
+VIEW = "https://www.mzpeak.org/view/"   # mzPeak Viewer — any .mzpeak (LC-MS + imaging)
 
 # Parent project site — every page links back here (header brand, hero CTA, footer).
 MZPEAK_SITE = "https://www.mzpeak.org/"
@@ -58,7 +57,7 @@ SUBSETS = OrderedDict([
              "(MTBLS1129 SDRF · MTBLS5358 native ISA-Tab) studies — label-free plus TMT 6/10/11-plex "
              "isobaric designs. The full chain — SDRF/ISA metadata + vendor RAW + mzML + mzPeak — is "
              "stored here; each dataset's <code>urls.txt</code> records the original source.")),
-    ("pwiz-examples", dict(slug="pwiz", title="ProteoWizard corpus", icon="\U0001F9EA", accent="#bc4c00",
+    ("pwiz-examples", dict(slug="pwiz-tests", title="ProteoWizard test corpus", icon="\U0001F9EA", accent="#bc4c00",
         blurb="The ProteoWizard <code>vendor_readers</code> test set across all vendors — broad mzML → "
               "mzPeak conversion coverage (the converter's regression corpus).", imaging=False,
         prov="<b>Provenance.</b> The ProteoWizard <code>vendor_readers</code> conformance corpus "
@@ -219,12 +218,8 @@ def head_sizes(files, imaging):
 
 def viewer_links(key, imaging):
     enc = quote(f"{BASE}/{key}", safe="")
-    out = [f'<a class="viewer ex" target="_blank" rel="noopener" href="{EXPLORER}?file={enc}" '
-           f'title="Open in mzPeak Explorer">▶ Explorer</a>']
-    if imaging:
-        out.append(f'<a class="viewer iv" target="_blank" rel="noopener" href="{MZPEAKIV}?file={enc}" '
-                   f'title="Open in mzPeakIV (imaging viewer)">▦ mzPeakIV</a>')
-    return " ".join(out)
+    return (f'<a class="viewer view" target="_blank" rel="noopener" href="{VIEW}?file={enc}" '
+            f'title="Open in mzPeak Viewer">▶ View</a>')
 
 
 # ---- read + bucket-organise -------------------------------------------------
@@ -418,8 +413,7 @@ ul.files li:last-child{border-bottom:0}
 .tag.sdrf{background:#f1eaff;color:#8250df}
 .right{display:flex;align-items:center;gap:.45rem;white-space:nowrap;flex:0 0 auto}
 .viewer{font-size:12px;line-height:1.6;padding:1px 9px;border-radius:12px;border:1px solid transparent}
-.viewer.ex{background:var(--blue-50);color:var(--accent);border-color:#c7d4fb}
-.viewer.iv{background:#e8f7ec;color:#1a7f37;border-color:#bfe6c9}
+.viewer.view{background:var(--blue-50);color:var(--accent);border-color:#c7d4fb}
 .viewer:hover{filter:brightness(.97);text-decoration:none}
 .sz{font-family:var(--font-mono);color:var(--faint);font-variant-numeric:tabular-nums;font-size:12px}
 .legend{margin:1.6rem 0;padding:.9rem 1rem;background:#fff;border:1px solid var(--line);border-radius:12px;color:var(--mut);font-size:13px}
@@ -440,57 +434,63 @@ footer.ftr a{color:#c2cbd6}footer.ftr a:hover{color:#fff}
 """
 
 
-def nav(active_slug):
-    """Sticky header — brand links to www.mzpeak.org (parent site); local pills for the example
-    subsets; explicit mzpeak.org + GitHub actions on the right."""
-    home_active = active_slug is None
-    pills = [f'<a class="pill{" active" if home_active else ""}" href="index.html">Home</a>']
-    for p in listed:
-        m = meta_for(p)
-        act = (m["slug"] == active_slug)
-        pills.append(f'<a class="pill{" active" if act else ""}" href="{m["slug"]}.html">{m["icon"]} {m["title"]}</a>')
+def nav(active_slug, standalone=False):
+    """Sticky header — brand links to www.mzpeak.org (parent site); local pills for the FEATURED
+    subsets; explicit mzpeak.org + GitHub actions on the right. A STANDALONE page (an unlisted corpus
+    like pwiz-tests) omits the pills entirely, so it never links into the example index.html."""
+    pills = ""
+    if not standalone:
+        home_active = active_slug is None
+        items = [f'<a class="pill{" active" if home_active else ""}" href="index.html">Home</a>']
+        for p in listed:
+            m = meta_for(p)
+            act = (m["slug"] == active_slug)
+            items.append(f'<a class="pill{" active" if act else ""}" href="{m["slug"]}.html">{m["icon"]} {m["title"]}</a>')
+        pills = f'<nav class="pills">{"".join(items)}</nav>'
+    label = "tests" if standalone else "examples"
     return ('<header class="nav"><div class="wrap">'
             f'<a class="brand" href="{MZPEAK_SITE}" title="Back to mzpeak.org">'
-            f'<img src="{MARK}" alt="mzPeak"><b>mzPeak</b><span class="ex">examples</span></a>'
-            f'<nav class="pills">{"".join(pills)}</nav>'
+            f'<img src="{MARK}" alt="mzPeak"><b>mzPeak</b><span class="ex">{label}</span></a>'
+            f'{pills}'
             '<div class="hdr-actions">'
             f'<a class="btn btn-ghost" href="{MZPEAK_SITE}">↗ mzpeak.org</a>'
             f'<a class="btn btn-primary" href="{GITHUB}">GitHub</a></div>'
             '</div><div class="spectrum-strip"></div></header>')
 
 
-FOOTER = (
-    '<footer class="ftr"><div class="wrap"><div class="ftr-in">'
-    '<div><a class="brand" href="%s"><img src="%s" alt="mzPeak" style="height:22px"><b>mzPeak</b></a>'
-    '<p class="ftr-tag">Open example datasets for the mzML2mzPeak converter — originals + converted '
-    '<span class="mono">.mzpeak</span>. Part of the mzPeak format, governed by HUPO-PSI.</p></div>'
-    '<div class="ftr-links">'
-    '<div class="ftr-col"><h4>mzPeak</h4>'
-    '<a href="%s">mzpeak.org</a>'
-    '<a href="%s">White paper</a>'
-    '<a href="https://hupo-psi.github.io/mzPeak-specification/">Specification</a></div>'
-    '<div class="ftr-col"><h4>This corpus</h4>'
-    '<a href="index.html">Examples home</a>'
-    '<a href="README.md">README.md</a>'
-    '<a href="%s">mzML2mzPeak on GitHub</a></div>'
-    '<div class="ftr-col"><h4>Viewers</h4>'
-    '<a href="%s">mzPeak Explorer</a>'
-    '<a href="%s">mzPeakIV (imaging)</a></div>'
-    '</div></div>'
-    '<div class="ftr-base"><span>Public-read example data · <span class="mono">s3://v09</span> · '
-    '%d objects · %s</span>'
-    '<span><a href="%s">← Back to mzpeak.org</a></span></div>'
-    '</div></footer>'
-) % (MZPEAK_SITE, MARK, MZPEAK_SITE, WHITEPAPER, GITHUB, EXPLORER, MZPEAKIV, total_n, hs(total_b), MZPEAK_SITE)
+def render_footer(standalone=False):
+    """Dark footer. A STANDALONE page drops the 'Examples home' (index.html) link so it carries NO
+    link into the example index — only mzpeak.org / GitHub / viewer links remain."""
+    examples_home = "" if standalone else '<a href="index.html">Examples home</a>'
+    return (
+        '<footer class="ftr"><div class="wrap"><div class="ftr-in">'
+        '<div><a class="brand" href="%s"><img src="%s" alt="mzPeak" style="height:22px"><b>mzPeak</b></a>'
+        '<p class="ftr-tag">Open example datasets for the mzML2mzPeak converter — originals + converted '
+        '<span class="mono">.mzpeak</span>. Part of the mzPeak format, governed by HUPO-PSI.</p></div>'
+        '<div class="ftr-links">'
+        '<div class="ftr-col"><h4>mzPeak</h4>'
+        '<a href="%s">mzpeak.org</a>'
+        '<a href="%s">White paper</a>'
+        '<a href="https://hupo-psi.github.io/mzPeak-specification/">Specification</a></div>'
+        '<div class="ftr-col"><h4>Links</h4>'
+        f'{examples_home}'
+        '<a href="%s">mzML2mzPeak on GitHub</a></div>'
+        '<div class="ftr-col"><h4>Viewer</h4>'
+        '<a href="%s">mzPeak Viewer</a></div>'
+        '</div></div>'
+        '<div class="ftr-base"><span>Public-read example data · <span class="mono">s3://v09</span></span>'
+        '<span><a href="%s">← Back to mzpeak.org</a></span></div>'
+        '</div></footer>'
+    ) % (MZPEAK_SITE, MARK, MZPEAK_SITE, WHITEPAPER, GITHUB, VIEW, MZPEAK_SITE)
 
 
-def page(title, active_slug, body):
+def page(title, active_slug, body, standalone=False):
     """body is full-bleed content (its own hero/subhero + a <main class="wrap"> block)."""
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width, initial-scale=1">'
             f'<link rel="icon" type="image/png" href="{MARK}">'
             f'<title>{html.escape(title)}</title><style>{CSS}</style></head><body>'
-            f'{nav(active_slug)}{body}{FOOTER}</body></html>')
+            f'{nav(active_slug, standalone)}{body}{render_footer(standalone)}</body></html>')
 
 
 def tag_for(rel):
@@ -545,10 +545,9 @@ for p in listed:
 landing = (
     '<main class="wrap" id="browse" style="padding-top:28px">'
     f'<section class="grid" style="grid-template-columns:repeat({len(cards)},minmax(0,1fr))">{"".join(cards)}</section>'
-    '<div class="legend">Each <code>.mzpeak</code> streams into a browser viewer over HTTP range (no download): '
-    f'<a class="viewer ex" target="_blank" rel="noopener" href="{EXPLORER}">▶ Explorer</a> = mzPeak Explorer '
-    f'(any file) · <a class="viewer iv" target="_blank" rel="noopener" href="{MZPEAKIV}">▦ mzPeakIV</a> = '
-    'imaging viewer (MSI datasets).</div></main>')
+    '<div class="legend">Each <code>.mzpeak</code> streams into the browser-based '
+    f'<a class="viewer view" target="_blank" rel="noopener" href="{VIEW}">▶ View</a> = mzPeak Viewer '
+    'over HTTP range (no download) — any file, LC-/GC-MS and imaging (MSI) alike.</div></main>')
 
 outdir = sys.argv[1] if len(sys.argv) > 1 else "."
 os.makedirs(outdir, exist_ok=True)
@@ -556,9 +555,37 @@ with open(os.path.join(outdir, "index.html"), "w") as f:
     f.write(page("mzPeak example data — s3://v09", None, landing))
 
 # ---- subpages ---------------------------------------------------------------
+def write_download_script(prefix, slug, title):
+    """Emit <slug>-download.sh: a credential-free curl fetcher for EVERY .mzpeak in this subset.
+    Returns (script_filename, n_mzpeak). The bucket is public-read, so plain HTTPS works for anyone."""
+    mzpeaks = sorted(
+        key for g in subsets[prefix].values() for (_, key, _) in g if key.lower().endswith(".mzpeak")
+    )
+    lines = [
+        "#!/usr/bin/env bash",
+        f"# Download every {title} .mzpeak from the public mzPeak example bucket — no credentials needed.",
+        f"# Usage:  bash {slug}-download.sh [DEST_DIR]   (default DEST_DIR = ./{slug})",
+        "# Files land under DEST/<vendor>/... mirroring the bucket layout.",
+        "set -euo pipefail",
+        f'BASE="{BASE}"',
+        f'DEST="${{1:-{slug}}}"',
+        'dl(){ curl -fsSL --create-dirs -o "$DEST/$2" "$BASE/$1"; echo "  ✓ $2"; }',
+        f'echo "downloading {len(mzpeaks)} {title} .mzpeak -> $DEST"',
+    ]
+    for key in mzpeaks:
+        rel = key[len(prefix) + 1:] if key.startswith(prefix + "/") else key
+        lines.append(f'dl "{quote(key)}" "{rel}"')
+    lines.append(f'echo "done: {len(mzpeaks)} files in $DEST"')
+    fname = f"{slug}-download.sh"
+    with open(os.path.join(outdir, fname), "w") as fh:
+        fh.write("\n".join(lines) + "\n")
+    return fname, len(mzpeaks)
+
+
 for p in order:
     m = meta_for(p)
     nds, nf, nb = stats(p)
+    standalone = p in UNLISTED
     provhtml = f'<p class="prov">{m["prov"]}</p>' if m.get("prov") else ""
     q = qualifying(p)
     if len(q) >= 2:
@@ -570,18 +597,33 @@ for p in order:
     else:
         fig_html = ""
     toprow = ('<div class="toprow">%s%s</div>' % (provhtml, fig_html)) if (provhtml or fig_html) else ""
+
+    # Unlisted corpus (pwiz-tests): emit a curl download-all script + a prominent button, and a
+    # crumb that does NOT link into the example index.html (standalone page).
+    dl_banner = ""
+    if standalone:
+        script, n_mz = write_download_script(p, m["slug"], m["title"])
+        dl_banner = (
+            '<div class="legend" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">'
+            f'<a class="btn btn-primary" href="{script}" download>⤓ Download all {n_mz} .mzpeak (bash + curl)</a>'
+            f'<span>No login needed — public HTTPS. Or run: <code>bash {script}</code></span></div>')
+        crumb = (f'<div class="crumb"><a href="{MZPEAK_SITE}">mzpeak.org</a> <span>›</span> '
+                 f'<span>{html.escape(m["title"])}</span></div>')
+    else:
+        crumb = (f'<div class="crumb"><a href="{MZPEAK_SITE}">mzpeak.org</a> <span>›</span> '
+                 '<a href="index.html">examples</a> <span>›</span> '
+                 f'<span>{html.escape(m["title"])}</span></div>')
+
     subhero = (
         '<section class="subhero"><div class="wrap subhero-in">'
-        f'<div class="crumb"><a href="{MZPEAK_SITE}">mzpeak.org</a> <span>›</span> '
-        '<a href="index.html">examples</a> <span>›</span> '
-        f'<span>{html.escape(m["title"])}</span></div>'
+        f'{crumb}'
         f'<h1><span>{m["icon"]}</span> {html.escape(m["title"])}'
         f'<span class="sub-badge" style="background:{m["accent"]}">{nds} datasets · {hs(nb)}</span></h1>'
         f'<p>{m["blurb"]}</p></div></section>')
     body = (subhero + '<main class="wrap">'
-            f'{toprow}{render_files(subsets[p], m["imaging"])}</main>')
+            f'{dl_banner}{toprow}{render_files(subsets[p], m["imaging"])}</main>')
     with open(os.path.join(outdir, f'{m["slug"]}.html'), "w") as f:
-        f.write(page(f'{m["title"]} — mzPeak examples', m["slug"], body))
+        f.write(page(f'{m["title"]} — mzPeak', m["slug"], body, standalone))
 
 # ---- README.md --------------------------------------------------------------
 md = [f"# mzPeak example data — `s3://v09`", "",
@@ -594,7 +636,7 @@ for p in listed:
         md += [f"_{md_text(m['prov'])}_", ""]
     md += [f"Browse: <{BASE}/{m['slug']}.html>", ""]
     for g in sorted(subsets[p]):
-        files = sorted(subsets[p][g])
+        files = sorted(subsets[p][g], key=lambda f: (not f[0].lower().endswith(".mzpeak"), f[0].lower()))
         ds = g.split("/", 1)[1] if "/" in g else g
         md += [f"### `{g}`", ""]
         if DATASETS.get(ds):
@@ -604,9 +646,7 @@ for p in listed:
             view = ""
             if key.lower().endswith(".mzpeak"):
                 enc = quote(f"{BASE}/{key}", safe="")
-                view = f"[▶ Explorer]({EXPLORER}?file={enc})"
-                if m["imaging"]:
-                    view += f" · [▦ mzPeakIV]({MZPEAKIV}?file={enc})"
+                view = f"[▶ View]({VIEW}?file={enc})"
             md.append(f"| `{rel}` | {hs(s)} | [link]({BASE}/{quote(key)}) | {view} |")
         md.append("")
 with open(os.path.join(outdir, "README.md"), "w") as f:

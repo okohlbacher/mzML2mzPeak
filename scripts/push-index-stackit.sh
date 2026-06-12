@@ -69,6 +69,15 @@ for f in "$OUT"/*.png; do
     say "put $(basename "$f")"
   else say "FAIL $(basename "$f")"; rc=1; fi
 done
+# 3c) upload any generated download helper scripts (e.g. pwiz-tests-download.sh)
+for f in "$OUT"/*.sh; do
+  if "${AWS[@]}" s3 cp "$f" "s3://$B/$(basename "$f")" \
+        --content-type "text/x-shellscript; charset=utf-8" --cache-control "no-cache" --only-show-errors; then
+    say "put $(basename "$f")"
+  else say "FAIL $(basename "$f")"; rc=1; fi
+done
+# 3d) remove the OLD pwiz.html (superseded by the standalone pwiz-tests.html) if present on the bucket
+"${AWS[@]}" s3 rm "s3://$B/pwiz.html" --only-show-errors 2>/dev/null && say "removed stale pwiz.html" || true
 
 # 4) verify the landing page is publicly served as HTML (200 + text/html)
 url="$EP/$B/index.html"
