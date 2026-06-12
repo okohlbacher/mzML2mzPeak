@@ -402,6 +402,37 @@ Verified: a TMT archive declares `['MS','UNIMOD','mzml2mzpeak']` and passes the 
 
 **Effort:** (a) S upstream PR (gated) · (b)/(c) S validator-repo edits · (d) XS. **Requirements:** TBD · **Plans:** TBD
 
+### Phase 999.16: cv_list — source from upstream registry + stop overwriting (BACKLOG — from the 2026-06-12 corpus validation)
+
+> Source: [`docs/handoff-mzpeak-corpus-validation-2026-06-12.md`](../docs/handoff-mzpeak-corpus-validation-2026-06-12.md)
+> (finding A) + analysis of upstream commit `29e59b2` *"JSON metadata in the index"*. The **hotfix**
+> (seed `cv_list_for_sample_metadata` with MS + UO, mirroring the upstream writer's default base vec)
+> landed 2026-06-12 (quick task `260612-sdrf-cvlist-uo`) and cleared all 172 sdrf-examples. These are
+> the **proper-fix** residuals — architectural alignment so the finding-A class cannot recur for another CV.
+
+- **(a) Stop overwriting `cv_list`; augment instead.** The SDRF/ISA path (`src/write/mzml.rs:603/722`)
+  REPLACES the upstream writer's base `cv_list` via `add_index_metadata("cv_list", …)`. Upstream
+  (`mzpeak_prototyping@29e59b2`) seeds every writer with `controlled_vocabularies: vec![MS, UO]` and
+  exposes `controlled_vocabularies_mut()` to **append**. Push our `UNIMOD`/`mzml2mzpeak` entries onto
+  that vec **before** `copy_metadata_to_index()` runs, and drop the manual overwrite → declared ⊇
+  referenced by construction, no hand-maintained base set. **Caveat:** requires sequencing the mutation
+  before the writer's metadata copy (writer-wrapper change). The hotfix's MS+UO seed is the safe interim.
+- **(b) Source CV identity from upstream's registry.** Our `cv_entry_for` (`src/schema/cv.rs`) is now a
+  hand-mirrored duplicate of upstream's `From<ControlledVocabulary>` impl (MS 4.1.248 / UO 2026-01-16 /
+  IMS 1.1.0, + EFO/OBI/NCIT/BTO/HANCESTRO/BFO/PRIDE). Consume `ControlledVocabularyEntry::from(cv)` for
+  the overlap and keep ONLY `UNIMOD` + `mzml2mzpeak` local (those aren't in mzdata's `ControlledVocabulary`
+  enum) → kills version/URI drift. Preserve the cv.rs single-source no-drift discipline.
+- **(c) Expand sample-metadata CV coverage.** Upstream now maps EFO/NCIT/BTO/OBI because SDRF/ISA
+  characteristics reference them (organism→NCIT, disease→EFO, tissue→BTO). Our registry covers only
+  MS/IMS/UO/UNIMOD/mzml2mzpeak; the moment a projected `sample_list` carries an EFO/NCIT `cv_ref`,
+  `cv_list_for_sample_metadata` logs+skips it → undeclared → **the same finding-A class for a different CV.**
+  Add coverage (or via (b)) ahead of richer SDRF characteristic projection.
+- **(d) Upstream robustness + cosmetic.** `ControlledVocabulary::Unknown => todo!()` panics the upstream
+  writer on an unclassifiable CV — file a `HUPO-PSI/mzPeak` issue (OWNER-GATED). Align our IMS URI to
+  upstream's `refs/heads/master/imagingMS.obo` form (byte-consistency, cosmetic).
+
+**Effort:** (a) M (writer-wrapper sequencing) · (b) S · (c) S · (d) XS issue + XS URI. **Requirements:** TBD · **Plans:** TBD
+
 ### Imaging structure (pixel facet, ROI polygons, continuous shared-axis, images.parquet) — DEFERRED beyond v1.0
 
 > **Owner decision (2026-06-08):** the whole imaging-structure cluster is post-1.0. v0.7 focuses on the
