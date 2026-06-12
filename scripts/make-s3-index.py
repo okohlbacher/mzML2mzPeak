@@ -118,7 +118,12 @@ DATASETS = {
     "Waters": "ProteoWizard <code>vendor_readers</code> · Waters (.raw / MassLynx) reader-regression files.",
 }
 
-HIDE_PREFIXES = {"demo", "pwiz-examples"}   # legacy duplicate + ProteoWizard corpus — not shown in the index
+HIDE_PREFIXES = {"demo"}                    # legacy duplicate — fully dropped (no objects, no page)
+# UNLISTED: kept in the bucket AND given their own linkable subpage (e.g. pwiz.html), but excluded from
+# the landing cards, the nav pills, the README manifest, and the headline totals — reachable only by a
+# direct link to that subpage. The ProteoWizard regression corpus is a vendor-coverage net, not a
+# curated showcase, so it's unlisted-but-downloadable rather than featured.
+UNLISTED = {"pwiz-examples"}
 # Loose test artifacts / per-dir READMEs that surfaced as fake one-file "datasets" — not examples.
 SKIP_GROUP_NAMES = {"README.md", "small.mzpeak", "small.chunked.mzpeak", "small.numpress.mzpeak", "has_uv.mzpeak"}
 SELF_SUFFIX = (".html", ".png", ".tsv")   # generated site assets at bucket root (index/subpages, ratio plots, ratios.tsv) — not example data
@@ -253,9 +258,12 @@ for k, s in objs:
 
 # preserve SUBSETS order, then any extras alphabetically
 order = [p for p in SUBSETS if p in subsets] + sorted(p for p in subsets if p not in SUBSETS)
-# totals over the SHOWN groups only (after SKIP_GROUP_NAMES), so the headline count matches what's listed
-total_n = sum(len(v) for gp in subsets.values() for v in gp.values())
-total_b = sum(s for gp in subsets.values() for v in gp.values() for _, _, s in v)
+# `listed` = the FEATURED subsets (landing cards, nav pills, README, headline totals). `order` still
+# includes UNLISTED subsets so they each get a linkable <slug>.html subpage (just not surfaced).
+listed = [p for p in order if p not in UNLISTED]
+# totals over the SHOWN groups only (after SKIP_GROUP_NAMES + UNLISTED), so the headline matches the cards
+total_n = sum(len(v) for p in listed for v in subsets[p].values())
+total_b = sum(s for p in listed for v in subsets[p].values() for _, _, s in v)
 
 
 def stats(prefix):
@@ -437,7 +445,7 @@ def nav(active_slug):
     subsets; explicit mzpeak.org + GitHub actions on the right."""
     home_active = active_slug is None
     pills = [f'<a class="pill{" active" if home_active else ""}" href="index.html">Home</a>']
-    for p in order:
+    for p in listed:
         m = meta_for(p)
         act = (m["slug"] == active_slug)
         pills.append(f'<a class="pill{" active" if act else ""}" href="{m["slug"]}.html">{m["icon"]} {m["title"]}</a>')
@@ -499,7 +507,9 @@ def tag_for(rel):
 def render_files(groups, imaging):
     rows = []
     for g in sorted(groups):
-        files = sorted(groups[g])
+        # mzPeak files first (the point of the corpus), then the originals/metadata underneath;
+        # alphabetical within each tier.
+        files = sorted(groups[g], key=lambda f: (not f[0].lower().endswith(".mzpeak"), f[0].lower()))
         ds = g.split("/", 1)[1] if "/" in g else g
         desc = DATASETS.get(ds, "")
         deschtml = f'<span class="dsdesc">{desc}</span>' if desc else ""
@@ -520,7 +530,7 @@ def render_files(groups, imaging):
 
 # ---- landing ----------------------------------------------------------------
 cards = []
-for p in order:
+for p in listed:
     m = meta_for(p)
     nds, nf, nb = stats(p)
     cards.append(
@@ -577,7 +587,7 @@ for p in order:
 md = [f"# mzPeak example data — `s3://v09`", "",
       "Public-read example datasets for the **mzML2mzPeak** project (originals + converted mzPeak).", "",
       f"- Browsable index: <{BASE}/index.html>", f"- {total_n} objects · {hs(total_b)} total", ""]
-for p in order:
+for p in listed:
     m = meta_for(p); nds, nf, nb = stats(p)
     md += [f"## {m['icon']} {m['title']} — `{p}/` ({nds} datasets, {nf} files, {hs(nb)})", ""]
     if m.get("prov"):
