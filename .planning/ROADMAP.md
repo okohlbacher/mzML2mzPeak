@@ -390,17 +390,19 @@ Verified: a TMT archive declares `['MS','UNIMOD','mzml2mzpeak']` and passes the 
   `#[serde(skip_serializing_if = "Option::is_none")]` to those fields (preferred), OR a spec change
   relaxing `ms_run.json` to `["string","null"]`. **OWNER-GATED** (outside `okohlbacher`). Likely also
   fixes a viewer crash on chromatogram-only files.
-- **(b) #4 — CV version pin mismatch (validator side).** Converter declares `MS 4.1.248`; the
-  validator's bundled profile pins `MS 4.1.217` → a per-file warning. Bump the validator's CV snapshot
-  (`~/Claude/mzPeakValidator`) to `4.1.248` (or whatever the chosen psi-ms release is). Warning-only.
-- **(c) `profile_resolution` warning (validator side).** The validator has no profile registered for
-  `metadata.version "0.9.0"` → defaults to latest. Register a `0.9.0 → mzpeak-0.9` mapping, or align the
-  declared version string. Cosmetic.
-- **(d) Confirm IMS/UNIMOD version pins.** `src/schema/cv.rs` now pins `IMS 1.1.0`, `UNIMOD 2024.01`,
-  `mzml2mzpeak 0.9.0` as concrete project values (the validator only checks MS). Confirm IMS + UNIMOD
-  against the actual ontology releases and record in `docs/cv-requests.md`.
+- **(b) #4 — CV version pin mismatch (validator side).** ⏳ **OPEN.** Converter declares `MS 4.1.248`;
+  the validator's bundled profile pins `MS 4.1.217` → a per-file warning. Proper fix belongs in the
+  validator's `--seal` workflow: swap `cv/psi-ms.obo.gz` for the 4.1.248 snapshot + reseal sha256 (a
+  bare version-string bump would falsely claim 4.1.248 while bundling 4.1.217 terms). Warning-only; the
+  CURIEs the corpus uses (scan_start_time, ion_injection_time, sample label) are stable across the bump.
+- **(c) `profile_resolution` warning (validator side).** ✅ **DONE 2026-06-12** (`mzPeakValidator`
+  `796075c`, local — not pushed). `resolve_profile` now does semver-tolerant major.minor matching, so
+  `metadata.version "0.9.0"` resolves to `mzpeak-0.9` with no warning. smoke_test.py green (15/15).
+- **(d) Confirm IMS/UNIMOD version pins.** IMS now sourced from upstream's registry (999.16b, `IMS 1.1.0`
+  + `refs/heads/master` URI). `UNIMOD 2024.01` + `mzml2mzpeak 0.9.0` remain local pins — confirm UNIMOD
+  against the actual release and record in `docs/cv-requests.md`.
 
-**Effort:** (a) S upstream PR (gated) · (b)/(c) S validator-repo edits · (d) XS. **Requirements:** TBD · **Plans:** TBD
+**Effort:** (a) S upstream PR (gated) · (b) S validator `--seal` (snapshot bump) · (d) XS. **Requirements:** TBD · **Plans:** TBD
 
 ### Phase 999.16: cv_list — source from upstream registry + stop overwriting (PARTIAL — b/c/d DONE 2026-06-12)
 
