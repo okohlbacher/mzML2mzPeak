@@ -392,11 +392,12 @@ Items deferred out of v0.7:
 | 260609-hhj | S3 index: per-accordion raw/mzML/mzPeak size+% headers (imaging RAW incl. optical) + per-category compression box-scatter PNGs embedded in each subpage (examples >50 MB input) | 2026-06-09 |
 | 260609-rfp | Make SDRF/ISA projections run-filtered — sample_list and channels scoped to matched rows only (v0.8.1 patch) | 2026-06-09 |
 | 260609-aim | ISA run-matching: structural assay-based match so ISA archives get non-empty run-filtered sample_list (v0.8.2 patch) | 2026-06-09 |
+| 260612-i9d | SDRF/ISA cv_list declares UO (mzPeakValidator finding A) + 999.16 b/c/d: source CV identity from upstream registry; 172 SDRF + 14 imaging reconverted, all 342 conformant | 2026-06-12 |
 
 ## Session Continuity
 
-Last session: 2026-06-09T18:30:00Z
-Stopped at: Quick task isa-run-matching COMPLETE — ISA structural assay matcher added; 584 tests green (was 565)
+Last session: 2026-06-12T11:30:00Z
+Stopped at: Quick task sdrf-cvlist-uo COMPLETE — finding A cleared; cv_entry_for sources MS/UO/IMS/EFO/NCIT/BTO/OBI/PRIDE/HANCESTRO/BFO from upstream registry; full suite green; corpus reconverted local (no S3). 999.16 (a) augment-not-overwrite + upstream todo!() issue remain open.
 Resume file: None
 
 ## Operator Next Steps
