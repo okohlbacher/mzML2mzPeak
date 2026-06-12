@@ -383,13 +383,34 @@ Verified: a TMT archive declares `['MS','UNIMOD','mzml2mzpeak']` and passes the 
 > (status update 2026-06-12). The converter-side fixes (#1–#3 + the cv_list concrete-version fix) landed
 > 2026-06-12; these are the residual OPEN items, none of which are fixable purely in the converter.
 
-- **(a) #5 — `run.default_source_file_id` / `default_data_processing_id` serialize as `null` (UPSTREAM).**
-  The `ms_run` blob is written by `mzpeak_prototyping`; it emits explicit `null` for these optional
-  `Option<String>` fields, violating `ms_run.json` (`type: string`). Fires on chromatogram-only / SRM
-  files (no `spectrumList defaultDataProcessingRef`). **Fix:** PR to `HUPO-PSI/mzPeak` adding
-  `#[serde(skip_serializing_if = "Option::is_none")]` to those fields (preferred), OR a spec change
-  relaxing `ms_run.json` to `["string","null"]`. **OWNER-GATED** (outside `okohlbacher`). Likely also
-  fixes a viewer crash on chromatogram-only files.
+- **(a) #5 — `run.default_source_file_id` / `default_data_processing_id` serialize as `null`.**
+  ⏳ **OPEN — RECLASSIFIED LOCAL** (per `docs/handoff-mzpeak-corpus-revalidation-2026-06-12.md`, the
+  523-file re-sweep: this is now the ONLY remaining failure class — **45 files**: pwiz 28, mzML 7,
+  imzml 10; sdrf 352/352 pass). The `ms_run` blob is serialized by `mzpeak_prototyping` from mzdata's
+  `run_description()`; it emits explicit `null` for these optional ids, violating `ms_run.json`
+  (`type: string`, and they're in its `required` list).
+
+  **Was framed as upstream-only/owner-gated — that is WRONG on two counts:**
+  1. The previously-preferred upstream `#[serde(skip_serializing_if = "Option::is_none")]` would NOT
+     pass validation — the fields are in `ms_run.json`'s `required[]`, so omitting them fails the
+     *required* check instead of the *type* check. Omission is a dead end.
+  2. **The fix is LOCAL.** mzdata's `MassSpectrometryRun.default_source_file_id` /
+     `default_data_processing_id` are `pub Option<String>`, and the writer exposes `run_description_mut()`
+     (`implement_mz_metadata!()`). Our converter already mutates writer metadata after
+     `copy_metadata_from` (`src/write/mzml.rs:245`, `src/write/writer.rs:307` + `push_source_files`).
+     We can default the id from the list already in the archive.
+
+  **Measured buckets (45 failing files):**
+  - **44 LOCAL-FIXABLE** — the list is already populated: set `default_source_file_id` from
+    `file_description.source_files[]` (20 files; usually a single unambiguous entry) and
+    `default_data_processing_id` from the emitted `data_processing` list (24 files).
+  - **1 RESIDUAL** — `mzML-examples/agilent-6560-dtims-imqtof/CEMS_10ppm.mzpeak` has an EMPTY
+    `source_files: []` → nothing to point at. Needs either emitting a source_file or a spec relax of
+    `ms_run.json` to `["string","null"]` + drop from `required` (spec decision, not converter).
+
+  **Plan:** add a shared post-`copy_metadata_from` defaulting step (plain `mzml.rs` + imaging `writer.rs`
+  paths) that fills the two default ids from the present lists when `None`. Clears 44/45 locally — no
+  owner gate. Track the 1 empty-`source_files` residual + the spec-relax question separately.
 - **(b) #4 — CV version pin mismatch (validator side).** ⏳ **OPEN.** Converter declares `MS 4.1.248`;
   the validator's bundled profile pins `MS 4.1.217` → a per-file warning. Proper fix belongs in the
   validator's `--seal` workflow: swap `cv/psi-ms.obo.gz` for the 4.1.248 snapshot + reseal sha256 (a
