@@ -18,9 +18,12 @@ def md_text(s):
     """Strip inline HTML tags + decode &amp; for the markdown manifest."""
     return re.sub(r"<[^>]+>", "", s).replace("&amp;", "&").replace("&times;", "×")
 
-BASE = "https://object.storage.eu01.onstackit.cloud/v09"
-EXPLORER = "https://okohlbacher.github.io/mzPeakExplorer/"   # general LC-MS / any .mzpeak
-MZPEAKIV = "https://okohlbacher.github.io/mzPeakIV/"         # imaging (MSI) .mzpeak
+# Public base URL for the corpus. Defaults to the direct object-storage endpoint;
+# set CDN_BASE to serve every generated link through the CDN, e.g.
+#   CDN_BASE=https://data.mzpeak.org/v09 bash scripts/push-index-stackit.sh
+BASE = os.environ.get("CDN_BASE", "https://object.storage.eu01.onstackit.cloud/v09")
+EXPLORER = "https://www.mzpeak.org/view/"   # general LC-MS / any .mzpeak
+MZPEAKIV = "https://www.mzpeak.org/IV/"         # imaging (MSI) .mzpeak
 
 # Parent project site — every page links back here (header brand, hero CTA, footer).
 MZPEAK_SITE = "https://www.mzpeak.org/"
