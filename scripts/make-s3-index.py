@@ -125,7 +125,7 @@ HIDE_PREFIXES = {"demo"}                    # legacy duplicate — fully dropped
 UNLISTED = {"pwiz-examples"}
 # Loose test artifacts / per-dir READMEs that surfaced as fake one-file "datasets" — not examples.
 SKIP_GROUP_NAMES = {"README.md", "small.mzpeak", "small.chunked.mzpeak", "small.numpress.mzpeak", "has_uv.mzpeak"}
-SELF_SUFFIX = (".html", ".png", ".tsv")   # generated site assets at bucket root (index/subpages, ratio plots, ratios.tsv) — not example data
+SELF_SUFFIX = (".html", ".png", ".tsv", ".sh")   # generated site assets at bucket root (index/subpages, ratio plots, ratios.tsv, download helpers like pwiz-tests-download.sh) — not example data, never listed
 SELF_NAMES = {"README.md"}
 
 
