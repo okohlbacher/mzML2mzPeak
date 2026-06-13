@@ -301,7 +301,15 @@ pub fn convert_mzml_with(
     let mut spectra = 0usize;
     let mut nonmono = CentroidNonMonotonic::default();
     let mut sort_applied = false;
+    let mut ms_level_remapped = 0usize;
     for mut entry in reader.iter() {
+        // Absent source MS level (mzdata 0 when MS:1000511 is missing) → MS1 on the mzPeak side
+        // (single-source policy). Counted; one warn per file after the loop (never per-spectrum).
+        if entry.description.ms_level == 0 {
+            entry.description.ms_level =
+                crate::write::spectrum::ms_level_or_ms1(entry.description.ms_level);
+            ms_level_remapped += 1;
+        }
         // Ion-mobility (timsTOF) spectra may arrive unsorted in m/z; the writer expects ascending
         // m/z. Stack→unstack reorders the 3D arrays by m/z without dropping the mobility axis.
         if entry.has_ion_mobility_dimension() {
@@ -401,6 +409,15 @@ pub fn convert_mzml_with(
         if spectra.is_multiple_of(5000) {
             log::info!("  …{spectra} spectra written");
         }
+    }
+
+    // One COUNTED warning per file (not per spectrum) when source spectra had no MS level and were
+    // defaulted to MS1 (mirrors the imaging path's warn + the centroid-non-monotonic counted shape).
+    if ms_level_remapped > 0 {
+        log::warn!(
+            "{ms_level_remapped} spectrum(s) had no MS level (source ms_level 0) — defaulted to MS1 \
+             (ms_level=1) in the mzPeak"
+        );
     }
 
     // Option 2: record the repair ONCE per file as a data_processing step, only if ≥1 spectrum was

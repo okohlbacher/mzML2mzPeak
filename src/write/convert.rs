@@ -31,7 +31,7 @@ use crate::write::image::{
     build_image_entry, detect_format, full_extent_affine, media_type_for_extension,
     read_jpeg_dimensions, read_png_dimensions, read_tiff_dimensions, sha256_and_size, ImageFormat,
 };
-use crate::write::spectrum::{to_mzdata_canonical, CastNarrowing};
+use crate::write::spectrum::{ms_level_or_ms1, to_mzdata_canonical, CastNarrowing};
 use crate::write::writer::IndexAccumulator;
 use crate::write::{ImagingWriter, WriteError, to_mzdata};
 
@@ -201,10 +201,17 @@ pub fn convert_with(
     // dtype-homogeneous), so capture it here. `narrowing` stays `Default` (no narrowing) for an
     // empty run. m/z never narrows; intensity narrows iff its source dtype is f64 (DTY-03).
     let mut narrowing = CastNarrowing::default();
+    // Count source spectra with NO MS level (mzdata 0) — remapped to MS1 (ms_level_or_ms1), one warn
+    // per file below. The accumulator observes the NORMALIZED level so its "MS1 m/z bounds" agree
+    // with the level to_mzdata writes (both go through ms_level_or_ms1).
+    let mut ms_level_remapped: usize = 0;
     let first = match reader.next() {
         Some(item) => {
             let rec = item?;
-            acc.observe(rec.x, rec.y, rec.z, rec.ms_level, &rec.mz);
+            if rec.ms_level == 0 {
+                ms_level_remapped += 1;
+            }
+            acc.observe(rec.x, rec.y, rec.z, ms_level_or_ms1(rec.ms_level), &rec.mz);
             let (spec, n) = to_mzdata_canonical(&rec)?;
             narrowing = n;
             Some(spec)
@@ -263,9 +270,13 @@ pub fn convert_with(
     }
     for item in reader {
         let s = item?;
-        // Observe the raw ImagingSpectrum BEFORE to_mzdata (IDX-02/03) — coords + MS1 m/z bounds
-        // for the index totals — then convert + write. One spectrum live at a time (no buffering).
-        acc.observe(s.x, s.y, s.z, s.ms_level, &s.mz);
+        // Observe the ImagingSpectrum BEFORE to_mzdata (IDX-02/03) — coords + MS1 m/z bounds for the
+        // index totals — then convert + write. One spectrum live at a time (no buffering). ms_level
+        // is normalized (absent/0 → MS1) so the index agrees with the written level.
+        if s.ms_level == 0 {
+            ms_level_remapped += 1;
+        }
+        acc.observe(s.x, s.y, s.z, ms_level_or_ms1(s.ms_level), &s.mz);
         // to_mzdata is fallible (WR-01 axis-length, CR-02 non-finite m/z, WR-03 coordinate
         // validation); a data-dependent defect surfaces as a typed WriteError, never a panic.
         let mz_spec = to_mzdata(&s)?;
@@ -278,6 +289,15 @@ pub fn convert_with(
     // placeholder chromatogram, not a fabricated total-ion-current. See
     // ImagingWriter::ensure_chromatogram_facet for the full rationale (CONTEXT Area 3 + OUT-01).
     writer.ensure_chromatogram_facet()?;
+
+    // One COUNTED warning per file (not per spectrum) when source spectra had no MS level and were
+    // defaulted to MS1 (real imzML — e.g. ms-imaging.org Example-1 — declares `ms level = 0`).
+    if ms_level_remapped > 0 {
+        log::warn!(
+            "{ms_level_remapped} spectrum(s) had no MS level (source ms_level 0) — defaulted to MS1 \
+             (ms_level=1) in the mzPeak"
+        );
+    }
 
     // (4) Terminal sequence (RESEARCH.md Q4, RESOLVED — the authoritative seam). NOT a plain
     //     writer.finish(): finish_parquet flushes the Parquet facets and hands back the still-

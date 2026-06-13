@@ -27,7 +27,8 @@
 //!      writer's profile→`spectra_data` / centroid→`spectra_peaks` routing; never infer it
 //!      from data shape.
 //!
-//! `ms_level` (including the legal value 0) and `native_id` are carried unchanged.
+//! `native_id` is carried unchanged. `ms_level` is normalized via [`ms_level_or_ms1`]: an absent
+//! source level (mzdata `0`) becomes MS1 (`1`) on the mzPeak side; any explicit level passes through.
 
 use mzdata::curie;
 use mzdata::params::{Param, Unit};
@@ -70,7 +71,8 @@ impl CastNarrowing {
 /// populated (and neither a peak nor deconvoluted-peak list is), `peaks()` reports
 /// `RawData`, which the writer routes by `signal_continuity` automatically.
 ///
-/// Does not panic on empty m/z/intensity arrays or `ms_level == 0` (both carried verbatim).
+/// Does not panic on empty m/z/intensity arrays or `ms_level == 0` (an absent/0 level is normalized
+/// to MS1 via [`ms_level_or_ms1`]; empty arrays are written as-is).
 ///
 /// # Errors
 /// Returns a typed [`WriteError`] instead of panicking on data-dependent defects (the read
@@ -84,6 +86,16 @@ impl CastNarrowing {
 ///   * [`WriteError::NonPositiveCoordinate`] (WR-03) — a coordinate is not a positive 1-based
 ///     pixel index (`x < 1` or `y < 1`, or a present `z < 1`). The coordinate columns are
 ///     `Int64` and would otherwise accept a nonsensical pixel silently.
+/// SINGLE SOURCE of the "absent MS level → MS1" policy. A source spectrum with no `MS:1000511`
+/// (or one declaring `value="0"`, as the canonical ms-imaging.org imzML Example-1 does) surfaces as
+/// `ms_level == 0` from mzdata; `0` is not a valid MS level, so the written mzPeak records MS1 (`1`).
+/// Any explicit level (`1`, `2`, …) passes through unchanged. Used by BOTH the imaging spectrum
+/// builder (here) and the plain-mzML path (`src/write/mzml.rs`); the imaging-index accumulator
+/// (`src/write/convert.rs`) calls it too so its "MS1 m/z bounds" agree with the written level.
+pub(crate) fn ms_level_or_ms1(raw: u8) -> u8 {
+    if raw == 0 { 1 } else { raw }
+}
+
 pub fn to_mzdata(s: &ImagingSpectrum) -> Result<MultiLayerSpectrum, WriteError> {
     // Most callers (the reverse path, fixtures) do not need the narrowing signal; delegate to
     // the canonical-emit path and drop the per-axis flag. The reverse path reads canonical-width
@@ -177,11 +189,12 @@ pub fn to_mzdata_canonical(
         &intensity,
     )?);
 
-    // (2) description: id + ms_level carried verbatim; signal_continuity from Representation
-    //     (drives the writer's profile/centroid routing — never inferred from data shape).
+    // (2) description: id carried verbatim; ms_level NORMALIZED (absent/0 → MS1) via the single-
+    //     source policy below; signal_continuity from Representation (drives the writer's
+    //     profile/centroid routing — never inferred from data shape).
     let mut descr = SpectrumDescription {
         id: s.native_id.clone(),
-        ms_level: s.ms_level,
+        ms_level: ms_level_or_ms1(s.ms_level),
         signal_continuity: match s.representation {
             Representation::Profile => SignalContinuity::Profile,
             Representation::Centroid => SignalContinuity::Centroid,
@@ -626,7 +639,8 @@ mod tests {
     }
 
     #[test]
-    fn ms_level_zero_and_native_id_carried_verbatim() {
+    fn ms_level_zero_maps_to_ms1_native_id_carried_verbatim() {
+        // Absent/0 source MS level → mzPeak MS1 (ms_level_or_ms1). native_id still carried verbatim.
         let s = sample(
             1,
             1,
@@ -637,8 +651,16 @@ mod tests {
             0,
         );
         let spec = to_mzdata(&s).expect("reconstruct succeeds");
-        assert_eq!(spec.ms_level(), 0, "ms_level 0 carried verbatim");
+        assert_eq!(spec.ms_level(), 1, "absent/0 source ms_level → MS1 on the mzPeak side");
         assert_eq!(spec.id(), "spectrum=1", "native_id carried unchanged");
+    }
+
+    #[test]
+    fn ms_level_or_ms1_only_remaps_zero() {
+        assert_eq!(super::ms_level_or_ms1(0), 1, "absent (0) → MS1");
+        assert_eq!(super::ms_level_or_ms1(1), 1, "explicit MS1 unchanged");
+        assert_eq!(super::ms_level_or_ms1(2), 2, "explicit MS2 unchanged");
+        assert_eq!(super::ms_level_or_ms1(5), 5, "explicit MSn unchanged");
     }
 
     #[test]
