@@ -25,7 +25,7 @@ set -uo pipefail
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 EP="${ENDPOINT:-https://object.storage.eu01.onstackit.cloud}"
-B="${BUCKET:-v09}"
+B="s3://${BUCKET:-v09}"   # full s3:// URI — `aws s3 rm` rejects a bare bucket name (ls tolerates it)
 PROFILE="${AWS_PROFILE:-stackit}"
 DATA="${DATA:-data}"
 TILES=(imzml-examples mzML-examples pwiz-examples sdrf-examples)
@@ -113,9 +113,13 @@ run_index(){
 }
 
 run_prune(){
-  say "scanning for bucket *.mzpeak orphans (in bucket, not local)…"
+  # Scope to the 4 managed corpus tiles ONLY — never touch other prefixes (e.g. demo/ holds the
+  # viewer's intentional demo file, which has no local counterpart but is NOT a corpus orphan).
+  say "scanning for bucket *.mzpeak orphans in the managed tiles (in bucket, not local)…"
   local listing; listing=$(mktemp)
-  "${AWS[@]}" s3 ls "$B/" --recursive 2>/dev/null | awk '{print $4}' | grep '\.mzpeak$' > "$listing" || true
+  for t in "${TILES[@]}"; do
+    "${AWS[@]}" s3 ls "$B/$t/" --recursive 2>/dev/null | awk '{print $4}' | grep '\.mzpeak$'
+  done > "$listing" || true
   local orphans=(); while IFS= read -r key; do
     [ -z "$key" ] && continue
     [ -f "$DATA/$key" ] || orphans+=("$key")
