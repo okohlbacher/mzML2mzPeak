@@ -35,9 +35,13 @@ OUT_DIR = Path("out/validator")
 def validate_one(py, mzpeak, quick):
     """Return (verdict, errors, warnings) for one archive. errors/warnings are (ruleId, message)."""
     tmp = "/tmp/_validate_corpus.json"
-    cmd = [py, "-m", "mzpeak_validator", mzpeak, "--json", tmp]
+    # Run the validator from its own repo dir (cwd=VALIDATOR), so the mzpeak path MUST be absolute —
+    # a relative data/... path would not resolve from there.
+    cmd = [py, "-m", "mzpeak_validator", os.path.abspath(mzpeak), "--json", tmp]
     if quick:
         cmd.insert(3, "--quick")
+    if os.path.exists(tmp):
+        os.remove(tmp)  # avoid reading a stale JSON if the validator fails to write
     subprocess.run(cmd, capture_output=True, cwd=VALIDATOR)
     try:
         r = json.load(open(tmp))
