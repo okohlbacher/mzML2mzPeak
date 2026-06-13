@@ -5,6 +5,19 @@
 **Supersedes the tallies in:** `docs/handoff-mzpeak-corpus-validation-2026-06-12.md` ·
 **Companion:** `docs/handoff-mzpeak-metadata-conformance.md` (findings #1–#5)
 
+> ## Status update — 2026-06-13: issue B/#5 RESOLVED → corpus now 523/523 PASS
+>
+> A **full-scan** re-sweep of the same 523-file corpus (full scan ≤50MB, `--quick` >50MB) on 2026-06-13
+> returns **523 PASS · 0 FAIL · 0 engine errors**. The 45 failures below were cleared by a **reconversion**
+> that landed between the two sweeps (file mtimes 2026-06-12 22:xx / 2026-06-13 04:xx): `metadata.run`
+> now populates **both** previously-null ids, including the empty-`source_files` edge case (preferred
+> fix option 1 — and the converter now synthesizes a `sourceFile` id where the source list was empty,
+> e.g. `agilent-6560-dtims-imqtof/CEMS_10ppm.mzpeak` → `default_source_file_id="sourceFile"`,
+> `default_data_processing_id="mzR_processing"`). The findings below are retained as the historical record.
+>
+> **Only remaining item, corpus-wide:** the `cv_list_declared` **warning** (523/523) — validator-side CV
+> pin lag (profile pins MS 4.1.217; files declare 4.1.248). No converter action.
+
 ## Scope & result
 
 Re-validated **every** `.mzpeak` (recursively) under
