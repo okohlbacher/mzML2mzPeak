@@ -457,6 +457,12 @@ pub fn convert_mzml_with(
         record_numpress_linear(&mut writer);
     }
 
+    // If the source mzML declared no <sourceFileList> (e.g. an mzR/MSnbase-written file like the
+    // Agilent CEMS_10ppm), emit the input mzML as the source_file so default_run_refs below has a
+    // real entry to point the required run.default_source_file_id at (validator #5 / B residual,
+    // Option 1). Scoped: no-op when source_files is already non-empty.
+    crate::write::writer::ensure_source_file_from_input(&mut writer, input);
+
     // Fill run.default_source_file_id / default_data_processing_id from the now-complete
     // source_files + data_processing lists when the source mzML left them unset (validator #5 / B).
     // MUST be after all data_processing appends above (record_sort_peaks / record_numpress_linear)

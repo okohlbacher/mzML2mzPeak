@@ -584,6 +584,35 @@ pub(crate) fn default_run_refs(target: &mut impl MSDataFileMetadata) {
     }
 }
 
+/// When the source declared NO source files (no `<sourceFileList>` — e.g. an mzR/MSnbase-written
+/// mzML), emit ONE `source_file` pointing at the input mzML itself, so the REQUIRED
+/// `run.default_source_file_id` can reference it (validator #5 / B residual — Option 1). The input
+/// mzML is the immediate, true source of this mzPeak, so this is faithful provenance, not invented
+/// data. Mirrors the imaging path's [`push_source_files`]. Fires ONLY when `source_files` is empty —
+/// a source that listed its own files is left verbatim, so the 478 files that already declare
+/// source_files stay byte-identical. No-op when no input path is available.
+pub(crate) fn ensure_source_file_from_input(target: &mut impl MSDataFileMetadata, input_path: &Path) {
+    if !target.file_description().source_files.is_empty() {
+        return;
+    }
+    // Parent dir as a file:// location URI (mirrors push_source_files); a bare filename → "file://".
+    let parent = input_path.parent().filter(|p| !p.as_os_str().is_empty());
+    let location = match parent {
+        Some(p) => format!("file://{}", p.display()),
+        None => "file://".to_string(),
+    };
+    let name = input_path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    target.file_description_mut().source_files.push(mzdata::meta::SourceFile {
+        name,
+        location,
+        id: "sourceFile".to_string(),
+        ..Default::default()
+    });
+}
+
 /// Build the `.ibd` checksum CV [`Param`] keyed on the declared algorithm, the SINGLE source of
 /// the checksum-accession keying shared by the `file_description.contents` mapping
 /// ([`wire_metadata_into`]) and the `file_description.source_files` `.ibd` params
@@ -1390,6 +1419,43 @@ mod tests {
         );
 
         let _ = std::fs::remove_file(&out);
+    }
+
+    /// Validator #5 / B residual (Option 1): `ensure_source_file_from_input` emits the input mzML as
+    /// a `source_file` ONLY when the source declared none — so a file with an empty `<sourceFileList>`
+    /// (e.g. mzR/MSnbase output) gets a real `default_source_file_id` instead of `null`. A source that
+    /// listed its own files is left verbatim.
+    #[test]
+    fn ensure_source_file_from_input_fills_only_when_empty() {
+        use mzdata::meta::{FileMetadataConfig, SourceFile};
+        use mzdata::prelude::MSDataFileMetadata;
+        use std::path::Path;
+
+        // (a) Empty source_files → one entry synthesized from the input mzML, then default_run_refs
+        //     can point at it.
+        let mut md = FileMetadataConfig::default();
+        super::ensure_source_file_from_input(&mut md, Path::new("/tmp/runs/CEMS_10ppm.mzML"));
+        let sf = &md.file_description().source_files;
+        assert_eq!(sf.len(), 1, "exactly one synthesized source_file");
+        assert_eq!(sf[0].id, "sourceFile");
+        assert_eq!(sf[0].name, "CEMS_10ppm.mzML", "name = input basename");
+        assert!(sf[0].location.contains("runs"), "location carries the parent dir");
+        super::default_run_refs(&mut md);
+        assert_eq!(
+            md.run_description().unwrap().default_source_file_id.as_deref(),
+            Some("sourceFile"),
+            "default_source_file_id now resolves to the synthesized entry"
+        );
+
+        // (b) Pre-existing source_files → NOT touched (left verbatim).
+        let mut md = FileMetadataConfig::default();
+        md.file_description_mut().source_files.push(SourceFile {
+            id: "WIFF".into(), name: "real.wiff".into(), ..Default::default()
+        });
+        super::ensure_source_file_from_input(&mut md, Path::new("/tmp/runs/x.mzML"));
+        let sf = &md.file_description().source_files;
+        assert_eq!(sf.len(), 1, "no synthesis when source declared its own files");
+        assert_eq!(sf[0].id, "WIFF", "existing source_file untouched");
     }
 
     /// `default_run_refs` ONLY fills a `None` — a source-declared ref is left verbatim, and an empty
