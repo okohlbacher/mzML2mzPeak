@@ -392,6 +392,7 @@ Items deferred out of v0.7:
 | 260609-hhj | S3 index: per-accordion raw/mzML/mzPeak size+% headers (imaging RAW incl. optical) + per-category compression box-scatter PNGs embedded in each subpage (examples >50 MB input) | 2026-06-09 |
 | 260609-rfp | Make SDRF/ISA projections run-filtered — sample_list and channels scoped to matched rows only (v0.8.1 patch) | 2026-06-09 |
 | 260609-aim | ISA run-matching: structural assay-based match so ISA archives get non-empty run-filtered sample_list (v0.8.2 patch) | 2026-06-09 |
+| 260613-gzb | Absent source MS level → mzPeak ms_level 1 (MS1); single-source helper, both paths, counted warn; 14 imzml reconverted (0→1), 0/509 non-imaging affected | 2026-06-13 |
 | 260612-ozw | Default run.default_*_id from existing source_files/data_processing lists (validator #5/B) — 44/45; whole corpus reconverted (523, 0 fail) | 2026-06-12 |
 | 260612-i9d | SDRF/ISA cv_list declares UO (mzPeakValidator finding A) + 999.16 b/c/d: source CV identity from upstream registry; 172 SDRF + 14 imaging reconverted, all 342 conformant | 2026-06-12 |
 
