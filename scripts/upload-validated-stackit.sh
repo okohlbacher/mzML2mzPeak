@@ -41,8 +41,9 @@ for line in open(sys.argv[1]):
 PY
 PASS=$(wc -l < /tmp/upload_pass.txt | tr -d ' ')
 FAILN=$(( $(wc -l < "$RESULTS" | tr -d ' ') - PASS ))
-say "PASS files to upload: $PASS  (skipping $FAILN non-PASS)"
-TOTSZ=$(xargs -a /tmp/upload_pass.txt stat -f%z 2>/dev/null | awk '{s+=$1} END{printf "%.1f GB", s/1073741824}')
+say "PASS files to upload: ${PASS}  (skipping ${FAILN} non-PASS)"
+# size: read newline-delimited (paths contain spaces), sum via python (xargs/stat would whitespace-split).
+TOTSZ=$(python3 -c "import os,sys; print('%.1f GB'%(sum(os.path.getsize(l.strip()) for l in open('/tmp/upload_pass.txt') if l.strip())/1073741824))" 2>/dev/null)
 say "total upload size: ${TOTSZ:-?}"
 
 # 4) Upload each PASS file → key = path minus leading "data/". (The AWS bash array can't cross the
@@ -56,7 +57,7 @@ up_one(){
   else echo "FAIL $K"; fi
 }
 export -f up_one
-say "uploading at concurrency $JOBS…"
+say "uploading at concurrency ${JOBS} ..."
 xargs -a /tmp/upload_pass.txt -P "$JOBS" -I{} bash -c 'up_one "$@"' _ {} | tee -a "$LOG" \
   | awk '/^OK/{o++} /^FAIL/{f++} /^MISS/{m++} END{print "  uploaded="o" failed="f" missing="m > "/dev/stderr"}'
 
