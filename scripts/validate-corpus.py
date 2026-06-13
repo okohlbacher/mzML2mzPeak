@@ -79,6 +79,7 @@ def main(argv):
     by_tile = defaultdict(lambda: [0, 0])      # tile -> [total, pass]
     err_rules = defaultdict(int)
     warn_rules = defaultdict(int)
+    warn_total = 0
     fails = []
     with open(jsonl, "w") as fh:
         for i, f in enumerate(files, 1):
@@ -94,6 +95,7 @@ def main(argv):
                 err_rules[rid] += 1
             for rid, _ in warnings:
                 warn_rules[rid] += 1
+                warn_total += 1
             fh.write(json.dumps({
                 "file": rel, "verdict": verdict,
                 "errors": errors, "warnings": warnings,
@@ -140,7 +142,8 @@ def main(argv):
     lines.append("")
     (OUT_DIR / "summary.md").write_text("\n".join(lines))
 
-    print(f"\n{passed}/{total} PASS · {len(fails)} FAIL")
+    print(f"\n{passed}/{total} PASS · {len(fails)} FAIL · "
+          f"{warn_total} warning-instances across {len(warn_rules)} rule(s)")
     print(f"  results: {jsonl}")
     print(f"  summary: {OUT_DIR / 'summary.md'}")
     return 0 if not fails else 1

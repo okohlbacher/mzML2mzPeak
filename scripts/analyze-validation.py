@@ -61,43 +61,73 @@ def main():
     rows = [json.loads(l) for l in jsonl.read_text().splitlines() if l.strip()]
     fails = [r for r in rows if r["verdict"] != "PASS"]
 
+    # ERRORS (block the verdict) → grouped for mitigation.
     by_rule = defaultdict(list)   # ruleId -> [files]
     for r in fails:
         for rid in sorted({e[0] for e in r["errors"]}):
             by_rule[rid].append(r["file"])
 
-    lines = [f"# Validation analysis & mitigations — {len(rows)} files, {len(fails)} FAIL\n"]
-    if not fails:
-        lines.append("All files PASS. No mitigations required.\n")
-        (OUT_DIR / "mitigations.md").write_text("\n".join(lines))
-        print("All PASS — out/validator/mitigations.md written.")
-        return 0
+    # WARNINGS (do NOT block the verdict) → REPORTED, never auto-fixed. Collected across ALL files.
+    warn_rule = defaultdict(list)
+    for r in rows:
+        for rid in sorted({w[0] for w in r.get("warnings", [])}):
+            warn_rule[rid].append(r["file"])
 
-    for rid in sorted(by_rule, key=lambda r: -len(by_rule[r])):
-        files = by_rule[rid]
-        lines.append(f"\n## `{rid}` — {len(files)} file(s)\n")
-        if rid in KNOWN:
-            cause, fix = KNOWN[rid]
-            lines.append(f"**Root cause:** {cause}\n")
-            lines.append(f"**Mitigation:** {fix}\n")
-        else:
-            lines.append("**Root cause:** NEW / unclassified — not in scripts/analyze-validation.py's "
-                         "KNOWN map. Investigate: read the finding `message` + `location` in "
-                         "out/validator/results.jsonl and trace to the emitting code.\n")
-            lines.append("**Mitigation:** classify, fix at source, then add the ruleId to KNOWN.\n")
-        lines.append("Affected files:")
-        for f in files[:40]:
-            lines.append(f"- `{f}`")
-        if len(files) > 40:
-            lines.append(f"- ...+{len(files) - 40} more")
-        lines.append("")
+    lines = [f"# Validation analysis & mitigations — {len(rows)} files, "
+             f"{len(fails)} FAIL, {sum(len(v) for v in warn_rule.values())} warning-instances\n"]
+
+    # ── ERRORS ──────────────────────────────────────────────────────────────────
+    lines.append("\n# Errors (block the verdict — fix these)\n")
+    if not fails:
+        lines.append("All files PASS the error axis. No error mitigations required.\n")
+    else:
+        for rid in sorted(by_rule, key=lambda r: -len(by_rule[r])):
+            files = by_rule[rid]
+            lines.append(f"\n## `{rid}` — {len(files)} file(s)\n")
+            if rid in KNOWN:
+                cause, fix = KNOWN[rid]
+                lines.append(f"**Root cause:** {cause}\n")
+                lines.append(f"**Mitigation:** {fix}\n")
+            else:
+                lines.append("**Root cause:** NEW / unclassified — not in analyze-validation.py's "
+                             "KNOWN map. Investigate: read the finding `message` + `location` in "
+                             "out/validator/results.jsonl and trace to the emitting code.\n")
+                lines.append("**Mitigation:** classify, fix at source, then add the ruleId to KNOWN.\n")
+            lines.append("Affected files:")
+            for f in files[:40]:
+                lines.append(f"- `{f}`")
+            if len(files) > 40:
+                lines.append(f"- ...+{len(files) - 40} more")
+            lines.append("")
+
+    # ── WARNINGS (report only — NOT auto-fixed) ─────────────────────────────────
+    lines.append("\n# Warnings (informational — REPORTED, not auto-fixed)\n")
+    lines.append("These do NOT affect the PASS/FAIL verdict. Surfaced for visibility; resolve "
+                 "deliberately (often validator-side or a conscious converter decision), never "
+                 "as an automatic fix.\n")
+    if not warn_rule:
+        lines.append("\n_No warnings._\n")
+    else:
+        for rid in sorted(warn_rule, key=lambda r: -len(warn_rule[r])):
+            note = KNOWN[rid][1] if rid in KNOWN else "Not in KNOWN map — review the message in results.jsonl."
+            lines.append(f"\n## `{rid}` — {len(warn_rule[rid])} file(s)\n")
+            lines.append(f"**Note:** {note}\n")
 
     (OUT_DIR / "mitigations.md").write_text("\n".join(lines))
-    print(f"{len(fails)} FAIL across {len(by_rule)} rule(s) → out/validator/mitigations.md")
-    for rid in sorted(by_rule, key=lambda r: -len(by_rule[r])):
-        tag = "" if rid in KNOWN else "  [NEW — investigate]"
-        print(f"  {rid}: {len(by_rule[rid])}{tag}")
-    return 1
+
+    # ── stdout rollup ───────────────────────────────────────────────────────────
+    print(f"{len(fails)} FAIL across {len(by_rule)} error-rule(s); "
+          f"{len(warn_rule)} warning-rule(s) → out/validator/mitigations.md")
+    if by_rule:
+        print("  ERRORS:")
+        for rid in sorted(by_rule, key=lambda r: -len(by_rule[r])):
+            tag = "" if rid in KNOWN else "  [NEW — investigate]"
+            print(f"    {rid}: {len(by_rule[rid])}{tag}")
+    if warn_rule:
+        print("  WARNINGS (reported, not auto-fixed):")
+        for rid in sorted(warn_rule, key=lambda r: -len(warn_rule[r])):
+            print(f"    {rid}: {len(warn_rule[rid])}")
+    return 1 if fails else 0
 
 
 if __name__ == "__main__":
