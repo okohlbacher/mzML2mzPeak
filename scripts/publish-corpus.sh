@@ -79,7 +79,9 @@ run_upload(){
     echo "ERROR: SDRF/ISA injection check failed — refusing to upload. Fix + retry." >&2; exit 1
   fi
   local inc=(--exclude '*' --include '*.mzpeak')
-  [ "$WITH_ORIG" = 1 ] && inc=(--exclude '*.log' --exclude '.DS_Store' --exclude '*.tmp')
+  # --with-originals: sync the whole tile (imzML/mzML/raw/metadata + mzpeak) EXCEPT junk and internal
+  # working notes (CANDIDATES.md is private curation notes — must never be published).
+  [ "$WITH_ORIG" = 1 ] && inc=(--exclude '*.log' --exclude '.DS_Store' --exclude '*.tmp' --exclude 'CANDIDATES.md')
   for t in "${TILES[@]}"; do
     [ -d "$DATA/$t" ] || continue
     local fails; fails=$(tile_fail_count "$t")
