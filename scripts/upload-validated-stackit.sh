@@ -58,7 +58,8 @@ up_one(){
 }
 export -f up_one
 say "uploading at concurrency ${JOBS} ..."
-xargs -a /tmp/upload_pass.txt -P "$JOBS" -I{} bash -c 'up_one "$@"' _ {} | tee -a "$LOG" \
+# BSD/macOS xargs has no -a FILE — feed the list via stdin redirect. -I{} = one line per call (spaces safe).
+xargs -P "$JOBS" -I{} bash -c 'up_one "$@"' _ {} < /tmp/upload_pass.txt | tee -a "$LOG" \
   | awk '/^OK/{o++} /^FAIL/{f++} /^MISS/{m++} END{print "  uploaded="o" failed="f" missing="m > "/dev/stderr"}'
 
 OKN=$(grep -c '^OK ' "$LOG"); FAILED=$(grep -c '^FAIL ' "$LOG")
