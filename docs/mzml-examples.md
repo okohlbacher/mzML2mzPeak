@@ -59,6 +59,15 @@ dominated by the Astral DIA run (~6.1 GB) and the timsTOF run (~1.45 GB). On com
 | `bruker-impact-ii-qtof` | Bruker impact II (UHR-QTOF) | Bruker high-res QTOF line | MetaboLights MTBLS12824 | 32.9 MB |
 | `sciex-zenotof-7600` | Sciex ZenoTOF 7600 (EAD/Zeno) | newest Sciex flagship | MassIVE MSV000095995 | 94 MB |
 
+### Promoted extras
+
+Datasets promoted from `data/raw-replacements/` staging into the published corpus — not
+part of the curated one-per-instrument sweep above.
+
+| Directory | Instrument (model) | Source | Approx size |
+|---|---|---|--:|
+| `thermo-qexactive-plus-PXD077619` | Thermo Q Exactive Plus (Orbitrap) — 2nd QE Plus; folder was formerly mislabeled `bruker-microtof-sub`, see [caveat](#directory-name-caveats) | ProteomeXchange PXD077619 | 480 MB mzML / 90 MB mzpeak |
+
 ## Original source URLs
 
 All URLs were verified (HTTP 200/206 + `<indexedmzML>` body) when this corpus was assembled.
