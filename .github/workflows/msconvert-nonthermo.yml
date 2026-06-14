@@ -18,6 +18,10 @@ on:
         description: "Optional: convert a single matrix name (blank = all)"
         required: false
         default: ""
+      inten:
+        description: "Intensity bit depth (32 or 64); m/z stays 64-bit"
+        required: false
+        default: "64"
 
 jobs:
   convert:
@@ -90,7 +94,7 @@ jobs:
           docker run --rm -v "$PWD/work":/work \
             chambm/pwiz-skyline-i-agree-to-the-vendor-licenses \
             wine msconvert "/${{ steps.locate.outputs.target }}" \
-              -o /work --outfile local.mzML --mzML --64 --zlib
+              -o /work --outfile local.mzML --mzML --mz64 --inten${{ github.event.inputs.inten }} --zlib
           ls -lh work/local.mzML
 
       - name: mzML -> mzPeak (our converter), then drop the big mzML
