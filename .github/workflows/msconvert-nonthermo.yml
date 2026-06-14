@@ -1,0 +1,112 @@
+# Off-box x86-64 RAW -> mzML conversion for the vendors this Apple-Silicon Mac cannot do.
+#
+# WHY: msconvert (Windows-only, run under wine in the pwiz Docker image) CRASHES under qemu
+# on Apple Silicon. GitHub's `ubuntu-latest` runners are NATIVE x86-64, so wine runs without
+# emulation and every vendor reader (Bruker/Sciex/Agilent/Waters) works. This job downloads
+# each public vendor RAW, converts it to profile mzML (same settings as the local Thermo TRFP
+# path: --mzML --64 --zlib, no peak-picking), and uploads the mzML as a build artifact. Pull
+# the artifact, then run the local mzML -> mzPeak step (target/release/mzml2mzpeak) on this Mac.
+#
+# Trigger: manual (workflow_dispatch). One matrix leg per dataset; legs run in parallel.
+# NOTE: not auto-enabled — added to the repo but only runs when you dispatch it.
+
+name: msconvert-nonthermo (x86 off-box)
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Optional: convert a single matrix name (blank = all)"
+        required: false
+        default: ""
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest   # native x86-64 -> wine works, no qemu
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: waters-synapt-MTBLS767
+            url: "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS767/FILES/2090_V_T424-72_MSMS45_P_J_180407_4.raw.zip"
+            archive: zip
+          - name: bruker-microtof-q2-MTBLS2
+            url: "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS2/FILES/MSpos-Ex1-cyp79-48h-Ag-2_1-B%2C2_01_9821.d.zip"
+            archive: zip
+          - name: bruker-impact-ii-PXD071586
+            url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2026/01/PXD071586/4928_QTOF1_32IS_sample_03_BB8_01_63101.d.zip"
+            archive: zip
+          - name: agilent-6460-qqq-MTBLS253
+            url: "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS253/FILES/17.zip"
+            archive: zip
+          - name: agilent-6560-imqtof-MTBLS427
+            url: "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS427/FILES/20150813_1_pos_HL.d.zip"
+            archive: zip
+          - name: agilent-gc-5977-Z3249821
+            url: "https://zenodo.org/api/records/3249821/files/PARFUM%20MS.zip/content"
+            archive: zip
+          # Sciex (.wiff needs its .wiff.scan sidecar) — fill exact PRIDE FTP paths then uncomment:
+          # - name: sciex-tripletof-PXD000343
+          #   url: "https://ftp.pride.ebi.ac.uk/.../PXD000343/collinsb_L120731_044.wiff"
+          #   scan_url: "https://ftp.pride.ebi.ac.uk/.../PXD000343/collinsb_L120731_044.wiff.scan"
+          #   archive: wiff
+          # - name: sciex-qtrap-PXD069437
+          #   url: "https://ftp.pride.ebi.ac.uk/.../PXD069437/20210726_MK_Insol_Reinject.wiff"
+          #   scan_url: "https://ftp.pride.ebi.ac.uk/.../PXD069437/20210726_MK_Insol_Reinject.wiff.scan"
+          #   archive: wiff
+    steps:
+      - name: Skip if not selected
+        id: gate
+        run: |
+          if [ -n "${{ github.event.inputs.only }}" ] && [ "${{ github.event.inputs.only }}" != "${{ matrix.name }}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          mkdir -p in out
+          echo "Fetching ${{ matrix.url }}"
+          curl -fSL --retry 3 -o in/payload "${{ matrix.url }}"
+          if [ -n "${{ matrix.scan_url || '' }}" ]; then
+            curl -fSL --retry 3 -o in/payload.scan "${{ matrix.scan_url }}"
+          fi
+          ls -lh in
+
+      - name: Extract + locate vendor file
+        if: steps.gate.outputs.skip == 'false'
+        id: locate
+        run: |
+          set -euo pipefail
+          cd in
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            unzip -q payload || (mv payload payload.zip && unzip -q payload.zip)
+          fi
+          # Find the vendor target: a .d/.D directory, a .raw file-or-dir, or a .wiff file.
+          target="$(find . -maxdepth 3 \( -iname '*.d' -o -iname '*.raw' \) | head -1)"
+          [ -z "$target" ] && target="$(find . -maxdepth 3 -iname '*.wiff' -type f | head -1)"
+          if [ -z "$target" ]; then echo "No vendor file found:"; find . -maxdepth 3; exit 1; fi
+          echo "Found: $target"
+          echo "target=$target" >> "$GITHUB_OUTPUT"
+
+      - name: msconvert (wine, native x86)
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD/in":/in -v "$PWD/out":/out \
+            chambm/pwiz-skyline-i-agree-to-the-vendor-licenses \
+            wine msconvert "/in/${{ steps.locate.outputs.target }}" \
+              -o /out --outfile "${{ matrix.name }}.mzML" --mzML --64 --zlib
+          ls -lh out
+
+      - name: Upload mzML artifact
+        if: steps.gate.outputs.skip == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mzml-${{ matrix.name }}
+          path: out/*.mzML
+          if-no-files-found: error
+          retention-days: 7
