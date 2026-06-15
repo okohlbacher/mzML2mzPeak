@@ -1,0 +1,8 @@
+/target
+*.ipynb
+*.txt
+*.mzpeak
+.Rproj.user
+*delta*.pq
+*error*.pq
+.coverage

@@ -1,0 +1,269 @@
+# mzPeak file format prototyping
+
+**The draft specification document is available <https://hupo-psi.github.io/mzPeak-specification/>** ([source](https://github.com/HUPO-PSI/mzPeak-specification))
+
+This repository contains prototype implementations of the mzPeak format initially described in https://pubs.acs.org/doi/10.1021/acs.jproteome.5c00435. The latest presentation of the results took place on November 11, 2025 at the HUPO conference in Toronto, Canada. The slides can be retrieved [here](https://zenodo.org/records/17747369).
+
+The mzPeak name is currently held in trust by the OpenMS Inc. The details of the trademark are described [here](https://doi.org/10.5281/zenodo.20054899)
+
+**NOTE**: This is a **work in progress**, no stability is guaranteed at this point.
+
+The primary work shown here is written in Rust at the repository root, including a library for reading and writing mzPeak files, as well as command line tools for converting existing formats into mzPeak.
+
+There is a separate Python implementation in `python/` which is a complete re-implementation for _reading_ mzPeak files using [`pyarrow`](https://arrow.apache.org/docs/python/index.html), and the PyData stack. The Python codebase does not support writing at this time although this is subject to change in the future.
+
+There is also an R implementation in `R/`, which is also a complete re-implementation using the [`arrow`](https://arrow.apache.org/docs/r/) for _reading_ only at this time.
+
+A separate .NET implementation written in C# is separately hosted at https://github.com/HUPO-PSI/mzPeak.NET.
+A separate JS implementation written with TypeScript is separately hosted at https://github.com/HUPO-PSI/mzpeakts with an online demo at https://hupo-psi.github.io/mzpeakts/app.html.
+
+Other languages are planned in the future in rough order of priority:
+
+- C++
+- Java
+
+## Table of contents
+- [mzPeak file format prototyping](#mzpeak-file-format-prototyping)
+  - [Table of contents](#table-of-contents)
+  - [High level overview](#high-level-overview)
+    - [File level metadata](#file-level-metadata)
+    - [Packed Parallel Tables](#packed-parallel-tables)
+    - [Zero Run Stripping](#zero-run-stripping)
+      - [Null Marking](#null-marking)
+    - [Point Layout for Data Arrays](#point-layout-for-data-arrays)
+    - [Chunked Layout for Data Arrays](#chunked-layout-for-data-arrays)
+  - [Conversion Program](#conversion-program)
+  - [Using the Rust implementation](#using-the-rust-implementation)
+  - [Using the Python implementation](#using-the-python-implementation)
+  - [Using the R implementation](#using-the-r-implementation)
+
+## High level overview
+
+
+
+mzPeak is a archive of multiple [Parquet](https://parquet.apache.org/) files, stored directly in an _uncompressed_ [ZIP](<https://en.wikipedia.org/wiki/ZIP_(file_format)>)
+archive. Each Parquet file describes a different facet of the stored mass spectrometry run. While the the data model draws on prior
+art like mzML (https://peptideatlas.org/tmp/mzML1.1.0.html), it is not a direct re-implementation in a Parquet table. It does attempt
+to re-use concepts like controlled vocabularies where feasible as well as arbitrary additional user metadata.
+
+Components of an mzPeak archive:
+
+- `mzpeak_index.json`: Definition of the files present in the archive, encoded as JSON. This makes resolving files by controlled terms easier than matching file names.
+- `spectra_metadata.parquet`: Spectrum level metadata and file-level metadata. Includes spectrum descriptions, scans, precursors, and selected ions using packed parallel tables.
+- `spectra_data.parquet`: Spectrum signal data in either profile or centroid mode. May be in point layout or chunked layout which have different size and random access characteristics.
+- `spectra_peaks.parquet` (optional): Spectrum centroids stored explicitly separately from whatever signal is in `spectra_data.parquet`, such as from instrument vendors who store both profile and centroid versions of the same spectra. This file may not always be present.
+- `chromatograms_metadata.parquet`: Chromatogram-level metadata and file-level metadata. Includes chromatogram descriptions, as well as precursors and selected ions using packed parallel tables.
+- `chromatograms_data.parquet`: Chromatogram signal data. May be in point layout or chunked layout which have different size and random access characteristics. Intensity measures with different units may be stored in parallel.
+
+### File level metadata
+
+mzPeak file-level metadata, including descriptions of the file's contents, the instrumentation, software, and data transformation pipeline are stored in the Parquet metadata segment as JSON documents. Several of these concepts are already covered by controlled vocabulary terms. See `schema/` for JSONSchemas for these elements.
+
+### Packed Parallel Tables
+
+The `spectra_metadata.parquet` and `chromatograms_metadata.parquet` store multiple schemas in parallel. In these Parquet files, the root schema is made up of several branched "group" or "struct" (Parquet vs. Arrow nomenclature) that may be null at any level.
+
+### Zero Run Stripping
+
+When storing spectrum data, some vendors will produce arrays with lots of "empty" regions filled with zero intensity values along a semi-regularly spaced m/z axis. These regions hold little information, so all but the first and last zero intensity points are removed. This is only meaningful for profile data.
+
+#### Null Marking
+
+For spectra with many small gaps, even zero run stripping leaves too much unhelpful information in the data. We can instead replace the flanking zero intensity points with `null` m/z and intensity values and Parquet will skip storing the expensive 32- and/or 64-bit values, retaining only the validity buffer bit flag. We can separately fit a simple m/z spacing model using weighted least squares of the form:
+
+$$
+    δ mz \sim β_0 + β_1 mz + β_2 mz^2 + ϵ
+$$
+
+Then when reading the the null-marked data, use either the local median $δ mz$ or the learned model for that spectrum to compute the m/z spacing for singleton points to achieve an very accurate reconstruction. Because the non-zero m/z points remain unchanged, the reconstructed signal's peak apex or centroid should be unaffected. If the peak is composed of only three points including the two zero intensity spots, no meaningful peak model can be fit in any case so the minute angle change this would induce are still effectively lossless.
+
+![Thermo dataset with null marking](static/thermo_null_marking_err.png)
+![Sciex dataset with delta encoding and null marking](static/sciex_null_marking_delta_encoding_error.png)
+
+Keep in mind that all Numpress compression methods are still available and still provide superior size reduction, but carry this slightly larger loss of accuracy. Using a Numpress compression is a transformation that requires the [Chunked Layout](#chunked-layout-for-data-arrays).
+
+### Point Layout for Data Arrays
+
+When storing data arrays, the point layout stores the data as-is in parallel arrays alongside a repeated index column.
+
+| spectrum_index | mz | intensity |
+| :-----:        | :------: | :---------: |
+| 1              | 213.2    | 1002 |
+| 1              | 506.9    | 500 |
+| 1              | 758.0    | 405 |
+| ...            | ...      | ... |
+| 2              | 329.1    | 50 |
+| 2              | 516.5    | 5002 |
+| 2              | 783.8    | 302 |
+
+This layout is simple, but carries several advantages. Scalar columns are easily filtered along the page-level range index. This makes multi-dimensional queries easier to write and optimize. The arrays are transparently encoded and compressed by Parquet, so the data may still be stored compactly. The data must be stored as-is in order to use the page index so no additional obscuring transformations can be used. The [zero run stripping](#zero-run-stripping) and [null marking](#null-marking) methods may still be employed as they only remove non-meaningful points from the array.
+
+### Chunked Layout for Data Arrays
+
+When storing data arrays, the chunked layout treats one array, which must be sorted, as the "primary" axis, cutting the array into chunks of a fixed size along that coordinate space (e.g. steps of 50 m/z) and taking the same segments from parallel arrays. The primary axis chunks' start, end, and a repeated index are recorded as columns, and then each array may be encoded as-is or with an opaque transform (e.g. δ-encoding, Numpress). The start and end interval permits granular random access along the primary axis as well as the source index.
+
+| spectrum_index | *mz_chunk_start* | *mz_chunk_end* | *mz_chunk_values* | intensity |
+| :-----:        | :------: | :---------: |:--- | :---
+| 1              | 200.0    | 250.0 | [0.0013, ..., 0.0013] | [...]
+| 1              | 250.0    | 300.0 | [0.0014, ..., 0.0014] | [...]
+| 1              | 500.0    | 550.0 | [0.0014, ..., 0.0015] | [...]
+| ...            | ...      | ... | ... | ...
+| 2              | 200.0    | 250.0 | [0.0013, ..., 0.0013] | [...]
+| 2              | 350.0    | 400.0 | [0.0014, ..., 0.0014] | [...]
+| 2              | 400.0    | 450.0 | [0.0013, ..., 0.0014] | [...]
+
+This example uses a δ-encoding for the m/z array chunks' values, which can be efficiently reconstructed with very high precision for 64-bit floats. The m/z values within the `mz_chunk_values` list aren't accessible to the page index, but the `_chunk_start` and `_chunk_end` columns are. The chunk values are still subject to Parquet encodings so they can be byte shuffled as well which further improves compression.
+
+
+## Conversion Program
+
+To run the Rust program to convert other mass spectrometry data file formats to mzPeak:
+
+`cargo r -r --example convert -- [OPTIONS] <FILENAME>`. Alternatively, run `cargo install --path .` and the `mzpeak_prototyping` executable will be available on your `$PATH`, with `mzpeak_prototyping convert` running the same program. The program can read mzML, MGF, and Bruker TDF files, passing `--features thermo` to `cargo` enables reading Thermo RAW files as well if a .NET runtime is available.
+
+```
+Convert a single mass spectrometry file to mzpeak format
+
+Usage: convert [OPTIONS] <FILENAME>
+
+Arguments:
+  <FILENAME>  Input file path
+
+Options:
+  -m, --mz-f32
+          Encode the m/z values using float32 instead of float64
+  -d, --ion-mobility-f32
+          Encode the ion mobility values using float32 instead of float64
+  -y, --intensity-f32
+          Encode the intensity values using float32
+      --intensity-numpress-slof
+          Encode the intensity values using the Numpress Short Logged Float transform. This requires the chunked encoding.
+  -i, --intensity-i32
+          Encode the intensity values as int32 instead of floats which may improve compression at the cost of the decimal component
+  -z, --shuffle-mz
+          Shuffle the m/z array, which may improve the compression of profile spectra
+  -u, --null-zeros
+          Null mask out sparse zero intensity peaks
+  -o, --outpath <OUTPATH>
+          Output file path
+  -b, --buffer-size <BUFFER_SIZE>
+          The number of spectra to buffer between writes [default: 5000]
+      --write-batch-size <WRITE_BATCH_SIZE>
+          The number of rows to write in a batch between deciding to open a new page or row group segment. Defaults to 1K. Supports SI suffixes K, M, G.
+      --data-page-size <DATA_PAGE_SIZE>
+          The approximate number of *bytes* per data page. Defaults to 1M. Supports SI suffixes K, M, G.
+      --row-group-size <ROW_GROUP_SIZE>
+          The approximate number of rows per row group. Defaults to 1M. Supports SI suffixes K, M, G.
+      --dictionary-page-size <DICTIONARY_PAGE_SIZE>
+          The approximate number of *bytes* per dictionary page. Defaults to 1M. Supports SI suffixes K, M, G.
+  -c, --chunked-encoding [<CHUNKED_ENCODING>]
+          Use the chunked encoding instead of the flat peak array layout, valid options are 'delta', 'basic' and 'numpress'. You can also specify a chunk size like 'delta:50'. Defaults to 'delta:50'
+  -k, --compression-level <COMPRESSION_LEVEL>
+          The Zstd compression level to use. Defaults to 3, but ranges from 1-22 [default: 3]
+  -p, --write-peaks-and-profiles
+          Whether or not to write both profile and peak picked data in the same file.
+  -t, --include-time-with-spectrum-data
+          Include an extra 'spectrum_time' array alongside the 'spectrum_index' array.
+  -h, --help
+          Print help
+```
+
+## Using the Rust implementation
+
+The Rust library uses the type system provided by [`mzdata`](https://github.com/mobiusklein/mzdata) for domain-specific data structures and common trait-based APIs. See [examples/](https://github.com/mobiusklein/mzpeak_prototyping/tree/main/examples/).
+
+```rust
+use std::io;
+use mzpeak_prototyping::MzPeakReader;
+use mzdata::prelude::*;
+
+fn main() -> io::Result<()> {
+    let mut reader = MzPeakReader::open_path("small.mzpeak")?;
+    let spec = reader.get_spectrum_by_index(2).unwrap();
+    println!("{:?}", spec.description());
+    Ok(())
+}
+```
+
+## Using the Python implementation
+
+The Python implementation has a high level API managed by the `MzPeakFile` class, given a path, it can open and read existing mzPeak files. See [python/](https://github.com/mobiusklein/mzpeak_prototyping/tree/main/python) for more details on how the library can be used.
+
+```python
+from mzpeak import MzPeakFile
+
+reader = MzPeakFile("small.mzpeak")
+
+spec = reader[2]
+print(spec)
+```
+```python
+{'id': 'controllerType=0 controllerNumber=1 scan=3',
+ 'ms level': 2,
+ 'time': 0.01121833361685276,
+ 'scan polarity': 1,
+ 'spectrum representation': 'MS:1000127',
+ 'spectrum type': 'MS:1000580',
+ 'lowest observed m/z': 231.3888397216797,
+ 'highest observed m/z': 1560.7198486328125,
+ 'number of data points': 485,
+ 'base peak m/z': 736.6370849609375,
+ 'base peak intensity': 161140.859375,
+ 'total ion current': 586279.0,
+ 'parameters': [],
+ 'number_of_auxiliary_arrays': 0,
+ 'mz_delta_model': None,
+ 'scans': [{'scan start time': 0.01121833361685276,
+   'preset scan configuration': 3,
+   'filter string': 'ITMS + c ESI d Full ms2 810.79@cid35.00 [210.00-1635.00]',
+   'ion injection time': 7.993005275726318,
+   'instrument_configuration_ref': 1,
+   'parameters': [{'value': 0,
+     'accession': None,
+     'name': '[Thermo Trailer Extra]Monoisotopic M/Z:',
+     'unit': None}],
+   'scan_windows': [{'MS_1000501_scan_window_lower_limit_unit_MS_1000040': 210.0,
+     'MS_1000500_scan_window_upper_limit_unit_MS_1000040': 1635.0,
+     'parameters': []}]}],
+ 'precursors': [{'precursor_index': 1,
+   'precursor_id': 'controllerType=0 controllerNumber=1 scan=2',
+   'isolation_window': {'isolation window target m/z': 810.7894287109375,
+    'isolation window lower offset': 809.7894287109375,
+    'isolation window upper offset': 811.7894287109375,
+    'parameters': []},
+   'activation': [{'value': None,
+     'accession': 'MS:1000133',
+     'name': 'collision-induced dissociation',
+     'unit': None},
+    {'value': 35.0,
+     'accession': 'MS:1000045',
+     'name': 'collision energy',
+     'unit': 'UO:0000266'}],
+   'selected ion m/z': 810.789428710938,
+   'peak intensity': 1994039.125,
+   'parameters': []}],
+ 'index': 2,
+ ...
+}
+```
+
+## Using the R implementation
+The Python implementation has a high level API managed by the `MZPeakFile` class, given a path, it can open and read existing mzPeak files. See [R/](https://github.com/mobiusklein/mzpeak_prototyping/tree/main/R) for more details on how the library can be used.
+
+```R
+require(mzpeak)
+
+reader <- MZPeakFile$new("small.chunked.mzpeak")
+
+mzIntens <- reader$read_spectrum(1)
+head(mzIntens)
+```
+```R
+        mz intensity
+1 202.6066     0.000
+2 202.6068  1938.117
+3 202.6071  2572.839
+4 202.6073  3392.107
+5 202.6076  3729.591
+6 202.6078  2819.127
+```

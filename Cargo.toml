@@ -142,3 +142,14 @@ tempfile = "=3.27.0"
 # chunk_series.rs intensity/mz index-by-output-position fix) was upstreamed as b9269029
 # "fix(chunk_series): index intensity/mz by output position, not source"; 29e59b24 adds the
 # "JSON metadata in the index" feature on top. All three former local patches are now upstream. ---
+
+# --- VENDORED PATCH (2026-06-15, pending upstream): re-vendors mzpeak_prototyping@29e59b2 with ONE
+# fix — the chunked-data row-group flush threshold lowered from `in_progress_size() > 512MB` to
+# `> 16MB` (writer.rs:798 + writer/base.rs:350). At 512MB a profile `spectra_data` facet whose
+# compressed buffer stays under 512MB emits ONE monolithic row group (e.g. 70JG_05: 1×942MB),
+# so a random single-spectrum read decodes the whole group. At 16MB it splits into ~25–40MB groups
+# (70JG: 1→28 groups, +1.4% size, validates PASS), matching the peaks facet's random-access cost.
+# See docs/handoff-mzpeak-profile-rowgroup-chunking-2026-06-15.md. Slimmed copy (src only, no .git/
+# test data). TODO: upstream this one-liner to HUPO-PSI/mzPeak, then drop vendor/ + this [patch]. ---
+[patch."https://github.com/HUPO-PSI/mzPeak"]
+mzpeak_prototyping = { path = "vendor/mzpeak_prototyping" }
