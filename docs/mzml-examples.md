@@ -67,6 +67,7 @@ part of the curated one-per-instrument sweep above.
 | Directory | Instrument (model) | Source | Approx size |
 |---|---|---|--:|
 | `thermo-qexactive-plus-PXD077619` | Thermo Q Exactive Plus (Orbitrap) — 2nd QE Plus; folder was formerly mislabeled `bruker-microtof-sub`, see [caveat](#directory-name-caveats) | ProteomeXchange PXD077619 | 480 MB mzML / 90 MB mzpeak |
+| `thermo-orbitrap-astral-PXD049028` | Thermo Orbitrap Astral (DIA) — 2nd Astral; 60-min single-shot HAP1 DIA. Its **22.12 GB** `.raw` is the largest single Thermo `.raw` found in a PRIDE + MassIVE survey | ProteomeXchange PXD049028 | 19.7 GB mzML / 8.5 GB mzpeak |
 
 ## Original source URLs
 
@@ -85,6 +86,7 @@ dataset description.
 | Thermo Orbitrap Fusion Lumos | `https://ftp.pride.ebi.ac.uk/pride/data/archive/2018/05/PXD008952/01_CPTAC_TMTS1-NCI7_P_JHUZ_20170509_LUMOS.mzML` |
 | Bruker timsTOF Pro | `https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000101607/peak/SBA415.mzML&forceDownload=true` |
 | Thermo Orbitrap Astral | `https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000100943/ccms_peak/RAW/20240912_WFB_exp01_magnet_5_0.mzML&forceDownload=true` |
+| Thermo Orbitrap Astral (PXD049028, 22.12 GB DIA — largest single Thermo .raw surveyed) | `https://ftp.pride.ebi.ac.uk/pride/data/archive/2024/03/PXD049028/20231206_HAP1_1ug_60min_DIA_2Th_5e4_3p5ms_rep03.raw` |
 | Shimadzu LCMS-9030 Q-TOF | `https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS13204/FILES/DERIVED_FILES/Blind_P1_pos_012.mzML` |
 | Agilent 8890 GC / 7000D (GC-EI) | `https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS11550/FILES/DERIVED_FILES/GC/EFWS-1.mzML` |
 | Agilent 6490 Triple Quad (SRM) | `https://ftp.pride.ebi.ac.uk/pride/data/archive/2024/01/PXD041762/REC-2349_P2_F1.mzML` |
