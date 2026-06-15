@@ -83,11 +83,42 @@ peaks default at 2 M rows; add `data_row_group_points: Some(2_000_000)` (or `_by
 > flushes by row count, and the chunk path never reaches it). If the cap lives in the dependency,
 > this may be a `mzpeak_prototyping` change rather than (or in addition to) a converter one.
 
-### (2) Page offset index — cheap backstop ✅
+**Don't over-promise the decode multiplier.** The naive "942 MB → 25 MB ⇒ ~37×" is a *bytes* ratio.
+Measured per-spectrum *time* scales sub-linearly: 942 MB group → ~600 ms vs 25 MB group → ~90–310 ms
+(~37× bytes, only ~2–7× time), and it also tracks points/spectrum + numpress decode, not just group
+bytes. So (1)'s local-decode win is large but well under the bytes ratio. The clean ~linear story
+belongs to **bytes fetched** on the remote path — see (2).
 
-Set `WriterProperties` `set_write_page_index(true)` (and a sane `data_page_size`, e.g. 1 MB) so even
-within a row group a reader can seek to the page covering the target rows. Additive metadata; helps
-any random access; complements (1) rather than replacing it.
+### (2) Page offset index — turns a per-spectrum *cloud fetch* from MBs into a page ✅
+
+Set `WriterProperties` `set_write_page_index(true)` (and a sane `data_page_size`, e.g. 1 MB) so a
+reader can seek to the page covering the target rows *within* a row group.
+
+**How the reader uses (1) and (2) — two-stage narrowing on one read** (mzpeakts
+`vendor/mzpeakts/lib/src/data.ts` `DataArraysReader.get()`):
+
+1. `rowGroupIndex.keysFor(key)` picks the row group via **row-group column stats** (always present) —
+   this is the granularity **(1)** controls. It works **today with no page index**.
+2. `findPageFor(key)` would set a row-window (`offset`/`limit`) within that group — but it reads
+   parquet's **column/offset index** (`columnIndexFor(0)`), and **no file in the corpus has one**
+   (verified: offset/column index absent on *every* member, incl. the fast centroid files), so it
+   returns `null` and the **whole row group is read/decoded**.
+
+Two consequences that correct the earlier framing:
+
+- **The ~90 ms figure is reached by (1) alone — it is *not* gated on (2).** The fast centroid path
+  hits ~90 ms reading a **25 MB row group with no page index** (step 2 returns null there too). So
+  ~90 ms *is* the 25 MB-group cost; capping profile groups to ~25 MB gets profile reads into that
+  ballpark on their own. The page index then pushes *below* 90 ms toward the single-page (~sub-MB)
+  decode — a further win, not the thing that unlocks 90 ms.
+- **(2)'s biggest, distinct payoff is the remote / lazy-Blob path, and it is about I/O, not CPU.**
+  `get()` reads the selected row group's column bytes via HTTP range / Blob slice. Without an offset
+  index that means fetching the **whole row group's columns — 25–64 MB per spectrum** over S3 (or off
+  local disk). With it, the reader range-reads only the target page(s) (**sub-MB per spectrum**). For
+  cloud navigation that is the difference between tens-of-MB and a page per step. This is why (2)
+  matters most and why it should land **together** with (1).
+
+Additive metadata; any reader that ignores it still works (§4).
 
 ### (3) Intensity dtype — **do NOT narrow to f32** ❌ (corrected)
 
