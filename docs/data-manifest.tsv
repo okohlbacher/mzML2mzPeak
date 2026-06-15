@@ -1,0 +1,1432 @@
+# data/** recovery manifest — regenerate with scripts/gen-data-manifest.py; recover with scripts/restore-data.sh
+# 1429 files, 331.4 GB total; 1286 on S3 (241.4 GB), 143 not on S3 (90.0 GB, recover via the listed script)
+path	bytes	on_s3	recover_via
+data/README.txt	702	N	(no recorded source — investigate)
+data/aws_login.sh	211	N	(no recorded source — investigate)
+data/cors.json	277	N	(no recorded source — investigate)
+data/demo/PXD001283-HR2MSI-urinary-bladder_HR2MSImouseurinarybladderS096.mzpeak	309870335	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/PXD001283-HR2MSI-urinary-bladder/HR2MSImouseurinarybladderS096-opticalimage.tif	1618790	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/PXD001283-HR2MSI-urinary-bladder/HR2MSImouseurinarybladderS096-results.csv	930	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/PXD001283-HR2MSI-urinary-bladder/HR2MSImouseurinarybladderS096.ibd	814997668	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/PXD001283-HR2MSI-urinary-bladder/HR2MSImouseurinarybladderS096.imzML	56197031	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/PXD001283-HR2MSI-urinary-bladder/HR2MSImouseurinarybladderS096.mzpeak	310007335	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/PXD001283-HR2MSI-urinary-bladder/README.md	1265	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/README.md	3379	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/example1-continuous/Example_Continuous.ibd	335976	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/example1-continuous/Example_Continuous.imzML	23129	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/example1-continuous/Example_Continuous.mzpeak	296343	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/example1-continuous/README.md	846	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/example1-processed/Example_Processed.ibd	604744	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/example1-processed/Example_Processed.imzML	23160	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/example1-processed/Example_Processed.mzpeak	296328	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/example1-processed/README.md	838	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-18187395-GBM-multimodal/24_Test_P15_r2/HE-XML/P1_patientset2_102524_104850_aperioID1010549.svs	172633155	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-18187395-GBM-multimodal/24_Test_P15_r2/HE-XML/P1_patientset2_102524_104850_aperioID1010549.xml	1426343	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-18187395-GBM-multimodal/24_Test_P15_r2/Optical/Patientset2_Rep2_0001.tif	28016776	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-18187395-GBM-multimodal/24_Test_P15_r2/TM/Test_P15_r2.xlsx	898916	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-18187395-GBM-multimodal/24_Test_P15_r2/imzml/Test_P15_r2.embedded-image_0000.tif	28016776	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-18187395-GBM-multimodal/24_Test_P15_r2/imzml/Test_P15_r2.embedded-image_0001.svs	172633155	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-18187395-GBM-multimodal/24_Test_P15_r2/imzml/Test_P15_r2.ibd	54443992	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-18187395-GBM-multimodal/24_Test_P15_r2/imzml/Test_P15_r2.imzML	6880543	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-18187395-GBM-multimodal/24_Test_P15_r2/imzml/Test_P15_r2.mzpeak	250240872	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-18187395-GBM-multimodal/README.md	2782	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-AP-SMALDI/README.md	1185	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-AP-SMALDI/imzML_AP_SMALDI/HR2MSImouseurinarybladderS096-opticalimage.tif	1618790	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-AP-SMALDI/imzML_AP_SMALDI/HR2MSImouseurinarybladderS096-results.csv	930	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-AP-SMALDI/imzML_AP_SMALDI/HR2MSImouseurinarybladderS096.ibd	814997668	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-AP-SMALDI/imzML_AP_SMALDI/HR2MSImouseurinarybladderS096.imzML	56197031	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-AP-SMALDI/imzML_AP_SMALDI/HR2MSImouseurinarybladderS096.mzpeak	310007335	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/README.md	1935	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/120TopL, 90TopR, 110BottomL, 100BottomR/120TopL, 90TopR, 110BottomL, 100BottomR-centroid.ibd	58431760	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/120TopL, 90TopR, 110BottomL, 100BottomR/120TopL, 90TopR, 110BottomL, 100BottomR-centroid.imzML	29409251	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/120TopL, 90TopR, 110BottomL, 100BottomR/120TopL, 90TopR, 110BottomL, 100BottomR-centroid.mzpeak	33962458	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/120TopL, 90TopR, 110BottomL, 100BottomR/90,100,110,120.jpg	402275	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/160TopL, 130TopR, 150BottomL, 140BottomR/130,140,150,160.jpg	330837	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/160TopL, 130TopR, 150BottomL, 140BottomR/160TopL,130TopR,150BottomL,140BottomR-centroid.ibd	44981428	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/160TopL, 130TopR, 150BottomL, 140BottomR/160TopL,130TopR,150BottomL,140BottomR-centroid.imzML	31615966	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/160TopL, 130TopR, 150BottomL, 140BottomR/160TopL,130TopR,150BottomL,140BottomR-centroid.mzpeak	26535767	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/200TopL, 170TopR, 190BottomL, 180BottomR/170,180,190,200.jpg	385596	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/200TopL, 170TopR, 190BottomL, 180BottomR/200TopL, 170TopR, 190BottomL, 180BottomR-centroid.ibd	43947940	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/200TopL, 170TopR, 190BottomL, 180BottomR/200TopL, 170TopR, 190BottomL, 180BottomR-centroid.imzML	27235773	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/200TopL, 170TopR, 190BottomL, 180BottomR/200TopL, 170TopR, 190BottomL, 180BottomR-centroid.mzpeak	25719910	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/240TopL, 210TopR, 230BottomL, 220BottomR/210,220,230,240.jpg	392371	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/240TopL, 210TopR, 230BottomL, 220BottomR/240TopL, 210TopR, 230BottomL, 220BottomR-centroid.ibd	68111608	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/240TopL, 210TopR, 230BottomL, 220BottomR/240TopL, 210TopR, 230BottomL, 220BottomR-centroid.imzML	32798742	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/240TopL, 210TopR, 230BottomL, 220BottomR/240TopL, 210TopR, 230BottomL, 220BottomR-centroid.mzpeak	39021846	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/280TopL, 250TopR, 270BottomL, 260BottomR/250,260,270,280.jpg	396630	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/280TopL, 250TopR, 270BottomL, 260BottomR/280TopL, 250TopR, 270BottomL, 260BottomR-centroid.ibd	71420212	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/280TopL, 250TopR, 270BottomL, 260BottomR/280TopL, 250TopR, 270BottomL, 260BottomR-centroid.imzML	32803926	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/280TopL, 250TopR, 270BottomL, 260BottomR/280TopL, 250TopR, 270BottomL, 260BottomR-centroid.mzpeak	40636773	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/40TopL,10TopR,30BottomL,20BottomR/10,20,30,40.jpg	375033	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/40TopL,10TopR,30BottomL,20BottomR/40TopL,10TopR,30BottomL,20BottomR-centroid.ibd	66051808	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/40TopL,10TopR,30BottomL,20BottomR/40TopL,10TopR,30BottomL,20BottomR-centroid.imzML	29193361	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/40TopL,10TopR,30BottomL,20BottomR/40TopL,10TopR,30BottomL,20BottomR-centroid.mzpeak	37733125	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/80TopL, 50TopR, 70BottomL, 60BottomR/50,60,70,80.jpg	370923	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/80TopL, 50TopR, 70BottomL, 60BottomR/80TopL, 50TopR, 70BottomL, 60BottomR-centroid.ibd	69569296	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/80TopL, 50TopR, 70BottomL, 60BottomR/80TopL, 50TopR, 70BottomL, 60BottomR-centroid.imzML	30526495	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-DESI/imzML_DESI/ColAd_Individual/80TopL, 50TopR, 70BottomL, 60BottomR/80TopL, 50TopR, 70BottomL, 60BottomR-centroid.mzpeak	39709758	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-LA-ESI/README.md	1031	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-LA-ESI/imzML_LA-ESI/180817_NEG_Thaliana_Leaf_bottom_1_0841.ibd	570324688	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-LA-ESI/imzML_LA-ESI/180817_NEG_Thaliana_Leaf_bottom_1_0841.imzML	2258689	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-LA-ESI/imzML_LA-ESI/180817_NEG_Thaliana_Leaf_bottom_1_0841.mzpeak	87714020	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-LA-ESI/imzML_LA-ESI/180817_Thaliana_leaf_bottom_1_0840_preabl_polX30.tif	5885102	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-LTP/README.md	2926	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-LTP/imzML_LTP/130704_IMGCHJ2.jpg	295479	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-LTP/imzML_LTP/CHJ2.png	358798	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-LTP/imzML_LTP/ltpmsi-chilli.ibd	369835008	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-LTP/imzML_LTP/ltpmsi-chilli.imzML	11612702	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-LTP/imzML_LTP/ltpmsi-chilli.imzML.orig-published-checksum	11612702	Y	aws s3 sync s3://v09 data/
+data/imzml-examples/zenodo-LTP/imzML_LTP/ltpmsi-chilli.mzpeak	122625150	Y	aws s3 sync s3://v09 data/
+data/keys.txt	87	N	(no recorded source — investigate)
+data/mzML-examples/README.md	4445	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/agilent-6490-triplequad/README.md	992	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/agilent-6490-triplequad/REC-2349_P2_F1.mzML	5514314	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/agilent-6490-triplequad/REC-2349_P2_F1.mzpeak	1005207	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/agilent-6560-dtims-imqtof/CEMS_10ppm.mzML	3445823	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/agilent-6560-dtims-imqtof/CEMS_10ppm.mzpeak	323316	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/agilent-6560-dtims-imqtof/README.md	1147	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/agilent-8890-gc-ei/EFWS-1.mzML	16714394	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/agilent-8890-gc-ei/EFWS-1.mzpeak	1656592	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/agilent-8890-gc-ei/README.md	980	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/agilent-qtof/MRM-standmix-5.mzML	2390872	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/agilent-qtof/MRM-standmix-5.mzpeak	853251	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/agilent-qtof/README.md	1206	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-impact-ii-qtof/21P0055_Tissue_Georges_NEG_N_01_17471.mzML	32866133	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-impact-ii-qtof/21P0055_Tissue_Georges_NEG_N_01_17471.mzpeak	21429078	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-impact-ii-qtof/README.md	1248	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-microtof-q2/README.md	540	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-microtof-q2/neg_01_Fistax_1-A,2_01_5715.mzML	59302317	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-microtof-q2/neg_01_Fistax_1-A,2_01_5715.mzpeak	37795950	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/README.md	732	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/SBA415.mzML	1453824675	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/SBA415.mzpeak	708907182	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/column_setpoint.txt	2268090	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/column_temperature.txt	2268093	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/execution-log_2026-04-08_01-43-11-AM.txt	69991	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/flowsensor-a_flow.txt	809738	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/flowsensor-b_flow.txt	1332703	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/pump-a_pressure.txt	470070	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/pump-a_speed.txt	2210619	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/pump-a_temperature.txt	227415	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/pump-a_volume.txt	274768	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/pump-b_pressure.txt	417662	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/pump-b_speed.txt	1970408	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/pump-b_temperature.txt	227415	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/pump-b_volume.txt	272168	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/sample-tray_temperature.txt	223803	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/setflow-a_setflow.txt	1948108	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/setflow-b_setflow.txt	1948108	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/solvent-a_composition.txt	2238846	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/solvent-b_composition.txt	2217319	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/system-info_2026-04-08_01-43-11-AM.txt	2323	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/system_activity.txt	287615	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/valve-a_angle.txt	2310101	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/valve-b_angle.txt	2324795	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/valve-i_angle.txt	227481	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/valve-t_angle.txt	232746	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/InstrumentSetup.isset	3103	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/Maldi.method	2696	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08.m/Maldi.method	1347	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08.m/diaSettings.diasqlite	24576	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08.m/hystar.method	36991	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08.m/microTOFQImpacTemAcquisition.method	192651	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08.m/prmSettings.prmsqlite	36864	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08.m/submethods.xml	933	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08_1.m/Maldi.method	1347	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08_1.m/diaSettings.diasqlite	24576	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08_1.m/hystar.method	36991	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08_1.m/microTOFQImpacTemAcquisition.method	198229	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08_1.m/prmSettings.prmsqlite	36864	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08_1.m/submethods.xml	939	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/desktop.ini	156	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/diaSettings.diasqlite	24576	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/hystar.method	36991	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/microTOFQImpacTemAcquisition.method	196675	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/prmSettings.prmsqlite	45056	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/submethods.xml	1001	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/synchroSettings.syncsqlite	4096	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/HyStarMetadata.xml	113324	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/SampleInfo.xml	4908	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/analysis.tdf	205651968	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/analysis.tdf_bin	1972764672	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/chromatography-data-pre.sqlite	131072	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/chromatography-data.sqlite	1454080	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/bruker-timstof-pro/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/desktop.ini	140	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/sciex-qtrap-6500/Drug_substance_3_scheduled_MRM.mzML	3145769	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/sciex-qtrap-6500/Drug_substance_3_scheduled_MRM.mzpeak	278187	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/sciex-qtrap-6500/README.md	1004	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/sciex-tripletof-6600/12_80.mzML	254897611	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/sciex-tripletof-6600/12_80.mzpeak	144830298	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/sciex-tripletof-6600/README.md	453	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/sciex-zenotof-7600/20240826_RNAseB_Reduced_50ngul_1ul_MRM_03.mzML	94211841	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/sciex-zenotof-7600/20240826_RNAseB_Reduced_50ngul_1ul_MRM_03.mzpeak	53444575	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/sciex-zenotof-7600/20240826_RNAseB_Reduced_50ngul_1ul_MRM_03.wiff	2168320	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/sciex-zenotof-7600/20240826_RNAseB_Reduced_50ngul_1ul_MRM_03.wiff.scan	72347631	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/sciex-zenotof-7600/20240826_RNAseB_Reduced_50ngul_1ul_MRM_03.wiff2	2494464	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/sciex-zenotof-7600/README.md	1169	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/shimadzu-lcms-9030-qtof/Blind_P1_pos_012.mzML	37906944	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/shimadzu-lcms-9030-qtof/Blind_P1_pos_012.mzpeak	2603410	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/shimadzu-lcms-9030-qtof/README.md	850	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-fusion-lumos/01_CPTAC_TMTS1-NCI7_P_JHUZ_20170509_LUMOS.mzML	617171864	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-fusion-lumos/01_CPTAC_TMTS1-NCI7_P_JHUZ_20170509_LUMOS.mzpeak	164001705	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-fusion-lumos/01_CPTAC_TMTS1-NCI7_P_JHUZ_20170509_LUMOS.raw	691434672	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-fusion-lumos/README.md	575	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-ltq-ft-ultra-fticr/README.md	966	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-ltq-ft-ultra-fticr/mtab_BIOS_CRAM1620_1_072617_34.RAW	231884992	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-ltq-ft-ultra-fticr/mtab_BIOS_CRAM1620_1_072617_34.mzML	31641068	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-ltq-ft-ultra-fticr/mtab_BIOS_CRAM1620_1_072617_34.mzpeak	5805768	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-ltq-orbitrap-velos/README.md	639	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-ltq-orbitrap-velos/TMT_Erwinia_01.raw	220475548	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-ltq-orbitrap-velos/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01-20141210.mzML	450032788	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-ltq-orbitrap-velos/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01-20141210.mzpeak	106431700	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-ltq-xl-iontrap/2013_30_Amrutha_050713_1.mzML	181980315	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-ltq-xl-iontrap/2013_30_Amrutha_050713_1.mzpeak	58222588	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-ltq-xl-iontrap/2013_30_Amrutha_050713_1.raw	73054467	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-ltq-xl-iontrap/README.md	942	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-orbitrap-astral-PXD049028/20231206_HAP1_1ug_60min_DIA_2Th_5e4_3p5ms_rep03.mzML	19714051337	N	scripts/fetch-mzml-examples.sh  (PXD049028 entry: PRIDE raw + TRFP, see restore-data.sh)
+data/mzML-examples/thermo-orbitrap-astral-PXD049028/20231206_HAP1_1ug_60min_DIA_2Th_5e4_3p5ms_rep03.mzpeak	9177662528	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-orbitrap-astral-PXD049028/20231206_HAP1_1ug_60min_DIA_2Th_5e4_3p5ms_rep03.raw	22121976843	N	scripts/fetch-mzml-examples.sh  (PXD049028 entry: PRIDE raw + TRFP, see restore-data.sh)
+data/mzML-examples/thermo-orbitrap-astral-PXD049028/README.md	1361	N	scripts/fetch-mzml-examples.sh  (PXD049028 entry: PRIDE raw + TRFP, see restore-data.sh)
+data/mzML-examples/thermo-orbitrap-astral-PXD049028/curl.log	69284	N	scripts/fetch-mzml-examples.sh  (PXD049028 entry: PRIDE raw + TRFP, see restore-data.sh)
+data/mzML-examples/thermo-orbitrap-astral-PXD049028/mzpeak.log	12698	N	scripts/fetch-mzml-examples.sh  (PXD049028 entry: PRIDE raw + TRFP, see restore-data.sh)
+data/mzML-examples/thermo-orbitrap-astral-PXD049028/raw-redl.log	112479	N	scripts/fetch-mzml-examples.sh  (PXD049028 entry: PRIDE raw + TRFP, see restore-data.sh)
+data/mzML-examples/thermo-orbitrap-astral-PXD049028/trfp.log	177	N	scripts/fetch-mzml-examples.sh  (PXD049028 entry: PRIDE raw + TRFP, see restore-data.sh)
+data/mzML-examples/thermo-orbitrap-astral/20240912_WFB_exp01_magnet_5_0.mzML	6415611632	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-orbitrap-astral/20240912_WFB_exp01_magnet_5_0.mzpeak	3523032751	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-orbitrap-astral/20240912_WFB_exp01_magnet_5_0.raw	9057318473	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-orbitrap-astral/README.md	783	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-qexactive-plus-PXD077619/QEP2_11961_RDA_GITR_GA_Afuc_200820.mzML	479885813	N	scripts/fetch-mzml-examples.sh  (PXD049028 entry: PRIDE raw + TRFP, see restore-data.sh)
+data/mzML-examples/thermo-qexactive-plus-PXD077619/QEP2_11961_RDA_GITR_GA_Afuc_200820.mzpeak	90274673	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-qexactive-plus-PXD077619/README.md	832	N	scripts/fetch-mzml-examples.sh  (PXD049028 entry: PRIDE raw + TRFP, see restore-data.sh)
+data/mzML-examples/thermo-qexactive-plus/160920_SM-AKTWT_509.mzML	253910025	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-qexactive-plus/160920_SM-AKTWT_509.mzpeak	103233051	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/thermo-qexactive-plus/README.md	520	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/waters-xevo-g2s-qtof/QC01.mzML	85801170	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/waters-xevo-g2s-qtof/QC01.mzpeak	47040159	Y	aws s3 sync s3://v09 data/
+data/mzML-examples/waters-xevo-g2s-qtof/README.md	903	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/7600ZenoTOFMSMS_EAD_TestData-S1.mzML	543660	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/7600ZenoTOFMSMS_EAD_TestData-S1.mzpeak	395687	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_En_04-srmSpectra.mzML	500028	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_En_04-srmSpectra.mzpeak	97362	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_01.mzML	206701	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_01.mzpeak	59192	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_02.mzML	215537	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_02.mzpeak	59192	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_03.mzML	212705	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_03.mzpeak	59192	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_04.mzML	215313	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_04.mzpeak	59192	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_05.mzML	213153	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_05.mzpeak	59192	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_06.mzML	212277	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_06.mzpeak	59192	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_07.mzML	211541	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_07.mzpeak	59192	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_08.mzML	213253	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_08.mzpeak	59192	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_09.mzML	214217	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_09.mzpeak	59192	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_10.mzML	210918	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/Enolase_repeats_AQv1.4.2-20070918_en_10.mzpeak	59192	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/PressureTrace1-6500SysSuit1269-globalChromatogramsAreMs1Only.mzML	384577	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/PressureTrace1-6500SysSuit1269-globalChromatogramsAreMs1Only.mzpeak	59105	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/PressureTrace1-6500SysSuit1269.mzML	403383	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/PressureTrace1-6500SysSuit1269.mzpeak	59105	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/swath.api-sample-centroid.mzML	1840470	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/ABI/Reader_ABI_Test.data/swath.api-sample-centroid.mzpeak	1036843	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/GFb_4Scan_TimeSegs_1530_100ng-combineIMS-globalChromatogramsAreMs1Only.mzML	61985	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/GFb_4Scan_TimeSegs_1530_100ng-combineIMS-globalChromatogramsAreMs1Only.mzpeak	129826	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/GFb_4Scan_TimeSegs_1530_100ng.mzML	2046858	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/GFb_4Scan_TimeSegs_1530_100ng.mzpeak	687857	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynthAllIons-combineIMS-globalChromatogramsAreMs1Only.mzML	13536	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynthAllIons-combineIMS-globalChromatogramsAreMs1Only.mzpeak	99282	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynthAllIons-combineIMS.mzML	785318	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynthAllIons-combineIMS.mzpeak	326238	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynthAllIons-ignoreZeros-combineIMS-mzMobilityFilter.mzML	492953	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynthAllIons-ignoreZeros-combineIMS-mzMobilityFilter.mzpeak	172649	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynthAllIons-ignoreZeros-combineIMS.mzML	762035	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynthAllIons-ignoreZeros-combineIMS.mzpeak	312156	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynthAllIons.mzML	5805271	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynthAllIons.mzpeak	345533	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynthCCS-combineIMS.mzML	390330	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynthCCS-combineIMS.mzpeak	318796	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynthCCS-ignoreZeros-combineIMS-mzMobilityFilter.mzML	60682	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynthCCS-ignoreZeros-combineIMS-mzMobilityFilter.mzpeak	124832	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynthCCS-ignoreZeros-combineIMS.mzML	377078	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynthCCS-ignoreZeros-combineIMS.mzpeak	312232	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynthCCS.mzML	3345301	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynthCCS.mzpeak	305769	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynth_Chrom-combineIMS.mzML	3730593	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynth_Chrom-combineIMS.mzpeak	456350	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynth_Chrom-ignoreZeros-combineIMS-mzMobilityFilter.mzML	2640000	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynth_Chrom-ignoreZeros-combineIMS-mzMobilityFilter.mzpeak	131418	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynth_Chrom-ignoreZeros-combineIMS.mzML	3664024	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynth_Chrom-ignoreZeros-combineIMS.mzpeak	434687	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynth_Chrom.mzML	23110658	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/ImsSynth_Chrom.mzpeak	520288	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/MRM Neg C5.mzML	54596	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/MRM Neg C5.mzpeak	78484	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/RS080806_APCI_PIscan_CE35.mzML	1739517	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/RS080806_APCI_PIscan_CE35.mzpeak	515957	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/RS080806_NL_448.2_001.mzML	2646870	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/RS080806_NL_448.2_001.mzpeak	521797	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/RS080906_MMI_PIscan_CE35_250ms.mzML	3891733	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/RS080906_MMI_PIscan_CE35_250ms.mzpeak	1002062	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/TOFsulfasMS4GHzDualMode+DADSpectra+UVSignal272-NoProfile.mzML	2275406	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/TOFsulfasMS4GHzDualMode+DADSpectra+UVSignal272-NoProfile.mzpeak	510607	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/Thyrxox 5 TS Diff Scan B.mzML	2058517	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/Thyrxox 5 TS Diff Scan B.mzpeak	561870	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/reserpine-MS2sim-010.mzML	23909	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Agilent/Reader_Agilent_Test.data/reserpine-MS2sim-010.mzpeak	78763	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/100 fmol BSA.mzML	2303736	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/100 fmol BSA.mzpeak	594680	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/20percLaser_100fold_1_0_H6_MS-ms1-centroid.mzML	14870	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/20percLaser_100fold_1_0_H6_MS-ms1-centroid.mzpeak	96027	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/20percLaser_100fold_1_0_H6_MS-ms2-centroid.mzML	7911	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/20percLaser_100fold_1_0_H6_MS-ms2-centroid.mzpeak	62023	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/20percLaser_100fold_1_0_H6_MS.mzML	618546	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/20percLaser_100fold_1_0_H6_MS.mzpeak	332886	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/CsI_Pos_0_G1_000003.mzML	3051130	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/CsI_Pos_0_G1_000003.mzpeak	2275221	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/Hela_QC_PASEF_Slot1-first-6-frames-combineIMS-centroid.mzML	128640	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/Hela_QC_PASEF_Slot1-first-6-frames-combineIMS-centroid.mzpeak	116843	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/Hela_QC_PASEF_Slot1-first-6-frames-combineIMS-ms1-centroid.mzML	28982	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/Hela_QC_PASEF_Slot1-first-6-frames-combineIMS-ms1-centroid.mzpeak	105829	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/Hela_QC_PASEF_Slot1-first-6-frames-combineIMS-ms2-centroid.mzML	107889	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/Hela_QC_PASEF_Slot1-first-6-frames-combineIMS-ms2-centroid.mzpeak	104954	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/Hela_QC_PASEF_Slot1-first-6-frames-globalChromatogramsAreMs1Only.mzML	10682	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/Hela_QC_PASEF_Slot1-first-6-frames-globalChromatogramsAreMs1Only.mzpeak	87183	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/Hela_QC_PASEF_Slot1-first-6-frames-ms1-centroid.mzML	284849	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/Hela_QC_PASEF_Slot1-first-6-frames-ms1-centroid.mzpeak	110693	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/Hela_QC_PASEF_Slot1-first-6-frames-ms2-centroid.mzML	5042663	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/Hela_QC_PASEF_Slot1-first-6-frames-ms2-centroid.mzpeak	140599	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/Hela_QC_PASEF_Slot1-first-6-frames-ms2-noMsMsWithoutPrecursor-centroid.mzML	1472337	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/Hela_QC_PASEF_Slot1-first-6-frames-ms2-noMsMsWithoutPrecursor-centroid.mzpeak	116179	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/Hela_QC_PASEF_Slot1-first-6-frames.mzML	5305930	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/Hela_QC_PASEF_Slot1-first-6-frames.mzpeak	144562	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/Sample_1-A,1_01_985.mzML	2225315	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/Sample_1-A,1_01_985.mzpeak	392330	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/ThyroglobMRM000003-combineIMS-centroid.mzML	49884	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/ThyroglobMRM000003-combineIMS-centroid.mzpeak	114599	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/ThyroglobMRM000003-combineIMS-ms1-centroid.mzML	7931	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/ThyroglobMRM000003-combineIMS-ms1-centroid.mzpeak	62341	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/ThyroglobMRM000003-combineIMS-ms2-centroid.mzML	49884	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/ThyroglobMRM000003-combineIMS-ms2-centroid.mzpeak	114599	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/ThyroglobMRM000003-ms1-centroid.mzML	7916	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/ThyroglobMRM000003-ms1-centroid.mzpeak	62299	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/ThyroglobMRM000003-ms2-centroid.mzML	2053498	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/ThyroglobMRM000003-ms2-centroid.mzpeak	139548	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/ThyroglobMRM000003.mzML	2037449	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/ThyroglobMRM000003.mzpeak	129235	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/diaPASEF-ms2-noMsMsWithoutPrecursor-centroid-mzMobilityFilter.mzML	956324	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/diaPASEF-ms2-noMsMsWithoutPrecursor-centroid-mzMobilityFilter.mzpeak	408180	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/timsTOF_autoMSMS_Urine_50s_neg-ms1-centroid.mzML	696477	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/timsTOF_autoMSMS_Urine_50s_neg-ms1-centroid.mzpeak	643646	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/timsTOF_autoMSMS_Urine_50s_neg-ms2-centroid.mzML	286646	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/timsTOF_autoMSMS_Urine_50s_neg-ms2-centroid.mzpeak	230269	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/timsTOF_autoMSMS_Urine_50s_neg.mzML	1743705	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Bruker/Reader_Bruker_Test.data/timsTOF_autoMSMS_Urine_50s_neg.mzpeak	1047706	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Mobilion/Reader_Mobilion_Test.data/2024-02-16-16.02.20-CCS Calibration_02-combineIMS.mzML	554280	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Mobilion/Reader_Mobilion_Test.data/2024-02-16-16.02.20-CCS Calibration_02-combineIMS.mzpeak	475875	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Mobilion/Reader_Mobilion_Test.data/2024-02-16-16.02.20-CCS Calibration_02-ignoreZeros-combineIMS.mzML	463904	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Mobilion/Reader_Mobilion_Test.data/2024-02-16-16.02.20-CCS Calibration_02-ignoreZeros-combineIMS.mzpeak	409615	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Mobilion/Reader_Mobilion_Test.data/2024-02-16-16.02.20-CCS Calibration_02-ignoreZeros.mzML	258596	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Mobilion/Reader_Mobilion_Test.data/2024-02-16-16.02.20-CCS Calibration_02-ignoreZeros.mzpeak	99192	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Mobilion/Reader_Mobilion_Test.data/2024-02-16-16.02.20-CCS Calibration_02.mzML	260923	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Mobilion/Reader_Mobilion_Test.data/2024-02-16-16.02.20-CCS Calibration_02.mzpeak	100027	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Mobilion/Reader_Mobilion_Test.data/ExampleTuneMix_binned5-centroid-cwt.mzML	258441	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Mobilion/Reader_Mobilion_Test.data/ExampleTuneMix_binned5-centroid-cwt.mzpeak	96402	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Mobilion/Reader_Mobilion_Test.data/ExampleTuneMix_binned5-combineIMS-centroid-cwt.mzML	176248	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Mobilion/Reader_Mobilion_Test.data/ExampleTuneMix_binned5-combineIMS-centroid-cwt.mzpeak	168249	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Mobilion/Reader_Mobilion_Test.data/ExampleTuneMix_binned5.mzML	271403	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Mobilion/Reader_Mobilion_Test.data/ExampleTuneMix_binned5.mzpeak	105061	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Shimadzu/Reader_Shimadzu_Test.data/10nmol_Negative_MS_ID_ON_055-centroid-globalChromatogramsAreMs1Only.mzML	9309	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Shimadzu/Reader_Shimadzu_Test.data/10nmol_Negative_MS_ID_ON_055-centroid-globalChromatogramsAreMs1Only.mzpeak	89058	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Shimadzu/Reader_Shimadzu_Test.data/10nmol_Negative_MS_ID_ON_055-centroid.mzML	582371	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Shimadzu/Reader_Shimadzu_Test.data/10nmol_Negative_MS_ID_ON_055-centroid.mzpeak	225881	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Shimadzu/Reader_Shimadzu_Test.data/10nmol_Negative_MS_ID_ON_055.mzML	1045434	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Shimadzu/Reader_Shimadzu_Test.data/10nmol_Negative_MS_ID_ON_055.mzpeak	483886	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Shimadzu/Reader_Shimadzu_Test.data/20140312_六mix_column_1 (scheduled) 一个试-centroid.mzML	416190	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Shimadzu/Reader_Shimadzu_Test.data/20140312_六mix_column_1 (scheduled) 一个试-centroid.mzpeak	59893	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Shimadzu/Reader_Shimadzu_Test.data/20140312_六mix_column_1 (scheduled) 一个试-srmSpectra-centroid.mzML	92590	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Shimadzu/Reader_Shimadzu_Test.data/20140312_六mix_column_1 (scheduled) 一个试-srmSpectra-centroid.mzpeak	92313	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Shimadzu/Reader_Shimadzu_Test.data/20140312_六mix_column_1 (scheduled) 一个试.mzML	415978	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Shimadzu/Reader_Shimadzu_Test.data/20140312_六mix_column_1 (scheduled) 一个试.mzpeak	58582	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/090701-LTQVelos-unittest-01-centroid-globalChromatogramsAreMs1Only.mzML	23716	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/090701-LTQVelos-unittest-01-centroid-globalChromatogramsAreMs1Only.mzpeak	96153	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/090701-LTQVelos-unittest-01-centroid.mzML	800020	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/090701-LTQVelos-unittest-01-centroid.mzpeak	551423	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/090701-LTQVelos-unittest-01.mzML	3201444	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/090701-LTQVelos-unittest-01.mzpeak	1968895	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/BSA-FT-ETD-centroid.mzML	10342	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/BSA-FT-ETD-centroid.mzpeak	88104	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/BSA-FT-ETD.mzML	12870	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/BSA-FT-ETD.mzpeak	86734	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/BSA-FT-HCD-centroid.mzML	10959	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/BSA-FT-HCD-centroid.mzpeak	88575	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/BSA-FT-HCD.mzML	17415	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/BSA-FT-HCD.mzpeak	89259	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/FT-HCD-MSX-centroid.mzML	28391	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/FT-HCD-MSX-centroid.mzpeak	101813	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/FT-HCD-MSX.mzML	28172	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/FT-HCD-MSX.mzpeak	100481	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/IT-HCD-SPS-centroid.mzML	19399	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/IT-HCD-SPS-centroid.mzpeak	92142	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/IT-HCD-SPS.mzML	36181	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/IT-HCD-SPS.mzpeak	102064	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/IsolationMzOffset-ReportedMassOffset-centroid.mzML	12783	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/IsolationMzOffset-ReportedMassOffset-centroid.mzpeak	90254	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/IsolationMzOffset-ReportedMassOffset.mzML	30605	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/IsolationMzOffset-ReportedMassOffset.mzpeak	99168	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/source_cid_test_3scans-centroid.mzML	30458	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/source_cid_test_3scans-centroid.mzpeak	98422	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/source_cid_test_3scans.mzML	30239	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Thermo/Reader_Thermo_Test.data/source_cid_test_3scans.mzpeak	97090	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/08Mar17_HDMSe_25fmolMix1_01_1_A,1_1-centroid-cwt.mzML	1408316	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/08Mar17_HDMSe_25fmolMix1_01_1_A,1_1-centroid-cwt.mzpeak	212737	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/08Mar17_HDMSe_25fmolMix1_01_1_A,1_1-combineIMS-centroid-cwt.mzML	1430002	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/08Mar17_HDMSe_25fmolMix1_01_1_A,1_1-combineIMS-centroid-cwt.mzpeak	1093756	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/08Mar17_HDMSe_25fmolMix1_01_1_A,1_1-combineIMS.mzML	1500355	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/08Mar17_HDMSe_25fmolMix1_01_1_A,1_1-combineIMS.mzpeak	1041597	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/08Mar17_HDMSe_25fmolMix1_01_1_A,1_1.mzML	53592	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/08Mar17_HDMSe_25fmolMix1_01_1_A,1_1.mzpeak	80968	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/08Mar17_MSe_25fmolMix1_01_1_A,1_1-centroid-cwt.mzML	1702270	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/08Mar17_MSe_25fmolMix1_01_1_A,1_1-centroid-cwt.mzpeak	1256384	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/08Mar17_MSe_25fmolMix1_01_1_A,1_1.mzML	1216393	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/08Mar17_MSe_25fmolMix1_01_1_A,1_1.mzpeak	575589	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/20181027 XZ blk_2_A,1_1-centroid-cwt.mzML	439367	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/20181027 XZ blk_2_A,1_1-centroid-cwt.mzpeak	201991	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/20181027 XZ blk_2_A,1_1.mzML	201366	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/20181027 XZ blk_2_A,1_1.mzpeak	110127	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/310811_037_1_23_1-centroid-cwt.mzML	163668	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/310811_037_1_23_1-centroid-cwt.mzpeak	96854	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/310811_037_1_23_1.mzML	17183	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/310811_037_1_23_1.mzpeak	87056	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/Hazell_Data_00004_1.mzML	72203	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/Hazell_Data_00004_1.mzpeak	51615	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/Hi3_ClpB_MSe_01_1_D,1_1-centroid-cwt.mzML	953807	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/Hi3_ClpB_MSe_01_1_D,1_1-centroid-cwt.mzpeak	432041	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/Hi3_ClpB_MSe_01_1_D,1_1.mzML	640030	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/Hi3_ClpB_MSe_01_1_D,1_1.mzpeak	210007	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/QC Vion IMSen190118_2_A,1_6-centroid-cwt.mzML	1264247	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/QC Vion IMSen190118_2_A,1_6-centroid-cwt.mzpeak	125874	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/QC Vion IMSen190118_2_A,1_6-combineIMS-centroid-cwt.mzML	440314	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/QC Vion IMSen190118_2_A,1_6-combineIMS-centroid-cwt.mzpeak	308486	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/QC Vion IMSen190118_2_A,1_6-combineIMS.mzML	308215	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/QC Vion IMSen190118_2_A,1_6-combineIMS.mzpeak	291411	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/QC Vion IMSen190118_2_A,1_6.mzML	18123	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/QC Vion IMSen190118_2_A,1_6.mzpeak	74615	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/Sample 1_1-centroid.mzML	226284	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/Sample 1_1-centroid.mzpeak	88929	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/Sample 1_1.mzML	12864	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/UNIFI/Reader_UNIFI_Test.data/Sample 1_1.mzpeak	80248	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/091204_NFDM_008.mzML	348845	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/091204_NFDM_008.mzpeak	347978	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/160109_Mix1_calcurve_070.mzML	311433	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/160109_Mix1_calcurve_070.mzpeak	288757	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/ATEHLSTLSEK_LM_684.3469-ddaProcessing.mzML	306215	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/ATEHLSTLSEK_LM_684.3469-ddaProcessing.mzpeak	420721	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/ATEHLSTLSEK_LM_684.3469.mzML	514285	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/ATEHLSTLSEK_LM_684.3469.mzpeak	613156	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/ATEHLSTLSEK_LM_785.8426.mzML	514359	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/ATEHLSTLSEK_LM_785.8426.mzpeak	613133	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/ATEHLSTLSEK_profile-centroid.mzML	469463	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/ATEHLSTLSEK_profile-centroid.mzpeak	561322	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/ATEHLSTLSEK_profile.mzML	2025646	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/ATEHLSTLSEK_profile.mzpeak	759431	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/DDA_IsolationWindow-ddaProcessing.mzML	14055	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/DDA_IsolationWindow-ddaProcessing.mzpeak	91246	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/DDA_IsolationWindow.mzML	13724	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/DDA_IsolationWindow.mzpeak	91246	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDDDA_Short_noLM-centroid-cwt.mzML	1437270	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDDDA_Short_noLM-centroid-cwt.mzpeak	278807	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDDDA_Short_noLM-combineIMS-centroid-cwt-ignoreCalibrationScans.mzML	53633	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDDDA_Short_noLM-combineIMS-centroid-cwt-ignoreCalibrationScans.mzpeak	137306	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDDDA_Short_noLM-combineIMS-centroid-cwt.mzML	53633	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDDDA_Short_noLM-combineIMS-centroid-cwt.mzpeak	137306	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDDDA_Short_noLM-combineIMS-mzMobilityFilter.mzML	199528	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDDDA_Short_noLM-combineIMS-mzMobilityFilter.mzpeak	200251	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDDDA_Short_noLM-combineIMS.mzML	2304710	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDDDA_Short_noLM-combineIMS.mzpeak	1183730	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDDDA_Short_noLM-globalChromatogramsAreMs1Only.mzML	11603	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDDDA_Short_noLM-globalChromatogramsAreMs1Only.mzpeak	96102	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDDDA_Short_noLM.mzML	3787924	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDDDA_Short_noLM.mzpeak	1534860	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDMRM_Short_noLM-combineIMS-mzMobilityFilter.mzML	31291	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDMRM_Short_noLM-combineIMS-mzMobilityFilter.mzpeak	105706	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDMRM_Short_noLM-combineIMS.mzML	97358	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDMRM_Short_noLM-combineIMS.mzpeak	152961	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDMRM_Short_noLM-globalChromatogramsAreMs1Only.mzML	10766	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDMRM_Short_noLM-globalChromatogramsAreMs1Only.mzpeak	88976	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDMRM_Short_noLM.mzML	2215209	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDMRM_Short_noLM.mzpeak	180696	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDMSe_Short_noLM-combineIMS-mzMobilityFilter.mzML	188621	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDMSe_Short_noLM-combineIMS-mzMobilityFilter.mzpeak	210075	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDMSe_Short_noLM-combineIMS.mzML	1922615	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDMSe_Short_noLM-combineIMS.mzpeak	1108552	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDMSe_Short_noLM.mzML	3459644	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/HDMSe_Short_noLM.mzpeak	1443603	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/MSe_Short-globalChromatogramsAreMs1Only.mzML	479106	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/MSe_Short-globalChromatogramsAreMs1Only.mzpeak	264978	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/MSe_Short.mzML	1699639	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/MSe_Short.mzpeak	644832	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/Minimal_DDA-ddaProcessing.mzML	26471	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/Minimal_DDA-ddaProcessing.mzpeak	101510	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/Minimal_DDA.mzML	36450	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/Minimal_DDA.mzpeak	101625	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/QC_LCMS2-2_23_268-1-1.mzML	85079	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/QC_LCMS2-2_23_268-1-1.mzpeak	156616	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/SONAR_Short-combineIMS-mzMobilityFilter.mzML	91153	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/SONAR_Short-combineIMS-mzMobilityFilter.mzpeak	191566	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/SONAR_Short-combineIMS.mzML	91153	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/SONAR_Short-combineIMS.mzpeak	191471	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/SONAR_Short.mzML	1972591	Y	aws s3 sync s3://v09 data/
+data/pwiz-examples/Waters/Reader_Waters_Test.data/SONAR_Short.mzpeak	204521	Y	aws s3 sync s3://v09 data/
+data/raw-bench/results.tsv	702	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-astral-MSV000100943/local.mzML	7844762660	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-astral-MSV000100943/local.mzpeak	3740049052	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-astral-MSV000100943/mzpeak.log	5361	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-astral-MSV000100943/trfp.log	437	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-fusion-lumos-PXD008952/local.mzML	1436649479	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-fusion-lumos-PXD008952/local.mzpeak	365857688	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-fusion-lumos-PXD008952/mzpeak.log	1193	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-fusion-lumos-PXD008952/trfp.log	344	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-ltq-ft-ultra-MTBLS3512/local.mzML	483023560	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-ltq-ft-ultra-MTBLS3512/local.mzpeak	95234023	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-ltq-ft-ultra-MTBLS3512/mzpeak.log	279	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-ltq-ft-ultra-MTBLS3512/trfp.log	321	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-ltq-orbitrap-velos-PXD000001/local.mzML	596260931	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-ltq-orbitrap-velos-PXD000001/local.mzpeak	140445005	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-ltq-orbitrap-velos-PXD000001/mzpeak.log	371	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-ltq-orbitrap-velos-PXD000001/trfp.log	289	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-ltq-xl-PXD059878/local.mzML	174241907	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-ltq-xl-PXD059878/local.mzpeak	58099765	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-ltq-xl-PXD059878/mzpeak.log	614	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-bench/thermo-ltq-xl-PXD059878/trfp.log	367	N	scripts/raw-bench-pipeline.sh  (regenerable benchmark scratch)
+data/raw-examples/README.md	4383	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/column_setpoint.txt	2268090	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/column_temperature.txt	2268093	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/execution-log_2026-04-08_01-43-11-AM.txt	69991	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/flowsensor-a_flow.txt	809738	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/flowsensor-b_flow.txt	1332703	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/pump-a_pressure.txt	470070	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/pump-a_speed.txt	2210619	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/pump-a_temperature.txt	227415	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/pump-a_volume.txt	274768	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/pump-b_pressure.txt	417662	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/pump-b_speed.txt	1970408	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/pump-b_temperature.txt	227415	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/pump-b_volume.txt	272168	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/sample-tray_temperature.txt	223803	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/setflow-a_setflow.txt	1948108	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/setflow-b_setflow.txt	1948108	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/solvent-a_composition.txt	2238846	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/solvent-b_composition.txt	2217319	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/system-info_2026-04-08_01-43-11-AM.txt	2323	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/system_activity.txt	287615	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/valve-a_angle.txt	2310101	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/valve-b_angle.txt	2324795	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/valve-i_angle.txt	227481	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/2026-04-08_01-43-12_Two-column-separation/valve-t_angle.txt	232746	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/InstrumentSetup.isset	3103	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/Maldi.method	2696	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08.m/Maldi.method	1347	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08.m/diaSettings.diasqlite	24576	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08.m/hystar.method	36991	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08.m/microTOFQImpacTemAcquisition.method	192651	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08.m/prmSettings.prmsqlite	36864	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08.m/submethods.xml	933	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08_1.m/Maldi.method	1347	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08_1.m/diaSettings.diasqlite	24576	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08_1.m/hystar.method	36991	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08_1.m/microTOFQImpacTemAcquisition.method	198229	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08_1.m/prmSettings.prmsqlite	36864	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/backup-2026-04-08_1.m/submethods.xml	939	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/desktop.ini	156	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/diaSettings.diasqlite	24576	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/hystar.method	36991	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/microTOFQImpacTemAcquisition.method	196675	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/prmSettings.prmsqlite	45056	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/submethods.xml	1001	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/8271.m/synchroSettings.syncsqlite	4096	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/HyStarMetadata.xml	113324	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/SampleInfo.xml	4908	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/analysis.tdf	205651968	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/analysis.tdf_bin	1972764672	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/chromatography-data-pre.sqlite	131072	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/chromatography-data.sqlite	1454080	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/bruker-timstof-MSV000101607/raw/SBA415_Try.d/SBA415(1) Try_Slot1-2_1_8271.d/desktop.ini	140	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/sciex-zenotof-MSV000095995/raw/20240826_RNAseB_Reduced_50ngul_1ul_MRM_03.wiff	2168320	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/sciex-zenotof-MSV000095995/raw/20240826_RNAseB_Reduced_50ngul_1ul_MRM_03.wiff.scan	72347631	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/sciex-zenotof-MSV000095995/raw/20240826_RNAseB_Reduced_50ngul_1ul_MRM_03.wiff2	2494464	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/shimadzu-lcms9030-MTBLS13204/raw/Blind_P1_pos_012.lcd	55492608	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/thermo-astral-MSV000100943/20240912_WFB_exp01_magnet_5_0.raw	9057318473	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/thermo-astral-MSV000100943/profile/20240912_WFB_exp01_magnet_5_0.mzML	7844762662	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/thermo-fusion-lumos-PXD008952/01_CPTAC_TMTS1-NCI7_P_JHUZ_20170509_LUMOS.raw	691434672	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/thermo-ltq-ft-ultra-MTBLS3512/mtab_BIOS_CRAM1620_1_072617_34.RAW	231884992	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/thermo-ltq-orbitrap-velos-PXD000001/TMT_Erwinia_01.raw	220475548	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-examples/thermo-ltq-xl-PXD059878/2013_30_Amrutha_050713_1.raw	73054467	N	scripts/raw-bench-pipeline.sh / original vendor RAW download (regenerable scratch)
+data/raw-replacements/bruker-impact-sub__PXD076459/S4_5foldGHRP.raw	437862917	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/bruker-impact-sub__PXD076459/curl.log	50166	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/bruker-impact-sub__PXD076459/local.mzML	891	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/bruker-impact-sub__PXD076459/local.mzpeak	46901	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/bruker-impact-sub__PXD076459/mzpeak.log	403	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/bruker-impact-sub__PXD076459/trfp.log	2372	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/bruker-timstof-sub__PXD049028/2024_LRS_Ascend_WT_C_03.raw	2108933460	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/bruker-timstof-sub__PXD049028/curl.log	51746	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/bruker-timstof-sub__PXD049028/local.mzML	5703114538	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/bruker-timstof-sub__PXD049028/local.mzpeak	1325599041	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/bruker-timstof-sub__PXD049028/mzpeak.log	1915	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/bruker-timstof-sub__PXD049028/trfp.log	309	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/impact-ii-inten32-PXD071586/bruker-impact-ii-PXD071586.mzpeak	582751272	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/impact-ii-inten32-PXD071586/dl.log	0	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/impact-ii-real-PXD071586/bruker-impact-ii-PXD071586.mzpeak	583000459	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/impact-ii-real-PXD071586/dl.log	0	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/results.tsv	706	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/sciex-qtrap-sub__PXD000320/QC_Shew_12_02_Run-02_6Sep12_Eagle_12-06-13.RAW	49535289	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/sciex-qtrap-sub__PXD000320/curl.log	5531	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/sciex-qtrap-sub__PXD000320/local.mzML	110070464	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/sciex-qtrap-sub__PXD000320/local.mzpeak	40699274	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/sciex-qtrap-sub__PXD000320/mzpeak.log	553	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/sciex-qtrap-sub__PXD000320/trfp.log	7964	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/sciex-tripletof-sub__PXD000561/Adult_NKcells_Gel_Elite_78_f13.raw	747343854	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/sciex-tripletof-sub__PXD000561/curl.log	58597	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/sciex-tripletof-sub__PXD000561/curl2.log	19880	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/sciex-tripletof-sub__PXD000561/local.mzML	185529416	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/sciex-tripletof-sub__PXD000561/local.mzpeak	45377280	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/sciex-tripletof-sub__PXD000561/mzpeak.log	290	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/sciex-tripletof-sub__PXD000561/trfp.log	226	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/sciex-zenotof-sub__PXD000320/QC_Shew_12_02_Run-11_8Dec12_Lion_12-10-03.RAW	69936600	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/sciex-zenotof-sub__PXD000320/curl.log	7348	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/sciex-zenotof-sub__PXD000320/local.mzML	144391605	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/sciex-zenotof-sub__PXD000320/local.mzpeak	57197637	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/sciex-zenotof-sub__PXD000320/mzpeak.log	557	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/sciex-zenotof-sub__PXD000320/trfp.log	141604	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/waters-synapt-sub__PXD000320/QC_Shew_12_02_Run-07_5Dec12_Lion_12-10-03.RAW	26889276	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/waters-synapt-sub__PXD000320/curl.log	3240	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/waters-synapt-sub__PXD000320/local.mzML	78825126	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/waters-synapt-sub__PXD000320/local.mzpeak	20224497	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/waters-synapt-sub__PXD000320/mzpeak.log	557	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/raw-replacements/waters-synapt-sub__PXD000320/trfp.log	239372	N	scripts/thermo-replacements-bench.sh  (regenerable benchmark scratch)
+data/sdrf-examples/CANDIDATES.md	4054	N	scripts/fetch-sdrf-examples.sh
+data/sdrf-examples/MTBLS1129/MTBLS1129.sdrf.tsv	106421	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC01.mzML	85801170	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC02.mzML	85801749	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC03.mzML	85558321	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC04.mzML	85278804	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC05.mzML	84740855	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC06.mzML	85669787	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC07.mzML	85993270	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC08.mzML	85763149	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC09.mzML	85484388	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC10.mzML	86002933	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC11.mzML	85613481	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC12.mzML	86870094	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC13.mzML	86688914	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC14.mzML	86805616	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC15.mzML	86685068	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC16.mzML	86739037	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC17.mzML	86423364	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC18.mzML	86783932	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC19.mzML	86939456	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC20.mzML	87118127	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC21.mzML	87087567	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC22.mzML	87436098	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC23.mzML	87172735	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC24.mzML	87390558	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC25.mzML	87207284	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC26.mzML	87340140	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC27.mzML	87948846	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/QC28.mzML	86521055	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage1_1122.mzML	85138287	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage1_1532.mzML	85737053	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage1_1941.mzML	86016412	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage1_1969.mzML	86317515	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage1_2516.mzML	86383864	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage1_26.mzML	85333354	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage1_2634.mzML	87096223	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage1_270.mzML	85063545	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage1_507.mzML	85148492	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage1_543.mzML	85634012	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage1_614.mzML	85516961	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage1_679.mzML	85751954	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage1_688.mzML	85516219	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage1_699.mzML	85458416	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage1_755.mzML	85412732	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_1011.mzML	85734969	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_1063.mzML	85540221	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_1333.mzML	86262075	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_134.mzML	84570377	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_1374.mzML	86422176	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_1402.mzML	86648860	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_1415.mzML	86146998	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_1723.mzML	85940869	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_1788.mzML	86018144	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_181.mzML	84983127	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_1894.mzML	86150141	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_203.mzML	84833923	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_2070.mzML	86160518	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_2247.mzML	86638505	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_240.mzML	85647801	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_2421.mzML	86601615	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_295.mzML	84280260	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_373.mzML	85414314	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_525.mzML	85534973	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_531.mzML	85230279	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_625.mzML	85952123	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_714.mzML	85129364	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_868.mzML	84960492	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_893.mzML	84906091	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage2_971.mzML	85670300	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage3_1030.mzML	84952251	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage3_1042.mzML	85234380	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage3_1638.mzML	85392061	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage3_1709.mzML	86423897	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage3_2124.mzML	86316954	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage3_229.mzML	85918691	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage3_2297.mzML	86136349	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage3_2559.mzML	86334940	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage3_258.mzML	85945290	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage3_537.mzML	85837274	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage3_664.mzML	85762540	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage3_67.mzML	85348420	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage3_717.mzML	85457439	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menLCCstage3_988.mzML	85792664	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage1_1266.mzML	86479301	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage1_1475.mzML	87383902	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage1_1528.mzML	86005953	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage1_1543.mzML	86248065	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage1_1902.mzML	86131600	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage1_2034.mzML	86420674	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage1_2163.mzML	86637201	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage1_2554.mzML	86574918	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage1_2622.mzML	87416222	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage1_47.mzML	85700767	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_113.mzML	85468358	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_1193.mzML	86335268	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_1278.mzML	86267692	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_130.mzML	85149964	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_1331.mzML	86324432	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_1379.mzML	86720557	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_1452.mzML	86255267	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_1501.mzML	85814118	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_2041.mzML	86111768	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_2054.mzML	85521158	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_2408.mzML	86231012	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_2498.mzML	86326944	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_2520.mzML	86301372	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_2551.mzML	86280053	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_2662.mzML	87022368	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_2683.mzML	87102271	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_329.mzML	84903063	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_534.mzML	85202534	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_797.mzML	85208510	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_810.mzML	85084801	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_885.mzML	84764140	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_981.mzML	85633713	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage2_991.mzML	85371848	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage3_102.mzML	85206796	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage3_1369.mzML	86252959	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage3_1737.mzML	85821264	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage3_1749.mzML	85734996	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage3_1831.mzML	85086486	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage3_1877.mzML	86257679	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage3_1960.mzML	85539301	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage3_1997.mzML	86069428	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage3_2113.mzML	86652916	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage3_2223.mzML	86661482	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage3_2270.mzML	86605209	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage3_326.mzML	84992204	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage3_546.mzML	85823556	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage3_605.mzML	85573727	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/menRCCstage3_667.mzML	85170074	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_166.mzML	85509228	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2332.mzML	86476181	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2357.mzML	86292777	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2371.mzML	86828528	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2407.mzML	86626220	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2409.mzML	86640018	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2422.mzML	86575929	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2424.mzML	86704784	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2480.mzML	87327605	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2518.mzML	86256423	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2521.mzML	86451767	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2560.mzML	86616962	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2569.mzML	87108338	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2612.mzML	87261199	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2627.mzML	86922184	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2632.mzML	87181069	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2659.mzML	87007865	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2663.mzML	86715325	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2665.mzML	87363394	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2673.mzML	87395341	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2676.mzML	87446170	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2691.mzML	87110254	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_2700.mzML	86898409	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_363.mzML	84422036	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_374.mzML	84691587	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_50.mzML	85403747	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/men_normal_6.mzML	85229609	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/urls.txt	26857	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage1_1037.mzML	85472314	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage1_110.mzML	85177480	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage1_1221.mzML	86293534	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage1_1313.mzML	86259189	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage1_1591.mzML	85975573	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage1_1858.mzML	85488323	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage1_2261.mzML	86211442	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage1_488.mzML	85576715	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage1_577.mzML	85516080	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage1_743.mzML	85353586	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage2_1026.mzML	85892918	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage2_1029.mzML	85643842	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage2_1310.mzML	86341803	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage2_1407.mzML	86568710	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage2_1427.mzML	86730140	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage2_146.mzML	84869477	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage2_1601.mzML	86763310	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage2_20.mzML	85611635	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage2_2151.mzML	86885261	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage2_276.mzML	84948907	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage2_434.mzML	85170353	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage2_468.mzML	85330516	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage2_504.mzML	85417731	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage2_574.mzML	85957468	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage2_581.mzML	85875138	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage2_618.mzML	85478444	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage2_95.mzML	85092322	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage3_1097.mzML	84993007	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage3_1404.mzML	86775610	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage3_1440.mzML	86383199	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage3_1631.mzML	86060316	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage3_1783.mzML	86168217	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage3_189.mzML	85336254	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage3_1890.mzML	85920258	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage3_2105.mzML	85656877	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage3_2291.mzML	86834555	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage3_23.mzML	85144971	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage3_2594.mzML	87185530	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage3_439.mzML	85761290	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage3_515.mzML	85089734	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage3_522.mzML	85406700	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage3_734.mzML	85457820	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage3_888.mzML	85404784	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage3_903.mzML	85271042	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenLCCstage3_938.mzML	85810189	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage1_1617.mzML	85960255	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage1_1963.mzML	86435591	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage1_2038.mzML	86664109	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage1_2202.mzML	86344590	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage1_2235.mzML	86595652	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage1_2258.mzML	86317500	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage1_2600.mzML	88087998	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage1_2668.mzML	87350083	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage1_491.mzML	85694163	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage1_910.mzML	85133065	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage1_941.mzML	86020655	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_1014.mzML	85217426	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_1190.mzML	85280889	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_1196.mzML	85988903	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_1304.mzML	86815318	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_1514.mzML	86501662	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_1665.mzML	86695989	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_1683.mzML	86303171	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_1728.mzML	86031262	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_1733.mzML	85738633	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_1846.mzML	86132826	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_1937.mzML	85628936	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_1987.mzML	86398760	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_2066.mzML	86095073	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_2479.mzML	86972273	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_261.mzML	85252565	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_2654.mzML	87060220	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_315.mzML	84448851	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_419.mzML	84476642	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_64.mzML	85229376	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_830.mzML	85270097	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage2_896.mzML	84426182	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage3_1224.mzML	85930460	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage3_1237.mzML	86524091	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage3_1316.mzML	86499333	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage3_1327.mzML	86407496	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage3_1363.mzML	86103511	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage3_1455.mzML	86338910	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage3_149.mzML	85187719	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage3_1855.mzML	86720581	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage3_1924.mzML	86010434	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage3_2208.mzML	86509351	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage3_2244.mzML	86184331	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage3_2303.mzML	86446303	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage3_2494.mzML	86307745	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage3_289.mzML	84769116	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage3_721.mzML	85710362	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage3_955.mzML	85863236	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage3_958.mzML	85919167	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/womenRCCstage_1216.mzML	85992356	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/women_normal_11.mzML	85280737	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/women_normal_2316.mzML	86253400	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/women_normal_2478.mzML	86268324	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/women_normal_2495.mzML	86450446	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/women_normal_2550.mzML	86658687	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/women_normal_264.mzML	85115432	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/women_normal_2655.mzML	86833843	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/women_normal_2670.mzML	87457086	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/women_normal_2705.mzML	87142874	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/women_normal_4.mzML	85273688	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/women_normal_834.mzML	85204480	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzml/women_normal_9.mzML	85438758	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC01.mzpeak	47147596	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC02.mzpeak	47225703	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC03.mzpeak	46999677	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC04.mzpeak	46909988	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC05.mzpeak	46962932	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC06.mzpeak	47125569	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC07.mzpeak	47437258	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC08.mzpeak	47267288	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC09.mzpeak	47271613	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC10.mzpeak	47678395	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC11.mzpeak	47360491	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC12.mzpeak	48153559	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC13.mzpeak	48081306	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC14.mzpeak	48208784	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC15.mzpeak	48302210	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC16.mzpeak	48269431	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC17.mzpeak	48128145	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC18.mzpeak	48378745	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC19.mzpeak	48509613	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC20.mzpeak	48497622	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC21.mzpeak	48550711	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC22.mzpeak	48875059	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC23.mzpeak	48674303	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC24.mzpeak	48795746	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC25.mzpeak	48687830	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC26.mzpeak	48774185	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC27.mzpeak	49241554	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/QC28.mzpeak	48248886	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage1_1122.mzpeak	47243671	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage1_1532.mzpeak	47802215	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage1_1941.mzpeak	47781393	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage1_1969.mzpeak	47798831	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage1_2516.mzpeak	48258673	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage1_26.mzpeak	46851103	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage1_2634.mzpeak	48584309	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage1_270.mzpeak	46773232	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage1_507.mzpeak	46923425	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage1_543.mzpeak	47162456	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage1_614.mzpeak	47012148	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage1_679.mzpeak	47283949	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage1_688.mzpeak	47167344	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage1_699.mzpeak	47213966	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage1_755.mzpeak	47209867	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_1011.mzpeak	47547053	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_1063.mzpeak	47465250	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_1333.mzpeak	47883712	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_134.mzpeak	46817530	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_1374.mzpeak	48015715	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_1402.mzpeak	48135159	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_1415.mzpeak	47671612	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_1723.mzpeak	47541246	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_1788.mzpeak	47802657	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_181.mzpeak	46603813	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_1894.mzpeak	47381997	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_203.mzpeak	46685045	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_2070.mzpeak	47924806	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_2247.mzpeak	48190874	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_240.mzpeak	47249114	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_2421.mzpeak	48183568	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_295.mzpeak	46204814	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_373.mzpeak	46911810	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_525.mzpeak	47088160	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_531.mzpeak	46904808	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_625.mzpeak	47614425	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_714.mzpeak	47059070	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_868.mzpeak	47044059	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_893.mzpeak	47141705	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage2_971.mzpeak	47378956	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage3_1030.mzpeak	47201780	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage3_1042.mzpeak	47373787	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage3_1638.mzpeak	47326046	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage3_1709.mzpeak	48043973	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage3_2124.mzpeak	47826290	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage3_229.mzpeak	47505974	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage3_2297.mzpeak	48021998	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage3_2559.mzpeak	48304647	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage3_258.mzpeak	47247813	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage3_537.mzpeak	47334035	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage3_664.mzpeak	47470169	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage3_67.mzpeak	47122302	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage3_717.mzpeak	47302649	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menLCCstage3_988.mzpeak	47626643	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage1_1266.mzpeak	48229658	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage1_1475.mzpeak	48249837	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage1_1528.mzpeak	47913467	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage1_1543.mzpeak	47599177	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage1_1902.mzpeak	47787774	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage1_2034.mzpeak	48198863	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage1_2163.mzpeak	48360223	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage1_2554.mzpeak	48148545	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage1_2622.mzpeak	48601362	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage1_47.mzpeak	47164917	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_113.mzpeak	47202889	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_1193.mzpeak	47780355	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_1278.mzpeak	47910901	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_130.mzpeak	46744013	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_1331.mzpeak	48032623	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_1379.mzpeak	48363461	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_1452.mzpeak	47724836	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_1501.mzpeak	47683233	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_2041.mzpeak	47888271	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_2054.mzpeak	47633412	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_2408.mzpeak	48237435	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_2498.mzpeak	48368046	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_2520.mzpeak	48251193	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_2551.mzpeak	48017873	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_2662.mzpeak	48538945	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_2683.mzpeak	48392886	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_329.mzpeak	46947974	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_534.mzpeak	46941045	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_797.mzpeak	47055970	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_810.mzpeak	47277354	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_885.mzpeak	46915525	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_981.mzpeak	47301725	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage2_991.mzpeak	47461497	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage3_102.mzpeak	46995326	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage3_1369.mzpeak	48078514	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage3_1737.mzpeak	47603516	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage3_1749.mzpeak	47585508	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage3_1831.mzpeak	47171816	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage3_1877.mzpeak	47789679	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage3_1960.mzpeak	47715520	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage3_1997.mzpeak	47830885	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage3_2113.mzpeak	48038705	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage3_2223.mzpeak	48298682	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage3_2270.mzpeak	48003248	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage3_326.mzpeak	46814098	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage3_546.mzpeak	47379217	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage3_605.mzpeak	47211585	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/menRCCstage3_667.mzpeak	47297862	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_166.mzpeak	47011764	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2332.mzpeak	48255445	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2357.mzpeak	48066125	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2371.mzpeak	48514519	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2407.mzpeak	48303980	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2409.mzpeak	48354598	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2422.mzpeak	48296157	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2424.mzpeak	48449254	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2480.mzpeak	48759266	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2518.mzpeak	48211420	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2521.mzpeak	48286334	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2560.mzpeak	48460938	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2569.mzpeak	48721238	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2612.mzpeak	48618241	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2627.mzpeak	48454625	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2632.mzpeak	48784254	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2659.mzpeak	48546734	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2663.mzpeak	48359725	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2665.mzpeak	48817555	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2673.mzpeak	48893005	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2676.mzpeak	48828151	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2691.mzpeak	48714664	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_2700.mzpeak	48547150	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_363.mzpeak	46644960	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_374.mzpeak	46761553	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_50.mzpeak	46895703	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/men_normal_6.mzpeak	46702519	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage1_1037.mzpeak	47490017	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage1_110.mzpeak	46809436	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage1_1221.mzpeak	47821324	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage1_1313.mzpeak	47726988	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage1_1591.mzpeak	47848873	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage1_1858.mzpeak	47265702	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage1_2261.mzpeak	47908165	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage1_488.mzpeak	47184111	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage1_577.mzpeak	47075098	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage1_743.mzpeak	47139439	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage2_1026.mzpeak	47459034	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage2_1029.mzpeak	47738485	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage2_1310.mzpeak	47946273	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage2_1407.mzpeak	48112100	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage2_1427.mzpeak	48085984	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage2_146.mzpeak	46613855	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage2_1601.mzpeak	48164026	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage2_20.mzpeak	46743083	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage2_2151.mzpeak	48485639	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage2_276.mzpeak	46763734	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage2_434.mzpeak	46974334	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage2_468.mzpeak	47023333	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage2_504.mzpeak	47105889	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage2_574.mzpeak	47420123	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage2_581.mzpeak	47376659	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage2_618.mzpeak	47063384	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage2_95.mzpeak	46994161	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage3_1097.mzpeak	47203020	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage3_1404.mzpeak	48249070	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage3_1440.mzpeak	48046590	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage3_1631.mzpeak	47665959	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage3_1783.mzpeak	47959630	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage3_189.mzpeak	46851681	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage3_1890.mzpeak	47778786	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage3_2105.mzpeak	47769632	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage3_2291.mzpeak	48445048	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage3_23.mzpeak	46809496	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage3_2594.mzpeak	48669936	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage3_439.mzpeak	47248213	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage3_515.mzpeak	47011883	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage3_522.mzpeak	47040201	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage3_734.mzpeak	47334553	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage3_888.mzpeak	47425053	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage3_903.mzpeak	47553944	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenLCCstage3_938.mzpeak	47409517	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage1_1617.mzpeak	47801874	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage1_1963.mzpeak	48014461	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage1_2038.mzpeak	48244622	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage1_2202.mzpeak	48015999	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage1_2235.mzpeak	48414535	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage1_2258.mzpeak	48078641	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage1_2600.mzpeak	48589678	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage1_2668.mzpeak	48777286	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage1_491.mzpeak	47351420	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage1_910.mzpeak	47133130	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage1_941.mzpeak	47678515	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_1014.mzpeak	47390694	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_1190.mzpeak	47497268	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_1196.mzpeak	47876181	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_1304.mzpeak	48191500	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_1514.mzpeak	48058866	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_1665.mzpeak	48232527	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_1683.mzpeak	47903724	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_1728.mzpeak	47815155	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_1733.mzpeak	47673382	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_1846.mzpeak	47887138	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_1937.mzpeak	47434978	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_1987.mzpeak	47911755	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_2066.mzpeak	48086859	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_2479.mzpeak	48594614	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_261.mzpeak	46870145	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_2654.mzpeak	48598128	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_315.mzpeak	46447692	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_419.mzpeak	46431698	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_64.mzpeak	46895623	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_830.mzpeak	47147823	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage2_896.mzpeak	46483398	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage3_1224.mzpeak	47808805	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage3_1237.mzpeak	48036381	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage3_1316.mzpeak	48106651	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage3_1327.mzpeak	48061912	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage3_1363.mzpeak	47777976	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage3_1455.mzpeak	47620117	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage3_149.mzpeak	46773054	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage3_1855.mzpeak	47786980	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage3_1924.mzpeak	47842605	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage3_2208.mzpeak	48217010	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage3_2244.mzpeak	48057315	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage3_2303.mzpeak	48222272	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage3_2494.mzpeak	48076743	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage3_289.mzpeak	46679650	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage3_721.mzpeak	47312888	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage3_955.mzpeak	47638198	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage3_958.mzpeak	47496019	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/womenRCCstage_1216.mzpeak	47739121	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/women_normal_11.mzpeak	46921919	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/women_normal_2316.mzpeak	48067513	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/women_normal_2478.mzpeak	48202308	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/women_normal_2495.mzpeak	48262007	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/women_normal_2550.mzpeak	48482261	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/women_normal_264.mzpeak	46640367	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/women_normal_2655.mzpeak	48492164	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/women_normal_2670.mzpeak	48813160	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/women_normal_2705.mzpeak	48703041	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/women_normal_4.mzpeak	46760341	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/women_normal_834.mzpeak	47108198	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/mzpeak/women_normal_9.mzpeak	46930762	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/raw/QC01.mzML	85801170	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/raw/menLCCstage1_26.mzML	85333354	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS1129/raw/women_normal_4.mzML	85273688	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/a_MTBLS5358_GC-MS_positive__metabolite_profiling.txt	13395	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/i_Investigation.txt	11254	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/CTR-1.mzML	65605834	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/CTR-2.mzML	65625194	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/CTR-3.mzML	65559081	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/CTR-4.mzML	65567096	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/CTR-5.mzML	65251206	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/G-1.mzML	65503208	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/G-2.mzML	65686256	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/G-3.mzML	65679911	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/G-4.mzML	65661610	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/G-5.mzML	65619314	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/G-Era-1.mzML	65642216	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/G-Era-2.mzML	65582129	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/G-Era-3.mzML	65413726	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/G-Era-4.mzML	65690474	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/G-Era-5.mzML	65630380	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/QC-1.mzML	65557723	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/QC-2.mzML	65542105	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/QC-3.mzML	65610041	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/QC-4.mzML	65624898	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzml/urls.txt	0	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzpeak/CTR-1.mzpeak	26348427	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzpeak/CTR-2.mzpeak	26326667	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzpeak/CTR-3.mzpeak	26391987	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzpeak/CTR-4.mzpeak	26419480	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzpeak/CTR-5.mzpeak	26093329	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzpeak/G-1.mzpeak	26361495	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzpeak/G-2.mzpeak	26375392	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzpeak/G-3.mzpeak	26382480	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzpeak/G-4.mzpeak	26377099	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzpeak/G-5.mzpeak	26443137	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzpeak/G-Era-1.mzpeak	26401647	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzpeak/G-Era-2.mzpeak	26404663	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzpeak/G-Era-3.mzpeak	26245950	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzpeak/G-Era-4.mzpeak	26345667	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzpeak/G-Era-5.mzpeak	26341346	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzpeak/QC-1.mzpeak	26393430	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzpeak/QC-2.mzpeak	26364848	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzpeak/QC-3.mzpeak	26442383	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/mzpeak/QC-4.mzpeak	26328321	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/CTR-1.raw	34305115	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/CTR-2.raw	34322464	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/CTR-3.raw	34288571	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/CTR-4.raw	34309133	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/CTR-5.raw	34077507	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/G-1.raw	34262342	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/G-2.raw	34335399	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/G-3.raw	34329114	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/G-4.raw	34323861	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/G-5.raw	34323626	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/G-Era-1.raw	34323124	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/G-Era-2.raw	34284431	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/G-Era-3.raw	34209984	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/G-Era-4.raw	34327427	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/G-Era-5.raw	34286808	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/QC-1.raw	34292732	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/QC-2.raw	34284259	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/QC-3.raw	34310923	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/QC-4.raw	34297064	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/raw/urls.txt	1896	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/MTBLS5358/s_MTBLS5358.txt	4994	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/PXD009465.sdrf.tsv	42428	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzml/t04175_EH_Malaria_WT_PK7_KO_Phos_SCX1.mzML	182893267	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzml/t04176_EH_Malaria_WT_PK7_KO_Phos_SCX2.mzML	167321638	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzml/t04177_EH_Malaria_WT_PK7_KO_Phos_SCX3.mzML	174591916	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzml/t04178_EH_Malaria_WT_PK7_KO_Phos_SCX4.mzML	182379790	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzml/t04179_EH_Malaria_WT_PK7_KO_Phos_SCX5.mzML	178855777	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzml/t04181_EH_Malaria_WT_PK7_KO_Phos_SCX6.mzML	186090989	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzml/t04182_EH_Malaria_WT_PK7_KO_Phos_SCX7.mzML	199474725	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzml/t04183_EH_Malaria_WT_PK7_KO_Phos_SCX8.mzML	187531171	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzml/t04184_EH_Malaria_WT_PK7_KO_Phos_SCX9.mzML	186323219	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzml/t04185_EH_Malaria_WT_PK7_KO_Phos_SCX10.mzML	243129956	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzml/urls.txt	0	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzpeak/t04175_EH_Malaria_WT_PK7_KO_Phos_SCX1.mzpeak	49063346	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzpeak/t04176_EH_Malaria_WT_PK7_KO_Phos_SCX2.mzpeak	52148718	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzpeak/t04177_EH_Malaria_WT_PK7_KO_Phos_SCX3.mzpeak	49027548	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzpeak/t04178_EH_Malaria_WT_PK7_KO_Phos_SCX4.mzpeak	53207718	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzpeak/t04179_EH_Malaria_WT_PK7_KO_Phos_SCX5.mzpeak	55479867	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzpeak/t04181_EH_Malaria_WT_PK7_KO_Phos_SCX6.mzpeak	63017857	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzpeak/t04182_EH_Malaria_WT_PK7_KO_Phos_SCX7.mzpeak	60824797	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzpeak/t04183_EH_Malaria_WT_PK7_KO_Phos_SCX8.mzpeak	61470473	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzpeak/t04184_EH_Malaria_WT_PK7_KO_Phos_SCX9.mzpeak	55207162	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/mzpeak/t04185_EH_Malaria_WT_PK7_KO_Phos_SCX10.mzpeak	88333839	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/raw/t04175_EH_Malaria_WT_PK7_KO_Phos_SCX1.RAW	131122992	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/raw/t04176_EH_Malaria_WT_PK7_KO_Phos_SCX2.RAW	139241320	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/raw/t04177_EH_Malaria_WT_PK7_KO_Phos_SCX3.RAW	131665580	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/raw/t04178_EH_Malaria_WT_PK7_KO_Phos_SCX4.RAW	141507210	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/raw/t04179_EH_Malaria_WT_PK7_KO_Phos_SCX5.RAW	147988996	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/raw/t04181_EH_Malaria_WT_PK7_KO_Phos_SCX6.RAW	164626492	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/raw/t04182_EH_Malaria_WT_PK7_KO_Phos_SCX7.RAW	159277072	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/raw/t04183_EH_Malaria_WT_PK7_KO_Phos_SCX8.RAW	160153934	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/raw/t04184_EH_Malaria_WT_PK7_KO_Phos_SCX9.RAW	147029318	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/raw/t04185_EH_Malaria_WT_PK7_KO_Phos_SCX10.RAW	227766812	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009465/raw/urls.txt	1071	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/PXD009909.sdrf.tsv	6768	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzml/70JG_01.mzML	2236259366	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzml/70JG_02.mzML	2578073671	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzml/70JG_03.mzML	2409629729	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzml/70JG_04.mzML	2253905198	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzml/70JG_05.mzML	2244994662	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzml/70JG_06.mzML	2187060402	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzml/70JG_07.mzML	2183061397	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzml/70JG_08.mzML	2068437601	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzml/70JG_09.mzML	1917591846	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzml/70JG_10.mzML	2180587494	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzml/70JG_11.mzML	2007822228	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzml/70JG_12.mzML	1804453555	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzml/70JG_mouse-1.mzML	2400134245	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzml/urls.txt	83	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzpeak/70JG_01.mzpeak	510433058	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzpeak/70JG_02.mzpeak	567160741	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzpeak/70JG_03.mzpeak	524700911	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzpeak/70JG_04.mzpeak	485723568	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzpeak/70JG_05.mzpeak	481394416	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzpeak/70JG_06.mzpeak	465197283	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzpeak/70JG_07.mzpeak	465186492	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzpeak/70JG_08.mzpeak	450348769	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzpeak/70JG_09.mzpeak	435334248	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzpeak/70JG_10.mzpeak	485648183	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzpeak/70JG_11.mzpeak	453084194	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/mzpeak/70JG_12.mzpeak	413507320	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/raw/70JG_01.raw	872577402	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/raw/70JG_02.raw	1000152454	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/raw/70JG_03.raw	963640472	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/raw/70JG_04.raw	919721438	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/raw/70JG_05.raw	912487900	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/raw/70JG_06.raw	880305034	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/raw/70JG_07.raw	862339838	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/raw/70JG_08.raw	806439098	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/raw/70JG_09.raw	752769490	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/raw/70JG_10.raw	843037940	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/raw/70JG_11.raw	782911684	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/raw/70JG_12.raw	711983086	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD009909/raw/urls.txt	924	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/PXD011799.sdrf.tsv	405972	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr10_MS2.mzML	1917968703	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr11_MS2.mzML	1900901664	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr1_MS2.mzML	1663434773	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr2_MS2.mzML	1881511345	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr3_MS2.mzML	1940027145	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr4_Ms2.mzML	1914529904	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr5_MS2.mzML	1904367371	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr6_MS2.mzML	1933672240	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr7_MS2.mzML	1907317861	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr9_MS2.mzML	1948116084	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_TiO2_TMT_fr1.mzML	1248635398	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_TiO2_TMT_fr10.mzML	284557561	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_TiO2_TMT_fr11.mzML	1980372011	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_TiO2_TMT_fr8.mzML	290194492	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_TiO2_TMT_fr9.mzML	283063889	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_TiO2_Fr12.mzML	1738399199	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_TiO2_Fr2.mzML	1172637240	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_TiO2_Fr7.mzML	1386614123	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_TiO2_Fr9.mzML	1361775812	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_global_Fr1.mzML	1524091538	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_global_Fr10.mzML	1456333137	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_global_Fr2.mzML	1500020569	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_global_Fr7.mzML	1501493090	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_global_Fr8.mzML	1485254510	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_global_Fr9.mzML	1470770573	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzml/urls.txt	376	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr10_MS2.mzpeak	450443575	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr11_MS2.mzpeak	446909410	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr1_MS2.mzpeak	382343426	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr2_MS2.mzpeak	443162648	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr3_MS2.mzpeak	455335345	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr4_Ms2.mzpeak	448021201	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr5_MS2.mzpeak	447564268	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr6_MS2.mzpeak	452543964	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr7_MS2.mzpeak	446719468	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr9_MS2.mzpeak	453733259	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_TiO2_TMT_fr1.mzpeak	319137401	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_TiO2_TMT_fr10.mzpeak	90180942	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_TiO2_TMT_fr11.mzpeak	456247825	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_TiO2_TMT_fr8.mzpeak	89975130	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_TiO2_TMT_fr9.mzpeak	91588301	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_TiO2_Fr12.mzpeak	396869923	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_TiO2_Fr2.mzpeak	273913938	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_TiO2_Fr7.mzpeak	318082009	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_TiO2_Fr9.mzpeak	309686691	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_global_Fr1.mzpeak	359102902	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_global_Fr10.mzpeak	350411671	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_global_Fr2.mzpeak	363144734	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_global_Fr7.mzpeak	354184332	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_global_Fr8.mzpeak	353696831	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/mzpeak/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_global_Fr9.mzpeak	351605406	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr10_MS2.raw	758025622	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr11_MS2.raw	753132634	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr1_MS2.raw	654574936	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr2_MS2.raw	750959020	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr3_MS2.raw	763647988	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr4_Ms2.raw	753145884	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr5_MS2.raw	754457352	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr6_MS2.raw	758481296	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr7_MS2.raw	750092668	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_Global_TMT_fr9_MS2.raw	757997152	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_TiO2_TMT_fr1.raw	597261156	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_TiO2_TMT_fr11.raw	723778138	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_TiO2_TMT_fr8.raw	645859392	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170131_Lumos_RSLC4_Maurer_Hartl_UW_MFPL_TiO2_TMT_fr9.raw	714348692	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_TiO2_Fr12.raw	638426826	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_TiO2_Fr2.raw	483169736	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_TiO2_Fr7.raw	533134736	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_TiO2_Fr9.raw	516021240	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_global_Fr1.raw	632790396	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_global_Fr10.raw	632639098	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_global_Fr2.raw	655016544	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_global_Fr7.raw	624128552	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_global_Fr8.raw	630787240	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/20170424_Lumos_RSLC3_Maurer_Hartl_UW_MFPL_shotgun_TMT1_global_Fr9.raw	631931132	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD011799/raw/urls.txt	3143	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/PXD014145.sdrf.tsv	90646	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzml/MFA380.mzML	1286975988	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzml/MFA381.mzML	1275986906	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzml/MFA382.mzML	1295131898	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzml/MFA383.mzML	1345208190	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzml/MFA384.mzML	1357827042	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzml/MFA385.mzML	1350917252	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzml/MFA386.mzML	1335447910	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzml/MFA387.mzML	1358217627	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzml/MFA388.mzML	1353787828	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzml/MFA389.mzML	1346043038	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzml/MFA390.mzML	1325745491	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzml/MFA391.mzML	1373253535	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzml/urls.txt	0	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzpeak/MFA380.mzpeak	315710528	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzpeak/MFA381.mzpeak	312672968	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzpeak/MFA382.mzpeak	317866095	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzpeak/MFA383.mzpeak	330142603	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzpeak/MFA384.mzpeak	335382965	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzpeak/MFA385.mzpeak	334754346	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzpeak/MFA386.mzpeak	332617092	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzpeak/MFA387.mzpeak	340176839	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzpeak/MFA388.mzpeak	337339541	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzpeak/MFA389.mzpeak	333317077	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzpeak/MFA390.mzpeak	327658010	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/mzpeak/MFA391.mzpeak	338247850	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/raw/MFA380.raw	548913446	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/raw/MFA381.raw	543028570	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/raw/MFA382.raw	551980620	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/raw/MFA383.raw	569447195	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/raw/MFA384.raw	581228628	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/raw/MFA385.raw	581463808	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/raw/MFA386.raw	579883683	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/raw/MFA387.raw	594536448	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/raw/MFA388.raw	586585656	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/raw/MFA389.raw	577688652	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/raw/MFA390.raw	568263151	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/raw/MFA391.raw	580702495	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD014145/raw/urls.txt	912	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/PXD020187.sdrf.tsv	6522	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzml/D1_Nat_1.mzML	1330642930	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzml/D2_Nat_2.mzML	1307431487	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzml/D3_Nat_3.mzML	1334714053	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzml/D4_Nat_4.mzML	1402352209	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzml/D5_Nat_5.mzML	1350724887	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzml/E1_Dec_1.mzML	1332925915	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzml/E2_Dec_2.mzML	1394378176	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzml/E3_Dec_3.mzML	1425251277	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzml/E4_Dec_4.mzML	1344664307	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzml/E5_Dec_5.mzML	1432675927	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzml/urls.txt	0	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzpeak/D1_Nat_1.mzpeak	306378053	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzpeak/D2_Nat_2.mzpeak	302448898	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzpeak/D3_Nat_3.mzpeak	307433806	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzpeak/D4_Nat_4.mzpeak	324348943	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzpeak/D5_Nat_5.mzpeak	310638317	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzpeak/E1_Dec_1.mzpeak	304051604	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzpeak/E2_Dec_2.mzpeak	322195347	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzpeak/E3_Dec_3.mzpeak	328582072	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzpeak/E4_Dec_4.mzpeak	308559223	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/mzpeak/E5_Dec_5.mzpeak	330716714	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/raw/D1_Nat_1.raw	609753404	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/raw/D2_Nat_2.raw	606064638	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/raw/D3_Nat_3.raw	610470826	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/raw/D4_Nat_4.raw	638168846	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/raw/D5_Nat_5.raw	615688298	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/raw/E1_Dec_1.raw	603902392	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/raw/E2_Dec_2.raw	636278552	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/raw/E3_Dec_3.raw	645525434	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/raw/E4_Dec_4.raw	612440406	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/raw/E5_Dec_5.raw	649252222	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/PXD020187/raw/urls.txt	780	Y	aws s3 sync s3://v09 data/
+data/sdrf-examples/README.md	980	Y	aws s3 sync s3://v09 data/
+data/validator_logs/run-2026-06-13-065239.log	68045	N	transient — regenerated by the mzPeakValidator sweep
+data/validator_logs/validation-2026-06-13-0700.json	250382	N	transient — regenerated by the mzPeakValidator sweep
+data/validator_logs/validation-2026-06-13-0700.md	2156	N	transient — regenerated by the mzPeakValidator sweep
