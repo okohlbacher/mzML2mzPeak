@@ -62,6 +62,24 @@ jobs:
             wiff_name: "Sample049.wiff"
             url: "https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000093587/raw/Sample049.wiff&forceDownload=true"
             scan_url: "https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000093587/raw/Sample049.wiff.scan&forceDownload=true"
+          # Three-file SciEx run (.wiff + .wiff.scan + .wiff2): `wiff2_url` adds the optional third file.
+          - name: sciex-tripletof6600-swath-PXD071869
+            wiff_name: "08_SWATH_1E_1H.wiff"
+            url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/12/PXD071869/08_SWATH_1E_1H.wiff"
+            scan_url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/12/PXD071869/08_SWATH_1E_1H.wiff.scan"
+            wiff2_url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/12/PXD071869/08_SWATH_1E_1H.wiff2"
+          # Bruker microTOF-Q Max (.baf inside a .d folder, zip-delivered). README mislabels it Agilent;
+          # contents are Bruker BAF. msconvert's Bruker reader handles it; profile gate adjudicates.
+          - name: bruker-microtofq-PXD059108
+            url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/12/PXD059108/lysate_000008.d.zip"
+          # Agilent QTOF .d.zip. NOTE: these two are CENTROID-ONLY at source (PXD059765 has no
+          # MSProfile.bin; PXD041903's MSProfile.bin is 0 bytes) — msconvert can only emit centroid,
+          # so the "Verify PROFILE" step is EXPECTED to fail them. Wired per the "all 8" directive so
+          # the authoritative off-box converter confirms the centroid-only finding at source.
+          - name: agilent-qtof-PXD059765
+            url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/05/PXD059765/CON1_2.d.zip"
+          - name: agilent-qtof-PXD041903
+            url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/05/PXD041903/20190423_Alex7.d.zip"
     steps:
       - name: Gate (single-leg select)
         id: gate
@@ -91,15 +109,19 @@ jobs:
         env:
           URL: ${{ matrix.url }}
           SCAN_URL: ${{ matrix.scan_url }}
+          WIFF2_URL: ${{ matrix.wiff2_url }}
           WIFF_NAME: ${{ matrix.wiff_name }}
         run: |
           set -euo pipefail
           mkdir -p work
           if [ -n "$SCAN_URL" ]; then
-            # Sciex two-file format: download .wiff + .wiff.scan with their real names so msconvert
-            # finds the .scan sibling next to the .wiff. No zip to extract.
+            # Sciex multi-file format: download .wiff + .wiff.scan (+ optional .wiff2) with their real
+            # names so msconvert finds the siblings next to the .wiff. No zip to extract.
             curl -fSL --retry 5 -o "work/$WIFF_NAME"      "$URL"
             curl -fSL --retry 5 -o "work/$WIFF_NAME.scan" "$SCAN_URL"
+            if [ -n "$WIFF2_URL" ]; then
+              curl -fSL --retry 5 -o "work/${WIFF_NAME}2" "$WIFF2_URL"   # e.g. foo.wiff -> foo.wiff2
+            fi
             ls -lh work/
           else
             curl -fSL --retry 5 -o work/payload "$URL"
@@ -158,26 +180,33 @@ jobs:
           fi
           echo "OK: profile data confirmed."
 
-      - name: mzML -> mzPeak (our converter), then drop the big mzML
+      - name: mzML -> mzPeak (our converter), then gzip the profile mzML to keep it
         if: steps.gate.outputs.skip == 'false'
         run: |
           set -euo pipefail
           ./target/release/mzml2mzpeak work/local.mzML "work/${{ matrix.name }}.mzpeak"
           ls -lh "work/${{ matrix.name }}.mzpeak"
-          rm -f work/local.mzML   # free the multi-GB mzML; we only ship the mzPeak
+          # Keep the PROFILE mzML (decision: ship mzpeak + profile mzML). gzip in place (-f replaces the
+          # original, so no second multi-GB copy on the runner's limited disk) and name it after the leg.
+          gzip -f work/local.mzML
+          mv work/local.mzML.gz "work/${{ matrix.name }}.mzML.gz"
+          ls -lh "work/${{ matrix.name }}.mzML.gz"
 
       - name: Size summary (for the benchmark)
         if: steps.gate.outputs.skip == 'false'
         run: |
           mp=$(stat -c%s "work/${{ matrix.name }}.mzpeak" 2>/dev/null || echo 0)
+          mg=$(stat -c%s "work/${{ matrix.name }}.mzML.gz" 2>/dev/null || echo 0)
           echo "### ${{ matrix.name }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "mzPeak bytes: $mp" >> "$GITHUB_STEP_SUMMARY"
+          echo "mzPeak bytes: $mp ; profile mzML.gz bytes: $mg" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload mzPeak artifact
+      - name: Upload mzPeak + profile mzML artifact
         if: steps.gate.outputs.skip == 'false'
         uses: actions/upload-artifact@v4
         with:
           name: mzpeak-${{ matrix.name }}
-          path: work/${{ matrix.name }}.mzpeak
+          path: |
+            work/${{ matrix.name }}.mzpeak
+            work/${{ matrix.name }}.mzML.gz
           if-no-files-found: error
           retention-days: 7
