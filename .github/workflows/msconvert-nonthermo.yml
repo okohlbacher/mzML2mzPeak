@@ -147,6 +147,17 @@ jobs:
             target="$(find . -maxdepth 3 \( -iname '*.d' -o -iname '*.raw' \) | head -1)"
             [ -z "$target" ] && target="$(find . -maxdepth 3 -iname '*.wiff' -type f | head -1)"
             if [ -z "$target" ]; then echo "No vendor file:"; find . -maxdepth 3; exit 1; fi
+            # Bruker BAF repair: some PRIDE deposits rename analysis.baf -> <prefix>_analysis.baf while
+            # keeping the standard analysis.baf_idx/xtr/sqlite companions, which makes msconvert's Bruker
+            # reader emit "[ReaderFail] don't know how to read". If the .d has a *.baf but no analysis.baf,
+            # restore the canonical name so the reader (and its sqlite cache) line up.
+            if [ -d "$target" ] && [ ! -e "$target/analysis.baf" ]; then
+              baf="$(find "$target" -maxdepth 1 -iname '*.baf' | head -1)"
+              if [ -n "$baf" ]; then
+                mv "$baf" "$target/analysis.baf"
+                echo "Bruker BAF repair: $(basename "$baf") -> analysis.baf"
+              fi
+            fi
             echo "Found: $target"; echo "target=work/$target" >> "$GITHUB_OUTPUT"
           fi
 
