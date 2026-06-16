@@ -42,6 +42,14 @@ jobs:
             url: "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS427/FILES/20150813_1_pos_HL.d.zip"
           - name: agilent-gc-5977-Z3249821
             url: "https://zenodo.org/api/records/3249821/files/PARFUM%20MS.zip/content"
+          # --- TOF-grid examples (PROFILE, for the grid-encoding eval) ---
+          # Sciex TripleTOF 6600 SWATH/DIA — profile continuum. Two-file format (.wiff + .wiff.scan),
+          # no zip: `scan_url` switches the download to the two-file path. msconvert keeps profile (no
+          # peakPicking); the "Verify PROFILE" step FAILS the run if the output came out centroided.
+          - name: sciex-tripletof6600-swath-MSV000090684
+            wiff_name: "11410_DGCR8_CBF_BR2_BioID_20181022_TOF6600_SWATH.wiff"
+            url: "https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000090684/raw/RAW/11410_DGCR8_CBF_BR2_BioID_20181022_TOF6600_SWATH.wiff&forceDownload=true"
+            scan_url: "https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000090684/raw/RAW/11410_DGCR8_CBF_BR2_BioID_20181022_TOF6600_SWATH.wiff.scan&forceDownload=true"
     steps:
       - name: Gate (single-leg select)
         id: gate
@@ -68,24 +76,44 @@ jobs:
 
       - name: Download vendor RAW
         if: steps.gate.outputs.skip == 'false'
+        env:
+          URL: ${{ matrix.url }}
+          SCAN_URL: ${{ matrix.scan_url }}
+          WIFF_NAME: ${{ matrix.wiff_name }}
         run: |
           set -euo pipefail
           mkdir -p work
-          curl -fSL --retry 5 -o work/payload "${{ matrix.url }}"
-          ls -lh work/payload
+          if [ -n "$SCAN_URL" ]; then
+            # Sciex two-file format: download .wiff + .wiff.scan with their real names so msconvert
+            # finds the .scan sibling next to the .wiff. No zip to extract.
+            curl -fSL --retry 5 -o "work/$WIFF_NAME"      "$URL"
+            curl -fSL --retry 5 -o "work/$WIFF_NAME.scan" "$SCAN_URL"
+            ls -lh work/
+          else
+            curl -fSL --retry 5 -o work/payload "$URL"
+            ls -lh work/payload
+          fi
 
       - name: Extract + locate vendor file
         if: steps.gate.outputs.skip == 'false'
         id: locate
+        env:
+          SCAN_URL: ${{ matrix.scan_url }}
+          WIFF_NAME: ${{ matrix.wiff_name }}
         run: |
           set -euo pipefail
           cd work
-          unzip -q payload || (mv payload payload.zip && unzip -q payload.zip)
-          rm -f payload payload.zip
-          target="$(find . -maxdepth 3 \( -iname '*.d' -o -iname '*.raw' \) | head -1)"
-          [ -z "$target" ] && target="$(find . -maxdepth 3 -iname '*.wiff' -type f | head -1)"
-          if [ -z "$target" ]; then echo "No vendor file:"; find . -maxdepth 3; exit 1; fi
-          echo "Found: $target"; echo "target=work/$target" >> "$GITHUB_OUTPUT"
+          if [ -n "$SCAN_URL" ]; then
+            # Sciex: the .wiff is the target directly (its .scan sibling is alongside).
+            echo "Found: $WIFF_NAME"; echo "target=work/$WIFF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            unzip -q payload || (mv payload payload.zip && unzip -q payload.zip)
+            rm -f payload payload.zip
+            target="$(find . -maxdepth 3 \( -iname '*.d' -o -iname '*.raw' \) | head -1)"
+            [ -z "$target" ] && target="$(find . -maxdepth 3 -iname '*.wiff' -type f | head -1)"
+            if [ -z "$target" ]; then echo "No vendor file:"; find . -maxdepth 3; exit 1; fi
+            echo "Found: $target"; echo "target=work/$target" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: msconvert (wine, native x86) -> mzML
         if: steps.gate.outputs.skip == 'false'
@@ -96,6 +124,27 @@ jobs:
             wine msconvert "/${{ steps.locate.outputs.target }}" \
               -o /work --outfile local.mzML --mzML --mz64 --inten${{ github.event.inputs.inten }} --zlib
           ls -lh work/local.mzML
+
+      - name: Verify PROFILE (fail if msconvert produced centroid data)
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          # Count spectrum-mode cvParams in the mzML head (enough to see the dominant mode without
+          # scanning the whole multi-GB file). MS:1000128 = profile spectrum, MS:1000127 = centroid.
+          head -c 200000000 work/local.mzML > work/_head.xml || true
+          prof=$(grep -o 'MS:1000128' work/_head.xml | wc -l | tr -d ' ')
+          cent=$(grep -o 'MS:1000127' work/_head.xml | wc -l | tr -d ' ')
+          rm -f work/_head.xml
+          echo "profile-spectrum cvParams: $prof   centroid-spectrum cvParams: $cent"
+          {
+            echo "### ${{ matrix.name }} — spectrum mode"
+            echo "profile cvParams: $prof, centroid cvParams: $cent"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$prof" -eq 0 ] || [ "$cent" -gt "$prof" ]; then
+            echo "::error::Output is NOT profile (profile=$prof centroid=$cent). This dataset is centroided; aborting per the profile-only requirement."
+            exit 1
+          fi
+          echo "OK: profile data confirmed."
 
       - name: mzML -> mzPeak (our converter), then drop the big mzML
         if: steps.gate.outputs.skip == 'false'
