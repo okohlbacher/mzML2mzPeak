@@ -76,8 +76,11 @@ jobs:
             allow_centroid: "true"
           # Bruker microTOF-Q Max (.baf inside a .d folder, zip-delivered). README mislabels it Agilent;
           # contents are Bruker BAF. msconvert's Bruker reader handles it; mode recorded by the verify step.
+          # NOTE: lysate_000008.d.zip (3.87 GB BAF) deterministically OOMs/disk-fills the hosted runner
+          # while writing the profile mzML (confirmed 2x). Swapped to a small MS1 (full-scan, profile)
+          # run from the same study — converts within hosted limits and is ideal for the grid eval.
           - name: bruker-microtofq-PXD059108
-            url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/12/PXD059108/lysate_000008.d.zip"
+            url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/12/PXD059108/den_pierce_0pt2ug_MS1_1.d.zip"
             allow_centroid: "true"
           # Agilent QTOF .d.zip. These two are CENTROID-ONLY at source (PXD059765 has no MSProfile.bin;
           # PXD041903's MSProfile.bin is 0 bytes) — msconvert can only emit centroid. `allow_centroid: true`
