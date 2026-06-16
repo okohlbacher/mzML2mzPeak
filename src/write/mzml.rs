@@ -239,6 +239,12 @@ pub fn convert_mzml_with(
     builder = builder
         .sample_array_types_from_spectrum_source(&mut reader)
         .sample_array_types_from_chromatograms(reader.iter_chromatograms().take(10));
+    // Register the explicit spectrum-TYPE column `MS_1000294_mass_spectrum` (W1 /
+    // cv_term_placement_tables). The writer's fixed `MS_1000559_spectrum_type` column carries only
+    // the PARENT accession in its name; the mzPeak `spectrum_must` rule requires a concrete CHILD
+    // of MS:1000559 in the spectrum facet. Each written spectrum carries the matching MS:1000294
+    // param (added in the per-spectrum loop below), which this column pulls by accession.
+    builder = builder.add_spectrum_param_field(crate::schema::cv::mass_spectrum_field());
     let mut writer = builder.build(handle, true);
 
     // Carry the source file_description / instrument / sample / software metadata across.
@@ -309,6 +315,20 @@ pub fn convert_mzml_with(
             entry.description.ms_level =
                 crate::write::spectrum::ms_level_or_ms1(entry.description.ms_level);
             ms_level_remapped += 1;
+        }
+        // Ensure a concrete spectrum-TYPE term MS:1000294 ("mass spectrum", a child of MS:1000559)
+        // is present so the writer's registered `MS_1000294_mass_spectrum` spectrum-facet column is
+        // populated — clears mzPeakValidator W1 (cv_term_placement_tables). Only added when absent
+        // so a source `<spectrum>` that already declares it (or another child) is left verbatim and
+        // the param list never carries a duplicate.
+        if entry
+            .description
+            .get_param_by_curie(&crate::schema::cv::mass_spectrum_curie())
+            .is_none()
+        {
+            entry
+                .description
+                .add_param(crate::schema::cv::mass_spectrum_param());
         }
         // Ion-mobility (timsTOF) spectra may arrive unsorted in m/z; the writer expects ascending
         // m/z. Stack→unstack reorders the 3D arrays by m/z without dropping the mobility axis.
