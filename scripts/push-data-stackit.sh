@@ -84,6 +84,40 @@ else
     --only-show-errors && say "  synced sdrf-examples"
 fi
 
+# 1c) TOF-GRID examples tile — raw vendor files (.wiff/.wiff.scan/.wiff2/.d.zip) PLUS the off-box
+#     CI conversion outputs placed in-place: <leg>.mzpeak + <leg>.mzML.gz (the kept PROFILE mzML).
+#     Like sdrf-examples, mzpeak is in-place here, so we do NOT exclude *.mzpeak. We DO exclude the
+#     bulky _download.log + junk. The two centroid-only Agilent datasets (PXD059765, PXD041903) have
+#     raw only (no profile -> no CI artifact); they sync as raw-only, which is correct.
+#
+#     S3 SAFETY: per the StackIT multipart-dropout note, high aws concurrency silently drops large
+#     multipart uploads (.wiff.scan are multi-GB). We pin max_concurrent_requests=10 for this tile and
+#     verify the disk-vs-S3 object count afterward, refusing to claim success on a count mismatch.
+if [ "$DRYRUN" = "1" ]; then
+  say "PLAN sync data/tof-grid-examples -> $B/tof-grid-examples (incl raw+mzpeak+mzML.gz; excl _download.log,*.log,*.DS_Store)"
+  find data/tof-grid-examples -type f ! -name '_download.log' ! -name '*.log' ! -name '*.DS_Store' | wc -l | sed 's/^/    files: /'
+else
+  say "sync data/tof-grid-examples -> $B/tof-grid-examples (incl raw + mzpeak + profile mzML.gz)"
+  # Multipart-dropout guard: temporarily pin stackit s3 concurrency to 10 (the .wiff.scan are multi-GB
+  # and high concurrency silently drops parts). Save + restore the prior value so we don't mutate the
+  # user's global aws config; restore even if the sync is interrupted.
+  PRIOR_CONC=$(aws configure get s3.max_concurrent_requests --profile stackit 2>/dev/null || echo "")
+  restore_conc(){ if [ -n "$PRIOR_CONC" ]; then aws configure set s3.max_concurrent_requests "$PRIOR_CONC" --profile stackit; else aws configure set s3.max_concurrent_requests 10 --profile stackit; fi; }
+  trap restore_conc EXIT
+  aws configure set s3.max_concurrent_requests 10 --profile stackit
+  AWS_MAX_ATTEMPTS=5 \
+  "${AWS[@]}" --cli-read-timeout 0 --cli-connect-timeout 60 \
+    s3 sync data/tof-grid-examples "$B/tof-grid-examples" \
+    --exclude '_download.log' --exclude '*.log' --exclude '*.DS_Store' \
+    --only-show-errors && say "  synced tof-grid-examples"
+  restore_conc; trap - EXIT
+  # verify disk-vs-S3 object count (multipart-dropout guard)
+  ndisk=$(find data/tof-grid-examples -type f ! -name '_download.log' ! -name '*.log' ! -name '*.DS_Store' | wc -l | tr -d ' ')
+  ns3=$("${AWS[@]}" s3 ls --recursive "$B/tof-grid-examples/" 2>/dev/null | grep -vE '/$' | wc -l | tr -d ' ')
+  say "  tof-grid count check: disk=$ndisk  s3=$ns3"
+  [ "$ndisk" = "$ns3" ] || say "  WARN tof-grid disk/S3 count mismatch ($ndisk vs $ns3) — re-run sync (possible multipart dropout)"
+fi
+
 # 2) IMAGING mzpeak -> next to source, renamed to source stem
 put "$MZ/PXD001283-HR2MSI-urinary-bladder_HR2MSImouseurinarybladderS096.mzpeak" "imzml-examples/PXD001283-HR2MSI-urinary-bladder/HR2MSImouseurinarybladderS096.mzpeak"
 put "$MZ/imzML_AP_SMALDI_HR2MSImouseurinarybladderS096.mzpeak"                   "imzml-examples/zenodo-AP-SMALDI/imzML_AP_SMALDI/HR2MSImouseurinarybladderS096.mzpeak"
