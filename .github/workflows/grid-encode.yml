@@ -1,0 +1,71 @@
+# Run the TOF grid-encoding detector (continuous vs sparse) on a converted mzpeak, in GitHub CI.
+# Consumes the `mzpeak-<leg>` artifact produced by the msconvert-nonthermo workflow (no re-conversion),
+# runs tools/grid-poc/measure_archive.py (fetched from the grid-encoding-poc branch), and uploads the
+# full report as `gridenc-<leg>`. The conversion intermediates (mzML.gz + mzpeak) stay in the convert
+# artifact; together they keep every intermediate.
+name: grid-encode (mzpeak -> continuous/sparse report)
+run-name: grid-encode ${{ inputs.leg }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      leg:
+        description: "Leg name, e.g. bruker-microtofq-PXD059108"
+        required: true
+      convert_run_id:
+        description: "msconvert-nonthermo run id holding the mzpeak-<leg> artifact"
+        required: true
+      max_chunks:
+        description: "Optional: sample only the first N chunks (blank = full archive)"
+        required: false
+        default: ""
+
+jobs:
+  encode:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (sets up origin so we can fetch the poc branch)
+        uses: actions/checkout@v4
+
+      - name: Fetch the grid detector from grid-encoding-poc
+        run: |
+          set -euo pipefail
+          git fetch --depth 1 origin grid-encoding-poc
+          git show FETCH_HEAD:tools/grid-poc/measure_archive.py > measure_archive.py
+          wc -l measure_archive.py
+
+      - name: Python deps
+        run: python3 -m pip install --quiet --disable-pip-version-check numpy pyarrow pynumpress
+
+      - name: Download mzpeak artifact from the convert run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p work
+          gh run download "${{ github.event.inputs.convert_run_id }}" -n "mzpeak-${{ github.event.inputs.leg }}" -D work
+          ls -lh work/
+
+      - name: Grid-encoding test (continuous vs sparse, near-lossless)
+        run: |
+          set -uo pipefail
+          leg="${{ github.event.inputs.leg }}"
+          rep="${leg}.grid-encoding.txt"
+          mc=""; [ -n "${{ github.event.inputs.max_chunks }}" ] && mc="--max-chunks ${{ github.event.inputs.max_chunks }}"
+          if [ ! -f "work/${leg}.mzpeak" ]; then
+            echo "no mzpeak in artifact (centroid leg or upload skipped) — nothing to grid-encode" | tee "$rep"
+          else
+            python3 measure_archive.py "work/${leg}.mzpeak" --mode auto $mc 2>&1 | tee "$rep" || true
+          fi
+          {
+            echo "### ${leg} — grid-encoding (continuous vs sparse)"
+            echo '```'; cat "$rep"; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload grid-encoding report
+        uses: actions/upload-artifact@v4
+        with:
+          name: gridenc-${{ github.event.inputs.leg }}
+          path: ${{ github.event.inputs.leg }}.grid-encoding.txt
+          if-no-files-found: error
+          retention-days: 7
