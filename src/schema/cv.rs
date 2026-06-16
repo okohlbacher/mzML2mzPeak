@@ -42,6 +42,24 @@ pub fn numpress_linear_curie() -> mzdata::params::CURIE {
         .expect("NumpressLinear param has a CURIE")
 }
 
+/// The single-source `Param` for the "Conversion to mzML" data-transformation CV term
+/// (`MS:1000544`), sourced from mzdata's upstream [`mzdata::meta::FormatConversion`] enum
+/// (no local literal — same no-drift discipline as [`numpress_linear_curie`]).
+///
+/// `MS:1000544` is a child of `MS:1000452` ("data transformation"), the term the mzPeak
+/// `processingmethod_must` CvMapping rule requires every
+/// `data_processing_method_list[].methods[]` to carry in its `parameters[]`
+/// (mzPeakValidator W2 / `cv_term_placement_metadata`). It is the appropriate transformation
+/// for the (im)zML→mzPeak conversion chain. Every `ProcessingMethod` this converter mints
+/// (`mzml2mzpeak_conversion` / `_sort_peaks` / `_numpress_linear`) carries this param so the
+/// rule's MUST/AND is satisfied for the methods list.
+///
+/// This is the ONE place the `MS:1000544` term is resolved in the converter — no independent
+/// `"1000544"` literal exists elsewhere (asserted by `no_drift_conversion_to_mzml_param`).
+pub fn conversion_to_mzml_param() -> mzdata::params::Param {
+    mzdata::meta::FormatConversion::ConversionToMzML.into()
+}
+
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 // Phase-31 carve-out: open-enum token constants for entity_type / data_kind (30-02, R4-M6)
 //
@@ -334,6 +352,68 @@ mod tests {
             from_mzdata.to_string(),
             "numpress_linear_curie() must equal BinaryCompressionType::NumpressLinear CURIE"
         );
+    }
+
+    /// W2 / 999.18: `conversion_to_mzml_param()` must resolve to PSI-MS `MS:1000544`
+    /// ("conversion to mzML"), the data-transformation child of `MS:1000452` the mzPeak
+    /// `processingmethod_must` CvMapping rule requires every data_processing method's
+    /// `parameters[]` to carry. Sourced from mzdata's upstream `FormatConversion` enum, so the
+    /// accession can never drift from a hand-typed literal.
+    #[test]
+    fn conversion_to_mzml_param_is_ms_1000544() {
+        let p = conversion_to_mzml_param();
+        let curie = p.curie().expect("conversion_to_mzml_param has a CURIE");
+        assert_eq!(
+            curie.to_string(),
+            "MS:1000544",
+            "conversion_to_mzml_param() must return MS:1000544 (conversion to mzML)"
+        );
+        // Cross-check against mzdata's typed enum directly — single source, no-drift.
+        let from_mzdata: mzdata::params::Param =
+            mzdata::meta::FormatConversion::ConversionToMzML.into();
+        assert_eq!(
+            curie,
+            from_mzdata.curie().unwrap(),
+            "conversion_to_mzml_param() must equal FormatConversion::ConversionToMzML's CURIE"
+        );
+    }
+
+    /// No-drift gate: the accession `"1000544"` must NOT appear as an independent raw literal in
+    /// any FORWARD converter source file OUTSIDE `src/schema/cv.rs` — every forward consumer must
+    /// call `conversion_to_mzml_param()`. Mirrors the CVG-01 / `no_drift_sample_label_curie`
+    /// pattern.
+    ///
+    /// `src/reverse/imzml_writer.rs` is intentionally NOT scanned: the reverse emitter hand-writes
+    /// the term as a raw mzML `<cvParam ... accession="MS:1000544" .../>` XML literal (alongside its
+    /// other hand-written cvParam XML — IMS:1000080 etc.), a representation distinct from a `Param`
+    /// value. The forward `Param` single-source accessor does not govern that XML serialization.
+    #[test]
+    fn no_drift_conversion_to_mzml_param() {
+        let sentinel = "1000544";
+        let scan_files = [
+            "src/write/writer.rs",
+            "src/write/convert.rs",
+            "src/write/mzml.rs",
+            "src/reverse/source.rs",
+            "src/reverse/convert.rs",
+            "src/verify/verify.rs",
+        ];
+        for path in &scan_files {
+            let source =
+                std::fs::read_to_string(std::path::Path::new(path)).unwrap_or_else(|_| String::new());
+            let non_comment: String = source
+                .lines()
+                .filter(|line| !line.trim_start().starts_with("//"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert!(
+                !non_comment.contains(sentinel),
+                "module {} contains '{}' as an independent literal — use conversion_to_mzml_param() \
+                 instead (single-source no-drift)",
+                path,
+                sentinel
+            );
+        }
     }
 
     /// Load and parse `schema/cv_list.json` at test time (no validator crate pinned — mirrors

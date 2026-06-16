@@ -26,7 +26,7 @@ use mzdata::spectrum::bindata::{
     ArrayType, BinaryArrayMap, BinaryArrayMap3D, BinaryDataArrayType, DataArray,
 };
 use mzdata::spectrum::{Chromatogram, ChromatogramDescription, SignalContinuity};
-use mzdata::meta::{DataProcessing, ProcessingMethod, Software};
+use mzdata::meta::{DataProcessing, ProcessingMethod, Software, custom_software_name};
 use mzdata::params::Param;
 use mzpeak_prototyping::writer::{AbstractMzPeakWriter, MzPeakWriterType};
 use mzpeaks::{CentroidPeak, DeconvolutedPeak};
@@ -778,20 +778,28 @@ pub fn convert_mzml_with(
 /// shape, but the plain path carries metadata on the vendored writer directly). Called once per
 /// file, only when ≥1 spectrum was actually reordered.
 fn record_sort_peaks(writer: &mut MzPeakWriterType<File>) {
+    // custom_software_name → MS:1000799 (custom unreleased software tool), a child of MS:1000531
+    // (software), so the software_must CvMapping rule is satisfied for this entry (W2).
     writer.softwares_mut().push(Software::new(
         "mzml2mzpeak".into(),
         env!("CARGO_PKG_VERSION").into(),
-        vec![],
+        vec![custom_software_name("mzml2mzpeak")],
     ));
     writer.data_processings_mut().push(DataProcessing {
         id: "mzml2mzpeak_sort_peaks".to_string(),
         methods: vec![ProcessingMethod {
             order: 1,
             software_reference: "mzml2mzpeak".to_string(),
-            params: vec![Param::new_key_value(
-                "sort_peaks",
-                "m/z sorted ascending on write (conformance: point.mz sorting_rank 0)",
-            )],
+            // MS:1000544 (conversion to mzML), a child of MS:1000452 (data transformation), to
+            // satisfy the processingmethod_must MUST/AND (W2 / cv_term_placement_metadata); the
+            // userParam keeps the human-readable sort-on-write provenance note.
+            params: vec![
+                crate::schema::cv::conversion_to_mzml_param(),
+                Param::new_key_value(
+                    "sort_peaks",
+                    "m/z sorted ascending on write (conformance: point.mz sorting_rank 0)",
+                ),
+            ],
         }],
     });
 }
@@ -807,20 +815,30 @@ fn record_sort_peaks(writer: &mut MzPeakWriterType<File>) {
 /// Mirrors [`record_sort_peaks`]'s shape (software entry + data_processing). Called once per file,
 /// only when numpress-linear m/z was actually applied (`opts.mz_is_lossy()`).
 fn record_numpress_linear(writer: &mut MzPeakWriterType<File>) {
+    // custom_software_name → MS:1000799 (custom unreleased software tool), a child of MS:1000531
+    // (software), so the software_must CvMapping rule is satisfied for this entry (W2).
     writer.softwares_mut().push(Software::new(
         "mzml2mzpeak".into(),
         env!("CARGO_PKG_VERSION").into(),
-        vec![],
+        vec![custom_software_name("mzml2mzpeak")],
     ));
     writer.data_processings_mut().push(DataProcessing {
         id: "mzml2mzpeak_numpress_linear".to_string(),
         methods: vec![ProcessingMethod {
             order: 1,
             software_reference: "mzml2mzpeak".to_string(),
-            params: vec![Param::builder()
-                .curie(crate::schema::cv::numpress_linear_curie())
-                .name("MS-Numpress linear prediction compression")
-                .build()],
+            // MS:1000544 (conversion to mzML), a child of MS:1000452 (data transformation),
+            // satisfies the processingmethod_must MUST/AND (W2). MS:1002312 (numpress-linear) is a
+            // child of MS:1000572 (binary data compression type), NOT of MS:1000452, so it does NOT
+            // satisfy the rule on its own — both params are emitted: the transformation term for the
+            // rule, the numpress CURIE for the compression provenance.
+            params: vec![
+                crate::schema::cv::conversion_to_mzml_param(),
+                Param::builder()
+                    .curie(crate::schema::cv::numpress_linear_curie())
+                    .name("MS-Numpress linear prediction compression")
+                    .build(),
+            ],
         }],
     });
 }
