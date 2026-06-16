@@ -22,6 +22,10 @@ on:
         description: "Intensity bit depth (32 or 64); m/z stays 64-bit"
         required: false
         default: "64"
+      keep_mzml:
+        description: "Keep + upload the profile mzML.gz (true). Set false for large files whose huge profile mzML overflows the runner disk (the mzpeak still converts + uploads)."
+        required: false
+        default: "true"
 
 jobs:
   convert:
@@ -230,17 +234,24 @@ jobs:
             echo "OK: profile data confirmed."
           fi
 
-      - name: mzML -> mzPeak (our converter), then gzip the profile mzML to keep it
+      - name: mzML -> mzPeak (our converter); optionally keep the profile mzML
         if: steps.gate.outputs.skip == 'false'
+        env:
+          KEEP_MZML: ${{ github.event.inputs.keep_mzml }}
         run: |
           set -euo pipefail
           ./target/release/mzml2mzpeak work/local.mzML "work/${{ matrix.name }}.mzpeak"
           ls -lh "work/${{ matrix.name }}.mzpeak"
-          # Keep the PROFILE mzML (decision: ship mzpeak + profile mzML). gzip in place (-f replaces the
-          # original, so no second multi-GB copy on the runner's limited disk) and name it after the leg.
-          gzip -f work/local.mzML
-          mv work/local.mzML.gz "work/${{ matrix.name }}.mzML.gz"
-          ls -lh "work/${{ matrix.name }}.mzML.gz"
+          if [ "$KEEP_MZML" = "true" ]; then
+            # Keep the PROFILE mzML. gzip in place (-f replaces the original). NOTE: for very large
+            # profile mzML (multi-GB raw) this can exhaust the runner disk — pass keep_mzml=false then.
+            gzip -f work/local.mzML
+            mv work/local.mzML.gz "work/${{ matrix.name }}.mzML.gz"
+            ls -lh "work/${{ matrix.name }}.mzML.gz"
+          else
+            rm -f work/local.mzML   # free the huge profile mzML; ship only the mzpeak
+            echo "keep_mzml=false — dropped the profile mzML (avoids runner disk overflow on large files)"
+          fi
 
       - name: Size summary (for the benchmark)
         if: steps.gate.outputs.skip == 'false'
