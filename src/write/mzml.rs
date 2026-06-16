@@ -487,6 +487,13 @@ pub fn convert_mzml_with(
     // is left verbatim, so a file that already set them stays byte-identical.
     crate::write::writer::default_run_refs(&mut writer);
 
+    // Fill the REQUIRED run.id + run.default_instrument_id when the source mzML left them unset
+    // (validator E2 / backlog 999.20 — the bruker-impact-sub FAIL class). run.id ← the input mzML
+    // stem; default_instrument_id ← the first instrument-config key (or 0). Only fills None/empty;
+    // a source-declared id/instrument ref stays verbatim. Same ordering constraints as the line
+    // above (after metadata wiring, before finish_parquet serializes the run blob).
+    crate::write::writer::default_run_id_and_instrument(&mut writer, Some(input));
+
     // Terminal sequence (mirror the imaging path in src/write/convert.rs): flush all Parquet
     // facets and hand back the still-open ZipArchiveWriter so typed members can be inserted
     // BEFORE the index is written. This is EQUIVALENT to the old one-liner writer.finish() —
