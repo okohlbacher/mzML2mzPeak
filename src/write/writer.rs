@@ -325,6 +325,12 @@ impl ImagingWriter {
         //     carries mzml2mzpeak_conversion (and any source dp) → first entry. Only fills None.
         default_run_refs(&mut self.inner);
 
+        // (f) Fill the REQUIRED run.id + run.default_instrument_id when the source left them unset
+        //     (validator E2 / backlog 999.20). run.id ← the .imzML stem (input_path), instrument id
+        //     ← the first instrument-config key (or 0). Only fills None/empty. The path may be None
+        //     on the back-compat entry point, in which case run.id falls back to "run".
+        default_run_id_and_instrument(&mut self.inner, input_path);
+
         Ok(())
     }
 
@@ -580,6 +586,60 @@ pub(crate) fn default_run_refs(target: &mut impl MSDataFileMetadata) {
         }
         if run.default_data_processing_id.is_none() {
             run.default_data_processing_id = first_data_processing_id;
+        }
+    }
+}
+
+/// Default `run.id` (string, required) and `run.default_instrument_id` (u32 ≥ 0, required) from
+/// the source when the source mzML / imzML left them unset — the E2 / backlog-999.20 fix. DISTINCT
+/// from [`default_run_refs`] (999.15a), which handles `default_source_file_id` /
+/// `default_data_processing_id`; this fills a different pair of required `ms_run` fields.
+///
+/// The mzPeak `ms_run` JSON schema types `run.id` as a required `string` and
+/// `run.default_instrument_id` as a required `integer ≥ 0`. When the source leaves `<run id=…>` or
+/// `<run defaultInstrumentConfigurationRef=…>` implicit (the bruker-impact-sub path, where mzdata
+/// carries `None`), the writer serializes JSON `null` → schema FAIL. We fill each `None`:
+///   * `run.id` ← the source filename **stem** (`input_path` final component without extension)
+///     when a path is available; otherwise the literal `"run"`. Never empty, never `null`.
+///   * `run.default_instrument_id` ← the SMALLEST key present in `instrument_configurations` (a
+///     real, referentially-valid config id), or `0` when the map is empty. The mzdata map keys ARE
+///     the 0-based config ids, so the smallest key is the first/default instrument configuration.
+///
+/// Discipline (mirrors [`default_run_refs`]): ONLY fills a `None` / empty — a source-declared `id`
+/// or `default_instrument_id` is left verbatim, so files that already set them stay byte-identical.
+/// The value chosen is always faithful (the real source stem / a real config key), never invented
+/// beyond the unavoidable no-path `"run"` fallback. Idempotent. Safe to call on EVERY conversion
+/// path (plain mzML, imaging/imzML, sdrf, bruker-impact-sub).
+///
+/// MUST run AFTER `copy_metadata_from` (so a source-declared id/instrument ref is visible) and
+/// BEFORE the writer serializes the run blob.
+pub(crate) fn default_run_id_and_instrument(
+    target: &mut impl MSDataFileMetadata,
+    input_path: Option<&Path>,
+) {
+    // Smallest instrument-config key (the first/default config). mzdata keys the map by the 0-based
+    // config id, so min() is the default instrument. Empty map → 0 (a faithful default index).
+    let first_instrument_id = target
+        .instrument_configurations()
+        .keys()
+        .copied()
+        .min()
+        .unwrap_or(0);
+    // Source filename stem when a path is threaded in; otherwise the literal "run". Never empty.
+    let stem_id = input_path
+        .and_then(|p| p.file_stem())
+        .map(|s| s.to_string_lossy().to_string())
+        .filter(|s| !s.is_empty());
+
+    if let Some(run) = target.run_description_mut() {
+        // Fill `id` when None OR empty (an empty string still violates a "non-null string" intent
+        // and is unhelpful as a run id). Prefer the source stem; fall back to "run".
+        if run.id.as_deref().unwrap_or("").is_empty() {
+            run.id = Some(stem_id.unwrap_or_else(|| "run".to_string()));
+        }
+        // Fill `default_instrument_id` only when the source left it unset.
+        if run.default_instrument_id.is_none() {
+            run.default_instrument_id = Some(first_instrument_id);
         }
     }
 }
@@ -1486,6 +1546,94 @@ mod tests {
         let run = md.run_description().unwrap();
         assert!(run.default_source_file_id.is_none(), "empty source_files → id left None (residual)");
         assert_eq!(run.default_data_processing_id.as_deref(), Some("only_dp"), "dp present → filled from first");
+    }
+
+    /// Validator E2 / backlog 999.20: `default_run_id_and_instrument` fills the REQUIRED `run.id`
+    /// (non-null string) and `run.default_instrument_id` (integer ≥ 0) when the source left them
+    /// `None` — the bruker-impact-sub FAIL class. It NEVER overrides a source-declared value, picks
+    /// the source filename stem for `id` (or `"run"` with no path), and the first instrument-config
+    /// key for the instrument id (or `0` when none exist).
+    #[test]
+    fn default_run_id_and_instrument_fills_required_run_fields() {
+        use mzdata::meta::{FileMetadataConfig, InstrumentConfiguration, MassSpectrometryRun};
+        use mzdata::prelude::MSDataFileMetadata;
+        use std::path::Path;
+
+        // (a) Both None + a source path + instrument configs present → filled from stem + min key.
+        let mut md = FileMetadataConfig::default();
+        for id in [2u32, 0u32, 1u32] {
+            md.instrument_configurations_mut()
+                .insert(id, InstrumentConfiguration { id, ..Default::default() });
+        }
+        super::default_run_id_and_instrument(&mut md, Some(Path::new("/data/bruker/local.d/run42.mzML")));
+        let run = md.run_description().unwrap();
+        assert_eq!(run.id.as_deref(), Some("run42"), "run.id ← source filename stem");
+        assert_eq!(run.default_instrument_id, Some(0), "default_instrument_id ← smallest config key");
+
+        // (b) Source-declared values are NOT overridden (only fills None/empty).
+        let mut md = FileMetadataConfig::default();
+        md.instrument_configurations_mut()
+            .insert(7, InstrumentConfiguration { id: 7, ..Default::default() });
+        *md.run_description_mut().unwrap() = MassSpectrometryRun {
+            id: Some("DECLARED_RUN".to_string()),
+            default_instrument_id: Some(7),
+            ..Default::default()
+        };
+        super::default_run_id_and_instrument(&mut md, Some(Path::new("/x/y.mzML")));
+        let run = md.run_description().unwrap();
+        assert_eq!(run.id.as_deref(), Some("DECLARED_RUN"), "source-declared id left verbatim");
+        assert_eq!(run.default_instrument_id, Some(7), "source-declared instrument id left verbatim");
+
+        // (c) No path + no instrument configs (the bruker-impact-sub null case) → "run" + 0,
+        //     so the emitted run blob is NEVER null on any path.
+        let mut md = FileMetadataConfig::default();
+        super::default_run_id_and_instrument(&mut md, None);
+        let run = md.run_description().unwrap();
+        assert_eq!(run.id.as_deref(), Some("run"), "no path → faithful non-null fallback id");
+        assert_eq!(run.default_instrument_id, Some(0), "no configs → default index 0");
+        // The required fields are now both Some (non-null) — the schema-FAIL precondition is gone.
+        assert!(run.id.is_some() && run.default_instrument_id.is_some());
+
+        // (d) Empty-string id is treated as unset and replaced (still a "non-null string" violation).
+        let mut md = FileMetadataConfig::default();
+        *md.run_description_mut().unwrap() = MassSpectrometryRun { id: Some(String::new()), ..Default::default() };
+        super::default_run_id_and_instrument(&mut md, Some(Path::new("/p/sample.imzML")));
+        assert_eq!(md.run_description().unwrap().id.as_deref(), Some("sample"), "empty id replaced by stem");
+    }
+
+    /// E2 end-to-end on the imaging path: `write_run_metadata_from` must leave `run.id` a non-null
+    /// string and `run.default_instrument_id` an integer ≥ 0 (backlog 999.20). A
+    /// `FileMetadataConfig::default()` source carries `run = None` for both fields — exactly the
+    /// bruker-impact-sub null case — so this asserts the defaulting fires through the public entry.
+    #[test]
+    fn write_run_metadata_fills_run_id_and_instrument() {
+        use mzdata::meta::FileMetadataConfig;
+        use mzdata::prelude::MSDataFileMetadata;
+        use std::path::Path;
+
+        let mut out = std::env::temp_dir();
+        out.push(format!("mzml2mzpeak_writer_runid_{}.mzpeak", std::process::id()));
+        let mut w = ImagingWriter::new(&out, &[]).expect("build writer");
+
+        let prov = RunProvenance {
+            uuid: Some("0a1b2c3d-4e5f-6071-8293-a4b5c6d7e8f9".to_string()),
+            data_mode: StorageMode::Processed,
+            ibd_checksum: None,
+            ibd_checksum_type: None,
+        };
+        let source = FileMetadataConfig::default();
+        let input = Path::new("/tmp/datasets/PXD076459_bruker.imzML");
+        w.write_run_metadata_from(&source, &prov, None, Some(input))
+            .expect("metadata wiring succeeds");
+
+        let run = w.inner.run_description().expect("a run description is present");
+        // The two fields the ms_run schema requires — must be non-null after wiring.
+        assert_eq!(run.id.as_deref(), Some("PXD076459_bruker"), "run.id ← .imzML stem, non-null");
+        assert!(run.id.as_deref().is_some_and(|s| !s.is_empty()), "run.id is a non-empty string");
+        // default_instrument_id is u32 (≥ 0 by type); assert it is present and the default index 0.
+        assert_eq!(run.default_instrument_id, Some(0), "default_instrument_id is a non-null integer ≥ 0");
+
+        let _ = std::fs::remove_file(&out);
     }
 
     /// SRC-01 back-compat: `write_run_metadata` (the no-path entry point used by the back-compat
