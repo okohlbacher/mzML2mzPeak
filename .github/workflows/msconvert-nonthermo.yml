@@ -65,21 +65,22 @@ jobs:
           # Three-file SciEx run (.wiff + .wiff.scan + .wiff2): `wiff2_url` adds the optional third file.
           - name: sciex-tripletof6600-swath-PXD071869
             wiff_name: "08_SWATH_1E_1H.wiff"
-            url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/12/PXD071869/08_SWATH_1E_1H.wiff"
-            scan_url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/12/PXD071869/08_SWATH_1E_1H.wiff.scan"
-            wiff2_url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/12/PXD071869/08_SWATH_1E_1H.wiff2"
+            url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2026/01/PXD071869/08_SWATH_1E_1H.wiff"
+            scan_url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2026/01/PXD071869/08_SWATH_1E_1H.wiff.scan"
+            wiff2_url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2026/01/PXD071869/08_SWATH_1E_1H.wiff2"
           # Bruker microTOF-Q Max (.baf inside a .d folder, zip-delivered). README mislabels it Agilent;
           # contents are Bruker BAF. msconvert's Bruker reader handles it; profile gate adjudicates.
           - name: bruker-microtofq-PXD059108
             url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/12/PXD059108/lysate_000008.d.zip"
-          # Agilent QTOF .d.zip. NOTE: these two are CENTROID-ONLY at source (PXD059765 has no
-          # MSProfile.bin; PXD041903's MSProfile.bin is 0 bytes) — msconvert can only emit centroid,
-          # so the "Verify PROFILE" step is EXPECTED to fail them. Wired per the "all 8" directive so
-          # the authoritative off-box converter confirms the centroid-only finding at source.
+          # Agilent QTOF .d.zip. These two are CENTROID-ONLY at source (PXD059765 has no MSProfile.bin;
+          # PXD041903's MSProfile.bin is 0 bytes) — msconvert can only emit centroid. `allow_centroid: true`
+          # makes the "Verify PROFILE" step WARN (not fail) so the centroid mzML + mzpeak are still produced.
           - name: agilent-qtof-PXD059765
             url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/05/PXD059765/CON1_2.d.zip"
+            allow_centroid: "true"
           - name: agilent-qtof-PXD041903
             url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/05/PXD041903/20190423_Alex7.d.zip"
+            allow_centroid: "true"
     steps:
       - name: Gate (single-leg select)
         id: gate
@@ -159,8 +160,10 @@ jobs:
               -o /work --outfile local.mzML --mzML --mz64 --inten${{ github.event.inputs.inten }} --zlib
           ls -lh work/local.mzML
 
-      - name: Verify PROFILE (fail if msconvert produced centroid data)
+      - name: Verify spectrum mode (fail on centroid unless allow_centroid)
         if: steps.gate.outputs.skip == 'false'
+        env:
+          ALLOW_CENTROID: ${{ matrix.allow_centroid }}
         run: |
           set -euo pipefail
           # Count spectrum-mode cvParams in the mzML head (enough to see the dominant mode without
@@ -175,10 +178,16 @@ jobs:
             echo "profile cvParams: $prof, centroid cvParams: $cent"
           } >> "$GITHUB_STEP_SUMMARY"
           if [ "$prof" -eq 0 ] || [ "$cent" -gt "$prof" ]; then
-            echo "::error::Output is NOT profile (profile=$prof centroid=$cent). This dataset is centroided; aborting per the profile-only requirement."
-            exit 1
+            if [ "$ALLOW_CENTROID" = "true" ]; then
+              echo "::warning::Output is CENTROID (profile=$prof centroid=$cent). Allowed for this leg (centroid-only source) — producing centroid mzML + mzpeak."
+              echo "spectrum mode: CENTROID (allowed)" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "::error::Output is NOT profile (profile=$prof centroid=$cent). This dataset is centroided; aborting per the profile-only requirement."
+              exit 1
+            fi
+          else
+            echo "OK: profile data confirmed."
           fi
-          echo "OK: profile data confirmed."
 
       - name: mzML -> mzPeak (our converter), then gzip the profile mzML to keep it
         if: steps.gate.outputs.skip == 'false'
