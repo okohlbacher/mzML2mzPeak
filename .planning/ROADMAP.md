@@ -454,6 +454,78 @@ Verified: a TMT archive declares `['MS','UNIMOD','mzml2mzpeak']` and passes the 
 
 **Effort:** (a) M (writer-wrapper sequencing) · (d-upstream) XS issue (gated). **Requirements:** TBD · **Plans:** TBD
 
+### mzPeakValidator corpus sweep 2026-06-16 (999.17–999.23) — BACKLOG
+
+> Source: [`docs/handoff-mzpeak-validator-corpus-2026-06-16.md`](../docs/handoff-mzpeak-validator-corpus-2026-06-16.md)
+> + companion triage [`docs/backlog-validator-corpus-2026-06-16.md`](../docs/backlog-validator-corpus-2026-06-16.md).
+> Validator catalog `1.10` (v0.9.1, `5aed8aa`) over 539 files → **537 PASS / 2 FAIL**. All actionable
+> findings are converter-side. **Sequencing:** [[999.20]] (the only hard FAIL) → [[999.17]]/[[999.18]]/[[999.19]]
+> (the 3 universal warning fixes) → [[999.21]] (full reconvert+republish) → [[999.22]] (stale files) →
+> [[999.23]] (validator promotes warning→error downstream).
+
+### Phase 999.17: Emit spectrum-type CV term in the spectrum facet (BACKLOG — converter, P1)
+
+**Goal:** Clear validator warning **W1** (`cv_term_placement_tables`) — trips **all 539 files**. The
+`spectrum_must` MUST/AND requires both `MS:1000525` representation (already emitted) AND a concrete
+`MS:1000559` spectrum-type child; the converter omits the latter.
+**Fix:** In the `spectra_metadata.spectrum` facet writer, emit the source mzML `<spectrum>` term when it is
+a child of `MS:1000559`; default `MS:1000294` (mass spectrum), which is safe + correct for the mzML-derived
+corpus. Feeds [[999.21]] (reconvert) and [[999.23]] (promote rule warning→error). **Requirements:** TBD · **Plans:** 0 plans
+
+### Phase 999.18: Populate data_processing + software CV params (BACKLOG — converter, P1)
+
+**Goal:** Clear validator warning **W2** (`cv_term_placement_metadata`) — **538/539 files**. The JSON
+metadata builder emits `parameters: []`, so each processing-method and software entry fails its MUST/AND.
+**Fix:** In the JSON metadata builder, give each `data_processing_method_list[].methods[]` a `parameters[]`
+with an `MS:1000452` (data transformation) child — e.g. `MS:1000544` conversion to mzML; and each
+`software_list[]` entry an `MS:1000531` (software) child — e.g. `MS:1000799` custom unreleased software (or
+a registered converter term). Feeds [[999.21]]. **Requirements:** TBD · **Plans:** 0 plans
+
+### Phase 999.19: Fix numpress chunk_end = 0 in chunk writer (BACKLOG — converter, P1)
+
+**Goal:** Clear validator warnings **W3** (`chunk_bounds_spectra_data`, 47 files) + **W5**
+(`chunk_bounds_chromatograms_data`, 2 files). The last/only numpress-linear chunk writes
+`mz_chunk_end = 0.0` (resp. `time_chunk_end = 0`) while start is non-zero → "chunk start > end".
+**Fix:** Write `chunk_end = last/max coord` (single-point chunk ⇒ `chunk_end = chunk_start`) for BOTH the
+`spectra_data` and `chromatograms_data` axes — most likely in the vendored `mzpeak_prototyping`
+`chunk_series` writer (this would be the **5th vendored patch**; group its upstreaming with [[999.1]]).
+Feeds [[999.21]] + [[999.23]]. **Requirements:** TBD · **Plans:** 0 plans
+
+### Phase 999.20: Never emit null run.id / run.default_instrument_id (BACKLOG — converter, P2)
+
+**Goal:** Clear the only hard error class **E2** (`index_schema_valid` + `meta_run_valid`, the
+`bruker-impact-sub__PXD076459` FAIL). `run.id` (string, required) and `run.default_instrument_id`
+(integer ≥ 0, required) arrive `null` on the bruker-impact-sub path.
+**Fix:** Audit ALL conversion paths; emit `run.id` = a non-null string (e.g. source filename stem) and
+`run.default_instrument_id` = the 0-based index of the instrument config (typically `0`). Distinct from the
+999.15(a) `default_source_file_id`/`default_data_processing_id` nullability — same family, different fields.
+**The lead fix** (only FAIL); sequenced first. Feeds [[999.21]]. **Requirements:** TBD · **Plans:** 0 plans
+
+### Phase 999.21: Full-corpus reconvert + republish after the converter fixes (BACKLOG — ops, P2)
+
+**Goal:** Propagate [[999.17]]/[[999.18]]/[[999.19]]/[[999.20]] across the published corpus — those fixes
+touch metadata/chunk bounds in **every** file, so all tiles must be reconverted.
+**Fix:** Reconvert with per-tile flags (`--sdrf`/`--isa` for sdrf-examples, plain for mzML/imzml — honor the
+SDRF-injection invariant), revalidate against mzPeakValidator, then `scripts/publish-corpus.sh all` and regen
+the data-manifest. **Depends on** the four converter fixes landing. **Requirements:** TBD · **Plans:** 0 plans
+
+### Phase 999.22: Reconvert stale row-group / pre-version files (BACKLOG — ops, P3)
+
+**Goal:** Clear **E1+W6** (the stale `demo/PXD001283` predating `metadata.version` + `cv_list[].version`)
+and **W4** (`data_row_group_not_monolithic`, 5 monolithic-row-group scratch files:
+raw-bench sciex-tripletof / orbitrap-velos / thermo-astral + raw-replacements ltq-ft-ultra / fusion-lumos).
+**Fix:** Reconvert each with the current row-group-bounded binary (data integrity unaffected; perf + schema
+only). Independent of the converter-logic fixes — can run any time. **Requirements:** TBD · **Plans:** 0 plans
+
+### Phase 999.23: Promote validator rules warning→error (BACKLOG — validator, downstream, do NOT edit here)
+
+**Goal:** After [[999.17]]/[[999.19]] (and [[999.18]]) land and the corpus revalidates clean, tighten the
+mzPeakValidator profile so regressions FAIL instead of warn.
+**Fix (in `~/Claude/mzPeakValidator`, NOT this repo):** promote `cv_term_placement_tables` (W1),
+`chunk_bounds_spectra_data` (W3), `chunk_bounds_chromatograms_data` (W5), and `cv_term_placement_metadata`
+(W2) from `severity: warning` to `error` in `profiles/mzpeak-0.9/rules/{semantic,layout}.rules.json`, then
+revalidate. **Depends on** the converter fixes + [[999.21]] reconvert. **Requirements:** TBD · **Plans:** 0 plans
+
 ### Imaging structure (pixel facet, ROI polygons, continuous shared-axis, images.parquet) — DEFERRED beyond v1.0
 
 > **Owner decision (2026-06-08):** the whole imaging-structure cluster is post-1.0. v0.7 focuses on the
