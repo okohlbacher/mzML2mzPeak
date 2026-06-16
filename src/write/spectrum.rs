@@ -216,6 +216,15 @@ pub fn to_mzdata_canonical(
         mzdata::meta::SpectrumType::MS1Spectrum
     });
 
+    // Attach the concrete spectrum-TYPE term MS:1000294 ("mass spectrum", a child of MS:1000559)
+    // so the writer's registered `MS_1000294_mass_spectrum` spectrum-facet column is populated.
+    // This clears mzPeakValidator W1 (cv_term_placement_tables): the `spectrum_must` rule requires
+    // the spectrum facet to carry a CHILD of MS:1000559 alongside the MS:1000525 representation
+    // term, and the column-name-derived placement check is only satisfied by a child accession in
+    // a column name (the fixed `MS_1000559_spectrum_type` column carries only the parent). Every
+    // (im)zML-derived spectrum is a mass spectrum, so MS:1000294 is the correct, safe default.
+    descr.add_param(crate::schema::cv::mass_spectrum_param());
+
     // (3) coordinate params on a scan event — the writer reads these by accession at write
     //     time (RESEARCH.md Pitfall 1). z is omitted entirely when absent (not null-valued).
     let mut scan = ScanEvent::default();

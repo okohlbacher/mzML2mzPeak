@@ -64,3 +64,74 @@ fn produced_archive_is_always_openable() {
     );
     let _ = std::fs::remove_file(&out);
 }
+
+/// W1 / 999.17 (`cv_term_placement_tables`): the produced `spectra_metadata.parquet` spectrum
+/// facet MUST carry a concrete CHILD of `MS:1000559` ("spectrum type") alongside the
+/// `MS:1000525` representation term. The converter registers an explicit
+/// `MS_1000294_mass_spectrum` column (a child of MS:1000559) and populates it per spectrum; the
+/// mzPeak validator derives CV-term placement from column NAMES, so this column's name is what
+/// satisfies the rule (the writer's built-in `MS_1000559_spectrum_type` column carries only the
+/// bare PARENT accession, which does NOT satisfy `use_term=false, allow_children=true`).
+///
+/// Mirrors the zip-extract + Parquet-schema readback of `tests/sorting_rank.rs`, but inspects the
+/// Arrow schema field NAMES of the `spectra_metadata.parquet` member rather than the array index.
+#[test]
+fn spectrum_facet_carries_spectrum_type_child_of_ms1000559() {
+    use std::io::{Read, Write};
+    use parquet::file::reader::FileReader;
+    use parquet::file::serialized_reader::SerializedFileReader;
+
+    let input = Path::new("tests/fixtures/mzml/tiny.pwiz.1.1.mzML");
+    if !input.exists() {
+        return;
+    }
+    let out = tmp_out("spectrum-type");
+    let _ = std::fs::remove_file(&out);
+    convert_mzml(input, &out, &mzml2mzpeak::write::EncodingOptions::default(), None, None, false)
+        .expect("convert");
+
+    // Extract the spectra_metadata.parquet member from the produced ZIP and spill it to a temp file
+    // so SerializedFileReader can read its Parquet schema (no extra bytes dependency).
+    let f = std::fs::File::open(&out).expect("open produced mzpeak");
+    let mut zip = zip::ZipArchive::new(f).expect("open zip");
+    let member_name = (0..zip.len())
+        .map(|i| zip.by_index(i).unwrap().name().to_string())
+        .find(|n| n.ends_with("spectra_metadata.parquet"))
+        .expect("archive must carry a spectra_metadata.parquet member");
+    let mut bytes = Vec::new();
+    zip.by_name(&member_name)
+        .expect("open spectra_metadata member")
+        .read_to_end(&mut bytes)
+        .expect("read spectra_metadata bytes");
+
+    let pq = std::env::temp_dir()
+        .join(format!("i2mp-mzml-{}-spectrum-type.parquet", std::process::id()));
+    {
+        let mut o = std::fs::File::create(&pq).expect("create temp parquet");
+        o.write_all(&bytes).expect("write temp parquet");
+    }
+    let reader = SerializedFileReader::try_from(pq.as_path()).expect("parquet reader");
+
+    // Collect every leaf column path in the spectra_metadata schema. The spectrum facet inflects a
+    // CV term to a `<facet>.<CV>_<accession>_<name>` column name, so MS:1000294 surfaces as a
+    // `…MS_1000294_mass_spectrum` leaf under the `spectrum` struct.
+    let schema = reader.metadata().file_metadata().schema_descr();
+    let column_paths: Vec<String> = (0..schema.num_columns())
+        .map(|i| schema.column(i).path().string())
+        .collect();
+    let _ = std::fs::remove_file(&pq);
+
+    // The representation term (parent MS:1000525, use_term=true) is already emitted by the writer.
+    assert!(
+        column_paths.iter().any(|p| p.contains("MS_1000525")),
+        "spectrum facet must carry the MS:1000525 representation column; got: {column_paths:?}"
+    );
+    // 999.17 fix: a concrete CHILD of MS:1000559 — MS:1000294 mass spectrum — must now also appear.
+    assert!(
+        column_paths.iter().any(|p| p.contains("MS_1000294")),
+        "spectrum facet must carry a concrete child of MS:1000559 (MS:1000294 mass spectrum) so \
+         the mzPeak spectrum_must placement rule (W1) is satisfied; got: {column_paths:?}"
+    );
+
+    let _ = std::fs::remove_file(&out);
+}

@@ -216,6 +216,14 @@ impl ImagingWriter {
             ));
         }
 
+        // Register the explicit spectrum-TYPE column `MS_1000294_mass_spectrum` (W1 /
+        // cv_term_placement_tables). The writer's fixed `MS_1000559_spectrum_type` column carries
+        // only the PARENT accession in its name; the mzPeak `spectrum_must` rule requires a
+        // concrete CHILD of MS:1000559 in the spectrum facet. Each converted spectrum carries the
+        // matching MS:1000294 param (added in `crate::write::spectrum::to_mzdata`), which this
+        // column pulls by accession at write time.
+        builder = builder.add_spectrum_param_field(crate::schema::cv::mass_spectrum_field());
+
         // Register the spectra_data POINT columns DERIVED FROM the sample array maps so
         // profile/processed m/z + intensity land in `point.mz` / `point.intensity` at their
         // SOURCE width instead of spilling to `spectrum.auxiliary_arrays` (DAT-01). This mirrors

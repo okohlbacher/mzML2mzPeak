@@ -60,6 +60,70 @@ pub fn conversion_to_mzml_param() -> mzdata::params::Param {
     mzdata::meta::FormatConversion::ConversionToMzML.into()
 }
 
+/// The single-source `Param` for the default **spectrum type** CV term `MS:1000294`
+/// ("mass spectrum"), a concrete child of `MS:1000559` ("spectrum type").
+///
+/// The mzPeak `spectrum_must` CvMapping rule (mzPeakValidator W1 /
+/// `cv_term_placement_tables`) requires the `spectra_metadata.spectrum` facet to carry BOTH a
+/// spectrum-representation term (`MS:1000525`, emitted by the writer's
+/// `MS_1000525_spectrum_representation` column) AND a concrete child of `MS:1000559`
+/// (`use_term=false, allow_children=true` — the bare parent does NOT satisfy it). The writer's
+/// fixed `MS_1000559_spectrum_type` column carries only the PARENT accession in its name, so the
+/// validator (which derives placement from column NAMES) never sees a child. We therefore register
+/// an explicit `MS_1000294_mass_spectrum` spectrum-facet column (see [`mass_spectrum_field`]) and
+/// attach this param to every converted spectrum so the column is populated.
+///
+/// `MS:1000294` ("mass spectrum") is the correct, safe default for the (im)zML-derived corpus —
+/// every spectrum this converter writes is a mass spectrum. A source `<spectrum>` that already
+/// carries a more specific child of `MS:1000559` could be passed through instead, but the validator
+/// outcome is driven solely by the (fixed) column NAME, so the default is sufficient.
+///
+/// The param carries a boolean `true` value rather than being presence-only: the inflected column
+/// is a `Boolean` (see [`mass_spectrum_field`]) so a populated `true` round-trips through BOTH the
+/// reference reader and this crate's reverse reader (the writer↔reader pair supports `Boolean`; a
+/// presence-only `Null` column panics the reverse reader's per-param dispatch — it has no `Null`
+/// arm). The term identity lives entirely in the accession + name; the boolean is just a populated
+/// presence marker so the column is non-null and the value survives the round-trip.
+///
+/// This is the ONE place the `MS:1000294` term is resolved in the converter; no independent
+/// `"1000294"` literal exists elsewhere (asserted by `no_drift_mass_spectrum_param`).
+pub fn mass_spectrum_param() -> mzdata::params::Param {
+    mzdata::params::Param::builder()
+        .name("mass spectrum")
+        .curie(mass_spectrum_curie())
+        .value(true)
+        .build()
+}
+
+/// The single-source CURIE for the default spectrum-type term `MS:1000294` ("mass spectrum").
+///
+/// Used by the forward mzML path to test (via `get_param_by_curie`) whether a source `<spectrum>`
+/// already declares this term before [`mass_spectrum_param`] is attached, so the lookup CURIE stays
+/// single-sourced here (no independent `MS:1000294` literal leaks into the forward modules — see
+/// `no_drift_mass_spectrum_param`).
+pub fn mass_spectrum_curie() -> mzdata::params::CURIE {
+    mzdata::curie!(MS:1000294)
+}
+
+/// The spectrum-facet column registration for the default spectrum-type term (W1 /
+/// `cv_term_placement_tables`): a `CustomBuilderFromParameter` that inflects to the
+/// `MS_1000294_mass_spectrum` column and, at write time, pulls its value from each spectrum
+/// description's `MS:1000294` param via `get_param_by_curie`.
+///
+/// Registered on BOTH forward writers (imaging via `add_spectrum_param_field` in
+/// `crate::write::writer`, plain mzML via the builder in `crate::write::mzml`). Its column NAME
+/// carries the `MS:1000294` accession — a concrete child of `MS:1000559` — which is exactly what
+/// the validator's column-name-derived placement check requires. The column is `Boolean` (a
+/// populated presence marker): the writer↔reader pair supports it, whereas a `Null`-typed column
+/// panics this crate's reverse reader's per-param value dispatch (no `Null` arm).
+pub fn mass_spectrum_field() -> mzpeak_prototyping::writer::CustomBuilderFromParameter {
+    mzpeak_prototyping::writer::CustomBuilderFromParameter::from_spec(
+        mzdata::curie!(MS:1000294),
+        "mass spectrum",
+        arrow::datatypes::DataType::Boolean,
+    )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 // Phase-31 carve-out: open-enum token constants for entity_type / data_kind (30-02, R4-M6)
 //
@@ -412,6 +476,49 @@ mod tests {
                  instead (single-source no-drift)",
                 path,
                 sentinel
+            );
+        }
+    }
+
+    /// W1 / 999.17: `mass_spectrum_param()` must resolve to PSI-MS `MS:1000294` ("mass spectrum"),
+    /// the concrete child of `MS:1000559` ("spectrum type") the mzPeak `spectrum_must` CvMapping
+    /// rule (`cv_term_placement_tables`) requires the spectrum facet to carry alongside the
+    /// `MS:1000525` representation term.
+    #[test]
+    fn mass_spectrum_param_is_ms_1000294() {
+        let p = mass_spectrum_param();
+        let curie = p.curie().expect("mass_spectrum_param has a CURIE");
+        assert_eq!(
+            curie.to_string(),
+            "MS:1000294",
+            "mass_spectrum_param() must return MS:1000294 (mass spectrum)"
+        );
+    }
+
+    /// No-drift gate: the accession `"1000294"` must NOT appear as an independent raw literal in any
+    /// forward converter source file OUTSIDE `src/schema/cv.rs` — every forward consumer must call
+    /// `mass_spectrum_param()` / `mass_spectrum_field()`. Mirrors the CVG-01 source-scan pattern.
+    #[test]
+    fn no_drift_mass_spectrum_param() {
+        let sentinel = "1000294";
+        let scan_files = [
+            "src/write/writer.rs",
+            "src/write/mzml.rs",
+            "src/write/spectrum.rs",
+            "src/write/convert.rs",
+        ];
+        for path in &scan_files {
+            let source =
+                std::fs::read_to_string(std::path::Path::new(path)).unwrap_or_else(|_| String::new());
+            let non_comment: String = source
+                .lines()
+                .filter(|line| !line.trim_start().starts_with("//"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert!(
+                !non_comment.contains(sentinel),
+                "module {path} contains '{sentinel}' as an independent literal — use \
+                 mass_spectrum_param()/mass_spectrum_field() instead (single-source no-drift)"
             );
         }
     }
