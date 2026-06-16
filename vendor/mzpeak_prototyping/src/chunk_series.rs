@@ -177,15 +177,24 @@ impl ChunkingStrategy {
         T::Native: Float,
         PrimitiveArray<T>: From<Vec<Option<T::Native>>>,
     {
-        // Need to find the first non-null value
-        let mut it = array.iter().filter(|v| v.is_some());
-        let start: f64 = it
+        // VENDORED PATCH (mzML2mzPeak backlog 999.19; W3 chunk_bounds_spectra_data + W5
+        // chunk_bounds_chromatograms_data; group upstreaming with 999.1). The original computed
+        // `start` and `end` from a SINGLE iterator: `it.next()` consumed the first non-null value,
+        // then `it.next_back()` read the back of the REMAINING iterator. For a chunk that reduces to
+        // one non-null value the iterator was already empty after `next()`, so `end` fell through to
+        // 0.0 — yielding `chunk_start > chunk_end (= 0)` and the validator's "chunk start > end".
+        // Read start and end from two INDEPENDENT iterators so a single-point chunk gives end == start.
+        let start: f64 = array
+            .iter()
+            .flatten()
             .next()
-            .and_then(|v| v.map(|v| v.to_f64().unwrap_or(0.0)))
+            .map(|v| v.to_f64().unwrap_or(0.0))
             .unwrap_or(0.0);
-        let end: f64 = it
+        let end: f64 = array
+            .iter()
+            .flatten()
             .next_back()
-            .and_then(|v| v.map(|v| v.to_f64().unwrap_or(0.0)))
+            .map(|v| v.to_f64().unwrap_or(0.0))
             .unwrap_or(0.0);
         match self {
             ChunkingStrategy::Basic { chunk_size: _ } => (
@@ -1167,6 +1176,27 @@ mod test {
         }
 
         Ok(mzs)
+    }
+
+    /// VENDORED PATCH regression (mzML2mzPeak backlog 999.19; W3/W5). A chunk that reduces to a
+    /// single non-null value must report `chunk_end == chunk_start`, never 0.0. Before the
+    /// two-independent-iterators fix the shared iterator was exhausted by `next()`, so `next_back()`
+    /// fell through to 0.0 → `chunk_start > chunk_end (= 0)` (the validator's "chunk start > end").
+    #[test]
+    fn test_encode_arrow_chunk_end_never_zero() {
+        use arrow::array::Float64Array;
+        let arr = Float64Array::from(vec![Some(3016.73_f64)]);
+        let (s, e, _) = ChunkingStrategy::Basic { chunk_size: 50.0 }.encode_arrow(&arr);
+        assert!((s - 3016.73).abs() < 1e-9, "Basic start wrong: {s}");
+        assert!((e - s).abs() < 1e-9, "Basic: single-point chunk_end must equal start: start={s} end={e}");
+        let (s, e, _) = ChunkingStrategy::Delta { chunk_size: 50.0 }.encode_arrow(&arr);
+        assert!((e - s).abs() < 1e-9, "Delta: single-point chunk_end must equal start: start={s} end={e}");
+        let (s, e, _) = ChunkingStrategy::NumpressLinear { chunk_size: 50.0 }.encode_arrow(&arr);
+        assert!((e - s).abs() < 1e-9, "NumpressLinear: single-point chunk_end must equal start: start={s} end={e}");
+        // null-padded single value: same invariant (start and end skip the nulls independently)
+        let arr2 = Float64Array::from(vec![None, Some(1171.8_f64), None]);
+        let (s2, e2, _) = ChunkingStrategy::NumpressLinear { chunk_size: 50.0 }.encode_arrow(&arr2);
+        assert!((s2 - 1171.8).abs() < 1e-9 && (e2 - s2).abs() < 1e-9, "null-padded single point: start={s2} end={e2}");
     }
 
     #[test]
