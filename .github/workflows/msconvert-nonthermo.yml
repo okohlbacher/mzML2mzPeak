@@ -50,6 +50,18 @@ jobs:
             wiff_name: "11410_DGCR8_CBF_BR2_BioID_20181022_TOF6600_SWATH.wiff"
             url: "https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000090684/raw/RAW/11410_DGCR8_CBF_BR2_BioID_20181022_TOF6600_SWATH.wiff&forceDownload=true"
             scan_url: "https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000090684/raw/RAW/11410_DGCR8_CBF_BR2_BioID_20181022_TOF6600_SWATH.wiff.scan&forceDownload=true"
+          - name: sciex-tripletof6600-swath-PXD011326
+            wiff_name: "VD_170826_SWATH_6600_PD_15.wiff"
+            url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2019/12/PXD011326/VD_170826_SWATH_6600_PD_15.wiff"
+            scan_url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2019/12/PXD011326/VD_170826_SWATH_6600_PD_15.wiff.scan"
+          - name: sciex-tripletof6600-swath-MSV000090136
+            wiff_name: "17_16_hpr56_ko_YMR295C_4444_-0.04.wiff"
+            url: "https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000090136/raw/plate56/17_16_hpr56_ko_YMR295C_4444_-0.04.wiff&forceDownload=true"
+            scan_url: "https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000090136/raw/plate56/17_16_hpr56_ko_YMR295C_4444_-0.04.wiff.scan&forceDownload=true"
+          - name: sciex-tripletof6600-swath-MSV000093587
+            wiff_name: "Sample049.wiff"
+            url: "https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000093587/raw/Sample049.wiff&forceDownload=true"
+            scan_url: "https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000093587/raw/Sample049.wiff.scan&forceDownload=true"
     steps:
       - name: Gate (single-leg select)
         id: gate
