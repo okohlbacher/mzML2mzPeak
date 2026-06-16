@@ -42,36 +42,43 @@ jobs:
             url: "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS427/FILES/20150813_1_pos_HL.d.zip"
           - name: agilent-gc-5977-Z3249821
             url: "https://zenodo.org/api/records/3249821/files/PARFUM%20MS.zip/content"
-          # --- TOF-grid examples (PROFILE, for the grid-encoding eval) ---
-          # Sciex TripleTOF 6600 SWATH/DIA — profile continuum. Two-file format (.wiff + .wiff.scan),
-          # no zip: `scan_url` switches the download to the two-file path. msconvert keeps profile (no
-          # peakPicking); the "Verify PROFILE" step FAILS the run if the output came out centroided.
+          # --- TOF-grid examples (for the grid-encoding eval) ---
+          # SciEx TripleTOF 6600 SWATH/DIA. We do NOT peak-pick; the "Verify spectrum mode" step records
+          # profile-vs-centroid in the run summary. msconvert's SciEx reader returns these vendor-centroided
+          # (profile=0), so `allow_centroid: true` keeps the (centroid) mzML + mzpeak instead of failing —
+          # whatever profile spectra survive are still labeled profile. Two-file format (.wiff + .wiff.scan).
           - name: sciex-tripletof6600-swath-MSV000090684
             wiff_name: "11410_DGCR8_CBF_BR2_BioID_20181022_TOF6600_SWATH.wiff"
             url: "https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000090684/raw/RAW/11410_DGCR8_CBF_BR2_BioID_20181022_TOF6600_SWATH.wiff&forceDownload=true"
             scan_url: "https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000090684/raw/RAW/11410_DGCR8_CBF_BR2_BioID_20181022_TOF6600_SWATH.wiff.scan&forceDownload=true"
+            allow_centroid: "true"
           - name: sciex-tripletof6600-swath-PXD011326
             wiff_name: "VD_170826_SWATH_6600_PD_15.wiff"
             url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2019/12/PXD011326/VD_170826_SWATH_6600_PD_15.wiff"
             scan_url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2019/12/PXD011326/VD_170826_SWATH_6600_PD_15.wiff.scan"
+            allow_centroid: "true"
           - name: sciex-tripletof6600-swath-MSV000090136
             wiff_name: "17_16_hpr56_ko_YMR295C_4444_-0.04.wiff"
             url: "https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000090136/raw/plate56/17_16_hpr56_ko_YMR295C_4444_-0.04.wiff&forceDownload=true"
             scan_url: "https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000090136/raw/plate56/17_16_hpr56_ko_YMR295C_4444_-0.04.wiff.scan&forceDownload=true"
+            allow_centroid: "true"
           - name: sciex-tripletof6600-swath-MSV000093587
             wiff_name: "Sample049.wiff"
             url: "https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000093587/raw/Sample049.wiff&forceDownload=true"
             scan_url: "https://massive.ucsd.edu/ProteoSAFe/DownloadResultFile?file=f.MSV000093587/raw/Sample049.wiff.scan&forceDownload=true"
+            allow_centroid: "true"
           # Three-file SciEx run (.wiff + .wiff.scan + .wiff2): `wiff2_url` adds the optional third file.
           - name: sciex-tripletof6600-swath-PXD071869
             wiff_name: "08_SWATH_1E_1H.wiff"
             url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2026/01/PXD071869/08_SWATH_1E_1H.wiff"
             scan_url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2026/01/PXD071869/08_SWATH_1E_1H.wiff.scan"
             wiff2_url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2026/01/PXD071869/08_SWATH_1E_1H.wiff2"
+            allow_centroid: "true"
           # Bruker microTOF-Q Max (.baf inside a .d folder, zip-delivered). README mislabels it Agilent;
-          # contents are Bruker BAF. msconvert's Bruker reader handles it; profile gate adjudicates.
+          # contents are Bruker BAF. msconvert's Bruker reader handles it; mode recorded by the verify step.
           - name: bruker-microtofq-PXD059108
             url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/12/PXD059108/lysate_000008.d.zip"
+            allow_centroid: "true"
           # Agilent QTOF .d.zip. These two are CENTROID-ONLY at source (PXD059765 has no MSProfile.bin;
           # PXD041903's MSProfile.bin is 0 bytes) — msconvert can only emit centroid. `allow_centroid: true`
           # makes the "Verify PROFILE" step WARN (not fail) so the centroid mzML + mzpeak are still produced.
@@ -195,8 +202,13 @@ jobs:
           # Count spectrum-mode cvParams in the mzML head (enough to see the dominant mode without
           # scanning the whole multi-GB file). MS:1000128 = profile spectrum, MS:1000127 = centroid.
           head -c 200000000 work/local.mzML > work/_head.xml || true
-          prof=$(grep -o 'MS:1000128' work/_head.xml | wc -l | tr -d ' ')
-          cent=$(grep -o 'MS:1000127' work/_head.xml | wc -l | tr -d ' ')
+          # `|| true` is REQUIRED: under `set -euo pipefail`, grep exits 1 when it finds ZERO matches,
+          # and pipefail propagates that — which previously ABORTED this whole step before the
+          # profile/centroid logic (and the allow_centroid branch) ever ran, so centroid output looked
+          # like a hard gate crash instead of a clean centroid verdict. Guard so 0 matches -> "0".
+          prof=$(grep -o 'MS:1000128' work/_head.xml | wc -l | tr -d ' ' || true)
+          cent=$(grep -o 'MS:1000127' work/_head.xml | wc -l | tr -d ' ' || true)
+          prof=${prof:-0}; cent=${cent:-0}
           rm -f work/_head.xml
           echo "profile-spectrum cvParams: $prof   centroid-spectrum cvParams: $cent"
           {
