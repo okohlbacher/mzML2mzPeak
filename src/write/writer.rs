@@ -507,7 +507,13 @@ fn wire_metadata_into(target: &mut impl MSDataFileMetadata, prov: &RunProvenance
         methods: vec![ProcessingMethod {
             order: 1,
             software_reference: "mzml2mzpeak".to_string(),
-            params: vec![Param::new_key_value("conversion", "imzML to imaging mzPeak")],
+            // MS:1000544 (conversion to mzML), a child of MS:1000452 (data transformation), so the
+            // mzPeak processingmethod_must CvMapping rule's MUST/AND is satisfied (W2 /
+            // cv_term_placement_metadata). The userParam keeps the human-readable provenance note.
+            params: vec![
+                crate::schema::cv::conversion_to_mzml_param(),
+                Param::new_key_value("conversion", "imzML to imaging mzPeak"),
+            ],
         }],
     });
 
@@ -1600,6 +1606,69 @@ mod tests {
         assert!(
             has_note(&w),
             "record_intensity_narrowing appends the Float64 -> Float32 provenance note (DTY-03)"
+        );
+
+        let _ = std::fs::remove_file(&out);
+    }
+
+    /// W2 / 999.18 (`cv_term_placement_metadata`): the wired `mzml2mzpeak_conversion`
+    /// DataProcessing method MUST carry a `parameters[]` entry that is a child of
+    /// `MS:1000452` (data transformation) — `MS:1000544` (conversion to mzML) — and the
+    /// `mzml2mzpeak` software entry MUST carry a `parameters[]` entry that is a child of
+    /// `MS:1000531` (software) — `MS:1000799` (custom unreleased software tool). This is the
+    /// regression guard for the empty-`parameters: []` bug that tripped the validator's
+    /// `processingmethod_must` / `software_must` MUST/AND rules on 538/539 files.
+    #[test]
+    fn conversion_method_and_software_carry_required_cv_children() {
+        use mzdata::meta::FileMetadataConfig;
+        use mzdata::params::CURIE;
+
+        let mut out = std::env::temp_dir();
+        out.push(format!("mzml2mzpeak_writer_w2_{}.mzpeak", std::process::id()));
+        let mut w = ImagingWriter::new(&out, &[]).expect("build writer");
+
+        let prov = RunProvenance {
+            uuid: None,
+            data_mode: StorageMode::Processed,
+            ibd_checksum: None,
+            ibd_checksum_type: None,
+        };
+        w.write_run_metadata(&FileMetadataConfig::default(), &prov, None)
+            .expect("wire metadata");
+
+        // The data-transformation child the conversion method must carry (MS:1000544 conversion to
+        // mzML, a child of MS:1000452 data transformation). Sourced via the SAME single-source
+        // accessor the writer emits, so the test can never drift from the production param. The
+        // child-of relationship + exact accession are asserted in
+        // `schema::cv::tests::conversion_to_mzml_param_is_ms_1000544`.
+        let want_method_curie =
+            crate::schema::cv::conversion_to_mzml_param().curie().expect("conversion param CURIE");
+
+        // A data_processing method carries a parameters[] entry that is the MS:1000544 child.
+        let method_has_transformation = w
+            .inner
+            .data_processings()
+            .iter()
+            .flat_map(|dp| dp.methods.iter())
+            .any(|m| m.params.iter().any(|p| p.curie() == Some(want_method_curie)));
+        assert!(
+            method_has_transformation,
+            "a data_processing method must carry a parameters[] child of MS:1000452 \
+             (the conversion-to-mzML data-transformation term) — W2 processingmethod_must"
+        );
+
+        // A software entry carries a parameters[] entry that is a child of MS:1000531
+        // (MS:1000799 custom unreleased software tool, from custom_software_name()).
+        let software_curie = CURIE::new(mzdata::params::ControlledVocabulary::MS, 1000799);
+        let software_has_software_term = w
+            .inner
+            .softwares()
+            .iter()
+            .any(|s| s.params.iter().any(|p| p.curie() == Some(software_curie)));
+        assert!(
+            software_has_software_term,
+            "a software_list entry must carry a parameters[] child of MS:1000531 \
+             (MS:1000799 custom unreleased software tool) — W2 software_must"
         );
 
         let _ = std::fs::remove_file(&out);
