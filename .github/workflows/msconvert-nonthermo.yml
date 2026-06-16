@@ -144,9 +144,24 @@ jobs:
           else
             unzip -q payload || (mv payload payload.zip && unzip -q payload.zip)
             rm -f payload payload.zip
+            # Locate the vendor file/dir. Prefer an exact *.d / *.raw; else an Agilent/Bruker dir holding
+            # an AcqData/ (handles Windows "<name>.d - Copy" deposits whose dir name doesn't end in .d);
+            # else a .wiff.
             target="$(find . -maxdepth 3 \( -iname '*.d' -o -iname '*.raw' \) | head -1)"
+            if [ -z "$target" ]; then
+              acq="$(find . -maxdepth 4 -type d -iname 'AcqData' | head -1)"
+              [ -n "$acq" ] && target="$(dirname "$acq")"
+            fi
             [ -z "$target" ] && target="$(find . -maxdepth 3 -iname '*.wiff' -type f | head -1)"
             if [ -z "$target" ]; then echo "No vendor file:"; find . -maxdepth 3; exit 1; fi
+            # Normalize a vendor directory whose name doesn't end in .d (e.g. "<name>.d - Copy") so the
+            # reader recognizes it by extension.
+            if [ -d "$target" ]; then
+              base="$(basename "$target")"; base="${base% - Copy}"
+              case "$base" in *.d) : ;; *) base="$base.d";; esac
+              nd="$(dirname "$target")/$base"
+              if [ "$target" != "$nd" ]; then mv "$target" "$nd"; target="$nd"; echo "normalized vendor dir -> $target"; fi
+            fi
             # Bruker BAF repair: some PRIDE deposits rename analysis.baf -> <prefix>_analysis.baf while
             # keeping the standard analysis.baf_idx/xtr/sqlite companions, which makes msconvert's Bruker
             # reader emit "[ReaderFail] don't know how to read". If the .d has a *.baf but no analysis.baf,
