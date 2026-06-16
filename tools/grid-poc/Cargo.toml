@@ -1,0 +1,10 @@
+[package]
+name = "grid-poc"
+version = "0.1.0"
+edition = "2021"
+
+# STD-ONLY: no dependencies, compiles fully offline.
+[dependencies]
+
+[profile.release]
+opt-level = 3
