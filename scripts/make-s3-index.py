@@ -101,6 +101,7 @@ DATASETS = {
     "sciex-tripletof-6600": "Zenodo 17416537 · SCIEX TripleTOF 6600 — DIA / SWATH.",
     "sciex-zenotof-7600": "MassIVE MSV000095995 · SCIEX ZenoTOF 7600 — EAD / Zeno top-down (Searfoss et al. 2025).",
     "shimadzu-lcms-9030-qtof": "MetaboLights MTBLS13204 · Shimadzu LCMS-9030 Q-TOF (seaweed metabolomics).",
+    "waters-pda-uv": "ProteoWizard Waters vendor-reader test data · Waters ACQUITY UPLC <b>PDA</b> — the corpus's <b>UV / photodiode-array exemplar</b>: ProteoWizard read the PDA function from a MassLynx <code>.raw</code> and wrote <code>wavelength array</code> (190–500 nm) + <code>electromagnetic radiation</code> (absorption) spectra. Demonstrates mzPeak's UV <code>wavelength_spectra</code> facet — the rare case of UV spectra carried inside the mzML.",
     "thermo-fusion-lumos": "PRIDE PXD008952 · Thermo Orbitrap Fusion Lumos — CPTAC NCI-7 TMT (Clark et al. 2018).",
     "thermo-ltq-ft-ultra-fticr": "MetaboLights MTBLS3512 · Thermo LTQ FT Ultra — FT-ICR (marine dissolved organic matter; Liu et al. 2020).",
     "thermo-ltq-orbitrap-velos": "PRIDE PXD000001 · Thermo LTQ Orbitrap Velos — TMT “Erwinia” spike-in, the <b>first ProteomeXchange dataset</b> (Gatto &amp; Christoforou 2013).",
