@@ -494,6 +494,10 @@ pub fn convert_mzml_with(
         record_numpress_linear(&mut writer);
     }
 
+    // W2 / 999.24: normalize copied source data_processing/software entries, plus any converter
+    // entries appended above, before `finish_parquet()` serializes the metadata index.
+    crate::write::writer::normalize_metadata_cv_terms(&mut writer);
+
     // If the source mzML declared no <sourceFileList> (e.g. an mzR/MSnbase-written file like the
     // Agilent CEMS_10ppm), emit the input mzML as the source_file so default_run_refs below has a
     // real entry to point the required run.default_source_file_id at (validator #5 / B residual,
@@ -898,6 +902,133 @@ mod tests {
             "mzml2mzpeak_mzml_seam_{tag}_{}.mzpeak",
             std::process::id()
         ))
+    }
+
+    /// W2 / 999.24 end-to-end on the plain mzML path: source-copied metadata entries with only
+    /// `userParam`s are normalized before the mzPeak index is serialized.
+    #[test]
+    fn convert_mzml_normalizes_source_copied_cv_children_in_index() {
+        let fixture = Path::new("tests/fixtures/mzml/profile_intensity_f64.mzML");
+        if !fixture.exists() {
+            return;
+        }
+
+        let input = std::env::temp_dir().join(format!(
+            "mzml2mzpeak_source_copied_w2_{}.mzML",
+            std::process::id()
+        ));
+        let out = tmp_out("source_copied_w2");
+        let _ = std::fs::remove_file(&input);
+        let _ = std::fs::remove_file(&out);
+
+        let indexed = std::fs::read_to_string(fixture).expect("read source fixture");
+        let mzml_start = indexed.find("<mzML ").expect("fixture contains mzML root");
+        let mzml_end = indexed
+            .rfind("</mzML>")
+            .map(|i| i + "</mzML>".len())
+            .expect("fixture contains mzML close");
+        let mut mzml = format!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n{}\n",
+            &indexed[mzml_start..mzml_end]
+        );
+        mzml = mzml.replacen("<softwareList count=\"1\">", "<softwareList count=\"2\">", 1);
+        mzml = mzml.replacen(
+            "    </softwareList>",
+            "      <software id=\"copied_tool_without_cv_child\" version=\"0.1.0\">\n\
+        <userParam name=\"vendor software note\" value=\"no software CV child\"/>\n\
+      </software>\n\
+    </softwareList>",
+            1,
+        );
+        mzml = mzml.replacen(
+            "<dataProcessingList count=\"1\">",
+            "<dataProcessingList count=\"2\">",
+            1,
+        );
+        mzml = mzml.replacen(
+            "    </dataProcessingList>",
+            "      <dataProcessing id=\"copied_processing_without_cv_child\">\n\
+        <processingMethod order=\"1\" softwareRef=\"copied_tool_without_cv_child\">\n\
+          <userParam name=\"vendor processing note\" value=\"no data-transformation CV child\"/>\n\
+        </processingMethod>\n\
+      </dataProcessing>\n\
+    </dataProcessingList>",
+            1,
+        );
+        std::fs::write(&input, mzml).expect("write temporary mzML");
+
+        convert_mzml(
+            &input,
+            &out,
+            &crate::write::EncodingOptions::lossless(),
+            None,
+            None,
+            false,
+        )
+        .expect("convert temporary mzML");
+
+        use std::io::Read as _;
+        let mut archive = zip::ZipArchive::new(
+            std::io::BufReader::new(File::open(&out).expect("open output archive")),
+        )
+        .expect("open output ZIP");
+        let mut index_json = String::new();
+        archive
+            .by_name("mzpeak_index.json")
+            .expect("index member present")
+            .read_to_string(&mut index_json)
+            .expect("read index");
+        let index: serde_json::Value = serde_json::from_str(&index_json).expect("parse index JSON");
+
+        fn params_have_accession(params: &[serde_json::Value], accession: &str) -> bool {
+            params
+                .iter()
+                .any(|p| p.get("accession").and_then(|v| v.as_str()) == Some(accession))
+        }
+
+        let dp_list = index
+            .pointer("/metadata/data_processing_method_list")
+            .and_then(|v| v.as_array())
+            .expect("data_processing_method_list metadata array");
+        let copied_dp = dp_list
+            .iter()
+            .find(|dp| dp.get("id").and_then(|v| v.as_str())
+                == Some("copied_processing_without_cv_child"))
+            .expect("copied data_processing entry present");
+        let method_params = copied_dp
+            .pointer("/methods/0/parameters")
+            .and_then(|v| v.as_array())
+            .expect("copied method parameters");
+        let transformation_accession = crate::schema::cv::conversion_to_mzml_param()
+            .curie()
+            .expect("conversion param CURIE")
+            .to_string();
+        assert!(
+            params_have_accession(method_params, &transformation_accession),
+            "source-copied ProcessingMethod must carry the conversion-to-mzML \
+             data-transformation term"
+        );
+
+        let software_list = index
+            .pointer("/metadata/software_list")
+            .and_then(|v| v.as_array())
+            .expect("software_list metadata array");
+        let copied_software = software_list
+            .iter()
+            .find(|sw| sw.get("id").and_then(|v| v.as_str())
+                == Some("copied_tool_without_cv_child"))
+            .expect("copied software entry present");
+        let software_params = copied_software
+            .get("parameters")
+            .and_then(|v| v.as_array())
+            .expect("copied software parameters");
+        assert!(
+            params_have_accession(software_params, "MS:1000799"),
+            "source-copied Software must carry an MS:1000531 child (MS:1000799)"
+        );
+
+        let _ = std::fs::remove_file(&input);
+        let _ = std::fs::remove_file(&out);
     }
 
     /// Determinism + read-back guard for the refactored finish_parquet → zip seam (Task 2).

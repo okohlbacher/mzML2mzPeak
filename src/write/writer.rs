@@ -51,8 +51,11 @@ use mzdata::spectrum::{Chromatogram, ChromatogramDescription};
 use mzdata::spectrum::bindata::{ArrayType, BinaryArrayMap, BinaryDataArrayType, DataArray};
 
 use mzdata::curie;
-use mzdata::meta::{DataProcessing, ProcessingMethod, Software, custom_software_name};
-use mzdata::params::Param;
+use mzdata::meta::{
+    DataProcessing, DataProcessingAction, FormatConversion, ProcessingMethod, Software,
+    SoftwareTerm, custom_software_name,
+};
+use mzdata::params::{ControlledVocabulary, Param};
 use mzdata::prelude::{ByteArrayView, MSDataFileMetadata, ParamDescribed};
 use mzdata::spectrum::MultiLayerSpectrum;
 
@@ -314,6 +317,7 @@ impl ImagingWriter {
         //     `wire_metadata_into`, shared so the logic has one home).
         self.inner.copy_metadata_from(source);
         wire_metadata_into(&mut self.inner, prov);
+        normalize_metadata_cv_terms(&mut self.inner);
 
         // (c2) SRC-01/SRC-02: push the .imzML + .ibd source_files when the input path is threaded
         //      in. ADDITIVE — the contents mapping above is untouched. Values are REUSED from
@@ -656,6 +660,53 @@ pub(crate) fn default_run_id_and_instrument(
             run.default_instrument_id = Some(first_instrument_id);
         }
     }
+}
+
+/// Normalize metadata-list CV placement after source metadata has been copied into the mzPeak
+/// writer. mzPeakValidator's `cv_term_placement_metadata` rule requires every
+/// `data_processing_method_list[].methods[].parameters[]` to carry a concrete child of
+/// `MS:1000452` (data transformation) and every `software_list[].parameters[]` to carry a concrete
+/// child of `MS:1000531` (software). Some source mzML files omit those children on copied entries.
+///
+/// This pass is additive and idempotent: copied entries that already carry a known PSI-MS
+/// data-transformation/software term are left untouched; otherwise the same fallback terms used by
+/// the converter-owned W2 wiring are appended.
+pub(crate) fn normalize_metadata_cv_terms(target: &mut impl MSDataFileMetadata) {
+    for dp in target.data_processings_mut() {
+        for method in &mut dp.methods {
+            if !method.params.iter().any(is_data_transformation_child_param) {
+                method.params.push(crate::schema::cv::conversion_to_mzml_param());
+            }
+        }
+    }
+
+    for software in target.softwares_mut() {
+        if !software.params.iter().any(is_software_child_param) {
+            software.params.push(custom_software_name(&software.id));
+        }
+    }
+}
+
+fn is_ms_accession(param: &Param) -> Option<u32> {
+    match (param.controlled_vocabulary, param.accession) {
+        (Some(ControlledVocabulary::MS), Some(accession)) => Some(accession),
+        _ => None,
+    }
+}
+
+fn is_data_transformation_child_param(param: &Param) -> bool {
+    let Some(accession) = is_ms_accession(param) else {
+        return false;
+    };
+    FormatConversion::from_accession(accession).is_some()
+        || DataProcessingAction::from_accession(accession).is_some()
+}
+
+fn is_software_child_param(param: &Param) -> bool {
+    let Some(accession) = is_ms_accession(param) else {
+        return false;
+    };
+    accession != 1000531 && SoftwareTerm::from_accession(accession).is_some()
 }
 
 /// When the source declared NO source files (no `<sourceFileList>` — e.g. an mzR/MSnbase-written
@@ -1825,6 +1876,82 @@ mod tests {
             software_has_software_term,
             "a software_list entry must carry a parameters[] child of MS:1000531 \
              (MS:1000799 custom unreleased software tool) — W2 software_must"
+        );
+
+        let _ = std::fs::remove_file(&out);
+    }
+
+    /// W2 / 999.24: source-copied data_processing/software entries are normalized too, not just
+    /// the converter-owned `mzml2mzpeak_conversion` entries added by 999.18.
+    #[test]
+    fn write_run_metadata_normalizes_source_copied_cv_children() {
+        use mzdata::meta::FileMetadataConfig;
+        use mzdata::prelude::MSDataFileMetadata;
+        use std::path::Path;
+
+        let mut out = std::env::temp_dir();
+        out.push(format!("mzml2mzpeak_writer_w2_source_{}.mzpeak", std::process::id()));
+        let mut w = ImagingWriter::new(&out, &[]).expect("build writer");
+
+        let mut source = FileMetadataConfig::default();
+        source.softwares_mut().push(Software::new(
+            "copied_tool_without_cv_child".into(),
+            "0.1.0".into(),
+            vec![Param::new_key_value("vendor software note", "no software CV child")],
+        ));
+        source.data_processings_mut().push(DataProcessing {
+            id: "copied_processing_without_cv_child".to_string(),
+            methods: vec![ProcessingMethod {
+                order: 1,
+                software_reference: "copied_tool_without_cv_child".to_string(),
+                params: vec![Param::new_key_value(
+                    "vendor processing note",
+                    "no data-transformation CV child",
+                )],
+            }],
+        });
+
+        let prov = RunProvenance {
+            uuid: None,
+            data_mode: StorageMode::Processed,
+            ibd_checksum: None,
+            ibd_checksum_type: None,
+        };
+        w.write_run_metadata_from(&source, &prov, None, Some(Path::new("copied.imzML")))
+            .expect("metadata wiring succeeds");
+
+        let transformation_curie =
+            crate::schema::cv::conversion_to_mzml_param().curie().expect("conversion param CURIE");
+        let copied_method = w
+            .inner
+            .data_processings()
+            .iter()
+            .find(|dp| dp.id == "copied_processing_without_cv_child")
+            .and_then(|dp| dp.methods.first())
+            .expect("copied data_processing method is present");
+        assert!(
+            copied_method
+                .params
+                .iter()
+                .any(|p| p.curie() == Some(transformation_curie)),
+            "copied ProcessingMethod must be normalized with the conversion-to-mzML term"
+        );
+
+        let software_curie = custom_software_name("copied_tool_without_cv_child")
+            .curie()
+            .expect("custom software param CURIE");
+        let copied_software = w
+            .inner
+            .softwares()
+            .iter()
+            .find(|s| s.id == "copied_tool_without_cv_child")
+            .expect("copied software is present");
+        assert!(
+            copied_software
+                .params
+                .iter()
+                .any(|p| p.curie() == Some(software_curie)),
+            "copied Software must be normalized with MS:1000799"
         );
 
         let _ = std::fs::remove_file(&out);
