@@ -91,7 +91,7 @@ run_upload(){
     fi
     [ "$fails" -gt 0 ] && say "  $t has $fails failing file(s) — uploading anyway (--allow-fail)"
     say "  sync $t  (idempotent: only changed files transfer)"
-    "${AWS[@]}" s3 sync "$DATA/$t" "$B/$t" "${inc[@]}" --only-show-errors "${SYNC_DRY[@]}" \
+    "${AWS[@]}" s3 sync "$DATA/$t" "$B/$t" "${inc[@]}" --only-show-errors ${SYNC_DRY[@]+"${SYNC_DRY[@]}"} \
       && say "    $t synced" || say "    $t sync FAILED"
   done
   [ "$DRYRUN" = 0 ] && run_verify
