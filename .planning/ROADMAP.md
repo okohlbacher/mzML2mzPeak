@@ -526,21 +526,35 @@ mzPeakValidator profile so regressions FAIL instead of warn.
 (W2) from `severity: warning` to `error` in `profiles/mzpeak-0.9/rules/{semantic,layout}.rules.json`, then
 revalidate. **Depends on** the converter fixes + [[999.21]] reconvert. **Requirements:** TBD · **Plans:** 0 plans
 
-### Phase 999.24: Normalize source-copied data_processing/software CV params (W2 follow-up; converter, P2)
+### Phase 999.24: Clear W2 — derive empty fileContent + normalize source-copied data_processing/software CV (converter, P2) — DONE 2026-06-19
 
-> Source: codex adversarial review (2026-06-18) + the post-999.21 mzPeakValidator sweep
-> (`out/validator/summary.md`). Confirms [[999.18]] is PARTIAL: it added the required CV children
-> (`MS:1000544` / `MS:1000799`) only to the converter's OWN minted ProcessingMethod/Software entries —
-> NOT to entries copied from the source mzML via `copy_metadata_from`. So `cv_term_placement_metadata` (W2)
-> still warns on **275 published files** (sdrf-examples 264 + imzml 3 + mzML 5 + pwiz 3) whose source mzML
-> carry their own data_processing/software lists.
+> Source: codex adversarial review (2026-06-18) + the post-999.21 mzPeakValidator sweep, then a
+> **2026-06-19 spot-check that CORRECTED the W2 root-cause breakdown.** The original framing (W2 =
+> source-copied data_processing/software only) was incomplete. Categorizing all 288 W2 findings
+> (`cv_term_placement_metadata`) by missing term showed the real distribution:
+> - **269 — `file_description` lacks any child of `MS:1000524` "data file content"** (DOMINANT). Many
+>   source mzML (ProteoWizard Waters) carry an **empty `<fileContent>`**, which the converter faithfully
+>   copied as `contents:[]` → no fileContent term declared.
+> - 18 — data transformation `MS:1000452` (data_processing) · 15 — software `MS:1000531`.
+> - 13 — spectrum type/representation · 3 — instrument model / detector type (separate, see below).
 
-**Goal:** Fully clear W2 so [[999.23]] (warning→error promotion) becomes possible.
-**Fix:** After `copy_metadata_from`, run an all-entry normalization pass over EVERY
-`data_processing_method_list[].methods[]` (ensure a child of `MS:1000452` in `parameters[]`) and EVERY
-`software_list[]` entry (ensure a child of `MS:1000531`) — adding the term when absent, leaving present ones
-untouched. Reuses [[999.18]]'s accessors (`conversion_to_mzml_param`, `custom_software_name`). Then reconvert
-the affected tiles (mainly sdrf-examples, with `--sdrf`/`--isa`) + republish via `publish-corpus.sh`.
+**Goal:** Clear W2 so [[999.23]] (warning→error promotion) becomes possible. **Status: DONE** — two
+commits, both implemented by codex, full `cargo test` green, validated end-to-end (a real reconverted
+sdrf file went PASS, 0 warnings):
+- **`10abcdf`** — normalize source-copied entries: after `copy_metadata_from`, every `ProcessingMethod`
+  lacking an `MS:1000452` child gets `conversion_to_mzml_param()` (MS:1000544); every `Software` lacking
+  an `MS:1000531` child gets `custom_software_name()` (MS:1000799). Clears the 18+15 data_proc/software.
+- **`c2b5b47`** — derive fileContent when empty: accumulate written ms-levels, inject `MS:1000579`
+  "MS1 spectrum" (ms_level==1) and/or `MS:1000580` "MSn spectrum" (ms_level>=2) — both children of
+  `MS:1000524` — into `file_description.contents` at finalize when it has no such child. Clears the 269.
+  Both imaging + plain paths; conformant non-empty contents left untouched.
+
+**Remaining W2 (out of scope here):** ~13 spectrum-type + ~3 instrument-model/detector findings are a
+distinct cause (not empty-fileContent, not copied data_proc/software); capture separately if they survive
+the reconvert sweep.
+
+**Cycle:** reconvert all 526 corpus files in place against the new binary → re-validate → republish via
+`publish-corpus.sh` (count-verified). Running 2026-06-19.
 
 **W1 note:** the 13 residual `cv_term_placement_tables` warnings are ALL in scratch tiles (raw-bench 5 /
 raw-replacements 8) — the **published corpus is W1-clean**; they clear whenever that scratch is regenerated
