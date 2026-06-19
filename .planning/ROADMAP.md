@@ -526,6 +526,26 @@ mzPeakValidator profile so regressions FAIL instead of warn.
 (W2) from `severity: warning` to `error` in `profiles/mzpeak-0.9/rules/{semantic,layout}.rules.json`, then
 revalidate. **Depends on** the converter fixes + [[999.21]] reconvert. **Requirements:** TBD · **Plans:** 0 plans
 
+### Phase 999.24: Normalize source-copied data_processing/software CV params (W2 follow-up; converter, P2)
+
+> Source: codex adversarial review (2026-06-18) + the post-999.21 mzPeakValidator sweep
+> (`out/validator/summary.md`). Confirms [[999.18]] is PARTIAL: it added the required CV children
+> (`MS:1000544` / `MS:1000799`) only to the converter's OWN minted ProcessingMethod/Software entries —
+> NOT to entries copied from the source mzML via `copy_metadata_from`. So `cv_term_placement_metadata` (W2)
+> still warns on **275 published files** (sdrf-examples 264 + imzml 3 + mzML 5 + pwiz 3) whose source mzML
+> carry their own data_processing/software lists.
+
+**Goal:** Fully clear W2 so [[999.23]] (warning→error promotion) becomes possible.
+**Fix:** After `copy_metadata_from`, run an all-entry normalization pass over EVERY
+`data_processing_method_list[].methods[]` (ensure a child of `MS:1000452` in `parameters[]`) and EVERY
+`software_list[]` entry (ensure a child of `MS:1000531`) — adding the term when absent, leaving present ones
+untouched. Reuses [[999.18]]'s accessors (`conversion_to_mzml_param`, `custom_software_name`). Then reconvert
+the affected tiles (mainly sdrf-examples, with `--sdrf`/`--isa`) + republish via `publish-corpus.sh`.
+
+**W1 note:** the 13 residual `cv_term_placement_tables` warnings are ALL in scratch tiles (raw-bench 5 /
+raw-replacements 8) — the **published corpus is W1-clean**; they clear whenever that scratch is regenerated
+(no code gap). **Requirements:** TBD · **Plans:** 0 plans
+
 ### Imaging structure (pixel facet, ROI polygons, continuous shared-axis, images.parquet) — DEFERRED beyond v1.0
 
 > **Owner decision (2026-06-08):** the whole imaging-structure cluster is post-1.0. v0.7 focuses on the
