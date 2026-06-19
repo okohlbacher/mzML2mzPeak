@@ -32,7 +32,7 @@ use crate::write::image::{
     read_jpeg_dimensions, read_png_dimensions, read_tiff_dimensions, sha256_and_size, ImageFormat,
 };
 use crate::write::spectrum::{ms_level_or_ms1, to_mzdata_canonical, CastNarrowing};
-use crate::write::writer::IndexAccumulator;
+use crate::write::writer::{FileContentSpectrumLevels, IndexAccumulator};
 use crate::write::{ImagingWriter, WriteError, to_mzdata};
 
 use mzpeak_prototyping::archive::ZipArchiveWriter;
@@ -205,13 +205,16 @@ pub fn convert_with(
     // per file below. The accumulator observes the NORMALIZED level so its "MS1 m/z bounds" agree
     // with the level to_mzdata writes (both go through ms_level_or_ms1).
     let mut ms_level_remapped: usize = 0;
+    let mut file_content_levels = FileContentSpectrumLevels::default();
     let first = match reader.next() {
         Some(item) => {
             let rec = item?;
             if rec.ms_level == 0 {
                 ms_level_remapped += 1;
             }
-            acc.observe(rec.x, rec.y, rec.z, ms_level_or_ms1(rec.ms_level), &rec.mz);
+            let written_ms_level = ms_level_or_ms1(rec.ms_level);
+            acc.observe(rec.x, rec.y, rec.z, written_ms_level, &rec.mz);
+            file_content_levels.observe(written_ms_level);
             let (spec, n) = to_mzdata_canonical(&rec)?;
             narrowing = n;
             Some(spec)
@@ -276,7 +279,9 @@ pub fn convert_with(
         if s.ms_level == 0 {
             ms_level_remapped += 1;
         }
-        acc.observe(s.x, s.y, s.z, ms_level_or_ms1(s.ms_level), &s.mz);
+        let written_ms_level = ms_level_or_ms1(s.ms_level);
+        acc.observe(s.x, s.y, s.z, written_ms_level, &s.mz);
+        file_content_levels.observe(written_ms_level);
         // to_mzdata is fallible (WR-01 axis-length, CR-02 non-finite m/z, WR-03 coordinate
         // validation); a data-dependent defect surfaces as a typed WriteError, never a panic.
         let mz_spec = to_mzdata(&s)?;
@@ -304,6 +309,7 @@ pub fn convert_with(
     //     open ZipArchiveWriter so the imaging block can be inserted before the index is
     //     written. finish_parquet(self) CONSUMES the writer, so the imaging block is cloned
     //     out FIRST (per Plan 02 handoff note; ImagingMetadata: Clone).
+    writer.ensure_file_content_terms(file_content_levels);
     let mut block = writer.imaging_metadata()?.clone();
     // Fold the bounded accumulator into the cloned block AFTER the full pass and BEFORE the index
     // is written (IDX-01 index-last seam): observed_max pixel_count when geometry did not declare

@@ -308,6 +308,7 @@ pub fn convert_mzml_with(
     let mut nonmono = CentroidNonMonotonic::default();
     let mut sort_applied = false;
     let mut ms_level_remapped = 0usize;
+    let mut file_content_levels = crate::write::writer::FileContentSpectrumLevels::default();
     for mut entry in reader.iter() {
         // Absent source MS level (mzdata 0 when MS:1000511 is missing) → MS1 on the mzPeak side
         // (single-source policy). Counted; one warn per file after the loop (never per-spectrum).
@@ -316,6 +317,7 @@ pub fn convert_mzml_with(
                 crate::write::spectrum::ms_level_or_ms1(entry.description.ms_level);
             ms_level_remapped += 1;
         }
+        file_content_levels.observe(entry.description.ms_level);
         // Ensure a concrete spectrum-TYPE term MS:1000294 ("mass spectrum", a child of MS:1000559)
         // is present so the writer's registered `MS_1000294_mass_spectrum` spectrum-facet column is
         // populated — clears mzPeakValidator W1 (cv_term_placement_tables). Only added when absent
@@ -497,6 +499,10 @@ pub fn convert_mzml_with(
     // W2 / 999.24: normalize copied source data_processing/software entries, plus any converter
     // entries appended above, before `finish_parquet()` serializes the metadata index.
     crate::write::writer::normalize_metadata_cv_terms(&mut writer);
+    crate::write::writer::ensure_file_content_terms_from_ms_levels(
+        &mut writer,
+        file_content_levels,
+    );
 
     // If the source mzML declared no <sourceFileList> (e.g. an mzR/MSnbase-written file like the
     // Agilent CEMS_10ppm), emit the input mzML as the source_file so default_run_refs below has a
@@ -895,6 +901,7 @@ pub fn inspect_mzml(input: &Path) -> Result<MzmlConvertReport, MzmlConvertError>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mzdata::prelude::MSDataFileMetadata;
     use mzpeak_prototyping::MzPeakReader;
 
     fn tmp_out(tag: &str) -> PathBuf {
@@ -902,6 +909,112 @@ mod tests {
             "mzml2mzpeak_mzml_seam_{tag}_{}.mzpeak",
             std::process::id()
         ))
+    }
+
+    fn with_empty_file_content(xml: &str) -> String {
+        let open = xml.find("<fileContent>").expect("fixture contains <fileContent>");
+        let body_start = open + "<fileContent>".len();
+        let close = xml[body_start..]
+            .find("</fileContent>")
+            .map(|i| body_start + i)
+            .expect("fixture contains </fileContent>");
+        let mut edited = xml.to_string();
+        edited.replace_range(body_start..close, "\n      ");
+        edited
+    }
+
+    fn file_content_accessions(path: &Path) -> Vec<String> {
+        let reader = MzPeakReader::new(path).expect("MzPeakReader opens converted archive");
+        reader
+            .file_description()
+            .contents
+            .iter()
+            .filter_map(|p| p.curie().map(|c| c.to_string()))
+            .collect()
+    }
+
+    /// W2 / 999.24 extension: an empty source `<fileContent>` is repaired from the spectra that
+    /// were actually written. `tiny.pwiz` carries both MS1 and MS2 spectra, so both ProteoWizard
+    /// fileContent terms are derived.
+    #[test]
+    fn convert_mzml_derives_file_content_from_written_ms_levels_when_source_empty() {
+        let fixture = Path::new("tests/fixtures/mzml/tiny.pwiz.1.1.mzML");
+        if !fixture.exists() {
+            return;
+        }
+
+        let input = std::env::temp_dir().join(format!(
+            "mzml2mzpeak_empty_file_content_{}.mzML",
+            std::process::id()
+        ));
+        let out = tmp_out("empty_file_content");
+        let _ = std::fs::remove_file(&input);
+        let _ = std::fs::remove_file(&out);
+
+        let xml = std::fs::read_to_string(fixture).expect("read source fixture");
+        std::fs::write(&input, with_empty_file_content(&xml)).expect("write temp mzML");
+
+        convert_mzml(
+            &input,
+            &out,
+            &crate::write::EncodingOptions::lossless(),
+            None,
+            None,
+            false,
+        )
+        .expect("convert temp mzML");
+
+        let accessions = file_content_accessions(&out);
+        assert!(
+            accessions.iter().any(|a| a == "MS:1000579"),
+            "empty fileContent must derive MS1 spectrum from written ms_level 1 spectra: {accessions:?}"
+        );
+        assert!(
+            accessions.iter().any(|a| a == "MS:1000580"),
+            "empty fileContent must derive MSn spectrum from written ms_level >= 2 spectra: {accessions:?}"
+        );
+
+        let _ = std::fs::remove_file(&input);
+        let _ = std::fs::remove_file(&out);
+    }
+
+    /// A source `fileContent` list that already carries a data-file-content child is left
+    /// untouched, even when the spectra include an MS level not listed there.
+    #[test]
+    fn convert_mzml_preserves_existing_file_content_child() {
+        let fixture = Path::new("tests/fixtures/mzml/tiny.pwiz.1.1.mzML");
+        if !fixture.exists() {
+            return;
+        }
+
+        let out = tmp_out("existing_file_content");
+        let _ = std::fs::remove_file(&out);
+
+        convert_mzml(
+            fixture,
+            &out,
+            &crate::write::EncodingOptions::lossless(),
+            None,
+            None,
+            false,
+        )
+        .expect("convert fixture");
+
+        let accessions = file_content_accessions(&out);
+        assert!(
+            accessions.iter().any(|a| a == "MS:1000580"),
+            "source MSn spectrum term is preserved: {accessions:?}"
+        );
+        assert!(
+            accessions.iter().any(|a| a == "MS:1000127"),
+            "source centroid spectrum term is preserved: {accessions:?}"
+        );
+        assert!(
+            !accessions.iter().any(|a| a == "MS:1000579"),
+            "already-valid source fileContent is untouched; MS1 is not backfilled: {accessions:?}"
+        );
+
+        let _ = std::fs::remove_file(&out);
     }
 
     /// W2 / 999.24 end-to-end on the plain mzML path: source-copied metadata entries with only

@@ -105,6 +105,50 @@ pub fn mass_spectrum_curie() -> mzdata::params::CURIE {
     mzdata::curie!(MS:1000294)
 }
 
+/// The single-source `Param` for the file-level `file_description.contents` term `MS:1000579`
+/// ("MS1 spectrum"), a concrete child of `MS:1000524` ("data file content").
+///
+/// Some vendor mzML files declare an empty `<fileContent/>`; when the converter copies that
+/// faithfully, mzPeakValidator's `cv_term_placement_metadata` rule sees no child of
+/// `MS:1000524`. The write layer derives this term from spectra with `ms_level == 1` and appends
+/// it only when the copied `contents` has no data-file-content child already. Sourced from
+/// mzdata's typed [`mzdata::meta::SpectrumType`] enum, so the accession/name cannot drift from
+/// upstream.
+pub fn ms1_spectrum_param() -> mzdata::params::Param {
+    mzdata::meta::SpectrumType::MS1Spectrum.into()
+}
+
+/// The single-source `Param` for the file-level `file_description.contents` term `MS:1000580`
+/// ("MSn spectrum"), a concrete child of `MS:1000524` ("data file content").
+///
+/// The write layer derives this term from spectra with `ms_level >= 2` and appends it only when
+/// the copied `contents` has no data-file-content child already, preserving a source-declared
+/// fileContent list verbatim when it is already valid.
+pub fn msn_spectrum_param() -> mzdata::params::Param {
+    mzdata::meta::SpectrumType::MSnSpectrum.into()
+}
+
+/// Return `true` when `params` contains a concrete PSI-MS child of `MS:1000524`
+/// ("data file content").
+///
+/// The bare parent term does NOT satisfy the validator rule; a concrete child such as
+/// `MS:1000579` (MS1 spectrum), `MS:1000580` (MSn spectrum), or `MS:1000294` (mass spectrum) does.
+/// mzdata's [`mzdata::meta::SpectrumType`] enum is the local typed membership set for these
+/// data-file-content spectrum terms, matching the 999.24 pattern of testing copied metadata by
+/// known PSI-MS child-term families instead of raw string names.
+pub fn params_contain_data_file_content_child(params: &[mzdata::params::Param]) -> bool {
+    params.iter().any(is_data_file_content_child_param)
+}
+
+fn is_data_file_content_child_param(param: &mzdata::params::Param) -> bool {
+    match (param.controlled_vocabulary, param.accession) {
+        (Some(mzdata::params::ControlledVocabulary::MS), Some(accession)) => {
+            mzdata::meta::SpectrumType::from_accession(accession).is_some()
+        }
+        _ => false,
+    }
+}
+
 /// The spectrum-facet column registration for the default spectrum-type term (W1 /
 /// `cv_term_placement_tables`): a `CustomBuilderFromParameter` that inflects to the
 /// `MS_1000294_mass_spectrum` column and, at write time, pulls its value from each spectrum
@@ -492,6 +536,54 @@ mod tests {
             curie.to_string(),
             "MS:1000294",
             "mass_spectrum_param() must return MS:1000294 (mass spectrum)"
+        );
+    }
+
+    /// W2 / 999.24 extension: `ms1_spectrum_param()` and `msn_spectrum_param()` must resolve to
+    /// the PSI-MS fileContent children ProteoWizard writes for MS1/MSn files.
+    #[test]
+    fn file_content_spectrum_params_are_ms1_and_msn() {
+        let ms1 = ms1_spectrum_param();
+        let msn = msn_spectrum_param();
+        assert_eq!(
+            ms1.curie().expect("MS1 spectrum param has a CURIE").to_string(),
+            "MS:1000579",
+            "ms1_spectrum_param() must return MS:1000579"
+        );
+        assert_eq!(
+            msn.curie().expect("MSn spectrum param has a CURIE").to_string(),
+            "MS:1000580",
+            "msn_spectrum_param() must return MS:1000580"
+        );
+    }
+
+    /// The fileContent placement helper recognizes concrete children of `MS:1000524`, but not the
+    /// bare parent or unrelated PSI-MS terms. This guards the "leave already-valid fileContent
+    /// untouched" decision from silently broadening to any MS param.
+    #[test]
+    fn data_file_content_child_helper_recognizes_only_concrete_children() {
+        let ms1 = ms1_spectrum_param();
+        let msn = msn_spectrum_param();
+        let mass = mass_spectrum_param();
+        assert!(params_contain_data_file_content_child(&[ms1]));
+        assert!(params_contain_data_file_content_child(&[msn]));
+        assert!(params_contain_data_file_content_child(&[mass]));
+
+        let parent = mzdata::params::Param::builder()
+            .name("data file content")
+            .curie(mzdata::curie!(MS:1000524))
+            .build();
+        let profile = mzdata::params::Param::builder()
+            .name("profile spectrum")
+            .curie(mzdata::curie!(MS:1000128))
+            .build();
+        assert!(
+            !params_contain_data_file_content_child(&[parent]),
+            "the bare MS:1000524 parent is not a concrete child"
+        );
+        assert!(
+            !params_contain_data_file_content_child(&[profile]),
+            "profile spectrum is not a data-file-content child"
         );
     }
 

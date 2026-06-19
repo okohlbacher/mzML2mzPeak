@@ -432,6 +432,15 @@ impl ImagingWriter {
         Ok(())
     }
 
+    /// Ensure `file_description.contents` declares data-file-content terms derived from the
+    /// spectra actually written, when the source metadata had no concrete `MS:1000524` child.
+    ///
+    /// Called late in the imaging path because `copy_metadata_from` runs before the stream, while
+    /// the MS-level set is only known after spectra have been written.
+    pub(crate) fn ensure_file_content_terms(&mut self, levels: FileContentSpectrumLevels) {
+        ensure_file_content_terms_from_ms_levels(&mut self.inner, levels);
+    }
+
     /// Flush the Parquet facets and return the still-open `ZipArchiveWriter`.
     ///
     /// This deliberately does NOT write `mzpeak_index.json`. Plan 03's orchestrator owns the
@@ -442,6 +451,29 @@ impl ImagingWriter {
     pub fn finish_parquet(self) -> Result<ZipArchiveWriter<File>, WriteError> {
         let zip = self.inner.finish_parquet()?;
         Ok(zip)
+    }
+}
+
+/// Streaming summary of the MS levels that were actually written to the archive.
+///
+/// It is intentionally just two booleans: fileContent only needs to know whether to add the
+/// ProteoWizard-style children `MS1 spectrum` and/or `MSn spectrum`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct FileContentSpectrumLevels {
+    saw_ms1: bool,
+    saw_msn: bool,
+}
+
+impl FileContentSpectrumLevels {
+    /// Observe one written spectrum level. Level 1 maps to `MS1 spectrum`; level >= 2 maps to
+    /// `MSn spectrum`. Level 0 is ignored here because callers normalize absent levels to MS1
+    /// before writing.
+    pub(crate) fn observe(&mut self, ms_level: u8) {
+        if ms_level == 1 {
+            self.saw_ms1 = true;
+        } else if ms_level >= 2 {
+            self.saw_msn = true;
+        }
     }
 }
 
@@ -684,6 +716,33 @@ pub(crate) fn normalize_metadata_cv_terms(target: &mut impl MSDataFileMetadata) 
         if !software.params.iter().any(is_software_child_param) {
             software.params.push(custom_software_name(&software.id));
         }
+    }
+}
+
+/// Fill missing `file_description.contents` data-file-content terms from the spectra that were
+/// actually written.
+///
+/// A source-declared `fileContent` list that already has a concrete child of `MS:1000524`
+/// ("data file content") is left untouched, even if the observed spectra would imply additional
+/// terms. This preserves faithful passthrough for valid metadata. Only when no such child is
+/// present do we append ProteoWizard-style terms derived from the written MS-level set:
+/// `ms_level == 1` -> `MS:1000579` and `ms_level >= 2` -> `MS:1000580`.
+pub(crate) fn ensure_file_content_terms_from_ms_levels(
+    target: &mut impl MSDataFileMetadata,
+    levels: FileContentSpectrumLevels,
+) {
+    if crate::schema::cv::params_contain_data_file_content_child(
+        &target.file_description().contents,
+    ) {
+        return;
+    }
+
+    let fd = target.file_description_mut();
+    if levels.saw_ms1 {
+        fd.contents.push(crate::schema::cv::ms1_spectrum_param());
+    }
+    if levels.saw_msn {
+        fd.contents.push(crate::schema::cv::msn_spectrum_param());
     }
 }
 
@@ -1955,6 +2014,77 @@ mod tests {
         );
 
         let _ = std::fs::remove_file(&out);
+    }
+
+    /// W2 / 999.24 extension: when copied `file_description.contents` has no child of
+    /// `MS:1000524`, derive ProteoWizard-style fileContent terms from written MS levels.
+    #[test]
+    fn file_content_terms_are_derived_when_source_has_no_data_content_child() {
+        use mzdata::meta::FileMetadataConfig;
+        use mzdata::prelude::MSDataFileMetadata;
+
+        let mut md = FileMetadataConfig::default();
+        md.file_description_mut().contents.push(
+            Param::builder()
+                .name("profile spectrum")
+                .curie(curie!(MS:1000128))
+                .build(),
+        );
+
+        let mut levels = FileContentSpectrumLevels::default();
+        levels.observe(1);
+        levels.observe(2);
+        ensure_file_content_terms_from_ms_levels(&mut md, levels);
+
+        let fd = md.file_description();
+        assert!(
+            fd.contents
+                .iter()
+                .any(|p| p.curie() == crate::schema::cv::ms1_spectrum_param().curie()),
+            "MS1 spectrum term is derived from a written ms_level 1 spectrum"
+        );
+        assert!(
+            fd.contents
+                .iter()
+                .any(|p| p.curie() == crate::schema::cv::msn_spectrum_param().curie()),
+            "MSn spectrum term is derived from a written ms_level >= 2 spectrum"
+        );
+        assert!(
+            fd.contents
+                .iter()
+                .any(|p| p.curie() == Some(curie!(MS:1000128))),
+            "unrelated source fileContent terms are preserved"
+        );
+    }
+
+    /// A source `fileContent` list that already has a concrete `MS:1000524` child is faithful
+    /// passthrough: do not append MS1/MSn even if the observed spectra would imply them.
+    #[test]
+    fn existing_file_content_child_is_left_unchanged() {
+        use mzdata::meta::FileMetadataConfig;
+        use mzdata::prelude::MSDataFileMetadata;
+
+        let mut md = FileMetadataConfig::default();
+        md.file_description_mut()
+            .contents
+            .push(crate::schema::cv::msn_spectrum_param());
+        md.file_description_mut().contents.push(
+            Param::builder()
+                .name("centroid spectrum")
+                .curie(curie!(MS:1000127))
+                .build(),
+        );
+        let before = md.file_description().contents.clone();
+
+        let mut levels = FileContentSpectrumLevels::default();
+        levels.observe(1);
+        ensure_file_content_terms_from_ms_levels(&mut md, levels);
+
+        assert_eq!(
+            md.file_description().contents,
+            before,
+            "already-valid source fileContent must be left untouched"
+        );
     }
 
     /// An all-`None` geometry (or `None` geom) assembles a minimal block: is_imaging + base.
