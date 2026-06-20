@@ -9,19 +9,33 @@ for vendor/HUPO-PSI discussion) and **(B) Rust proof-of-principle** (`grid-encod
 - Lossless against the **source** (vendor SDK array), with declared tolerance + sparse residual backstop.
 - Direct (closed-form) calibration fit, never iterative LSQ (Toffee's lesson).
 - Per-acquisition-segment scope (MS-level / polarity / DIA window / mass-range), not one global axis.
-- Align with PSI-MS CV; don't invent opaque metadata.
+- Align with PSI-MS CV — the terms **already exist** (`MS:1003820`–`MS:1003826`, merged in psi-ms-CV
+  #491): √-law = `MS:1003825`, externally-stored grid = `MS:1003826`. Don't invent; attach to these.
+- Land it as a comment on the existing, unclaimed reference-impl issue
+  [`HUPO-PSI/mzPeak#12`](https://github.com/HUPO-PSI/mzPeak/issues/12), not a private extension.
 
 ## Phase 0 — Proof of principle (DONE on `grid-encoding-poc`)
 - Extract a real impact II QTOF MS1 m/z array; verify √(m/z) is integer-lattice (measured: 100% of gaps
   are integer multiples of one √-step).
 - Rust PoC: direct (a,b) fit → integer bins → sparse residuals → decode → lossless check + size report
   (explicit-f64 vs grid-encoded m/z column). **Gate:** lossless within tolerance + measured column shrink.
+- **Findings (2026-06):** per-~50-Th-chunk order-1 fit → residual fraction **0.016% (Bruker) / 0.020%
+  (Sciex)** = near-lossless; archive **98.2% of vendor `.d.zip`** (impact II), **2.91×** smaller (Sciex
+  SWATH). Order-1 per chunk is sufficient — higher *global* order not needed (proposal §6.4). HAP1 DIA
+  2-Th regresses (sparse, 91.6% residuals) → residual-fraction gate + explicit fallback is mandatory.
+- **CONTINUOUS-mode caveat (measured 2026-06-20, proposal §3a):** validated only synthetically. On the
+  real imzML-continuous example, our converter zero-trims per pixel *before* the codec sees it, destroying
+  the shared axis (detects SPARSE, Jaccard 0.57). ⇒ CONTINUOUS support belongs in the converter read path
+  (Phase 1/2), not the post-hoc codec.
 
 ## Phase 1 — Lattice detection + fit (read side, no format change)
 - Detector: given a profile spectrum's m/z array, decide TOF-lattice vs not (gaps integer-multiples of a
   √-step within tolerance); reject non-conforming spectra.
 - Direct closed-form `√(m/z)=a·k+b` fit + bin assignment; optional higher-order term + residual measurement.
 - Segment grouping (MS-level/polarity/scan-window) → candidate `grid_id`s.
+- **CONTINUOUS detection at convert time:** detect identical/shared source m/z arrays (imzML continuous,
+  TOF imaging) **before** profile-zero trimming; store the master axis once + per-spectrum `(start,count)`
+  (`MS:1003826`). Recovering this post-trim is impossible (§3a) — it must read the source's shared block.
 - **Gate:** on real Agilent/Sciex/Bruker data, detection precision/recall + residual distribution reported.
 
 ## Phase 2 — Schema + writer (encode)
@@ -45,8 +59,10 @@ for vendor/HUPO-PSI discussion) and **(B) Rust proof-of-principle** (`grid-encod
 - **Gate:** 0 conformance errors; measured **archive** size delta vs vendor + vs current mzPeak.
 
 ## Phase 5 — Spec proposal + vendor discussion
-- Finalize the proposal (CV terms, tolerance, segment rules, calibration order) → HUPO-PSI/mzPeak issue +
-  vendor review (Agilent, Sciex, Bruker). Resolve the §6 open questions.
+- Post this proposal + the PoC numbers as a comment on the existing, unclaimed issue
+  [`HUPO-PSI/mzPeak#12`](https://github.com/HUPO-PSI/mzPeak/issues/12) (the spec author's own grid thread);
+  confirm the `MS:1003820`–`MS:1003826` mapping; raise the one schema gap (store-once master-axis slot).
+  Resolve the §6 open questions; vendor review (Agilent, Sciex, Bruker).
 - **Gate:** spec text + at least one vendor sign-off on the calibration/segment model.
 
 ## Phase 6 — Upstream + corpus
