@@ -36,6 +36,14 @@ jobs:
         include:
           - name: waters-synapt-MTBLS767
             url: "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS767/FILES/2090_V_T424-72_MSMS45_P_J_180407_4.raw.zip"
+          # Waters SELECT SERIES Cyclic IMS (PXD072128) — ion mobility ACTUALLY acquired.
+          # `ims: true` adds msconvert --combineIonMobilitySpectra so the mobility dimension is
+          # retained as a per-spectrum array (vs frame-expanded). Centroid allowed; profile mzML
+          # dropped on the runner (keep_mzml=false) since the 2.3 GB raw's profile mzML is huge.
+          - name: waters-cyclic-ims-PXD072128
+            url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/12/PXD072128/Gingko_PDNV_P100k_F3.raw.zip"
+            ims: "true"
+            allow_centroid: "true"
           - name: bruker-microtof-q2-MTBLS2
             url: "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS2/FILES/MSpos-Ex1-cyp79-48h-Ag-2_1-B%2C2_01_9821.d.zip"
           - name: bruker-impact-ii-PXD071586
@@ -192,12 +200,16 @@ jobs:
 
       - name: msconvert (wine, native x86) -> mzML
         if: steps.gate.outputs.skip == 'false'
+        env:
+          # Ion-mobility legs: combine drift scans so the mobility dimension is kept as a
+          # per-spectrum array instead of frame-expanded. Empty for non-IMS legs.
+          IMS_FLAG: ${{ matrix.ims == 'true' && '--combineIonMobilitySpectra' || '' }}
         run: |
           set -euo pipefail
           docker run --rm -v "$PWD/work":/work \
             chambm/pwiz-skyline-i-agree-to-the-vendor-licenses \
             wine msconvert "/${{ steps.locate.outputs.target }}" \
-              -o /work --outfile local.mzML --mzML --mz64 --inten${{ github.event.inputs.inten }} --zlib
+              -o /work --outfile local.mzML --mzML --mz64 --inten${{ github.event.inputs.inten }} --zlib $IMS_FLAG
           ls -lh work/local.mzML
 
       - name: Verify spectrum mode (fail on centroid unless allow_centroid)
