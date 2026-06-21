@@ -44,6 +44,14 @@ jobs:
             url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2025/12/PXD072128/Gingko_PDNV_P100k_F3.raw.zip"
             ims: "true"
             allow_centroid: "true"
+          # Waters SYNAPT G2-Si HDMS, LINEAR TWIMS, HDMSe (mobility ON: _extern.inf IMS Wave
+          # Height 30 V, "MOBILITY MS FUNCTION", mob_cal.csv). Unlike Cyclic IMS, linear-TWIMS
+          # --combineIonMobilitySpectra yields a per-peak mobility array (the viewer's IMS view).
+          # MetaboLights MTBLS812 (LC-IMS-MS, pancreatic cancer lines), single 730 MB raw.
+          - name: waters-synapt-hdmse-MTBLS812
+            url: "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS812/FILES/20181203_Capan2_1.zip"
+            ims: "true"
+            allow_centroid: "true"
           - name: bruker-microtof-q2-MTBLS2
             url: "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS2/FILES/MSpos-Ex1-cyp79-48h-Ag-2_1-B%2C2_01_9821.d.zip"
           - name: bruker-impact-ii-PXD071586
