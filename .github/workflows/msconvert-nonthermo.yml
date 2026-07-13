@@ -56,6 +56,12 @@ jobs:
             url: "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS2/FILES/MSpos-Ex1-cyp79-48h-Ag-2_1-B%2C2_01_9821.d.zip"
           - name: bruker-impact-ii-PXD071586
             url: "https://ftp.pride.ebi.ac.uk/pride/data/archive/2026/01/PXD071586/4928_QTOF1_32IS_sample_03_BB8_01_63101.d.zip"
+          # Bruker micrOTOF II BAF (.d), MassIVE MSV000084273. MassIVE only offers per-file downloads,
+          # so the .d was re-zipped and hosted in our public bucket. Converts BAF -> mzML -> mzpeak so
+          # the corpus entry is no longer raw-only. allow_centroid in case the acquisition is centroided.
+          - name: bruker-microtof-ii-MSV000084273
+            url: "https://data.mzpeak.org/v09/_convert-staging/MSV000084273.d.zip"
+            allow_centroid: "true"
           - name: agilent-6460-qqq-MTBLS253
             url: "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public/MTBLS253/FILES/17.zip"
           - name: agilent-6560-imqtof-MTBLS427
